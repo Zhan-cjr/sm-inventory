@@ -1,0 +1,46 @@
+<?php
+
+namespace App\Observers;
+
+use App\Models\Transaction;
+use App\Models\Stock;
+use App\Models\StockBatch;
+use App\Models\StockBatchDeduction;
+
+class TransactionObserver
+{
+    /**
+     * Handle the Transaction "updated" event.
+     */
+    public function updated(Transaction $transaction): void
+    {
+        // If transaction is voided
+        if ($transaction->isDirty('is_voided') && $transaction->is_voided) {
+            foreach ($transaction->items as $item) {
+                // Return stock to main inventory
+                $stock = Stock::where('branch_id', $transaction->branch_id)
+                    ->where('product_id', $item->product_id)
+                    ->first();
+
+                if ($stock) {
+                    $stock->log_type = 'SALE_VOID';
+                    $stock->reason_code = 'POS_VOID';
+                    $stock->reference_doc_type = 'TRANSACTION';
+                    $stock->reference_doc_id = $transaction->id;
+                    $stock->notes = 'Void Penjualan ' . $transaction->local_transaction_id;
+                    
+                    $stock->increment('quantity_on_hand', $item->quantity);
+                }
+
+                // Return stock to batches
+                $deductions = StockBatchDeduction::where('transaction_item_id', $item->id)->get();
+                foreach ($deductions as $deduction) {
+                    $batch = StockBatch::find($deduction->stock_batch_id);
+                    if ($batch) {
+                        $batch->increment('remaining_quantity', $deduction->quantity);
+                    }
+                }
+            }
+        }
+    }
+}

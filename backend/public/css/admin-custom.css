@@ -1,0 +1,254 @@
+/* ============================================================
+   SM INVENTORY — LIGHT THEME (Clean & Fast)
+   Fokus: keterbacaan tinggi, warna cerah, performa optimal
+   ============================================================ */
+
+/* ============================================================
+   ANIMATIONS — ringan, hanya opacity + translate
+   ============================================================ */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   TOP NAVIGATION BAR
+   ============================================================ */
+.fi-topbar {
+    background: #ffffff !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.08) !important;
+    animation: slideDown 0.3s ease-out;
+}
+
+/* Nav item text — hitam/gelap agar terbaca di background putih */
+.fi-topbar-nav-item-button,
+.fi-topbar-nav-item-button span,
+.fi-topbar-group-button,
+.fi-topbar-group-button span {
+    color: #334155 !important;
+    font-weight: 500 !important;
+}
+
+.fi-topbar-nav-item-button:hover,
+.fi-topbar-group-button:hover {
+    background: #eff6ff !important;
+    border-radius: 8px !important;
+}
+.fi-topbar-nav-item-button:hover span,
+.fi-topbar-group-button:hover span {
+    color: #1d4ed8 !important;
+}
+
+.fi-topbar-nav-item-active-button span {
+    color: #2563eb !important;
+    font-weight: 600 !important;
+}
+
+/* Brand name */
+.fi-logo,
+.fi-logo span {
+    color: #1e293b !important;
+    font-weight: 700 !important;
+}
+
+/* ============================================================
+   MAIN LAYOUT
+   ============================================================ */
+body, html {
+    background: #f8fafc !important;
+}
+
+.fi-main {
+    background: #f8fafc !important;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.fi-main-ctn {
+    background: #f8fafc !important;
+}
+
+/* ============================================================
+   PANELS / SECTIONS
+   ============================================================ */
+.fi-section {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06) !important;
+}
+
+.fi-section-header {
+    background: #f8fafc !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    border-radius: 12px 12px 0 0 !important;
+    padding: 0.85rem 1.25rem !important;
+}
+
+.fi-section-header h3,
+.fi-section-header-heading {
+    color: #1e293b !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+}
+
+/* ============================================================
+   FORM FIELDS
+   ============================================================ */
+.fi-fo-field-wrp-label label {
+    color: #475569 !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+}
+
+.fi-fo-text-input input,
+.fi-fo-date-picker input,
+.fi-fo-textarea textarea {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    border-radius: 8px !important;
+    font-size: 0.9rem !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
+}
+
+.fi-fo-text-input input:focus,
+.fi-fo-date-picker input:focus,
+.fi-fo-textarea textarea:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15) !important;
+    outline: none !important;
+}
+
+.fi-fo-text-input input[readonly] {
+    background: #f1f5f9 !important;
+    color: #64748b !important;
+}
+
+/* ============================================================
+   SELECT / DROPDOWN
+   ============================================================ */
+.fi-fo-select {
+    border-radius: 8px !important;
+}
+
+/* ============================================================
+   TABLES (List view)
+   ============================================================ */
+.fi-ta-ctn {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06) !important;
+    overflow: hidden !important;
+}
+
+.fi-ta-header-cell {
+    background: #f8fafc !important;
+    color: #64748b !important;
+    font-weight: 700 !important;
+    font-size: 0.72rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.7px !important;
+    padding: 0.85rem 1.25rem !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+}
+
+.fi-ta-row {
+    border-bottom: 1px solid #f1f5f9 !important;
+    transition: background 0.15s ease !important;
+}
+
+.fi-ta-row:hover {
+    background: #eff6ff !important;
+}
+
+.fi-ta-cell {
+    color: #1e293b !important;
+    padding: 0.85rem 1.25rem !important;
+    font-size: 0.875rem !important;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.fi-btn-color-primary {
+    background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3) !important;
+    transition: all 0.2s ease !important;
+}
+.fi-btn-color-primary:hover {
+    box-shadow: 0 4px 14px rgba(37,99,235,0.4) !important;
+    transform: translateY(-1px) !important;
+}
+
+.fi-btn-color-gray {
+    background: #ffffff !important;
+    color: #374151 !important;
+    border: 1px solid #d1d5db !important;
+}
+.fi-btn-color-gray:hover {
+    background: #f9fafb !important;
+    border-color: #9ca3af !important;
+}
+
+.fi-btn-color-danger {
+    background: #fee2e2 !important;
+    color: #dc2626 !important;
+    border: 1px solid #fca5a5 !important;
+}
+.fi-btn-color-danger:hover {
+    background: #dc2626 !important;
+    color: #fff !important;
+}
+
+.fi-btn-color-success {
+    background: linear-gradient(135deg, #059669, #10b981) !important;
+    color: #fff !important;
+    border: none !important;
+}
+
+/* ============================================================
+   BADGES
+   ============================================================ */
+.fi-badge {
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    border-radius: 6px !important;
+    letter-spacing: 0.3px !important;
+}
+
+/* ============================================================
+   MODALS
+   ============================================================ */
+.fi-modal-window {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.15) !important;
+}
+
+/* ============================================================
+   PAGINATION
+   ============================================================ */
+.fi-pagination-item a {
+    color: #374151 !important;
+}
+.fi-pagination-item-active a {
+    background: #2563eb !important;
+    color: #fff !important;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }

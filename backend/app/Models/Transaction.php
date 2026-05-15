@@ -1,0 +1,66 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+
+class Transaction extends Model
+{
+    use HasUuids;
+
+    protected $fillable = [
+        'organization_id', 'branch_id', 'terminal_id', 'shift_id', 'transaction_type', 
+        'transaction_date', 'cashier_id', 'total_amount', 
+        'discount_amount', 'final_amount', 'payment_method', 
+        'bank_id', 'received_amount', 'change_amount',
+        'is_voided', 'void_reason', 'void_date', 'voided_by', 
+        'sync_status', 'local_transaction_id'
+    ];
+
+    protected $casts = [
+        'transaction_date' => 'datetime',
+        'total_amount' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
+        'final_amount' => 'decimal:2',
+        'received_amount' => 'decimal:2',
+        'change_amount' => 'decimal:2',
+        'is_voided' => 'boolean',
+        'void_date' => 'datetime',
+    ];
+
+    public function terminal()
+    {
+        return $this->belongsTo(Terminal::class);
+    }
+
+    public function bank()
+    {
+        return $this->belongsTo(Bank::class);
+    }
+
+    public function organization(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function branch(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function cashier(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cashier_id');
+    }
+
+    public function items()
+    {
+        return $this->hasMany(TransactionItem::class);
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
+}

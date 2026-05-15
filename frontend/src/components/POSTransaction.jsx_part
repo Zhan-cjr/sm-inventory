@@ -1,0 +1,41 @@
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleHoldTransaction = () => {
+    if (items.length === 0) return;
+    
+    const newHeld = [
+      ...heldTransactions,
+      {
+        id: Date.now(),
+        items,
+        subtotal,
+        finalAmount,
+        timestamp: new Date().toISOString(),
+        itemCount: items.length
+      }
+    ];
+    
+    setHeldTransactions(newHeld);
+    localStorage.setItem('pos_held_transactions', JSON.stringify(newHeld));
+    setItems([]);
+    setManualTotalDiscount(0);
+    setAlertMsg({ text: 'Transaksi ditunda (HOLD).', type: 'info' });
+    setTimeout(() => setAlertMsg(null), 2000);
+  };
+
+  const handleRecallTransaction = (held) => {
+    setItems(held.items);
+    
+    const newHeld = heldTransactions.filter(h => h.id !== held.id);
+    setHeldTransactions(newHeld);
+    localStorage.setItem('pos_held_transactions', JSON.stringify(newHeld));
+    setIsRecallModalOpen(false);
+    
+    setAlertMsg({ text: 'Transaksi berhasil dipanggil (RECALL).', type: 'info' });
+    setTimeout(() => setAlertMsg(null), 2000);
+  };
+
+  const formatCurrency = (val) => {

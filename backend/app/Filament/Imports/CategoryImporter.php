@@ -1,0 +1,76 @@
+<?php
+
+namespace App\Filament\Imports;
+
+use App\Models\Category;
+use App\Models\Organization;
+use Filament\Actions\Imports\ImportColumn;
+use Filament\Actions\Imports\Importer;
+use Filament\Actions\Imports\Models\Import;
+
+class CategoryImporter extends Importer
+{
+    protected static ?string $model = Category::class;
+
+    public static function getColumns(): array
+    {
+        return [
+            ImportColumn::make('organization_id')
+                ->label('ID Organisasi')
+                ->requiredMapping()
+                ->example('ORG-001')
+                ->fillRecordUsing(function (Category $record, ?string $state): void {
+                    $org = Organization::where('id', $state)->orWhere('code', $state)->first();
+                    $record->organization_id = $org?->id ?? $state;
+                }),
+
+            ImportColumn::make('code')
+                ->label('Kode Kategori')
+                ->requiredMapping()
+                ->example('KAT-001')
+                ->rules(['required', 'string', 'max:50']),
+
+            ImportColumn::make('name')
+                ->label('Nama Kategori')
+                ->requiredMapping()
+                ->example('Makanan Ringan')
+                ->rules(['required', 'string', 'max:255']),
+
+            ImportColumn::make('description')
+                ->label('Deskripsi')
+                ->example('Kategori untuk makanan ringan dan snack')
+                ->rules(['nullable', 'string']),
+
+            ImportColumn::make('is_active')
+                ->label('Aktif (1/0)')
+                ->boolean()
+                ->example('1')
+                ->rules(['nullable', 'boolean']),
+        ];
+    }
+
+    public function resolveRecord(): ?Category
+    {
+        $org = Organization::where('id', $this->data['organization_id'])
+            ->orWhere('code', $this->data['organization_id'])
+            ->first();
+
+        if (!$org) return null;
+
+        return Category::firstOrNew([
+            'organization_id' => $org->id,
+            'code' => $this->data['code'],
+        ]);
+    }
+
+    public static function getCompletedNotificationBody(Import $import): string
+    {
+        $body = 'Import kategori selesai. ' . number_format($import->successful_rows) . ' baris berhasil diimpor.';
+
+        if ($failedRowsCount = $import->getFailedRowsCount()) {
+            $body .= ' ' . number_format($failedRowsCount) . ' baris gagal.';
+        }
+
+        return $body;
+    }
+}
