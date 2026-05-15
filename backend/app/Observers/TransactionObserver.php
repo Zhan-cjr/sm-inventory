@@ -43,4 +43,22 @@ class TransactionObserver
             }
         }
     }
+    /**
+     * Handle the Transaction "deleting" event.
+     */
+    public function deleting(Transaction $transaction): void
+    {
+        // If the transaction was NOT voided, return the stock
+        // If it was already voided, stock has been returned previously
+        if (!$transaction->is_voided) {
+            foreach ($transaction->items as $item) {
+                // By calling delete() on the item, we trigger TransactionItemObserver::deleting
+                $item->delete();
+            }
+        } else {
+            // Just delete items without triggering stock return (since already voided)
+            // We can bypass the observer by using the query builder
+            $transaction->items()->delete();
+        }
+    }
 }
