@@ -234,6 +234,13 @@ class StockAdjustmentResource extends Resource
 
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
-        return parent::getEloquentQuery()->with(['branch']);
+        $query = parent::getEloquentQuery()->with(['branch']);
+        
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user && $user->branch_id) {
+            $query->where('branch_id', $user->branch_id);
+        }
+
+        return $query;
     }
 }

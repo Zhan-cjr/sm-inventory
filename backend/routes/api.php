@@ -130,5 +130,26 @@ Route::prefix('v1')->group(function () {
 
         // Manager Dashboard Metrics
         Route::get('/dashboard/metrics', [\App\Http\Controllers\Api\V1\DashboardController::class, 'metrics']);
+        Route::get('/dashboard/low-stock', [\App\Http\Controllers\Api\V1\DashboardController::class, 'lowStockProducts']);
+
+        // Get Server Time for Sync
+        Route::get('/server-time', function () {
+            $now = now();
+            return response()->json([
+                'timestamp' => $now->getPreciseTimestamp(3),
+                'formatted' => $now->format('H:i:s'),
+                'timezone' => config('app.timezone'),
+                'wib_timestamp' => $now->timezone('Asia/Jakarta')->getPreciseTimestamp(3)
+            ]);
+        });
+        // Get Suppliers
+        Route::get('/suppliers', function () {
+            return response()->json(\App\Models\Supplier::where('is_active', true)->orderBy('name')->get());
+        });
+
+        // Suggested Orders
+        Route::get('/suggested-orders', [\App\Http\Controllers\Api\V1\SuggestedOrderController::class, 'index']);
+        Route::post('/purchase-orders/create-from-suggestion', [\App\Http\Controllers\Api\V1\PurchaseOrderController::class, 'createFromSuggestion']);
+        Route::post('/purchase-orders/create-bulk-from-suggestions', [\App\Http\Controllers\Api\V1\PurchaseOrderController::class, 'createBulkFromSuggestions']);
     });
 });

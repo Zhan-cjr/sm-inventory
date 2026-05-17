@@ -29,7 +29,9 @@ class StocksRelationManager extends RelationManager
                     ->label('Cabang')
                     ->relationship('branch', 'name')
                     ->required()
-                    ->disabled(fn ($record) => $record !== null), // Only allow choosing branch on create/attach
+                    ->default(fn() => auth()->user()->branch_id)
+                    ->disabled(fn ($record) => $record !== null || auth()->user()->branch_id !== null)
+                    ->dehydrated(),
                 TextInput::make('cost_price')
                     ->label('Harga Beli Cabang')
                     ->helperText('Kosongkan untuk menggunakan harga default produk')
@@ -55,6 +57,23 @@ class StocksRelationManager extends RelationManager
                     ->required()
                     ->numeric()
                     ->default(500),
+                TextInput::make('lead_time')
+                    ->label('Lead Time (Hari)')
+                    ->helperText('Waktu pengiriman dari supplier')
+                    ->numeric()
+                    ->default(3)
+                    ->suffix('Hari'),
+                TextInput::make('safety_stock')
+                    ->label('Safety Stock')
+                    ->helperText('Stok cadangan minimum')
+                    ->numeric()
+                    ->default(0),
+                TextInput::make('desired_inventory_days')
+                    ->label('Target Inventori (Hari)')
+                    ->helperText('Berapa hari stok yang ingin dipertahankan')
+                    ->numeric()
+                    ->default(14)
+                    ->suffix('Hari'),
             ]);
     }
 
@@ -88,6 +107,14 @@ class StocksRelationManager extends RelationManager
                 TextColumn::make('max_qty')
                     ->label('Max')
                     ->numeric()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('lead_time')
+                    ->label('Lead Time')
+                    ->suffix(' Hr')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('desired_inventory_days')
+                    ->label('Target Days')
+                    ->suffix(' Hr')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
                     ->label('Update Terakhir')

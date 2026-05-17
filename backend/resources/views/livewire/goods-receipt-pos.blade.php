@@ -15,14 +15,21 @@
         .pos-grid-th { background-color: #f3f4f6; border-bottom: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; font-weight: 600; color: #374151; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;}
         .pos-grid-td { border-bottom: 1px solid #f3f4f6; padding: 0.5rem; background-color: white; font-size: 0.875rem; color: #1f2937; }
         
-        .dark .pos-input { background-color: #1f2937; border-color: #374151; color: #f3f4f6; }
-        .dark .pos-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 1px #60a5fa; }
-        .dark .pos-label { color: #9ca3af; }
-        .dark .pos-grid-th { background-color: #111827; border-color: #374151; color: #d1d5db; }
-        .dark .pos-grid-td { background-color: #1f2937; border-color: #374151; color: #f3f4f6; }
-        .dark .bg-white { background-color: #1f2937; }
+        .dark .pos-input { background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important; }
+        .dark .pos-input:focus { border-color: #60a5fa !important; box-shadow: 0 0 0 1px #60a5fa !important; }
+        .dark .pos-label { color: #9ca3af !important; }
+        .dark .pos-grid-th { background-color: #111827 !important; border-color: #374151 !important; color: #d1d5db !important; }
+        .dark .pos-grid-td { background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important; }
+        .dark .bg-white { background-color: #1f2937 !important; }
+        .dark .empty-state { color: #9ca3af !important; }
         
         .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .flex-end { display: flex; justify-content: flex-end; align-items: center; }
+
+        .search-result-item { border-left: 4px solid transparent; transition: all 0.1s ease-in-out; }
+        .highlighted-item { background-color: #dbeafe !important; border-left: 4px solid #2563eb !important; }
+        .dark .highlighted-item { background-color: #374151 !important; border-left: 4px solid #60a5fa !important; }
     </style>
 
     <!-- Top Section (Receipt & Supplier) -->
@@ -59,7 +66,7 @@
                     <tr>
                         <td class="pos-label">Lokasi Cabang</td>
                         <td>
-                            <select class="pos-input" wire:model="branch_id">
+                            <select class="pos-input" wire:model="branch_id" @if(auth()->user()->branch_id) disabled @endif>
                                 <option value="">Pilih Lokasi...</option>
                                 @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
@@ -150,20 +157,71 @@
     <!-- Barcode Scanner Input -->
     <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 1rem;" class="bg-white dark:bg-gray-900 dark:border-gray-800">
         <div style="font-weight: 600; white-space: nowrap; color: #374151;" class="dark:text-gray-300">Cari / Scan Produk</div>
-        <div style="flex: 1; position: relative;">
+        <div style="flex: 1; position: relative;"
+             x-data="{ 
+                highlightedIndex: -1,
+                updateHighlight() {
+                    let items = document.querySelectorAll('.search-result-item');
+                    items.forEach((item, idx) => {
+                        if (idx === this.highlightedIndex) {
+                            item.classList.add('highlighted-item');
+                        } else {
+                            item.classList.remove('highlighted-item');
+                        }
+                    });
+                },
+                moveDown() {
+                    let items = document.querySelectorAll('.search-result-item');
+                    let max = items.length - 1;
+                    if (this.highlightedIndex < max) {
+                        this.highlightedIndex++;
+                        this.updateHighlight();
+                        this.scrollToHighlighted();
+                    }
+                },
+                moveUp() {
+                    if (this.highlightedIndex > 0) {
+                        this.highlightedIndex--;
+                        this.updateHighlight();
+                        this.scrollToHighlighted();
+                    }
+                },
+                scrollToHighlighted() {
+                    this.$nextTick(() => {
+                        let items = document.querySelectorAll('.search-result-item');
+                        if (items[this.highlightedIndex]) {
+                            items[this.highlightedIndex].scrollIntoView({ block: 'nearest' });
+                        }
+                    });
+                },
+                selectCurrent() {
+                    if (this.highlightedIndex >= 0) {
+                        let items = document.querySelectorAll('.search-result-item');
+                        if (items[this.highlightedIndex]) {
+                            items[this.highlightedIndex].click();
+                        }
+                    } else {
+                        @this.call('searchProduct');
+                    }
+                    this.highlightedIndex = -1;
+                }
+             }">
             <input type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
                    placeholder="Scan barcode atau ketik nama produk... tekan Enter"
-                   wire:model.live.debounce.300ms="searchQuery"
-                   wire:keydown.enter="searchProduct"
+                   wire:model.live.debounce.250ms="searchQuery"
+                   @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
+                   @keydown.arrow-down.prevent="moveDown()"
+                   @keydown.arrow-up.prevent="moveUp()"
+                   @keydown.enter.prevent="selectCurrent()"
                    autofocus>
 
             <!-- Interactive Search Dropdown -->
             @if(count($searchResults) > 0)
-            <div style="position: absolute; left: 0; right: 0; top: 100%; z-index: 100; background: white; border: 1px solid #e5e7eb; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-top: 0.25rem;" class="dark:bg-gray-800 dark:border-gray-700">
-                @foreach($searchResults as $result)
+            <div style="position: absolute; left: 0; right: 0; top: 100%; z-index: 100; background: white; border: 1px solid #e5e7eb; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-top: 0.25rem; max-height: 300px; overflow-y: auto;" class="dark:bg-gray-800 dark:border-gray-700">
+                @foreach($searchResults as $index => $result)
                 <div wire:click="selectProduct('{{ $result->id }}')" 
-                     style="padding: 0.75rem; cursor: pointer; border-bottom: 1px solid #f9fafb; display: flex; justify-content: space-between; align-items: center;" 
-                     class="hover:bg-blue-50 dark:hover:bg-gray-700 dark:border-gray-700">
+                     class="search-result-item hover:bg-blue-50 dark:hover:bg-gray-700 dark:border-gray-700"
+                     style="padding: 0.75rem; cursor: pointer; border-bottom: 1px solid #f9fafb; display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <div style="font-weight: 700; color: #1f2937;" class="dark:text-gray-200">{{ $result->sku }}</div>
                         <div style="font-size: 0.75rem; color: #6b7280;" class="dark:text-gray-400">{{ $result->name }}</div>
@@ -191,7 +249,7 @@
     </div>
 
     <!-- Data Grid -->
-    <div style="flex: 1; overflow-y: auto; background-color: #ffffff;" class="dark:bg-gray-900">
+    <div style="flex: 1; overflow-y: auto;" class="bg-white dark:bg-gray-900">
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead style="position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);">
                 <tr>
@@ -278,7 +336,7 @@
     </div>
 
     <!-- Footer Summary & Actions -->
-    <div style="padding: 1rem; border-top: 1px solid #e5e7eb; background-color: #f9fafb; display: flex; justify-content: space-between; align-items: center;" class="dark:bg-gray-800 dark:border-gray-700">
+    <div style="padding: 1rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;" class="bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
         
         <!-- Actions Button -->
         <div style="display: flex; gap: 0.5rem;">

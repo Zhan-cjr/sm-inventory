@@ -8,20 +8,43 @@ export const useOfflineSync = (branchId, authToken) => {
 
   useEffect(() => {
     const initDB = async () => {
+      // Request persistent storage if supported
+      if (navigator.storage && navigator.storage.persist) {
+        const isPersisted = await navigator.storage.persist();
+        console.log(`Storage persistence: ${isPersisted ? 'granted' : 'denied'}`);
+      }
+
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open('PosDatabase', 1);
+        const request = indexedDB.open('PosDatabase', 2); // Incremented version to ensure onupgradeneeded runs
         
         request.onupgradeneeded = (e) => {
           const database = e.target.result;
           if (!database.objectStoreNames.contains('transactions')) {
             database.createObjectStore('transactions', { keyPath: 'localId' });
+          }
+          if (!database.objectStoreNames.contains('stocks')) {
             database.createObjectStore('stocks', { keyPath: 'id' });
+          }
+          if (!database.objectStoreNames.contains('promos')) {
             database.createObjectStore('promos', { keyPath: 'id' });
           }
         };
         
         request.onsuccess = () => {
           db.current = request.result;
+          // After DB is ready, calculate initial pendingCount
+          try {
+            if (request.result.objectStoreNames.contains('transactions')) {
+              const store = request.result.transaction('transactions', 'readonly').objectStore('transactions');
+              const countReq = store.getAll();
+              countReq.onsuccess = () => {
+                const pending = countReq.result.filter(tx => tx.syncStatus === 'PENDING');
+                setPendingCount(pending.length);
+              };
+            }
+          } catch (err) {
+            console.error('Failed to get pending count:', err);
+          }
           resolve(request.result);
         };
         

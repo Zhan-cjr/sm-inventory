@@ -18,12 +18,15 @@ class Stock extends Model
     protected $fillable = [
         'branch_id', 'product_id', 'cost_price', 'selling_price', 'quantity_on_hand', 
         'quantity_reserved', 'last_count_date', 'min_qty', 
-        'max_qty', 'version'
+        'max_qty', 'lead_time', 'safety_stock', 'desired_inventory_days', 'version'
     ];
 
     protected $casts = [
         'cost_price' => 'decimal:2',
         'selling_price' => 'decimal:2',
+        'lead_time' => 'integer',
+        'safety_stock' => 'integer',
+        'desired_inventory_days' => 'integer',
     ];
 
     public function branch()

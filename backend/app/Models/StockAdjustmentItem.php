@@ -10,7 +10,7 @@ class StockAdjustmentItem extends Model
 
     protected $fillable = [
         'stock_adjustment_id', 'product_id', 'previous_quantity', 
-        'adjustment_quantity', 'new_quantity', 'reason_code'
+        'adjustment_quantity', 'new_quantity', 'reason_code', 'unit_cost', 'total_cost'
     ];
 
     public function product()

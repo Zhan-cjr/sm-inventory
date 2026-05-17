@@ -4,10 +4,13 @@ namespace App\Filament\Widgets;
 
 use App\Models\Transaction;
 use Filament\Widgets\ChartWidget;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Illuminate\Support\Carbon;
 
 class SalesChart extends ChartWidget
 {
+    use InteractsWithPageFilters;
+
     protected ?string $heading = 'Tren Penjualan (7 Hari Terakhir)';
     protected static ?int $sort = 2;
 
@@ -15,13 +18,14 @@ class SalesChart extends ChartWidget
     {
         $data = [];
         $labels = [];
+        $branchId = auth()->user()->branch_id ?? $this->filters['branch_id'] ?? null;
 
-        // Manual trend calculation if Trend package is not installed, 
-        // but I'll check if I can use simple Eloquent queries.
         for ($i = 6; $i >= 0; $i--) {
             $date = now()->subDays($i);
             $labels[] = $date->format('d M');
-            $data[] = Transaction::whereDate('created_at', $date->toDateString())->sum('total_amount');
+            $data[] = Transaction::whereDate('created_at', $date->toDateString())
+                ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->sum('total_amount');
         }
 
         return [
@@ -30,8 +34,8 @@ class SalesChart extends ChartWidget
                     'label' => 'Total Penjualan (Rp)',
                     'data' => $data,
                     'fill' => 'start',
-                    'borderColor' => 'rgb(59, 130, 246)',
-                    'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
+                    'borderColor' => 'rgb(79, 70, 229)', // Updated to match indigo
+                    'backgroundColor' => 'rgba(79, 70, 229, 0.1)',
                 ],
             ],
             'labels' => $labels,

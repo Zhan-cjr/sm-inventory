@@ -1,0 +1,58 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Models\Stock;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Filament\Widgets\TableWidget as BaseWidget;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
+use Illuminate\Database\Eloquent\Builder;
+
+class LowStockAlert extends BaseWidget
+{
+    use InteractsWithPageFilters;
+
+    protected static ?int $sort = 5;
+    protected int | string | array $columnSpan = 'full';
+    protected static ?string $heading = 'Peringatan Stok Menipis';
+
+    public function table(Table $table): Table
+    {
+        $branchId = auth()->user()->branch_id ?? $this->filters['branch_id'] ?? null;
+
+        $query = Stock::query()
+            ->with(['product', 'branch'])
+            ->whereRaw('quantity_on_hand <= COALESCE(min_qty, 10)')
+            ->orderBy('quantity_on_hand', 'asc')
+            ->limit(10);
+
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $table
+            ->query($query)
+            ->columns([
+                Tables\Columns\TextColumn::make('product.sku')
+                    ->label('SKU')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('product.name')
+                    ->label('Produk')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('branch.name')
+                    ->label('Cabang')
+                    ->visible(fn () => auth()->user()->branch_id === null),
+                Tables\Columns\TextColumn::make('quantity_on_hand')
+                    ->label('Sisa Stok')
+                    ->numeric()
+                    ->badge()
+                    ->color('danger'),
+                Tables\Columns\TextColumn::make('min_qty')
+                    ->label('Batas Minimum')
+                    ->numeric()
+                    ->formatStateUsing(fn ($state) => $state ?? 10),
+            ])
+            ->paginated(false);
+    }
+}

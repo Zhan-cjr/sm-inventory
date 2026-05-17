@@ -31,12 +31,20 @@ import {
 } from 'lucide-react';
 
 export const POSTransaction = ({ branchId, branchName, orgName, authToken, userName, onLogout }) => {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('pos_active_cart') || '[]');
+    } catch (e) {
+      console.error('Failed to parse pos_active_cart:', e);
+      return [];
+    }
+  });
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [isProcessing, setIsProcessing] = useState(false);
   const [alertMsg, setAlertMsg] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [serverOffset, setServerOffset] = useState(parseInt(localStorage.getItem('pos_server_offset') || '0'));
+  const [currentTime, setCurrentTime] = useState(new Date(Date.now() + serverOffset));
   const barcodeInput = useRef(null);
   
   // New State for enhancements
@@ -51,6 +59,7 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
   const [changeModalInfo, setChangeModalInfo] = useState(null);
   const [posSettings, setPosSettings] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [inputValue, setInputValue] = useState('');
   const [allTerminals, setAllTerminals] = useState([]);
   const [isTerminalModalOpen, setIsTerminalModalOpen] = useState(!localStorage.getItem('pos_terminal_id'));
@@ -71,34 +80,65 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
   const [selectedShiftName, setSelectedShiftName] = useState(localStorage.getItem('pos_preselected_shift') || 'Shift 1');
   const [isCheckingShift, setIsCheckingShift] = useState(true);
 
+  const { storeLocalTransaction, syncTransactions, pendingCount, syncStatus } = useOfflineSync(branchId, authToken);
+  const discountEngine = useRef(new DiscountEngine([]));
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const timer = setInterval(() => {
+      const offset = parseInt(localStorage.getItem('pos_server_offset') || '0');
+      setCurrentTime(new Date(Date.now() + offset));
+    }, 1000);
     
     const handleGlobalKeyPress = () => {
       if (changeModalInfo) setChangeModalInfo(null);
     };
     window.addEventListener('keydown', handleGlobalKeyPress);
     
+    const handleBeforeUnload = (e) => {
+      if (pendingCount > 0) {
+        e.preventDefault();
+        e.returnValue = 'Ada transaksi yang belum sinkron. Data mungkin hilang jika cache dihapus!';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('keydown', handleGlobalKeyPress);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       clearInterval(timer);
     };
-  }, [changeModalInfo]);
+  }, [changeModalInfo, pendingCount]);
 
-  const { storeLocalTransaction, syncTransactions, pendingCount, syncStatus } = useOfflineSync(branchId, authToken);
-  const discountEngine = useRef(new DiscountEngine([]));
+  useEffect(() => {
+    localStorage.setItem('pos_active_cart', JSON.stringify(items));
+  }, [items]);
 
   const [dbProducts, setDbProducts] = useState([]);
   const [dbPromos, setDbPromos] = useState([]);
 
   useEffect(() => {
+    fetch('/api/v1/server-time', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        const serverMs = data.timestamp;
+        const clientMs = Date.now();
+        const offset = serverMs - clientMs;
+        setServerOffset(offset);
+        localStorage.setItem('pos_server_offset', offset.toString());
+        localStorage.setItem('pos_last_sync_time', serverMs.toString());
+      })
+      .catch(err => console.error('Failed to sync server time:', err));
+
     fetch('/api/v1/products', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
@@ -221,14 +261,17 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
         p.barcode?.toLowerCase().includes(val.toLowerCase())
       ).slice(0, 10);
       setSearchResults(filtered);
+      setHighlightedIndex(-1);
     } else {
       setSearchResults([]);
+      setHighlightedIndex(-1);
     }
   };
 
   const handleClearInput = () => {
     setInputValue('');
     setSearchResults([]);
+    setHighlightedIndex(-1);
     setIsSubtotalMode(false);
     barcodeInput.current?.focus();
   };
@@ -436,6 +479,27 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
     if (items.length === 0) return;
     setIsProcessing(true);
     try {
+      const nowCorrected = new Date(Date.now() + serverOffset);
+      const lastSync = parseInt(localStorage.getItem('pos_last_sync_time') || '0');
+      
+      // Safety check: Prevent backdating or extreme forward dating
+      if (lastSync > 0) {
+        const driftLimit = 24 * 60 * 60 * 1000; // 24 hours
+        const diffFromLast = nowCorrected.getTime() - lastSync;
+        
+        if (diffFromLast < -300000) { // More than 5 mins in the past compared to last sync
+          setAlertMsg({ text: 'Waktu sistem tidak valid (Mundur dari waktu terakhir). Mohon koreksi jam perangkat.', type: 'error' });
+          setIsProcessing(false);
+          return;
+        }
+        
+        if (diffFromLast > driftLimit && !isOnline) {
+          setAlertMsg({ text: 'Waktu sistem terlalu jauh dari sinkronisasi terakhir. Mohon online-kan untuk kalibrasi jam.', type: 'error' });
+          setIsProcessing(false);
+          return;
+        }
+      }
+
       const currentFinalAmount = finalAmount;
       const currentReceived = overrideReceived !== null ? parseFloat(overrideReceived) : (parseFloat(receivedAmount) || finalAmount);
       
@@ -460,7 +524,7 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
         shiftId: activeShift?.id,
         receivedAmount: currentReceived,
         changeAmount: currentChange,
-        appliedPromos
+        appliedPromos,
       };
 
       await storeLocalTransaction(transaction);
@@ -484,8 +548,9 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
           orgName,
           userName,
           customerName: selectedCustomer?.name,
-          timestamp: new Date().toISOString()
+          timestamp: nowCorrected.toISOString(),
         });
+        localStorage.setItem('pos_last_sync_time', nowCorrected.getTime().toString());
         setChangeModalInfo({ amount: currentChange });
       }, 100);
 
@@ -807,15 +872,25 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
         </div>
         
         <div className="pos-time-section">
-          <div className="time">{currentTime.toLocaleTimeString('id-ID')}</div>
-          <div className="date">{currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+          <div className="time">{currentTime.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false })}</div>
+          <div className="date">{currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' })}</div>
         </div>
 
         <div className="pos-user-status">
           {pendingCount > 0 && (
-            <div className="sync-status mr-4">
+            <div className={`sync-status mr-4 ${!isOnline ? 'warning-pulse' : ''}`} style={{ 
+              background: !isOnline ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.1)',
+              border: !isOnline ? '1px solid #ef4444' : '1px solid #3b82f6',
+              padding: '4px 12px',
+              borderRadius: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: !isOnline ? '#ef4444' : '#3b82f6',
+              fontWeight: 'bold'
+            }}>
               <RefreshCw size={18} className={syncStatus === 'syncing' ? 'spin' : ''} />
-              <span>Antrean: {pendingCount}</span>
+              <span>Antrean: {pendingCount} {!isOnline && <span style={{ fontSize: '0.7rem' }}>(OFFLINE - JANGAN CLEAR CACHE)</span>}</span>
             </div>
           )}
           <div className="status-indicator">
@@ -979,7 +1054,27 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
                 placeholder={isSubtotalMode ? "Masukkan jumlah uang..." : "Scan Barcode / Cari Produk..."}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onKeyDown={(e) => { 
-                  if (e.key === 'Enter') { 
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (highlightedIndex < searchResults.length - 1) {
+                      const newIndex = highlightedIndex + 1;
+                      setHighlightedIndex(newIndex);
+                      setTimeout(() => {
+                        const items = document.querySelectorAll('.search-item');
+                        if (items[newIndex]) items[newIndex].scrollIntoView({ block: 'nearest' });
+                      }, 0);
+                    }
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (highlightedIndex > 0) {
+                      const newIndex = highlightedIndex - 1;
+                      setHighlightedIndex(newIndex);
+                      setTimeout(() => {
+                        const items = document.querySelectorAll('.search-item');
+                        if (items[newIndex]) items[newIndex].scrollIntoView({ block: 'nearest' });
+                      }, 0);
+                    }
+                  } else if (e.key === 'Enter') { 
                     if (isSubtotalMode) {
                       const amount = e.target.value;
                       setReceivedAmount(amount);
@@ -988,6 +1083,9 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
                       if (amount) {
                         setTimeout(() => processTransaction('CASH', null, amount), 100);
                       }
+                    } else if (highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
+                      addItemToTransaction(searchResults[highlightedIndex]);
+                      handleClearInput();
                     } else if (searchResults.length === 1) {
                       addItemToTransaction(searchResults[0]);
                       handleClearInput();
@@ -1000,12 +1098,27 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
                 autoFocus
               />
               {searchResults.length > 0 && (
-                <div className="search-results-floating fade-in" style={{ bottom: '100%', left: 0, width: '100%' }}>
-                  {searchResults.map(p => (
-                    <div key={p.id} className="search-item" onClick={() => { addItemToTransaction(p); handleClearInput(); }}>
-                      <span className="sku">{p.sku}</span>
-                      <span className="name">{p.name}</span>
-                      <span className="price">{formatCurrency(p.selling_price)}</span>
+                <div className="search-results-floating fade-in" style={{ bottom: '100%', left: 0, width: '100%', maxHeight: '300px', overflowY: 'auto' }}>
+                  {searchResults.map((p, index) => (
+                    <div key={p.id} 
+                         className={`search-item ${index === highlightedIndex ? 'highlighted' : ''}`} 
+                         style={{ 
+                            padding: '10px 15px', 
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #f1f5f9',
+                            backgroundColor: index === highlightedIndex ? '#dbeafe' : 'white',
+                            borderLeft: index === highlightedIndex ? '4px solid #2563eb' : '4px solid transparent',
+                            transition: 'all 0.1s ease-in-out',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                         }}
+                         onClick={() => { addItemToTransaction(p); handleClearInput(); }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span className="sku" style={{ fontWeight: '700', color: index === highlightedIndex ? '#1e40af' : '#1f2937' }}>{p.sku}</span>
+                        <span className="name" style={{ fontSize: '0.75rem', color: index === highlightedIndex ? '#3b82f6' : '#6b7280' }}>{p.name}</span>
+                      </div>
+                      <span className="price" style={{ fontWeight: '600', color: '#3b82f6' }}>{formatCurrency(p.selling_price)}</span>
                     </div>
                   ))}
                 </div>

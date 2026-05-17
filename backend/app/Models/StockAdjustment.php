@@ -10,7 +10,7 @@ class StockAdjustment extends Model
 
     protected $fillable = [
         'adjustment_number', 'adjustment_date', 'branch_id', 'adjustment_reason_id',
-        'notes', 'recorded_by', 'status'
+        'notes', 'recorded_by', 'status', 'total_value'
     ];
 
     public function adjustmentReason()

@@ -49,6 +49,7 @@ class ProductsTable
                 \Filament\Tables\Filters\SelectFilter::make('branch')
                     ->label('Cabang')
                     ->relationship('stocks.branch', 'name')
+                    ->hidden(fn () => auth()->user()->branch_id !== null)
             ])
             ->headerActions([])
             ->recordActions([
@@ -72,6 +73,9 @@ class ProductsTable
                                 ->label('Pilih Cabang')
                                 ->options(fn () => \App\Models\Branch::all()->pluck('name', 'id'))
                                 ->searchable()
+                                ->default(fn() => auth()->user()->branch_id)
+                                ->disabled(fn() => auth()->user()->branch_id !== null)
+                                ->dehydrated()
                                 ->required(),
                             \Filament\Forms\Components\TextInput::make('quantity')
                                 ->label('Stok Awal')

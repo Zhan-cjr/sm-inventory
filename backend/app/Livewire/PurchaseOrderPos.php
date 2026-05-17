@@ -42,6 +42,7 @@ class PurchaseOrderPos extends Component
     {
         if ($purchaseOrder) {
             $this->purchaseOrder = $purchaseOrder;
+            
             $this->po_number = $purchaseOrder->po_number;
             $this->po_date = $purchaseOrder->po_date;
             $this->faktur = $purchaseOrder->faktur;
@@ -51,11 +52,19 @@ class PurchaseOrderPos extends Component
             $this->include_tax = $purchaseOrder->include_tax;
             $this->tax_amount = $purchaseOrder->tax_amount;
 
-            foreach ($purchaseOrder->items as $item) {
+            $items = \App\Models\PurchaseOrderItem::where('purchase_order_id', $purchaseOrder->id)->with('product')->get();
+            foreach ($items as $item) {
+                if (!$item->product) continue;
+
                 // Get stock
                 $stock = \App\Models\Stock::where('product_id', $item->product_id)
                     ->where('branch_id', $this->branch_id)
                     ->value('quantity_on_hand') ?? 0;
+
+                $stockModel = $item->product->stocks->where('branch_id', $this->branch_id)->first();
+
+                $avgBln = \App\Models\TransactionItem::where('product_id', $item->product_id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(30)))->sum('quantity');
+                $avgMinggu = \App\Models\TransactionItem::where('product_id', $item->product_id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(7)))->sum('quantity');
 
                 $this->cart[] = [
                     'product_id' => $item->product_id,
@@ -63,17 +72,17 @@ class PurchaseOrderPos extends Component
                     'barcode' => $item->product->barcode,
                     'name' => $item->product->name,
                     'max_order' => 0,
-                    'avg_bln' => 0,
-                    'avg_minggu' => 0,
+                    'avg_bln' => $avgBln,
+                    'avg_minggu' => $avgMinggu,
                     'stock' => $stock,
-                    'min_qty' => $item->product->stocks->where('branch_id', $this->branch_id)->first()->min_qty ?? 0,
-                    'max_qty' => $item->product->stocks->where('branch_id', $this->branch_id)->first()->max_qty ?? 0,
-                    'qty' => $item->quantity_ordered,
-                    'unit_cost' => $item->unit_cost,
-                    'discount_1' => $item->discount_1,
-                    'discount_2' => $item->discount_2,
-                    'discount_3' => $item->discount_3,
-                    'subtotal' => $item->subtotal
+                    'min_qty' => $stockModel->min_qty ?? 0,
+                    'max_qty' => $stockModel->max_qty ?? 0,
+                    'qty' => (float)$item->quantity_ordered,
+                    'unit_cost' => (float)$item->unit_cost,
+                    'discount_1' => (float)$item->discount_1,
+                    'discount_2' => (float)$item->discount_2,
+                    'discount_3' => (float)$item->discount_3,
+                    'subtotal' => (float)$item->subtotal
                 ];
             }
         } else {
@@ -152,8 +161,8 @@ class PurchaseOrderPos extends Component
                 'barcode' => $product->barcode,
                 'name' => $product->name,
                 'max_order' => 0,
-                'avg_bln' => 0,
-                'avg_minggu' => 0,
+                'avg_bln' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(30)))->sum('quantity'),
+                'avg_minggu' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(7)))->sum('quantity'),
                 'stock' => $stock,
                 'min_qty' => \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->value('min_qty') ?? 0,
                 'max_qty' => \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->value('max_qty') ?? 0,
@@ -222,53 +231,45 @@ class PurchaseOrderPos extends Component
             return;
         }
 
-        // Optimization: Eager load stocks for the current branch
-        $products = Product::where('supplier_id', $this->supplier_id)
-            ->with(['stocks' => function($q) {
-                $q->where('branch_id', $this->branch_id);
-            }])
-            ->get();
-
-        $salesData = [];
-        if ($method === 'sales') {
-            // Optimization: Fetch total sales for all products in one query
-            $salesData = \App\Models\TransactionItem::whereIn('product_id', $products->pluck('id'))
-                ->whereHas('transaction', function($q) {
-                    $q->where('branch_id', $this->branch_id)
-                      ->where('transaction_date', '>=', now()->subDays(30));
-                })
-                ->selectRaw('product_id, sum(quantity) as total_qty')
-                ->groupBy('product_id')
-                ->pluck('total_qty', 'product_id');
-        }
-
         $addedCount = 0;
 
-        foreach ($products as $product) {
-            $stockRec = $product->stocks->first();
-            $currentStock = $stockRec->quantity_on_hand ?? 0;
-            $minQty = $stockRec->min_qty ?? 0;
-            $maxQty = $stockRec->max_qty ?? 0;
-
-            $suggestedQty = 0;
-
-            if ($method === 'minmax') {
-                if ($currentStock < $minQty) {
-                    $suggestedQty = $maxQty - $currentStock;
-                }
-            } elseif ($method === 'sales') {
-                $totalSold = $salesData[$product->id] ?? 0;
-                $avgDaily = $totalSold / 30;
-                $targetStock = ceil($avgDaily * 14); // 14 days safety stock
-                
-                if ($currentStock < $targetStock) {
-                    $suggestedQty = $targetStock - $currentStock;
+        if ($method === 'sales') {
+            $service = app(\App\Services\SuggestedOrderService::class);
+            $suggestions = $service->calculateForBranch($this->branch_id, ['supplier_id' => $this->supplier_id]);
+            
+            foreach ($suggestions as $suggestion) {
+                if ($suggestion['suggested_qty'] > 0) {
+                    $product = Product::find($suggestion['product_id']);
+                    $this->addItemWithQty($product, $suggestion['suggested_qty']);
+                    $addedCount++;
                 }
             }
+        } else {
+            // Optimization: Eager load stocks for the current branch
+            $products = Product::where('supplier_id', $this->supplier_id)
+                ->with(['stocks' => function($q) {
+                    $q->where('branch_id', $this->branch_id);
+                }])
+                ->get();
 
-            if ($suggestedQty > 0) {
-                $this->addItemWithQty($product, $suggestedQty, $stockRec);
-                $addedCount++;
+            foreach ($products as $product) {
+                $stockRec = $product->stocks->first();
+                $currentStock = $stockRec->quantity_on_hand ?? 0;
+                $minQty = $stockRec->min_qty ?? 0;
+                $maxQty = $stockRec->max_qty ?? 0;
+
+                $suggestedQty = 0;
+
+                if ($method === 'minmax') {
+                    if ($currentStock < $minQty) {
+                        $suggestedQty = $maxQty - $currentStock;
+                    }
+                }
+
+                if ($suggestedQty > 0) {
+                    $this->addItemWithQty($product, $suggestedQty, $stockRec);
+                    $addedCount++;
+                }
             }
         }
 
@@ -299,8 +300,8 @@ class PurchaseOrderPos extends Component
                 'barcode' => $product->barcode,
                 'name' => $product->name,
                 'max_order' => 0,
-                'avg_bln' => 0,
-                'avg_minggu' => 0,
+                'avg_bln' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(30)))->sum('quantity'),
+                'avg_minggu' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(7)))->sum('quantity'),
                 'stock' => $stockRec->quantity_on_hand ?? 0,
                 'min_qty' => $stockRec->min_qty ?? 0,
                 'max_qty' => $stockRec->max_qty ?? 0,

@@ -7,7 +7,7 @@ use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
+use App\Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -30,14 +30,15 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->colors([
-                'primary' => Color::Blue,
+                'primary' => Color::Indigo,
                 'gray'    => Color::Slate,
                 'success' => Color::Emerald,
                 'warning' => Color::Amber,
                 'danger'  => Color::Rose,
+                'info'    => Color::Sky,
             ])
             ->brandName('SM Inventory')
-            ->font('Inter', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap')
+            ->font('Plus Jakarta Sans', 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap')
             ->topNavigation()
             ->spa()
             ->databaseNotifications()

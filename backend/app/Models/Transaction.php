@@ -63,4 +63,16 @@ class Transaction extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    public function getCogsAttribute()
+    {
+        return $this->items->sum(function ($item) {
+            return $item->product ? ($item->product->cost_price * $item->quantity) : 0;
+        });
+    }
+
+    public function getGrossProfitAttribute()
+    {
+        return $this->final_amount - $this->cogs;
+    }
 }

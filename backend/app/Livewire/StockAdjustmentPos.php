@@ -1,0 +1,272 @@
+<?php
+
+namespace App\Livewire;
+
+use Livewire\Component;
+use App\Models\Product;
+use App\Models\AdjustmentReason;
+use App\Models\Branch;
+use App\Models\StockAdjustment;
+use App\Models\StockAdjustmentItem;
+use Filament\Notifications\Notification;
+
+class StockAdjustmentPos extends Component
+{
+    public $adjustment_number;
+    public $adjustment_date;
+    public $branch_id;
+    public $notes;
+    public $adjustment_reason_id;
+    public $reason_type = 'PLUS'; // PLUS or MINUS
+
+    public $visibleColumns = ['barcode', 'name', 'stock', 'qty', 'unit_cost', 'subtotal'];
+
+    public $searchQuery = '';
+    public $cart = [];
+
+    // Summary
+    public $totalQty = 0;
+    public $totalLines = 0;
+    public $grandTotal = 0;
+
+    public $searchResults = [];
+    public $stockAdjustment;
+
+    public function mount($stockAdjustment = null)
+    {
+        if ($stockAdjustment) {
+            $this->stockAdjustment = $stockAdjustment;
+            
+            $this->adjustment_number = $stockAdjustment->adjustment_number;
+            $this->adjustment_date = $stockAdjustment->adjustment_date;
+            $this->branch_id = $stockAdjustment->branch_id;
+            $this->notes = $stockAdjustment->notes;
+            $this->adjustment_reason_id = $stockAdjustment->adjustment_reason_id;
+            
+            $reason = AdjustmentReason::find($this->adjustment_reason_id);
+            if ($reason) {
+                $this->reason_type = $reason->type;
+            }
+
+            $items = StockAdjustmentItem::where('stock_adjustment_id', $stockAdjustment->id)->with('product')->get();
+            foreach ($items as $item) {
+                if (!$item->product) continue;
+
+                $this->cart[] = [
+                    'product_id' => $item->product_id,
+                    'sku' => $item->product->sku,
+                    'barcode' => $item->product->barcode,
+                    'name' => $item->product->name,
+                    'stock' => (float)$item->previous_quantity,
+                    'qty' => (float)$item->adjustment_quantity,
+                    'new_qty' => (float)$item->new_quantity,
+                    'unit_cost' => (float)$item->unit_cost,
+                    'subtotal' => (float)$item->total_cost
+                ];
+            }
+        } else {
+            $this->adjustment_number = 'ADJ-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(2)));
+            $this->adjustment_date = date('Y-m-d');
+            $this->branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
+            
+            $firstReason = AdjustmentReason::first();
+            if ($firstReason) {
+                $this->adjustment_reason_id = $firstReason->id;
+                $this->reason_type = $firstReason->type;
+            }
+        }
+
+        $this->calculateTotals();
+    }
+
+    public function updatedAdjustmentReasonId($value)
+    {
+        $reason = AdjustmentReason::find($value);
+        if ($reason) {
+            $this->reason_type = $reason->type;
+        }
+        foreach ($this->cart as $index => $item) {
+            $this->recalculateRow($index);
+        }
+    }
+
+    public function updatedSearchQuery($value)
+    {
+        if (strlen($value) >= 2) {
+            $this->searchResults = Product::where('sku', 'LIKE', '%' . $value . '%')
+                ->orWhere('barcode', 'LIKE', '%' . $value . '%')
+                ->orWhere('name', 'LIKE', '%' . $value . '%')
+                ->limit(5)
+                ->get();
+        } else {
+            $this->searchResults = [];
+        }
+    }
+
+    public function selectProduct($productId)
+    {
+        $product = Product::find($productId);
+        if ($product) {
+            $this->addItemToCart($product);
+            $this->searchQuery = '';
+            $this->searchResults = [];
+            $this->dispatch('item-added', index: count($this->cart) - 1);
+        }
+    }
+
+    public function searchProduct()
+    {
+        if (strlen($this->searchQuery) > 0) {
+            $product = Product::where('sku', $this->searchQuery)
+                ->orWhere('barcode', $this->searchQuery)
+                ->orWhere('name', 'LIKE', '%' . $this->searchQuery . '%')
+                ->first();
+
+            if ($product) {
+                $this->addItemToCart($product);
+                $this->searchQuery = '';
+                $this->searchResults = [];
+                $this->dispatch('item-added', index: count($this->cart) - 1);
+            } else {
+                Notification::make()->title('Produk tidak ditemukan!')->warning()->send();
+            }
+        }
+    }
+
+    public function addItemToCart($product)
+    {
+        $existingIndex = collect($this->cart)->search(fn($item) => $item['product_id'] == $product->id);
+
+        if ($existingIndex !== false) {
+            $this->cart[$existingIndex]['qty']++;
+            $this->recalculateRow($existingIndex);
+            $this->dispatch('item-added', index: $existingIndex);
+        } else {
+            // Get stock
+            $stock = \App\Models\Stock::where('product_id', $product->id)
+                ->where('branch_id', $this->branch_id)
+                ->value('quantity_on_hand') ?? 0;
+
+            $qty = 1;
+            $multiplier = $this->reason_type === 'MINUS' ? -1 : 1;
+            $newQty = $stock + ($qty * $multiplier);
+
+            $this->cart[] = [
+                'product_id' => $product->id,
+                'sku' => $product->sku,
+                'barcode' => $product->barcode,
+                'name' => $product->name,
+                'stock' => $stock,
+                'qty' => $qty,
+                'new_qty' => $newQty,
+                'unit_cost' => $product->cost_price,
+                'subtotal' => $product->cost_price * $qty
+            ];
+        }
+
+        $this->calculateTotals();
+    }
+
+    public function updateRow($index, $field, $value)
+    {
+        $this->cart[$index][$field] = $value;
+        $this->recalculateRow($index);
+        $this->calculateTotals();
+    }
+
+    public function removeItem($index)
+    {
+        unset($this->cart[$index]);
+        $this->cart = array_values($this->cart); // Re-index
+        $this->calculateTotals();
+    }
+
+    public function recalculateRow($index)
+    {
+        $item = $this->cart[$index];
+        $qty = (float) $item['qty'];
+        $cost = (float) $item['unit_cost'];
+        $stock = (float) $item['stock'];
+        
+        $multiplier = $this->reason_type === 'MINUS' ? -1 : 1;
+        $this->cart[$index]['new_qty'] = $stock + ($qty * $multiplier);
+        $this->cart[$index]['subtotal'] = round($qty * $cost, 2);
+        
+        $this->calculateTotals();
+    }
+
+    public function calculateTotals()
+    {
+        $this->totalLines = count($this->cart);
+        $this->totalQty = collect($this->cart)->sum('qty');
+        $this->grandTotal = collect($this->cart)->sum('subtotal');
+    }
+
+    public function save()
+    {
+        $this->validate([
+            'branch_id' => 'required',
+            'adjustment_reason_id' => 'required',
+            'adjustment_date' => 'required|date',
+            'adjustment_number' => 'required|unique:stock_adjustments,adjustment_number,' . ($this->stockAdjustment ? $this->stockAdjustment->id : 'NULL'),
+        ]);
+
+        if (empty($this->cart)) {
+            Notification::make()->title('Keranjang kosong!')->danger()->send();
+            return;
+        }
+
+        $data = [
+            'branch_id' => $this->branch_id,
+            'adjustment_number' => $this->adjustment_number,
+            'adjustment_date' => $this->adjustment_date,
+            'adjustment_reason_id' => $this->adjustment_reason_id,
+            'notes' => $this->notes,
+            'status' => 'COMPLETED',
+            'total_value' => $this->grandTotal,
+            'recorded_by' => auth()->user()->id, // Storing UUID
+        ];
+
+        if ($this->stockAdjustment) {
+            $this->stockAdjustment->update($data);
+            $this->stockAdjustment->items()->delete();
+            $adj = $this->stockAdjustment;
+        } else {
+            $adj = StockAdjustment::create($data);
+        }
+
+        foreach ($this->cart as $item) {
+            StockAdjustmentItem::create([
+                'stock_adjustment_id' => $adj->id,
+                'product_id' => $item['product_id'],
+                'previous_quantity' => $item['stock'],
+                'adjustment_quantity' => $item['qty'],
+                'new_quantity' => $item['new_qty'],
+                'unit_cost' => $item['unit_cost'],
+                'total_cost' => $item['subtotal']
+            ]);
+            
+            // Execute stock adjustment to actual stock
+            $stockRec = \App\Models\Stock::firstOrCreate([
+                'product_id' => $item['product_id'],
+                'branch_id' => $this->branch_id
+            ], [
+                'quantity_on_hand' => 0
+            ]);
+            $stockRec->quantity_on_hand = $item['new_qty'];
+            $stockRec->save();
+        }
+
+        Notification::make()->title('Koreksi Stok berhasil disimpan.')->success()->send();
+        
+        return redirect()->to(route('filament.admin.resources.stock-adjustments.index'));
+    }
+
+    public function render()
+    {
+        return view('livewire.stock-adjustment-pos', [
+            'branches' => Branch::all(),
+            'reasons' => AdjustmentReason::all(),
+        ]);
+    }
+}
