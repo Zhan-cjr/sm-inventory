@@ -40,7 +40,17 @@ const safeSetItem = (key, value) => {
   }
 };
 
-export const POSTransaction = ({ branchId, branchName, orgName, authToken, userName, userRole, onLogout }) => {
+export const POSTransaction = ({ 
+  branchId, 
+  branchName, 
+  orgName, 
+  authToken, 
+  userName, 
+  userRole, 
+  onLogout,
+  lockedTerminalId,
+  lockedTerminalName
+}) => {
   const [items, setItems] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('pos_active_cart') || '[]');
@@ -67,7 +77,15 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
   });
   const [selectedBank, setSelectedBank] = useState(null);
   const [isBankSelectOpen, setIsBankSelectOpen] = useState(false);
-  const [terminalInfo, setTerminalInfo] = useState({ id: localStorage.getItem('pos_terminal_id'), name: localStorage.getItem('pos_terminal_name') || 'Belum Diatur', orgName: orgName });
+  
+  // Initialize terminalInfo: locked terminal takes absolute priority, then local storage cache
+  const [terminalInfo, setTerminalInfo] = useState(() => {
+    if (lockedTerminalId) {
+      return { id: lockedTerminalId, name: lockedTerminalName || 'Terminal Terkunci', orgName: orgName };
+    }
+    return { id: localStorage.getItem('pos_terminal_id'), name: localStorage.getItem('pos_terminal_name') || 'Belum Diatur', orgName: orgName };
+  });
+  
   const [changeModalInfo, setChangeModalInfo] = useState(null);
   const [posSettings, setPosSettings] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pos_cached_settings') || '[]'); } catch (e) { return []; }
@@ -76,7 +94,14 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [inputValue, setInputValue] = useState('');
   const [allTerminals, setAllTerminals] = useState([]);
-  const [isTerminalModalOpen, setIsTerminalModalOpen] = useState(!localStorage.getItem('pos_terminal_id'));
+  
+  // Initialize terminal select modal state: if locked, it's permanently closed (false)
+  const [isTerminalModalOpen, setIsTerminalModalOpen] = useState(() => {
+    if (lockedTerminalId) {
+      return false;
+    }
+    return !localStorage.getItem('pos_terminal_id');
+  });
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const [lastTransaction, setLastTransaction] = useState(null);
   const [heldTransactions, setHeldTransactions] = useState(() => {
@@ -358,12 +383,21 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
       .then(data => {
         setAllTerminals(data);
         safeSetItem('pos_cached_terminals', JSON.stringify(data));
-        const terminalId = localStorage.getItem('pos_terminal_id');
-        if (terminalId) {
-          const terminal = data.find(t => t.id === terminalId);
+        
+        // Force bind locked terminal properties on startup if present
+        let activeTerminalId = lockedTerminalId || localStorage.getItem('pos_terminal_id');
+        if (lockedTerminalId) {
+          safeSetItem('pos_terminal_id', lockedTerminalId);
+          if (lockedTerminalName) safeSetItem('pos_terminal_name', lockedTerminalName);
+          safeSetItem('pos_terminal_branch_id', branchId);
+          safeSetItem('pos_terminal_branch_name', branchName);
+        }
+
+        if (activeTerminalId) {
+          const terminal = data.find(t => t.id === activeTerminalId);
           if (terminal) {
             setTerminalInfo(terminal);
-            checkActiveShift(terminalId);
+            checkActiveShift(activeTerminalId);
           } else {
             // Mismatch: previously saved terminal belongs to another branch!
             if (userRole !== 'ADMIN') {
@@ -377,7 +411,7 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
               });
               setIsCheckingShift(false);
             } else {
-              checkActiveShift(terminalId);
+              checkActiveShift(activeTerminalId);
             }
           }
         } else {
@@ -400,11 +434,19 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
           }
         }
 
-        const terminalId = localStorage.getItem('pos_terminal_id');
+        // Force bind locked terminal properties offline if present
+        let activeTerminalId = lockedTerminalId || localStorage.getItem('pos_terminal_id');
+        if (lockedTerminalId) {
+          safeSetItem('pos_terminal_id', lockedTerminalId);
+          if (lockedTerminalName) safeSetItem('pos_terminal_name', lockedTerminalName);
+          safeSetItem('pos_terminal_branch_id', branchId);
+          safeSetItem('pos_terminal_branch_name', branchName);
+        }
+
         const terminalBranchId = localStorage.getItem('pos_terminal_branch_id');
 
-        // Check for offline branch mismatch
-        if (terminalId && terminalBranchId && terminalBranchId !== branchId && userRole !== 'ADMIN') {
+        // Check for offline branch mismatch (skip validation if locked by backend)
+        if (!lockedTerminalId && activeTerminalId && terminalBranchId && terminalBranchId !== branchId && userRole !== 'ADMIN') {
           localStorage.removeItem('pos_terminal_id');
           localStorage.removeItem('pos_terminal_name');
           localStorage.removeItem('pos_terminal_branch_id');
@@ -417,8 +459,8 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
           return;
         }
 
-        if (terminalId) {
-          const terminal = terminals.find(t => t.id === terminalId);
+        if (activeTerminalId) {
+          const terminal = terminals.find(t => t.id === activeTerminalId);
           if (terminal) setTerminalInfo(terminal);
 
           // Restore cached shift when offline
@@ -426,7 +468,7 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
           if (cachedShift) {
             try {
               const parsed = JSON.parse(cachedShift);
-              if (parsed && parsed.terminal_id === terminalId) {
+              if (parsed && parsed.terminal_id === activeTerminalId) {
                 setActiveShift(parsed);
               } else {
                 setIsOpenShiftModalOpen(true);
@@ -768,23 +810,25 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
   };
 
   const handleClearDiscount = () => {
-    let cleared = false;
-    if (queuedDiscount) {
-      setQueuedDiscount(null);
-      cleared = true;
-    }
-    if (manualTotalDiscount > 0) {
-      setManualTotalDiscount(0);
-      cleared = true;
-    }
-    if (cleared) {
-      setAlertMsg({ text: 'Seluruh diskon manual berhasil dibatalkan/dibersihkan!', type: 'success' });
-      setTimeout(() => setAlertMsg(null), 2000);
-    } else {
-      setAlertMsg({ text: 'Tidak ada diskon aktif yang dapat dibersihkan.', type: 'info' });
-      setTimeout(() => setAlertMsg(null), 2000);
-    }
-    barcodeInput.current?.focus();
+    // Preserve items in the cart!
+    setManualTotalDiscount(0);
+    setQueuedDiscount(null);
+    setReceivedAmount('');
+    setInputValue('');
+    setIsSubtotalMode(false);
+    setSelectedBank(null);
+    setSearchResults([]);
+    setHighlightedIndex(-1);
+
+    setAlertMsg({ text: 'Diskon & pembayaran dibersihkan. POS siap scan barang kembali.', type: 'success' });
+    setTimeout(() => setAlertMsg(null), 2500);
+
+    setTimeout(() => {
+      if (barcodeInput.current) {
+        barcodeInput.current.value = '';
+        barcodeInput.current.focus();
+      }
+    }, 50);
   };
 
   const requestAuthorization = (actionName, callback) => {
@@ -943,41 +987,97 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
   };
 
+  const getShortcutHint = (keyName, fallback) => {
+    const setting = posSettings?.find(s => s.key_name === keyName);
+    return setting && setting.is_active ? setting.shortcut_key : fallback;
+  };
+
   useEffect(() => {
     const handleShortcuts = (e) => {
-      if (e.target.tagName === 'INPUT' && !['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12', 'Escape', 'Delete'].includes(e.key)) {
-        return;
-      }
-
       const settingsList = posSettings && posSettings.length > 0 ? posSettings : [
-        { key_name: 'btn_pay', shortcut_key: 'F12' },
-        { key_name: 'btn_subtotal', shortcut_key: 'F1' },
-        { key_name: 'btn_disc_item_rp', shortcut_key: 'F2' },
-        { key_name: 'btn_disc_item_pct', shortcut_key: 'F3' },
-        { key_name: 'btn_disc_total_rp', shortcut_key: 'F4' },
-        { key_name: 'btn_disc_total_pct', shortcut_key: 'F5' },
-        { key_name: 'btn_tunai', shortcut_key: 'F6' },
-        { key_name: 'btn_card', shortcut_key: 'F7' },
-        { key_name: 'btn_void_item', shortcut_key: 'F8' },
-        { key_name: 'btn_void_all', shortcut_key: 'F9' }
+        { key_name: 'btn_pay', shortcut_key: 'F10', is_active: 1 },
+        { key_name: 'btn_subtotal', shortcut_key: 'F9', is_active: 1 },
+        { key_name: 'btn_disc_item_rp', shortcut_key: 'F1', is_active: 1 },
+        { key_name: 'btn_disc_item_pct', shortcut_key: 'F2', is_active: 1 },
+        { key_name: 'btn_disc_total_rp', shortcut_key: 'F3', is_active: 1 },
+        { key_name: 'btn_disc_total_pct', shortcut_key: 'F4', is_active: 1 },
+        { key_name: 'btn_tunai', shortcut_key: 'F5', is_active: 1 },
+        { key_name: 'btn_card', shortcut_key: 'F6', is_active: 1 },
+        { key_name: 'btn_void_item', shortcut_key: 'Delete', is_active: 1 },
+        { key_name: 'btn_void_all', shortcut_key: 'Escape', is_active: 1 }
       ];
 
-      const setting = settingsList.find(s => s.shortcut_key.toLowerCase() === e.key.toLowerCase());
-      if (!setting) return;
+      // Find if the key pressed is one of the active registered shortcut keys (case-insensitive)
+      const setting = settingsList.find(s => s.shortcut_key && s.shortcut_key.toLowerCase() === e.key.toLowerCase());
+      if (!setting || !setting.is_active) return;
+
+      // If focusing on input, we only allow key presses that are exactly registered in settingsList
+      if (e.target.tagName === 'INPUT') {
+        const allowedKeys = settingsList.filter(s => s.is_active).map(s => s.shortcut_key.toLowerCase());
+        if (!allowedKeys.includes(e.key.toLowerCase())) {
+          return;
+        }
+      }
 
       e.preventDefault();
       switch (setting.key_name) {
-        case 'btn_pay': processTransaction(); break;
-        case 'btn_subtotal': setIsSubtotalMode(true); barcodeInput.current?.focus(); break;
-        case 'btn_disc_item_rp': handleManualDiscountItem('NOMINAL'); break;
-        case 'btn_disc_item_pct': handleManualDiscountItem('PERCENT'); break;
-        case 'btn_disc_total_rp': handleManualTotalDiscount('NOMINAL'); break;
-        case 'btn_disc_total_pct': handleManualTotalDiscount('PERCENT'); break;
-        case 'btn_tunai': startPayment('CASH'); break;
-        case 'btn_card': startPayment('CARD'); break;
-        case 'btn_void_item': updateQuantity(items[items.length - 1]?.productId, 0); break;
-        case 'btn_void_all': setItems([]); break;
-        default: break;
+        case 'btn_pay': 
+          processTransaction(); 
+          break;
+        case 'btn_subtotal': 
+          setIsSubtotalMode(true); 
+          barcodeInput.current?.focus(); 
+          break;
+        case 'btn_disc_item_rp': 
+          requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL')); 
+          break;
+        case 'btn_disc_item_pct': 
+          requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT')); 
+          break;
+        case 'btn_disc_total_rp': 
+          requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL')); 
+          break;
+        case 'btn_disc_total_pct': 
+          requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT')); 
+          break;
+        case 'btn_tunai': 
+          startPayment('CASH'); 
+          break;
+        case 'btn_card': 
+          startPayment('CARD'); 
+          break;
+        case 'btn_void_item': 
+          requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0)); 
+          break;
+        case 'btn_void_all': 
+          requestAuthorization("VOID", () => { setItems([]); setManualTotalDiscount(0); setIsReturnMode(false); }); 
+          break;
+        case 'handleClearDiscount':
+        case 'btn_clear':
+        case 'btn_clear_discount':
+          handleClearDiscount();
+          break;
+        case 'btn_hold':
+        case 'btn_hold_transaction':
+        case 'handleHoldTransaction':
+          requestAuthorization("HOLD_RECALL", () => handleHoldTransaction());
+          break;
+        case 'btn_recall':
+        case 'btn_recall_transaction':
+        case 'setIsRecallModalOpen':
+          requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true));
+          break;
+        case 'btn_member':
+        case 'setIsMemberModalOpen':
+          setIsMemberModalOpen(true);
+          break;
+        case 'btn_retur':
+        case 'btn_return':
+        case 'setIsReturnModalOpen':
+          requestAuthorization("RETURN", () => setIsReturnModalOpen(true));
+          break;
+        default: 
+          break;
       }
     };
 
@@ -1509,23 +1609,23 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
           </div>
 
           <div className="function-grid">
-            <button className="func-btn danger" onClick={handleClearDiscount}><X size={18} /><span>Clear Disc</span></button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL'))}><Tag size={18} /><span>Disc Item Rp</span><span className="key-hint">F1</span></button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT'))}><Tag size={18} /><span>Disc Item %</span><span className="key-hint">F2</span></button>
+            <button className="func-btn danger" onClick={handleClearDiscount} style={{ background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' }}><X size={18} /><span>Clear</span><span className="key-hint">{getShortcutHint('btn_clear', getShortcutHint('btn_clear_discount', getShortcutHint('handleClearDiscount', '')))}</span></button>
+            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL'))}><Tag size={18} /><span>Disc Item Rp</span><span className="key-hint">{getShortcutHint('btn_disc_item_rp', 'F1')}</span></button>
+            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT'))}><Tag size={18} /><span>Disc Item %</span><span className="key-hint">{getShortcutHint('btn_disc_item_pct', 'F2')}</span></button>
             <button className="func-btn primary"><Package size={18} /><span>Qty</span></button>
-            <button className="func-btn secondary" onClick={() => requestAuthorization("RETURN", () => setIsReturnModalOpen(true))}><RotateCcw size={18} /><span>Retur</span></button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL'))}><Tag size={18} /><span>Disc Total Rp</span><span className="key-hint">F3</span></button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT'))}><Tag size={18} /><span>Disc Total %</span><span className="key-hint">F4</span></button>
+            <button className="func-btn secondary" onClick={() => requestAuthorization("RETURN", () => setIsReturnModalOpen(true))}><RotateCcw size={18} /><span>Retur</span><span className="key-hint">{getShortcutHint('btn_retur', getShortcutHint('btn_return', getShortcutHint('setIsReturnModalOpen', '')))}</span></button>
+            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL'))}><Tag size={18} /><span>Disc Total Rp</span><span className="key-hint">{getShortcutHint('btn_disc_total_rp', 'F3')}</span></button>
+            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT'))}><Tag size={18} /><span>Disc Total %</span><span className="key-hint">{getShortcutHint('btn_disc_total_pct', 'F4')}</span></button>
 
-            <button className={`func-btn payment ${paymentMethod === 'CARD' ? 'active' : ''}`} onClick={() => startPayment('CARD')}><CreditCard size={18} /><span>Card</span><span className="key-hint">F6</span></button>
-            <button className={`func-btn payment ${paymentMethod === 'CASH' ? 'active' : ''}`} onClick={() => startPayment('CASH')}><Banknote size={18} /><span>Tunai</span><span className="key-hint">F5</span></button>
+            <button className={`func-btn payment ${paymentMethod === 'CARD' ? 'active' : ''}`} onClick={() => startPayment('CARD')}><CreditCard size={18} /><span>Card</span><span className="key-hint">{getShortcutHint('btn_card', 'F6')}</span></button>
+            <button className={`func-btn payment ${paymentMethod === 'CASH' ? 'active' : ''}`} onClick={() => startPayment('CASH')}><Banknote size={18} /><span>Tunai</span><span className="key-hint">{getShortcutHint('btn_tunai', 'F5')}</span></button>
 
-            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction())}><Lock size={18} /><span>Hold</span></button>
-            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true))}><History size={18} /><span>Recall</span></button>
-            <button className="func-btn action" onClick={() => setIsMemberModalOpen(true)}><User size={18} /><span>Member</span></button>
+            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction())}><Lock size={18} /><span>Hold</span><span className="key-hint">{getShortcutHint('btn_hold', getShortcutHint('btn_hold_transaction', getShortcutHint('handleHoldTransaction', '')))}</span></button>
+            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true))}><History size={18} /><span>Recall</span><span className="key-hint">{getShortcutHint('btn_recall', getShortcutHint('btn_recall_transaction', getShortcutHint('setIsRecallModalOpen', '')))}</span></button>
+            <button className="func-btn action" onClick={() => setIsMemberModalOpen(true)}><User size={18} /><span>Member</span><span className="key-hint">{getShortcutHint('btn_member', getShortcutHint('setIsMemberModalOpen', ''))}</span></button>
             <button className="func-btn secondary" onClick={() => setIsCloseShiftModalOpen(true)}><LogOut size={18} /><span>Tutup Kasir</span></button>
-            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0))}><Eraser size={18} /><span>Void Item</span><span className="key-hint">Del</span></button>
-            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={18} /><span>Void All</span><span className="key-hint">Esc</span></button>
+            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0))}><Eraser size={18} /><span>Void Item</span><span className="key-hint">{getShortcutHint('btn_void_item', 'Del')}</span></button>
+            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={18} /><span>Void All</span><span className="key-hint">{getShortcutHint('btn_void_all', 'Esc')}</span></button>
             <button className="func-btn secondary" onClick={() => requestAuthorization("SETTINGS", () => setIsTerminalModalOpen(true))}><Settings size={18} /><span>Menu</span></button>
           </div>
 
@@ -1618,7 +1718,7 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
                 style={{ flex: 1, padding: '1rem' }}
                 onClick={() => { setIsSubtotalMode(true); barcodeInput.current.focus(); }}
               >
-                SUBTOTAL (F9)
+                SUBTOTAL ({getShortcutHint('btn_subtotal', 'F9')})
               </button>
               <button
                 className="btn-process-payment"
@@ -1626,22 +1726,22 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
                 disabled={isProcessing || items.length === 0 || (isSubtotalMode && !receivedAmount) || !activeShift}
                 onClick={() => processTransaction()}
               >
-                {isProcessing ? '...' : (activeShift ? 'BAYAR (F10)' : 'BELUM BUKA SHIFT')}
+                {isProcessing ? '...' : (activeShift ? `BAYAR (${getShortcutHint('btn_pay', 'F10')})` : 'BELUM BUKA SHIFT')}
               </button>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem' }}>
-              <a 
-                href="https://www.instagram.com/amn4ll?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" 
-                target="_blank" 
+              <a
+                href="https://www.instagram.com/amn4ll?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="
+                target="_blank"
                 rel="noopener noreferrer"
-                style={{ 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  color: 'rgba(255, 255, 255, 0.4)', 
-                  textDecoration: 'none', 
-                  fontSize: '0.75rem', 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  textDecoration: 'none',
+                  fontSize: '0.75rem',
                   fontWeight: '500',
                   transition: 'color 0.2s',
                 }}

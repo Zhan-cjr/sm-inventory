@@ -12,11 +12,13 @@ use App\Http\Controllers\Api\V1\TransactionController;
 */
 
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\PosDeviceController;
 
 Route::prefix('v1')->group(function () {
     
     // Public Routes
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/devices/handshake', [PosDeviceController::class, 'handshake']);
 
 
 

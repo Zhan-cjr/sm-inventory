@@ -37,6 +37,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role ?? 'CASHIER',
                 'branch_id' => $branchId,
+                'branch_name' => $user->branch?->name ?? 'Cabang Lain',
             ],
             'token' => $token
         ]);
