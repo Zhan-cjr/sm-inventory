@@ -1629,6 +1629,38 @@ export const POSTransaction = ({ branchId, branchName, orgName, authToken, userN
                 {isProcessing ? '...' : (activeShift ? 'BAYAR (F10)' : 'BELUM BUKA SHIFT')}
               </button>
             </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem' }}>
+              <a 
+                href="https://www.instagram.com/amn4ll?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  color: 'rgba(255, 255, 255, 0.4)', 
+                  textDecoration: 'none', 
+                  fontSize: '0.75rem', 
+                  fontWeight: '500',
+                  transition: 'color 0.2s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)'; }}
+              >
+                <svg width="16" height="16" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '4px' }}>
+                  <defs>
+                    <linearGradient id="zGradPos" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#4f46e5" />
+                      <stop offset="100%" stopColor="#06b6d4" />
+                    </linearGradient>
+                  </defs>
+                  <rect width="100" height="100" rx="30" fill="url(#zGradPos)" />
+                  <path d="M30 30H70L30 70H70" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Zhan_soft &copy; {new Date().getFullYear()}</span>
+              </a>
+            </div>
           </div>
         </aside>
       </div>

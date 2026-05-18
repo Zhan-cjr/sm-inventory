@@ -90,7 +90,7 @@ export const Login = ({ onLoginSuccess }) => {
   const [shift, setShift] = useState('Shift 1');
 
   return (
-    <div className="login-container">
+    <div className="login-container" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', justifyContent: 'center', alignItems: 'center' }}>
       <div className="login-box glass-panel">
         <h2 style={{ marginBottom: '0.5rem' }}>Toserba Selamat POS</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Silakan masuk untuk memulai sesi kasir Anda</p>
@@ -138,6 +138,44 @@ export const Login = ({ onLoginSuccess }) => {
             {isLoading ? <span className="spinner"></span> : 'Masuk POS Terminal'}
           </button>
         </form>
+      </div>
+
+      <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'center', zIndex: 10 }}>
+        <a 
+          href="https://www.instagram.com/amn4ll?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            color: 'rgba(255, 255, 255, 0.6)', 
+            textDecoration: 'none', 
+            fontSize: '0.85rem', 
+            fontWeight: '500',
+            transition: 'color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            const link = e.currentTarget;
+            link.style.color = '#fff';
+          }}
+          onMouseLeave={(e) => {
+            const link = e.currentTarget;
+            link.style.color = 'rgba(255, 255, 255, 0.6)';
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '6px' }}>
+            <defs>
+              <linearGradient id="zGradLogin" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#4f46e5" />
+                <stop offset="100%" stopColor="#06b6d4" />
+              </linearGradient>
+            </defs>
+            <rect width="100" height="100" rx="30" fill="url(#zGradLogin)" />
+            <path d="M30 30H70L30 70H70" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>Copyright &copy; {new Date().getFullYear()} Zhan_soft</span>
+        </a>
       </div>
     </div>
   );
