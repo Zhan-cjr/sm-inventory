@@ -71,6 +71,14 @@ class LaporanPersediaan extends Page implements HasTable
                     ->relationship('product.category', 'name'),
             ])
             ->headerActions([
+                \Filament\Actions\Action::make('cetak')
+                    ->label('Cetak')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'laporan-persediaan',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
                 ExportAction::make()
                     ->exporter(StockExporter::class)
                     ->label('Export CSV')
@@ -79,3 +87,9 @@ class LaporanPersediaan extends Page implements HasTable
             ]);
     }
 }
+
+
+
+
+
+

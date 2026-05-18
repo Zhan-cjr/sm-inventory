@@ -23,8 +23,8 @@ class LaporanPenjualanKasir extends Page implements HasTable
     use InteractsWithTable;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
-    protected static ?string $navigationLabel = 'Penjualan Per Kasir & Kassa';
-    protected static ?string $title = 'Laporan Penjualan (Kasir & Kassa)';
+    protected static ?string $navigationLabel = 'Penjualan Per Kassa';
+    protected static ?string $title = 'Laporan Penjualan (Per Kassa)';
     protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
 
     protected string $view = 'filament.pages.report-page';
@@ -71,22 +71,7 @@ class LaporanPenjualanKasir extends Page implements HasTable
                     ->sortable(),
             ])
             ->filters([
-                Filter::make('transaction_date')
-                    ->form([
-                        DatePicker::make('created_from')->label('Dari Tanggal'),
-                        DatePicker::make('created_until')->label('Sampai Tanggal'),
-                    ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query
-                            ->when(
-                                $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('transaction_date', '>=', $date),
-                            )
-                            ->when(
-                                $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('transaction_date', '<=', $date),
-                            );
-                    }),
+                \App\Filament\Filters\DateFilterHelper::make('transaction_date'),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('branch', 'name')
@@ -99,6 +84,14 @@ class LaporanPenjualanKasir extends Page implements HasTable
                     ->relationship('cashier', 'name')
             ])
             ->headerActions([
+                \Filament\Actions\Action::make('cetak')
+                    ->label('Cetak')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'laporan-penjualan-kasir',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
                 ExportAction::make()
                     ->exporter(TransactionExporter::class)
                     ->label('Export CSV')
@@ -107,3 +100,7 @@ class LaporanPenjualanKasir extends Page implements HasTable
             ]);
     }
 }
+
+
+
+

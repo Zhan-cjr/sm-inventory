@@ -32,6 +32,7 @@ class LaporanShiftKasir extends Page implements HasTable
         return $table
             ->query(
                 Shift::query()
+                    ->when(Auth::user()->branch_id !== null, fn($q) => $q->where('branch_id', Auth::user()->branch_id))
                     ->with(['branch', 'user', 'terminal'])
             )
             ->columns([
@@ -42,6 +43,11 @@ class LaporanShiftKasir extends Page implements HasTable
                     ->label('Kassa'),
                 TextColumn::make('user.name')
                     ->label('Kasir'),
+                TextColumn::make('shift_name')
+                    ->label('Shift')
+                    ->badge()
+                    ->color('info')
+                    ->searchable(),
                 TextColumn::make('start_time')
                     ->label('Mulai')
                     ->dateTime('d M Y H:i')
@@ -57,10 +63,15 @@ class LaporanShiftKasir extends Page implements HasTable
                 TextColumn::make('starting_cash')
                     ->label('Kas Awal')
                     ->money('IDR', true),
+                TextColumn::make('total_sales')
+                    ->label('Pendapatan')
+                    ->money('IDR', true)
+                    ->state(fn (Shift $record): float => ($record->total_cash_sales ?? 0) + ($record->total_card_sales ?? 0)),
                 TextColumn::make('expected_ending_cash')
                     ->label('Kas Harapan')
-                    ->money('IDR', true),
-                TextColumn::make('actual_ending_cash')
+                    ->money('IDR', true)
+                    ->state(fn (Shift $record): float => ($record->starting_cash ?? 0) + ($record->total_cash_sales ?? 0)),
+                TextColumn::make('actual_cash')
                     ->label('Kas Aktual')
                     ->money('IDR', true),
                 TextColumn::make('difference')
@@ -70,22 +81,7 @@ class LaporanShiftKasir extends Page implements HasTable
                     ->color(fn ($state) => $state < 0 ? 'danger' : ($state > 0 ? 'warning' : 'success')),
             ])
             ->filters([
-                Filter::make('start_time')
-                    ->form([
-                        DatePicker::make('created_from')->label('Dari Tanggal'),
-                        DatePicker::make('created_until')->label('Sampai Tanggal'),
-                    ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query
-                            ->when(
-                                $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('start_time', '>=', $date),
-                            )
-                            ->when(
-                                $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('start_time', '<=', $date),
-                            );
-                    }),
+                \App\Filament\Filters\DateFilterHelper::make('start_time', 'start_time'),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('branch', 'name')
@@ -95,6 +91,14 @@ class LaporanShiftKasir extends Page implements HasTable
                     ->relationship('user', 'name'),
             ])
             ->headerActions([
+                \Filament\Actions\Action::make('cetak')
+                    ->label('Cetak')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'laporan-shift-kasir',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
                 ExportAction::make()
                     ->exporter(ShiftExporter::class)
                     ->label('Export CSV')
@@ -103,3 +107,9 @@ class LaporanShiftKasir extends Page implements HasTable
             ]);
     }
 }
+
+
+
+
+
+

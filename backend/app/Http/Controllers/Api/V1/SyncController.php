@@ -43,13 +43,26 @@ class SyncController extends Controller
                         continue;
                     }
 
+                    $shiftId = $txData['shiftId'] ?? null;
+                    if (!$shiftId && !empty($txData['terminalId'])) {
+                        // Find any open shift on this terminal for this cashier
+                        $activeShift = \App\Models\Shift::where('terminal_id', $txData['terminalId'])
+                            ->where('user_id', $user->id)
+                            ->where('status', 'OPEN')
+                            ->first();
+                        
+                        if ($activeShift) {
+                            $shiftId = $activeShift->id;
+                        }
+                    }
+
                     $tx = Transaction::create([
                         'organization_id' => $user->organization_id,
                         'branch_id' => $validated['branchId'],
                         'terminal_id' => $txData['terminalId'] ?? null,
                         'customer_id' => $txData['customerId'] ?? null,
-                        'shift_id' => $txData['shiftId'] ?? null,
-                        'transaction_type' => 'SALES',
+                        'shift_id' => $shiftId,
+                        'transaction_type' => $txData['transaction_type'] ?? ($txData['finalAmount'] < 0 ? 'RETURN' : 'SALES'),
                         'transaction_date' => now(),
                         'cashier_id' => $user->id,
                         'total_amount' => $txData['totalAmount'],
@@ -61,6 +74,7 @@ class SyncController extends Controller
                         'change_amount' => $txData['changeAmount'] ?? 0,
                         'sync_status' => 'SYNCED',
                         'local_transaction_id' => $txData['localId'],
+                        'receipt_number' => $txData['receipt_number'] ?? ('SMI-' . strtoupper(substr(uniqid(), -6))),
                     ]);
 
                     // Update customer points if applicable
@@ -82,6 +96,7 @@ class SyncController extends Controller
                             'service_id' => $isService ? $item['productId'] : null,
                             'quantity' => $item['quantity'],
                             'unit_price' => $item['unitPrice'],
+                            'discount_per_item' => $item['manualDiscount'] ?? 0,
                         ]);
                     }
 

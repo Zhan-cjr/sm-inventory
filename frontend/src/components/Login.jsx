@@ -6,26 +6,75 @@ export const Login = ({ onLoginSuccess }) => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const hashPasswordLocal = (email, password) => {
+    const salt = "sminventory_salt_2026";
+    const str = email.toLowerCase().trim() + "|" + password + "|" + salt;
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return hash.toString(36);
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
     try {
-      const res = await fetch('/api/v1/login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
-      });
+      let isOffline = !navigator.onLine;
+      let res = null;
+      let data = null;
 
-      const data = await res.json();
+      if (!isOffline) {
+        try {
+          res = await fetch('/api/v1/login', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+          });
+          data = await res.json();
+        } catch (fetchErr) {
+          isOffline = true;
+        }
+      }
+
+      if (isOffline) {
+        const offlineUsers = JSON.parse(localStorage.getItem('pos_offline_users') || '{}');
+        const cachedUser = offlineUsers[email.toLowerCase().trim()];
+
+        if (cachedUser) {
+          const enteredHash = hashPasswordLocal(email, password);
+          if (enteredHash === cachedUser.hash) {
+            localStorage.setItem('pos_preselected_shift', shift);
+            onLoginSuccess(cachedUser.token, cachedUser.user);
+            return;
+          } else {
+            throw new Error('Password salah (Mode Offline)');
+          }
+        } else {
+          throw new Error('Koneksi offline. Kasir ini belum terdaftar di perangkat ini untuk login offline.');
+        }
+      }
 
       if (!res.ok) {
         throw new Error(data.message || 'Login failed');
       }
+
+      // Save offline credentials hash for future use
+      const hash = hashPasswordLocal(email, password);
+      const offlineUsers = JSON.parse(localStorage.getItem('pos_offline_users') || '{}');
+      offlineUsers[email.toLowerCase().trim()] = {
+        hash,
+        token: data.token,
+        user: data.user
+      };
+      localStorage.setItem('pos_offline_users', JSON.stringify(offlineUsers));
 
       // Store selected shift name to be used in POS
       localStorage.setItem('pos_preselected_shift', shift);

@@ -36,6 +36,18 @@ class UserForm
                     ->multiple()
                     ->preload()
                     ->searchable(),
+                \Filament\Forms\Components\CheckboxList::make('pos_authorizations')
+                    ->label('Izin Otorisasi POS Kasir')
+                    ->options([
+                        'DISCOUNT' => 'Diskon (Manual & Total)',
+                        'VOID' => 'Void / Hapus Item',
+                        'RETURN' => 'Retur Transaksi',
+                        'CLOSE_SHIFT' => 'Tutup Kasir',
+                        'MENU' => 'Akses Menu (Pengaturan Kassa)',
+                        'HOLD_RECALL' => 'Hold & Recall Transaksi',
+                    ])
+                    ->columns(2)
+                    ->helperText('Centang menu apa saja yang bisa diotorisasi oleh user ini di POS Kasir (wajib mengisi password user saat otorisasi).'),
             ]);
     }
 }

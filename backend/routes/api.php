@@ -18,9 +18,20 @@ Route::prefix('v1')->group(function () {
     // Public Routes
     Route::post('/login', [AuthController::class, 'login']);
 
+
+
     // Protected Routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('/me', [AuthController::class, 'me']);
+        
+        // POS Authorization
+        Route::get('/pos-authorizers', [\App\Http\Controllers\Api\V1\PosAuthController::class, 'getAuthorizers']);
+        Route::post('/authorize-action', [\App\Http\Controllers\Api\V1\PosAuthController::class, 'authorizeAction']);
+        
+        // Transaction retrieval for POS Return
+        Route::get('/transactions/receipt/{receipt}', [\App\Http\Controllers\Api\V1\TransactionController::class, 'getTransactionByReceipt']);
+
         Route::get('/user', function (Request $request) {
             $user = $request->user();
             return response()->json([
@@ -113,10 +124,19 @@ Route::prefix('v1')->group(function () {
             return response()->json(\App\Models\PosSetting::where('is_active', true)->get());
         });
 
+        // Get Branches
+        Route::get('/branches', function (\Illuminate\Http\Request $request) {
+            $user = $request->user();
+            if ($user->branch_id) {
+                return response()->json(\App\Models\Branch::where('id', $user->branch_id)->get());
+            }
+            return response()->json(\App\Models\Branch::all());
+        });
+
         // Get Terminals
         Route::get('/terminals', function (\Illuminate\Http\Request $request) {
             $branchId = $request->query('branch_id');
-            $query = \App\Models\Terminal::where('is_active', true);
+            $query = \App\Models\Terminal::with('branch')->where('is_active', true);
             if ($branchId) {
                 $query->where('branch_id', $branchId);
             }

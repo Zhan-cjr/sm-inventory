@@ -44,7 +44,7 @@ class AdminPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->renderHook(
                 'panels::head.end',
-                fn (): string => '<link rel="stylesheet" href="/css/admin-custom.css">',
+                fn (): string => '<link rel="stylesheet" href="/css/admin-custom.css">' . view('filament.print-styles')->render(),
             )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

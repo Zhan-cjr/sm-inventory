@@ -7,7 +7,14 @@ import './index.css';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('pos_token') || null);
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem('pos_user')) || null);
+  const [user, setUser] = useState(() => {
+    try {
+      const val = localStorage.getItem('pos_user');
+      return val && val !== 'undefined' ? JSON.parse(val) : null;
+    } catch(e) {
+      return null;
+    }
+  });
 
   React.useEffect(() => {
     if (token && !user?.organization_name) {
@@ -35,6 +42,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('pos_token');
     localStorage.removeItem('pos_user');
+    localStorage.removeItem('pos_active_shift');
     setToken(null);
     setUser(null);
   };
@@ -43,15 +51,17 @@ function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  const isManagerOrAdmin = user?.role === 'MANAGER' || user?.role === 'ADMIN';
+
   return (
     <Router>
       <Routes>
         <Route path="/" element={
-          user.role === 'MANAGER' ? <Navigate to="/dashboard" replace /> : <Navigate to="/pos" replace />
+          isManagerOrAdmin ? <Navigate to="/dashboard" replace /> : <Navigate to="/pos" replace />
         } />
         
         <Route path="/pos" element={
-          user.role === 'CASHIER' ? (
+          user.role === 'CASHIER' || isManagerOrAdmin ? (
             <div className="app-container">
               <POSTransaction 
                 branchId={user.branch_id} 
@@ -59,6 +69,7 @@ function App() {
                 orgName={user.organization_name}
                 authToken={token} 
                 userName={user.name}
+                userRole={user.role}
                 onLogout={handleLogout}
               />
             </div>
@@ -66,7 +77,7 @@ function App() {
         } />
 
         <Route path="/dashboard" element={
-          user.role === 'MANAGER' ? (
+          isManagerOrAdmin ? (
             <ManagerDashboard user={user} authToken={token} onLogout={handleLogout} />
           ) : <Navigate to="/pos" replace />
         } />

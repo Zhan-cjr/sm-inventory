@@ -16,13 +16,13 @@ use Filament\Actions\ExportAction;
 use App\Filament\Exports\TransactionItemExporter;
 use Illuminate\Support\Facades\Auth;
 
-class LaporanBarangDijual extends Page implements HasTable
+class LaporanJasaTerjual extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-bag';
-    protected static ?string $navigationLabel = 'Laporan Barang Dijual';
-    protected static ?string $title = 'Laporan Barang Dijual';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-wrench-screwdriver';
+    protected static ?string $navigationLabel = 'Laporan Jasa Terjual';
+    protected static ?string $title = 'Laporan Jasa Terjual';
     protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
 
     protected string $view = 'filament.pages.report-page';
@@ -32,14 +32,9 @@ class LaporanBarangDijual extends Page implements HasTable
         return $table
             ->query(
                 TransactionItem::query()
-                    ->whereHas('transaction', function (Builder $query) {
-                        $query->where('is_voided', false);
-                        if (Auth::user()->branch_id !== null) {
-                            $query->where('branch_id', Auth::user()->branch_id);
-                        }
-                    })
-                    ->whereNotNull('product_id')
-                    ->with(['transaction', 'transaction.branch', 'product'])
+                    ->whereHas('transaction', fn (Builder $query) => $query->where('is_voided', false))
+                    ->whereNotNull('service_id')
+                    ->with(['transaction', 'transaction.branch', 'service'])
             )
             ->columns([
                 TextColumn::make('transaction.transaction_date')
@@ -52,35 +47,18 @@ class LaporanBarangDijual extends Page implements HasTable
                 TextColumn::make('transaction.branch.name')
                     ->label('Cabang')
                     ->hidden(fn () => Auth::user()->branch_id !== null),
-                TextColumn::make('product.sku')
-                    ->label('SKU')
+                TextColumn::make('service.code')
+                    ->label('Kode Jasa')
                     ->searchable(),
-                TextColumn::make('product.name')
-                    ->label('Nama Barang')
+                TextColumn::make('service.name')
+                    ->label('Nama Jasa')
                     ->searchable(),
-                TextColumn::make('qty_terjual')
-                    ->label('Qty Terjual')
-                    ->state(fn (TransactionItem $record) => $record->quantity > 0 ? $record->quantity : 0)
+                TextColumn::make('quantity')
+                    ->label('Qty')
                     ->numeric()
-                    ->sortable(),
-                TextColumn::make('qty_retur')
-                    ->label('Qty Retur')
-                    ->state(fn (TransactionItem $record) => $record->quantity < 0 ? abs($record->quantity) : 0)
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('cost_price')
-                    ->label('Harga Beli')
-                    ->money('IDR', true)
-                    ->state(function (TransactionItem $record) {
-                        $branch_id = $record->transaction?->branch_id;
-                        $stock = \App\Models\Stock::where('product_id', $record->product_id)
-                                ->where('branch_id', $branch_id)
-                                ->first();
-                        return ($stock && $stock->cost_price > 0) ? $stock->cost_price : ($record->product?->cost_price ?? 0);
-                    })
                     ->sortable(),
                 TextColumn::make('unit_price')
-                    ->label('Harga Jual')
+                    ->label('Harga Satuan')
                     ->money('IDR', true)
                     ->sortable(),
                 TextColumn::make('discount_per_item')
@@ -106,7 +84,7 @@ class LaporanBarangDijual extends Page implements HasTable
                     ->icon('heroicon-o-printer')
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
-                        'type' => 'laporan-barang-dijual',
+                        'type' => 'laporan-jasa-terjual',
                         'tableFilters' => $livewire->tableFilters
                     ]), true),
                 ExportAction::make()

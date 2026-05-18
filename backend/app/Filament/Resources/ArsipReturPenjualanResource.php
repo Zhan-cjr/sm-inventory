@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ArsipTransaksiResource\Pages;
+use App\Filament\Resources\ArsipReturPenjualanResource\Pages;
 use App\Models\Transaction;
 use Filament\Schemas\Schema;
 use Filament\Resources\Resource;
@@ -34,16 +34,16 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Grid;
 use Filament\Infolists\Components\RepeatableEntry;
 
-class ArsipTransaksiResource extends Resource
+class ArsipReturPenjualanResource extends Resource
 {
     use HasBranchScope;
 
     protected static ?string $model = Transaction::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-archive-box-arrow-down';
-    protected static ?string $navigationLabel = 'Arsip Transaksi';
-    protected static ?string $pluralModelLabel = 'Arsip Transaksi';
-    protected static ?string $modelLabel = 'Arsip Transaksi';
+    protected static ?string $navigationLabel = 'Arsip Retur Penjualan';
+    protected static ?string $pluralModelLabel = 'Arsip Retur Penjualan';
+    protected static ?string $modelLabel = 'Arsip Retur Penjualan';
     protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
 
     public static function form(Schema $schema): Schema
@@ -162,23 +162,7 @@ class ArsipTransaksiResource extends Resource
                 Tables\Columns\TextColumn::make('discount_amount')
                     ->label('Diskon')
                     ->money('IDR', true)
-                    ->state(fn (Transaction $record) => $record->transaction_type === 'RETURN' ? 0 : $record->discount_amount)
-                    ->summarize(
-                        Summarizer::make()
-                            ->label('Total')
-                            ->using(fn ($query) => $query->where('transaction_type', '!=', 'RETURN')->orWhereNull('transaction_type')->sum('discount_amount'))
-                            ->money('IDR')
-                    ),
-                Tables\Columns\TextColumn::make('retur')
-                    ->label('Retur')
-                    ->money('IDR', true)
-                    ->state(fn (Transaction $record) => $record->transaction_type === 'RETURN' ? abs($record->final_amount) : 0)
-                    ->summarize(
-                        Summarizer::make()
-                            ->label('Total')
-                            ->using(fn ($query) => abs($query->where('transaction_type', 'RETURN')->sum('final_amount')))
-                            ->money('IDR')
-                    ),
+                    ->summarize(Sum::make()->label('Total')->money('IDR')),
                 Tables\Columns\TextColumn::make('tax')
                     ->label('Tax')
                     ->state(fn () => 0)
@@ -344,8 +328,13 @@ class ArsipTransaksiResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListArsipTransaksis::route('/'),
+            'index' => Pages\ListArsipReturPenjualans::route('/'),
         ];
+    }
+    
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->where('transaction_type', 'RETURN');
     }
     
     public static function canCreate(): bool

@@ -1,8 +1,9 @@
 import React from 'react';
 import { Printer, X } from 'lucide-react';
+import Barcode from 'react-barcode';
 
 export const ReceiptPreview = ({ transaction, onPrint, onClose }) => {
-  const { items, totalAmount, discountAmount, finalAmount, paymentMethod, bankId, terminalId, receivedAmount, changeAmount, appliedPromos, branchName, orgName, userName, customerName, timestamp } = transaction;
+  const { items, totalAmount, discountAmount, finalAmount, paymentMethod, bankId, terminalId, receivedAmount, changeAmount, appliedPromos, branchName, orgName, userName, customerName, timestamp, receipt_number } = transaction;
 
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
@@ -90,6 +91,20 @@ export const ReceiptPreview = ({ transaction, onPrint, onClose }) => {
             <p>Terima Kasih</p>
             <p>Selamat Belanja Kembali</p>
             <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
+            {receipt_number && <p style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem', color: 'black' }}>NOTA: {receipt_number}</p>}
+            {receipt_number && (
+              <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Barcode 
+                  value={receipt_number} 
+                  format="CODE128" 
+                  width={1.5} 
+                  height={40} 
+                  fontSize={12} 
+                  margin={0} 
+                  displayValue={false} 
+                />
+              </div>
+            )}
           </div>
         </div>
 

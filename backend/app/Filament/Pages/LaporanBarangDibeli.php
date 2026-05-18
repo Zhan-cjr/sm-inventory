@@ -71,24 +71,7 @@ class LaporanBarangDibeli extends Page implements HasTable
                     ->sortable(),
             ])
             ->filters([
-                Filter::make('receipt_date')
-                    ->form([
-                        DatePicker::make('created_from')->label('Dari Tanggal'),
-                        DatePicker::make('created_until')->label('Sampai Tanggal'),
-                    ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query->whereHas('goodsReceipt', function (Builder $query) use ($data) {
-                            $query
-                                ->when(
-                                    $data['created_from'],
-                                    fn (Builder $query, $date): Builder => $query->whereDate('receipt_date', '>=', $date),
-                                )
-                                ->when(
-                                    $data['created_until'],
-                                    fn (Builder $query, $date): Builder => $query->whereDate('receipt_date', '<=', $date),
-                                );
-                        });
-                    }),
+                \App\Filament\Filters\DateFilterHelper::make('goodsReceipt.receipt_date', 'receipt_date'),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('goodsReceipt.branch', 'name')
@@ -98,6 +81,14 @@ class LaporanBarangDibeli extends Page implements HasTable
                     ->relationship('goodsReceipt.supplier', 'name'),
             ])
             ->headerActions([
+                \Filament\Actions\Action::make('cetak')
+                    ->label('Cetak')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'laporan-barang-dibeli',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
                 ExportAction::make()
                     ->exporter(GoodsReceiptItemExporter::class)
                     ->label('Export CSV')
@@ -106,3 +97,9 @@ class LaporanBarangDibeli extends Page implements HasTable
             ]);
     }
 }
+
+
+
+
+
+

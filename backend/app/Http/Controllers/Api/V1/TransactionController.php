@@ -34,7 +34,7 @@ class TransactionController extends Controller
             'payment_method' => 'required|string',
             'items' => 'required|array',
             'items.*.product_id' => 'required|uuid',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|integer|not_in:0',
             'items.*.unit_price' => 'required|numeric',
             'items.*.discount_per_item' => 'nullable|numeric',
         ]);
@@ -55,6 +55,7 @@ class TransactionController extends Controller
                     'final_amount' => $validated['final_amount'] ?? 0,
                     'payment_method' => $validated['payment_method'],
                     'sync_status' => 'SYNCED',
+                    'receipt_number' => $request->receipt_number ?? ('SMI-' . strtoupper(substr(uniqid(), -6))),
                 ]);
 
                 foreach ($validated['items'] as $item) {
@@ -76,6 +77,7 @@ class TransactionController extends Controller
                 'message' => 'Transaction created successfully',
                 'transaction' => [
                     'id' => $transaction->id,
+                    'receipt_number' => $transaction->receipt_number,
                     'transaction_date' => $transaction->transaction_date,
                     'total_amount' => $transaction->total_amount,
                     'final_amount' => $transaction->final_amount,
@@ -89,5 +91,20 @@ class TransactionController extends Controller
                 'error' => $e->getMessage()
             ], 422);
         }
+    }
+
+    public function getTransactionByReceipt($receipt)
+    {
+        $transaction = Transaction::where('id', $receipt)
+            ->orWhere('receipt_number', $receipt)
+            ->orWhere('local_transaction_id', $receipt)
+            ->with(['items.product'])
+            ->first();
+
+        if (!$transaction) {
+            return response()->json(['message' => 'Transaksi tidak ditemukan.'], 404);
+        }
+
+        return response()->json($transaction);
     }
 }

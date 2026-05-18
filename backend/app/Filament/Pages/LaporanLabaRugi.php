@@ -68,28 +68,21 @@ class LaporanLabaRugi extends Page implements HasTable
                     ->sortable(),
             ])
             ->filters([
-                Filter::make('transaction_date')
-                    ->form([
-                        DatePicker::make('created_from')->label('Dari Tanggal'),
-                        DatePicker::make('created_until')->label('Sampai Tanggal'),
-                    ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query
-                            ->when(
-                                $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('transaction_date', '>=', $date),
-                            )
-                            ->when(
-                                $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('transaction_date', '<=', $date),
-                            );
-                    }),
+                \App\Filament\Filters\DateFilterHelper::make('transaction_date'),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('branch', 'name')
                     ->hidden(fn () => Auth::user()->branch_id !== null),
             ])
             ->headerActions([
+                \Filament\Actions\Action::make('cetak')
+                    ->label('Cetak')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'laporan-laba-rugi',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
                 ExportAction::make()
                     ->exporter(LabaRugiExporter::class)
                     ->label('Export CSV')
@@ -98,3 +91,9 @@ class LaporanLabaRugi extends Page implements HasTable
             ]);
     }
 }
+
+
+
+
+
+

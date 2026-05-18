@@ -21,8 +21,13 @@ class ShiftExporter extends Exporter
             ExportColumn::make('end_time')->label('Selesai'),
             ExportColumn::make('status')->label('Status'),
             ExportColumn::make('starting_cash')->label('Kas Awal'),
-            ExportColumn::make('expected_ending_cash')->label('Kas Harapan'),
-            ExportColumn::make('actual_ending_cash')->label('Kas Aktual'),
+            ExportColumn::make('total_sales')
+                ->label('Pendapatan')
+                ->state(fn (Shift $record): float => ($record->total_cash_sales ?? 0) + ($record->total_card_sales ?? 0)),
+            ExportColumn::make('expected_ending_cash')
+                ->label('Kas Harapan')
+                ->state(fn (Shift $record): float => ($record->starting_cash ?? 0) + ($record->total_cash_sales ?? 0)),
+            ExportColumn::make('actual_cash')->label('Kas Aktual'),
             ExportColumn::make('difference')->label('Selisih'),
         ];
     }

@@ -25,6 +25,8 @@ class TransactionResource extends Resource
 
     protected static \UnitEnum|string|null $navigationGroup = 'Penjualan & Kasir';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $modelLabel = 'Transaksi';
 
     protected static ?string $pluralModelLabel = 'Transaksi';

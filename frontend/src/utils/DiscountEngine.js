@@ -77,7 +77,7 @@ export class DiscountEngine {
     }
 
     return {
-      totalDiscount: Math.min(totalDiscount, subtotal),
+      totalDiscount: subtotal > 0 ? Math.min(totalDiscount, subtotal) : 0,
       appliedPromos
     };
   }
