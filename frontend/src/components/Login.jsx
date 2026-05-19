@@ -63,7 +63,7 @@ export const Login = ({ onLoginSuccess }) => {
       }
 
       if (!res.ok) {
-        throw new Error(data.message || 'Login failed');
+        throw new Error(data?.message || `Login failed (HTTP ${res?.status})`);
       }
 
       // Save offline credentials hash for future use

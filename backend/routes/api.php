@@ -44,6 +44,7 @@ Route::prefix('v1')->group(function () {
                     'role' => $user->role,
                     'branch_id' => $user->branch_id,
                     'branch_name' => $user->branch?->name,
+                    'branch_code' => $user->branch?->code,
                     'organization_id' => $user->organization_id,
                     'organization_name' => $user->organization?->name,
                 ]

@@ -43,6 +43,7 @@ const safeSetItem = (key, value) => {
 export const POSTransaction = ({ 
   branchId, 
   branchName, 
+  branchCode,
   orgName, 
   authToken, 
   userName, 
@@ -132,6 +133,52 @@ export const POSTransaction = ({
 
   const { storeLocalTransaction, syncTransactions, pendingCount, syncStatus } = useOfflineSync(branchId, authToken);
   const discountEngine = useRef(new DiscountEngine([]));
+
+  // --- IndexedDB Helper for Large Caches ---
+  const idbCache = {
+    async open() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('POSCacheDB', 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('caches')) {
+            db.createObjectStore('caches');
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    },
+    async set(key, data) {
+      try {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('caches', 'readwrite');
+          const store = tx.objectStore('caches');
+          const req = store.put(data, key);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      } catch (e) {
+        console.warn('IDB Set Error:', e);
+      }
+    },
+    async get(key) {
+      try {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction('caches', 'readonly');
+          const store = tx.objectStore('caches');
+          const req = store.get(key);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      } catch (e) {
+        console.warn('IDB Get Error:', e);
+        return null;
+      }
+    }
+  };
 
   useEffect(() => {
     const checkServerConnection = async () => {
@@ -243,7 +290,10 @@ export const POSTransaction = ({
     fetch('/api/v1/server-time', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         const serverMs = data.timestamp;
         const clientMs = Date.now();
@@ -257,23 +307,37 @@ export const POSTransaction = ({
     fetch('/api/v1/products', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
-      .then(data => {
-        setDbProducts(data);
-        safeSetItem('pos_cached_products', JSON.stringify(data));
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
       })
-      .catch(err => {
-        console.error('Failed to load products:', err);
-        const cached = localStorage.getItem('pos_cached_products');
-        if (cached) {
-          try { setDbProducts(JSON.parse(cached)); } catch (e) { }
+      .then(data => {
+        if (Array.isArray(data)) {
+          setDbProducts(prev => {
+            const services = prev.filter(p => p.is_service);
+            return [...data, ...services];
+          });
+          idbCache.set('pos_cached_products', data);
+        }
+      })
+      .catch(async err => {
+        console.warn('Failed to load products, using cache:', err);
+        const parsed = await idbCache.get('pos_cached_products');
+        if (parsed && Array.isArray(parsed)) {
+          setDbProducts(prev => {
+            const services = prev.filter(p => p.is_service);
+            return [...parsed, ...services];
+          });
         }
       });
 
     fetch('/api/v1/promotions', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         setDbPromos(data);
         discountEngine.current = new DiscountEngine(data);
@@ -294,7 +358,10 @@ export const POSTransaction = ({
     fetch('/api/v1/banks', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         setBanks(data);
         safeSetItem('pos_cached_banks', JSON.stringify(data));
@@ -310,7 +377,10 @@ export const POSTransaction = ({
     fetch('/api/v1/pos-settings', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         setPosSettings(data);
         safeSetItem('pos_cached_settings', JSON.stringify(data));
@@ -326,7 +396,10 @@ export const POSTransaction = ({
     fetch('/api/v1/customers', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         setCustomers(data);
         safeSetItem('pos_cached_customers', JSON.stringify(data));
@@ -342,36 +415,49 @@ export const POSTransaction = ({
     fetch('/api/v1/services', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
-        const servicesAsProducts = data.map(s => ({
-          id: s.id,
-          sku: s.code,
-          barcode: s.code,
-          name: s.name + ' (Jasa)',
-          selling_price: s.price,
-          category_id: null,
-          is_service: true
-        }));
-        setDbProducts(prev => [...prev, ...servicesAsProducts]);
-        safeSetItem('pos_cached_services', JSON.stringify(data));
+        if (Array.isArray(data)) {
+          const servicesAsProducts = data.map(s => ({
+            id: s.id,
+            sku: s.code,
+            barcode: s.code,
+            name: s.name + ' (Jasa)',
+            selling_price: s.price,
+            category_id: null,
+            is_service: true
+          }));
+          setDbProducts(prev => {
+            const productsOnly = prev.filter(p => !p.is_service);
+            return [...productsOnly, ...servicesAsProducts];
+          });
+          safeSetItem('pos_cached_services', JSON.stringify(data));
+        }
       })
       .catch(err => {
-        console.error('Failed to load services:', err);
+        console.warn('Failed to load services, using cache:', err);
         const cached = localStorage.getItem('pos_cached_services');
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
-            const servicesAsProducts = parsed.map(s => ({
-              id: s.id,
-              sku: s.code,
-              barcode: s.code,
-              name: s.name + ' (Jasa)',
-              selling_price: s.price,
-              category_id: null,
-              is_service: true
-            }));
-            setDbProducts(prev => [...prev, ...servicesAsProducts]);
+            if (Array.isArray(parsed)) {
+              const servicesAsProducts = parsed.map(s => ({
+                id: s.id,
+                sku: s.code,
+                barcode: s.code,
+                name: s.name + ' (Jasa)',
+                selling_price: s.price,
+                category_id: null,
+                is_service: true
+              }));
+              setDbProducts(prev => {
+                const productsOnly = prev.filter(p => !p.is_service);
+                return [...productsOnly, ...servicesAsProducts];
+              });
+            }
           } catch (e) { }
         }
       });
@@ -379,7 +465,10 @@ export const POSTransaction = ({
     fetch(`/api/v1/terminals?branch_id=${branchId}`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         setAllTerminals(data);
         safeSetItem('pos_cached_terminals', JSON.stringify(data));
@@ -547,7 +636,10 @@ export const POSTransaction = ({
     fetch(`/api/v1/shifts/active?terminal_id=${terminalId}`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         if (data.status === 'USER_HAS_OTHER_SHIFT' || data.status === 'TERMINAL_IN_USE') {
           setLockScreenInfo({ status: data.status, message: data.message });
@@ -632,7 +724,10 @@ export const POSTransaction = ({
         starting_cash: startingCashVal
       })
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         if (data.shift) {
           setActiveShift(data.shift);
@@ -695,7 +790,10 @@ export const POSTransaction = ({
         actual_cash: parseFloat(actualCash)
       })
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         setIsProcessing(false);
         if (data.shift) {
@@ -905,7 +1003,7 @@ export const POSTransaction = ({
         receivedAmount: currentReceived,
         changeAmount: currentChange,
         appliedPromos,
-        receipt_number: 'SMI-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+        receipt_number: (branchCode || 'SMI') + '-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
         transaction_type: isReturnMode ? 'RETURN' : 'SALES',
       };
 
@@ -1451,6 +1549,7 @@ export const POSTransaction = ({
         <AuthorizationModal
           actionName={pendingAuthAction.name}
           authToken={authToken}
+          isOnline={isOnline}
           onSuccess={(user) => {
             setPendingAuthAction(null);
             pendingAuthAction.callback();

@@ -66,6 +66,7 @@ function App() {
           setDeviceInfo({
             branchId: data.branch_id,
             branchName: data.branch_name,
+            branchCode: data.branch_code,
             terminalId: data.terminal_id,
             terminalName: data.terminal_name
           });
@@ -73,6 +74,7 @@ function App() {
           localStorage.setItem('pos_device_status', 'APPROVED');
           localStorage.setItem('pos_device_branch_id', data.branch_id || '');
           localStorage.setItem('pos_device_branch_name', data.branch_name || '');
+          localStorage.setItem('pos_device_branch_code', data.branch_code || '');
           localStorage.setItem('pos_device_terminal_id', data.terminal_id || '');
           localStorage.setItem('pos_device_terminal_name', data.terminal_name || '');
         } else if (data.status === 'BLOCKED') {
@@ -92,6 +94,7 @@ function App() {
           setDeviceInfo({
             branchId: localStorage.getItem('pos_device_branch_id'),
             branchName: localStorage.getItem('pos_device_branch_name'),
+            branchCode: localStorage.getItem('pos_device_branch_code'),
             terminalId: localStorage.getItem('pos_device_terminal_id'),
             terminalName: localStorage.getItem('pos_device_terminal_name')
           });
@@ -293,6 +296,7 @@ function App() {
               <POSTransaction
                 branchId={deviceInfo?.branchId || user.branch_id}
                 branchName={deviceInfo?.branchName || user.branch_name}
+                branchCode={deviceInfo?.branchCode || user.branch_code}
                 orgName={user.organization_name}
                 authToken={token}
                 userName={user.name}

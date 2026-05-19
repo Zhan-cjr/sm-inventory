@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, X } from 'lucide-react';
 
-export const AuthorizationModal = ({ actionName, authToken, onSuccess, onCancel }) => {
+export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess, onCancel }) => {
   const [authorizers, setAuthorizers] = useState(() => {
     try {
       const cached = localStorage.getItem('pos_cached_authorizers');
@@ -31,30 +31,30 @@ export const AuthorizationModal = ({ actionName, authToken, onSuccess, onCancel 
     fetch('/api/v1/pos-authorizers', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(data => {
         setAuthorizers(data);
         localStorage.setItem('pos_cached_authorizers', JSON.stringify(data));
-        if (data.length > 0) {
+        if (data.length > 0 && !selectedEmail) {
           setSelectedEmail(data[0].email);
         }
       })
       .catch(err => {
-        console.error('Failed to fetch authorizers:', err);
+        console.warn('Failed to fetch authorizers:', err);
         const cached = localStorage.getItem('pos_cached_authorizers');
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
             setAuthorizers(parsed);
-            if (parsed.length > 0) {
+            if (parsed.length > 0 && !selectedEmail) {
               setSelectedEmail(parsed[0].email);
             }
           } catch (e) {
             console.error('Failed to parse cached authorizers:', e);
-            setError('Gagal memuat daftar otorisator. Periksa koneksi internet.');
           }
-        } else {
-          setError('Gagal memuat daftar otorisator. Periksa koneksi internet.');
         }
       });
   }, [authToken]);
@@ -62,14 +62,15 @@ export const AuthorizationModal = ({ actionName, authToken, onSuccess, onCancel 
   const handleAuthorize = async (e) => {
     e.preventDefault();
     if (!selectedEmail || !password) {
-      setError('Pilih otorisator dan masukkan password.');
+      setError('Pilih/masukkan otorisator dan password.');
       return;
     }
 
     setIsLoading(true);
     setError(null);
 
-    if (!navigator.onLine) {
+    // Gunakan isOnline prop untuk menentukan apakah server bisa diakses
+    if (!isOnline) {
       try {
         const hashPasswordLocal = (email, password) => {
           const salt = "sminventory_salt_2026";
@@ -84,20 +85,22 @@ export const AuthorizationModal = ({ actionName, authToken, onSuccess, onCancel 
         };
 
         const offlineUsers = JSON.parse(localStorage.getItem('pos_offline_users') || '{}');
-        const cachedUser = offlineUsers[selectedEmail.toLowerCase().trim()];
+        // Pencarian case insensitive berdasarkan input
+        const targetEmail = selectedEmail.toLowerCase().trim();
+        const cachedUser = offlineUsers[targetEmail];
 
         if (!cachedUser) {
-          throw new Error('Otorisator belum pernah login di perangkat ini saat online. Otorisasi offline tidak dapat dilakukan.');
+          throw new Error('Otorisator belum pernah login di perangkat ini saat online. Otorisasi offline tidak dapat dilakukan untuk email tersebut.');
         }
 
-        const enteredHash = hashPasswordLocal(selectedEmail, password);
+        const enteredHash = hashPasswordLocal(targetEmail, password);
         if (enteredHash !== cachedUser.hash) {
           throw new Error('Password salah (Mode Offline)');
         }
 
-        const authorizer = authorizers.find(a => a.email.toLowerCase().trim() === selectedEmail.toLowerCase().trim());
+        const authorizer = authorizers.find(a => a.email.toLowerCase().trim() === targetEmail);
         if (!authorizer) {
-          throw new Error('Data otorisator tidak ditemukan di cache peramban.');
+          throw new Error('Data izin otorisator tidak ditemukan di cache lokal.');
         }
 
         const authorizations = authorizer.pos_authorizations || [];
@@ -130,15 +133,26 @@ export const AuthorizationModal = ({ actionName, authToken, onSuccess, onCancel 
         })
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.message || 'Otorisasi gagal.');
+        let errorMsg = `Otorisasi gagal (HTTP ${res.status})`;
+        try {
+          const data = await res.json();
+          if (data.message) errorMsg = data.message;
+        } catch (e) {
+          // Response is not JSON
+        }
+        throw new Error(errorMsg);
       }
 
+      const data = await res.json();
       onSuccess(data.user);
     } catch (err) {
-      setError(err.message);
+      // Jika terjadi TypeError karena ServiceWorker timeout / router putus
+      if (err.message.includes('Unexpected end of JSON input') || err.message.includes('Failed to fetch')) {
+        setError('Koneksi ke server terputus. Silakan alihkan status ke Offline lalu coba lagi.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -164,21 +178,21 @@ export const AuthorizationModal = ({ actionName, authToken, onSuccess, onCancel 
         <form onSubmit={handleAuthorize}>
           <div className="form-group" style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Otorisator</label>
-            <select 
+            <input 
+              type="text"
+              list="authorizers-list"
               className="modern-barcode-input" 
               style={{ width: '100%', padding: '0.75rem' }}
               value={selectedEmail}
               onChange={(e) => setSelectedEmail(e.target.value)}
-              disabled={authorizers.length === 0}
-            >
-              {authorizers.length === 0 ? (
-                <option value="">Memuat data...</option>
-              ) : (
-                authorizers.map(a => (
-                  <option key={a.id} value={a.email}>{a.name} ({a.role})</option>
-                ))
-              )}
-            </select>
+              placeholder="Cari atau pilih email..."
+              autoComplete="off"
+            />
+            <datalist id="authorizers-list">
+              {authorizers.map(a => (
+                <option key={a.id} value={a.email}>{a.name} ({a.role})</option>
+              ))}
+            </datalist>
           </div>
 
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>
@@ -190,7 +204,6 @@ export const AuthorizationModal = ({ actionName, authToken, onSuccess, onCancel 
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoFocus
             />
           </div>
 
