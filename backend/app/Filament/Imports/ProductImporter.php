@@ -27,9 +27,6 @@ class ProductImporter extends Importer
     protected static array $catCache = [];
     protected static array $supCache = [];
 
-    // Menyimpan sementara nilai teks mentah dari CSV sebelum dikonversi ke UUID di beforeSave()
-    protected ?string $rawCategoryName = null;
-    protected ?string $rawSupplierName = null;
 
     public static function getColumns(): array
     {
@@ -63,12 +60,12 @@ class ProductImporter extends Importer
                 ->example('Indomie Goreng')
                 ->rules(['required', 'string', 'max:255']),
 
-            // Simpan nama mentah ke instance property; UUID diset di beforeSave()
+            // Set null dulu agar tidak melanggar FK; UUID-nya diset di beforeSave()
             ImportColumn::make('category_id')
                 ->label('Kategori (ID/Kode/Nama)')
                 ->example('Makanan')
-                ->fillRecordUsing(function (?string $state): void {
-                    $this->rawCategoryName = $state ?: null;
+                ->fillRecordUsing(function (Product $record): void {
+                    $record->category_id = null;
                 }),
 
             ImportColumn::make('sub_category')
@@ -76,12 +73,12 @@ class ProductImporter extends Importer
                 ->example('Minuman Ringan')
                 ->rules(['nullable', 'string', 'max:255']),
 
-            // Simpan nama mentah ke instance property; UUID diset di beforeSave()
+            // Set null dulu agar tidak melanggar FK; UUID-nya diset di beforeSave()
             ImportColumn::make('supplier_id')
                 ->label('Pemasok (ID/Kode/Nama)')
                 ->example('PT Indofood')
-                ->fillRecordUsing(function (?string $state): void {
-                    $this->rawSupplierName = $state ?: null;
+                ->fillRecordUsing(function (Product $record): void {
+                    $record->supplier_id = null;
                 }),
 
             ImportColumn::make('cost_price')
@@ -180,8 +177,8 @@ class ProductImporter extends Importer
     {
         $orgId = $this->record->organization_id;
 
-        // --- Resolve Category dari instance property ---
-        $catRaw = $this->rawCategoryName;
+        // Baca nilai mentah dari data CSV asli (tersimpan di $this->data)
+        $catRaw = $this->data['category_id'] ?? null;
         if ($catRaw && $orgId) {
             $cacheKey = $orgId . '|' . $catRaw;
             if (!isset(static::$catCache[$cacheKey])) {
@@ -206,8 +203,8 @@ class ProductImporter extends Importer
             $this->record->category_id = null;
         }
 
-        // --- Resolve Supplier dari instance property ---
-        $supRaw = $this->rawSupplierName;
+        // Baca nilai mentah dari data CSV asli (tersimpan di $this->data)
+        $supRaw = $this->data['supplier_id'] ?? null;
         if ($supRaw && $orgId) {
             $cacheKey = $orgId . '|' . $supRaw;
             if (!isset(static::$supCache[$cacheKey])) {
