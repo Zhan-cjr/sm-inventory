@@ -14,7 +14,7 @@ export class DiscountEngine {
     const sortedPromos = this.sortPromosByPriority(this.promos);
 
     for (const promo of sortedPromos) {
-      if (!this.isPromoValid(promo)) continue;
+      if (!this.isPromoValid(promo, customer)) continue;
 
       const minPurchase = parseFloat(promo.min_purchase_amount || 0);
       if (minPurchase > 0 && subtotal < minPurchase) continue;
@@ -117,12 +117,39 @@ export class DiscountEngine {
     return Math.floor(amount * (discountValue / 100));
   }
 
-  isPromoValid(promo) {
+  isPromoValid(promo, customer) {
     if (!promo || !promo.is_active) return false;
     const now = new Date();
     const from = new Date(promo.valid_from);
     const until = new Date(promo.valid_until);
-    return from <= now && until >= now;
+    if (from > now || until < now) return false;
+
+    // Check member tiers if specified in promo_config
+    if (promo.promo_config?.member_tiers && promo.promo_config.member_tiers.length > 0) {
+      const customerTier = customer?.memberTier || 'REGULAR';
+      if (!promo.promo_config.member_tiers.includes(customerTier)) {
+        return false;
+      }
+    }
+
+    // Check applicable days if specified (e.g. ['MONDAY', 'FRIDAY'])
+    if (promo.promo_config?.applicable_days && promo.promo_config.applicable_days.length > 0) {
+      const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+      const currentDayName = dayNames[now.getDay()];
+      if (!promo.promo_config.applicable_days.includes(currentDayName)) {
+        return false;
+      }
+    }
+
+    // Check applicable hours if specified (e.g. start_time: "14:00", end_time: "17:00")
+    if (promo.promo_config?.start_time && promo.promo_config?.end_time) {
+      const currentHourMin = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      if (currentHourMin < promo.promo_config.start_time || currentHourMin > promo.promo_config.end_time) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   sortPromosByPriority(promos) {

@@ -27,6 +27,10 @@ class ProductImporter extends Importer
     protected static array $catCache = [];
     protected static array $supCache = [];
 
+    // Menyimpan sementara nilai teks mentah dari CSV sebelum dikonversi ke UUID di beforeSave()
+    protected ?string $rawCategoryName = null;
+    protected ?string $rawSupplierName = null;
+
     public static function getColumns(): array
     {
         return [
@@ -59,18 +63,12 @@ class ProductImporter extends Importer
                 ->example('Indomie Goreng')
                 ->rules(['required', 'string', 'max:255']),
 
+            // Simpan nama mentah ke instance property; UUID diset di beforeSave()
             ImportColumn::make('category_id')
                 ->label('Kategori (ID/Kode/Nama)')
                 ->example('Makanan')
-                ->fillRecordUsing(function (Product $record, ?string $state): void {
-                    if (!$state) return;
-                    if (!isset(static::$catCache[$state])) {
-                        static::$catCache[$state] = Category::where('id', $state)
-                            ->orWhere('code', $state)
-                            ->orWhere('name', $state)
-                            ->value('id');
-                    }
-                    $record->category_id = static::$catCache[$state];
+                ->fillRecordUsing(function (?string $state): void {
+                    $this->rawCategoryName = $state ?: null;
                 }),
 
             ImportColumn::make('sub_category')
@@ -78,18 +76,12 @@ class ProductImporter extends Importer
                 ->example('Minuman Ringan')
                 ->rules(['nullable', 'string', 'max:255']),
 
+            // Simpan nama mentah ke instance property; UUID diset di beforeSave()
             ImportColumn::make('supplier_id')
                 ->label('Pemasok (ID/Kode/Nama)')
                 ->example('PT Indofood')
-                ->fillRecordUsing(function (Product $record, ?string $state): void {
-                    if (!$state) return;
-                    if (!isset(static::$supCache[$state])) {
-                        static::$supCache[$state] = Supplier::where('id', $state)
-                            ->orWhere('code', $state)
-                            ->orWhere('name', $state)
-                            ->value('id');
-                    }
-                    $record->supplier_id = static::$supCache[$state];
+                ->fillRecordUsing(function (?string $state): void {
+                    $this->rawSupplierName = $state ?: null;
                 }),
 
             ImportColumn::make('cost_price')
@@ -177,6 +169,68 @@ class ProductImporter extends Importer
         }
         
         return $record;
+    }
+
+    /**
+     * Dijalankan setelah semua kolom diisi ke $record.
+     * Pada titik ini organization_id sudah pasti terisi sehingga aman
+     * untuk membuat kategori/supplier baru jika belum ada.
+     */
+    protected function beforeSave(): void
+    {
+        $orgId = $this->record->organization_id;
+
+        // --- Resolve Category dari instance property ---
+        $catRaw = $this->rawCategoryName;
+        if ($catRaw && $orgId) {
+            $cacheKey = $orgId . '|' . $catRaw;
+            if (!isset(static::$catCache[$cacheKey])) {
+                $cat = Category::where('organization_id', $orgId)
+                    ->where(function ($q) use ($catRaw) {
+                        $q->where('id', $catRaw)
+                          ->orWhere('code', $catRaw)
+                          ->orWhere('name', $catRaw);
+                    })->first();
+
+                if (!$cat) {
+                    $cat = Category::create([
+                        'organization_id' => $orgId,
+                        'name'            => $catRaw,
+                        'is_active'       => true,
+                    ]);
+                }
+                static::$catCache[$cacheKey] = $cat->id;
+            }
+            $this->record->category_id = static::$catCache[$cacheKey];
+        } else {
+            $this->record->category_id = null;
+        }
+
+        // --- Resolve Supplier dari instance property ---
+        $supRaw = $this->rawSupplierName;
+        if ($supRaw && $orgId) {
+            $cacheKey = $orgId . '|' . $supRaw;
+            if (!isset(static::$supCache[$cacheKey])) {
+                $sup = Supplier::where('organization_id', $orgId)
+                    ->where(function ($q) use ($supRaw) {
+                        $q->where('id', $supRaw)
+                          ->orWhere('code', $supRaw)
+                          ->orWhere('name', $supRaw);
+                    })->first();
+
+                if (!$sup) {
+                    $sup = Supplier::create([
+                        'organization_id' => $orgId,
+                        'name'            => $supRaw,
+                        'is_active'       => true,
+                    ]);
+                }
+                static::$supCache[$cacheKey] = $sup->id;
+            }
+            $this->record->supplier_id = static::$supCache[$cacheKey];
+        } else {
+            $this->record->supplier_id = null;
+        }
     }
 
     public static function getCompletedNotificationBody(Import $import): string

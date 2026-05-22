@@ -1231,23 +1231,71 @@ body {
 }
 
 @media print {
+  @page {
+    margin: 0; /* Menghilangkan header & footer default browser seperti tulisan localhost, tanggal, halaman */
+  }
+
+  /* Sembunyikan semua elemen di halaman */
   body * {
     visibility: hidden;
   }
 
+  /* Tampilkan struk dan semua elemen di dalamnya */
   #printable-receipt,
   #printable-receipt * {
-    visibility: visible;
+    visibility: visible !important;
+    color: #000 !important;
+    background: transparent !important;
   }
 
+  /* Hilangkan batasan tinggi, scrollbar, dan flex/grid layout dari semua elemen pembungkus (parent) */
+  html,
+  body,
+  #root,
+  .app-container,
+  .change-modal-overlay,
+  .receipt-preview-card,
+  .receipt-paper {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Posisikan struk cetak di pojok kiri atas halaman print */
   #printable-receipt {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    /* Standard thermal width */
-    margin: 0;
-    padding: 10px;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 68mm !important; /* Lebar optimal untuk printer epson TM-U220 */
+    margin: 0 !important;
+    padding: 0 0 60px 0 !important; /* Memberikan feed kertas kosong 60px agar kertas bisa disobek dengan aman setelah cetak */
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+
+  .receipt-header h2 {
+    font-size: 13px !important;
+    font-weight: bold !important;
+  }
+
+  .divider {
+    letter-spacing: -1px;
+  }
+
+  /* Pastikan header preview modal dan tombol close/cetak disembunyikan saat mencetak */
+  .receipt-preview-header,
+  .receipt-preview-footer {
+    display: none !important;
+    visibility: hidden !important;
   }
 }
 

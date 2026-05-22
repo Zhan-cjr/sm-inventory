@@ -86,20 +86,39 @@ class NewDatabase extends Page
                 '--force' => true,
             ]);
 
-            // 5. Copy current logged-in user
-            $user = auth()->user();
-            if ($user) {
-                $userData = (array) DB::connection('mysql')->table('users')->where('id', $user->id)->first();
-                DB::connection('dynamic')->table('users')->insertOrIgnore($userData);
+            // 5. Copy roles and permissions from master DB
+            $roles = DB::connection('mysql')->table('roles')->get()->map(fn($item) => (array)$item)->toArray();
+            if (!empty($roles)) DB::connection('dynamic')->table('roles')->insertOrIgnore($roles);
 
-                $userRoles = DB::connection('mysql')->table('model_has_roles')->where('model_id', $user->id)->get();
-                foreach ($userRoles as $role) {
-                    $roleData = (array) DB::connection('mysql')->table('roles')->where('id', $role->role_id)->first();
-                    if ($roleData) {
-                        DB::connection('dynamic')->table('roles')->insertOrIgnore($roleData);
-                    }
-                    DB::connection('dynamic')->table('model_has_roles')->insertOrIgnore((array) $role);
-                }
+            $permissions = DB::connection('mysql')->table('permissions')->get()->map(fn($item) => (array)$item)->toArray();
+            if (!empty($permissions)) DB::connection('dynamic')->table('permissions')->insertOrIgnore($permissions);
+
+            $roleHasPermissions = DB::connection('mysql')->table('role_has_permissions')->get()->map(fn($item) => (array)$item)->toArray();
+            if (!empty($roleHasPermissions)) DB::connection('dynamic')->table('role_has_permissions')->insertOrIgnore($roleHasPermissions);
+
+            // 6. Create default super admin user
+            $adminUser = [
+                'name' => 'Super Admin',
+                'email' => 'admin@selamat.id',
+                'password' => \Illuminate\Support\Facades\Hash::make('password'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            
+            DB::connection('dynamic')->table('users')->updateOrInsert(
+                ['email' => 'admin@selamat.id'],
+                $adminUser
+            );
+
+            $user = DB::connection('dynamic')->table('users')->where('email', 'admin@selamat.id')->first();
+            $superAdminRole = DB::connection('dynamic')->table('roles')->where('name', 'super_admin')->first();
+            
+            if ($user && $superAdminRole) {
+                DB::connection('dynamic')->table('model_has_roles')->insertOrIgnore([
+                    'role_id' => $superAdminRole->id,
+                    'model_type' => 'App\\Models\\User',
+                    'model_id' => $user->id,
+                ]);
             }
 
             // 6. Switch default connection in session to the new database

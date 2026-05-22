@@ -2,12 +2,264 @@ import React from 'react';
 import { Printer, X } from 'lucide-react';
 import Barcode from 'react-barcode';
 
-export const ReceiptPreview = ({ transaction, onPrint, onClose }) => {
-  const { items, totalAmount, discountAmount, finalAmount, paymentMethod, bankId, terminalId, receivedAmount, changeAmount, appliedPromos, branchName, orgName, userName, customerName, timestamp, receipt_number } = transaction;
+const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
+  const { 
+    items, totalAmount, discountAmount, finalAmount, paymentMethod, 
+    terminalId, receivedAmount, changeAmount, branchName, branchAddress, orgName, 
+    userName, customerName, timestamp, receipt_number 
+  } = transaction;
+
+  const pad = (str, len, char = ' ') => {
+    str = String(str);
+    if (str.length >= len) return str.substring(0, len);
+    return str + char.repeat(len - str.length);
+  };
+
+  const padLeft = (str, len, char = ' ') => {
+    str = String(str);
+    if (str.length >= len) return str.substring(0, len);
+    return char.repeat(len - str.length) + str;
+  };
+
+  const center = (str, len) => {
+    str = String(str);
+    if (str.length >= len) return str.substring(0, len);
+    const left = Math.floor((len - str.length) / 2);
+    const right = len - str.length - left;
+    return ' '.repeat(left) + str + ' '.repeat(right);
+  };
+
+  const formatPlaceholder = (lineText) => {
+    if (!lineText) return '';
+    let result = lineText
+      .replace(/{org_name}/g, orgName || '')
+      .replace(/{branch_name}/g, branchName || '')
+      .replace(/{branch_address}/g, branchAddress || '');
+    
+    if (result.includes('{branch_phone}')) {
+      const phone = branchSettings?.phone || '';
+      if (!phone) {
+        result = result.replace(/Telp:\s*{branch_phone}/i, '').trim();
+        result = result.replace(/{branch_phone}/g, '').trim();
+      } else {
+        result = result.replace(/{branch_phone}/g, phone);
+      }
+    }
+    return result;
+  };
+
+  const divider = '-'.repeat(columns);
+  let lines = [];
+
+  // Parse Headers
+  const headerLines = [];
+  for (let i = 1; i <= 4; i++) {
+    const textKey = `receipt_header_line${i}`;
+    const textVal = branchSettings?.[textKey];
+    if (textVal) {
+      const formatted = formatPlaceholder(textVal);
+      if (formatted.trim()) {
+        headerLines.push(formatted);
+      }
+    }
+  }
+
+  if (headerLines.length === 0) {
+    lines.push(center(orgName || 'TOSERBA SELAMAT', columns));
+    lines.push(center(branchName || 'Cabang Utama', columns));
+    lines.push(center('THE MOSLEM FAMILY', columns));
+  } else {
+    headerLines.forEach(text => {
+      lines.push(center(text, columns));
+    });
+  }
+
+  lines.push(divider);
+
+  lines.push(pad(`Kasir: ${userName || 'Kasir'}`, columns));
+  if (customerName) {
+    lines.push(pad(`Member: ${customerName}`, columns));
+  }
+  const dateStr = new Date(timestamp).toLocaleString('id-ID', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+  lines.push(pad(`Tgl  : ${dateStr}`, columns));
+  lines.push(pad(`Kassa: ${terminalId?.split('-')[0] || 'T01'}`, columns));
+  if (receipt_number) {
+    lines.push(pad(`Nota : ${receipt_number}`, columns));
+  }
+  lines.push(divider);
+
+  items.forEach(item => {
+    lines.push(pad(item.name || 'Item', columns));
+    const qtyPrice = `${item.quantity} x ${item.unitPrice.toLocaleString('id-ID')}`;
+    const sub = (item.quantity * item.unitPrice).toLocaleString('id-ID');
+    const space = columns - qtyPrice.length - sub.length;
+    if (space > 0) {
+      lines.push(qtyPrice + ' '.repeat(space) + sub);
+    } else {
+      lines.push(qtyPrice + '\n' + padLeft(sub, columns));
+    }
+
+    if (item.manualDiscount > 0) {
+      const discLabel = '  (Diskon Item)';
+      const discVal = `-${(item.quantity * item.manualDiscount).toLocaleString('id-ID')}`;
+      const discSpace = columns - discLabel.length - discVal.length;
+      if (discSpace > 0) {
+        lines.push(discLabel + ' '.repeat(discSpace) + discVal);
+      } else {
+        lines.push(discLabel + '\n' + padLeft(discVal, columns));
+      }
+    }
+  });
+  lines.push(divider);
+
+  const formatRow = (label, val) => {
+    const valStr = typeof val === 'number' ? val.toLocaleString('id-ID') : String(val);
+    const space = columns - label.length - valStr.length;
+    return label + ' '.repeat(Math.max(1, space)) + valStr;
+  };
+
+  lines.push(formatRow('Total Gross', totalAmount));
+  if (discountAmount > 0) {
+    lines.push(formatRow('Total Diskon', -discountAmount));
+  }
+  lines.push(formatRow('GRAND TOTAL', finalAmount));
+  lines.push(formatRow(`Bayar (${paymentMethod})`, receivedAmount));
+  lines.push(formatRow('Kembalian', changeAmount));
+
+  // PPN / Tax information
+  if (branchSettings?.receipt_show_tax) {
+    const taxRate = parseFloat(branchSettings.receipt_tax_rate ?? 11);
+    const dppRate = parseFloat(branchSettings.receipt_dpp_rate ?? 1.11);
+    const taxMessage = branchSettings.receipt_tax_message || 'Harga di atas sudah termasuk PPN';
+    const taxRateMsg = branchSettings.receipt_tax_rate_message || 'Tarif PPn';
+    const dppMsg = branchSettings.receipt_dpp_message || 'SblmPPn';
+    const totalTaxMsg = branchSettings.receipt_total_tax_message || 'NilPPn';
+
+    const dppVal = Math.round(finalAmount / dppRate);
+    const taxVal = finalAmount - dppVal;
+
+    lines.push(divider);
+    lines.push(center(taxMessage, columns));
+    lines.push(formatRow(dppMsg, dppVal));
+    lines.push(formatRow(`${taxRateMsg} (${taxRate}%)`, taxVal));
+    lines.push(formatRow(totalTaxMsg, taxVal));
+  }
+
+  lines.push(divider);
+
+  // Parse Footers
+  const footerLines = [];
+  const footerCount = parseInt(branchSettings?.receipt_footer_layout ?? 4, 10);
+  for (let i = 1; i <= footerCount; i++) {
+    const textKey = `receipt_footer_line${i}`;
+    const textVal = branchSettings?.[textKey];
+    if (textVal) {
+      footerLines.push(textVal);
+    }
+  }
+
+  if (footerLines.length === 0) {
+    lines.push(center('TERIMA KASIH', columns));
+    lines.push(center('SELAMAT BELANJA KEMBALI', columns));
+    lines.push(center('Barang yang sudah dibeli', columns));
+    lines.push(center('tidak dapat ditukar/dikembalikan', columns));
+  } else {
+    footerLines.forEach(text => {
+      lines.push(center(text, columns));
+    });
+  }
+  
+  // Feed paper (5 lines) to allow tearing
+  lines.push('\n\n\n\n\n');
+
+  return lines.join('\n');
+};
+
+export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }) => {
+  const { items, totalAmount, discountAmount, finalAmount, paymentMethod, bankId, terminalId, receivedAmount, changeAmount, appliedPromos, branchName, branchAddress, orgName, userName, customerName, timestamp, receipt_number } = transaction;
 
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
   };
+
+  const handlePrintRawText = () => {
+    const rawText = generateRawTextReceipt(transaction, branchSettings, 32);
+    
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+    
+    const doc = iframe.contentWindow.document || iframe.contentDocument;
+    doc.open();
+    doc.write('<html><head><title>Struk ESC/POS</title><style>@page { margin: 0; size: auto; } body { margin: 0; padding: 0; font-family: "Courier New", Courier, monospace; font-size: 10px; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>');
+    doc.close();
+    
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        if (onClose) onClose();
+      }, 1000);
+    }, 500);
+  };
+
+  const formatPlaceholder = (lineText) => {
+    if (!lineText) return '';
+    let result = lineText
+      .replace(/{org_name}/g, orgName || '')
+      .replace(/{branch_name}/g, branchName || '')
+      .replace(/{branch_address}/g, branchAddress || '');
+    
+    if (result.includes('{branch_phone}')) {
+      const phone = branchSettings?.phone || '';
+      if (!phone) {
+        result = result.replace(/Telp:\s*{branch_phone}/i, '').trim();
+        result = result.replace(/{branch_phone}/g, '').trim();
+      } else {
+        result = result.replace(/{branch_phone}/g, phone);
+      }
+    }
+    return result;
+  };
+
+  // Header and footer configurations for HTML layout
+  const headerLines = [];
+  for (let i = 1; i <= 4; i++) {
+    const textKey = `receipt_header_line${i}`;
+    const boldKey = `receipt_header_line${i}_bold`;
+    const textVal = branchSettings?.[textKey];
+    if (textVal) {
+      const formatted = formatPlaceholder(textVal);
+      if (formatted.trim()) {
+        headerLines.push({
+          text: formatted,
+          bold: !!branchSettings?.[boldKey]
+        });
+      }
+    }
+  }
+
+  const footerLines = [];
+  const footerCount = parseInt(branchSettings?.receipt_footer_layout ?? 4, 10);
+  for (let i = 1; i <= footerCount; i++) {
+    const textKey = `receipt_footer_line${i}`;
+    const boldKey = `receipt_footer_line${i}_bold`;
+    const textVal = branchSettings?.[textKey];
+    if (textVal) {
+      footerLines.push({
+        text: textVal,
+        bold: !!branchSettings?.[boldKey]
+      });
+    }
+  }
 
   return (
     <div className="change-modal-overlay">
@@ -19,8 +271,34 @@ export const ReceiptPreview = ({ transaction, onPrint, onClose }) => {
         
         <div className="receipt-paper" id="printable-receipt">
           <div className="receipt-header">
-            <h2 className="org-name">{orgName}</h2>
-            <p className="branch-name">{branchName}</p>
+            {!!branchSettings?.receipt_show_logo && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.6rem' }}>
+                <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="100" height="100" rx="30" fill="#4f46e5" />
+                  <path d="M30 30H70L30 70H70" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
+
+            {headerLines.length === 0 ? (
+              <>
+                <h2 className="org-name">{orgName}</h2>
+                <p className="branch-name">{branchName}</p>
+                {branchAddress && <p className="branch-address" style={{ fontSize: '10px', margin: '2px 0 0 0' }}>{branchAddress}</p>}
+              </>
+            ) : (
+              headerLines.map((line, idx) => (
+                <p key={idx} style={{ 
+                  margin: '2px 0', 
+                  fontSize: '11px', 
+                  fontWeight: line.bold ? 'bold' : 'normal',
+                  textAlign: 'center',
+                  color: 'black'
+                }}>
+                  {line.text}
+                </p>
+              ))
+            )}
             <p className="divider">--------------------------------</p>
           </div>
           
@@ -74,6 +352,25 @@ export const ReceiptPreview = ({ transaction, onPrint, onClose }) => {
               <span>Kembalian</span>
               <span>{formatCurrency(changeAmount)}</span>
             </div>
+
+            {/* PPN / Tax Details */}
+            {!!branchSettings?.receipt_show_tax && (
+              <div style={{ fontSize: '10px', marginTop: '6px', borderTop: '1px dashed #ccc', paddingTop: '6px' }}>
+                <p style={{ textAlign: 'center', margin: '2px 0', fontStyle: 'italic' }}>{branchSettings.receipt_tax_message || 'Harga di atas sudah termasuk PPN'}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                  <span>{branchSettings.receipt_dpp_message || 'SblmPPn'}</span>
+                  <span>{formatCurrency(Math.round(finalAmount / (branchSettings.receipt_dpp_rate ?? 1.11)))}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                  <span>{branchSettings.receipt_tax_rate_message || 'Tarif PPn'} ({branchSettings.receipt_tax_rate ?? 11}%)</span>
+                  <span>{formatCurrency(finalAmount - Math.round(finalAmount / (branchSettings.receipt_dpp_rate ?? 1.11)))}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                  <span>{branchSettings.receipt_total_tax_message || 'NilPPn'}</span>
+                  <span>{formatCurrency(finalAmount - Math.round(finalAmount / (branchSettings.receipt_dpp_rate ?? 1.11)))}</span>
+                </div>
+              </div>
+            )}
             <p className="divider">--------------------------------</p>
           </div>
 
@@ -81,17 +378,33 @@ export const ReceiptPreview = ({ transaction, onPrint, onClose }) => {
             <div className="receipt-promos">
               <p>Promosi Diterapkan:</p>
               {appliedPromos.map((p, idx) => (
-                <p key={idx}>* {p.name}</p>
+                <p key={idx}>* {p.promoName || p.name}</p>
               ))}
               <p className="divider">--------------------------------</p>
             </div>
           )}
 
           <div className="receipt-footer">
-            <p>Terima Kasih</p>
-            <p>Selamat Belanja Kembali</p>
-            <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
-            {receipt_number && <p style={{ marginTop: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem', color: 'black' }}>NOTA: {receipt_number}</p>}
+            {footerLines.length === 0 ? (
+              <>
+                <p>Terima Kasih</p>
+                <p>Selamat Belanja Kembali</p>
+                <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</p>
+              </>
+            ) : (
+              footerLines.map((line, idx) => (
+                <p key={idx} style={{ 
+                  margin: '2px 0', 
+                  fontSize: '11px', 
+                  fontWeight: line.bold ? 'bold' : 'normal',
+                  textAlign: 'center',
+                  color: 'black'
+                }}>
+                  {line.text}
+                </p>
+              ))
+            )}
+            {receipt_number && <p style={{ marginTop: '0.6rem', fontWeight: 'bold', fontSize: '0.9rem', color: 'black' }}>NOTA: {receipt_number}</p>}
             {receipt_number && (
               <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <Barcode 
@@ -108,9 +421,12 @@ export const ReceiptPreview = ({ transaction, onPrint, onClose }) => {
           </div>
         </div>
 
-        <footer className="receipt-preview-footer">
-          <button className="btn-print-now" onClick={onPrint}>
-            <Printer size={18} /> CETAK STRUK
+        <footer className="receipt-preview-footer" style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn-print-now" onClick={onPrint} style={{ flex: 1 }}>
+            <Printer size={18} /> CETAK GRAFIS
+          </button>
+          <button className="btn-print-now" onClick={handlePrintRawText} style={{ flex: 1, backgroundColor: '#0284c7' }}>
+            <Printer size={18} /> CETAK TEKS (ESC/POS)
           </button>
         </footer>
       </div>

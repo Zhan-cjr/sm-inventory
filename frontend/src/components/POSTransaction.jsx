@@ -40,18 +40,28 @@ const safeSetItem = (key, value) => {
   }
 };
 
-export const POSTransaction = ({ 
-  branchId, 
-  branchName, 
+export const POSTransaction = ({
+  branchId,
+  branchName,
   branchCode,
-  orgName, 
-  authToken, 
-  userName, 
-  userRole, 
+  branchAddress,
+  orgName,
+  authToken,
+  userName,
+  userRole,
   onLogout,
   lockedTerminalId,
   lockedTerminalName
 }) => {
+  const pointConversionRate = (() => {
+    try {
+      const userObj = JSON.parse(localStorage.getItem('pos_user'));
+      return parseInt(userObj?.point_conversion_rate || '1000', 10);
+    } catch (e) {
+      return 1000;
+    }
+  })();
+
   const [items, setItems] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('pos_active_cart') || '[]');
@@ -78,7 +88,7 @@ export const POSTransaction = ({
   });
   const [selectedBank, setSelectedBank] = useState(null);
   const [isBankSelectOpen, setIsBankSelectOpen] = useState(false);
-  
+
   // Initialize terminalInfo: locked terminal takes absolute priority, then local storage cache
   const [terminalInfo, setTerminalInfo] = useState(() => {
     if (lockedTerminalId) {
@@ -86,16 +96,19 @@ export const POSTransaction = ({
     }
     return { id: localStorage.getItem('pos_terminal_id'), name: localStorage.getItem('pos_terminal_name') || 'Belum Diatur', orgName: orgName };
   });
-  
+
   const [changeModalInfo, setChangeModalInfo] = useState(null);
   const [posSettings, setPosSettings] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pos_cached_settings') || '[]'); } catch (e) { return []; }
+  });
+  const [branchSettings, setBranchSettings] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pos_cached_branch_settings') || 'null'); } catch (e) { return null; }
   });
   const [searchResults, setSearchResults] = useState([]);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [inputValue, setInputValue] = useState('');
   const [allTerminals, setAllTerminals] = useState([]);
-  
+
   // Initialize terminal select modal state: if locked, it's permanently closed (false)
   const [isTerminalModalOpen, setIsTerminalModalOpen] = useState(() => {
     if (lockedTerminalId) {
@@ -374,6 +387,30 @@ export const POSTransaction = ({
         }
       });
 
+    fetch('/api/v1/branches', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          const activeBranch = data.find(b => b.id === branchId) || data[0];
+          if (activeBranch) {
+            setBranchSettings(activeBranch);
+            safeSetItem('pos_cached_branch_settings', JSON.stringify(activeBranch));
+          }
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load branch settings:', err);
+        const cached = localStorage.getItem('pos_cached_branch_settings');
+        if (cached) {
+          try { setBranchSettings(JSON.parse(cached)); } catch (e) { }
+        }
+      });
+
     fetch('/api/v1/pos-settings', {
       headers: { 'Authorization': `Bearer ${authToken}` }
     })
@@ -472,7 +509,7 @@ export const POSTransaction = ({
       .then(data => {
         setAllTerminals(data);
         safeSetItem('pos_cached_terminals', JSON.stringify(data));
-        
+
         // Force bind locked terminal properties on startup if present
         let activeTerminalId = lockedTerminalId || localStorage.getItem('pos_terminal_id');
         if (lockedTerminalId) {
@@ -821,6 +858,24 @@ export const POSTransaction = ({
     const existingItem = items.find(i => i.productId === product.id);
     let manualDiscount = 0;
 
+    const allowMinusStock = (() => {
+      try {
+        const userObj = JSON.parse(localStorage.getItem('pos_user'));
+        return userObj?.allow_minus_stock !== false;
+      } catch (e) {
+        return true;
+      }
+    })();
+
+    if (!product.is_service) {
+      const currentQty = existingItem ? existingItem.quantity : 0;
+      if (!allowMinusStock && currentQty + 1 > (product.quantity_on_hand || 0)) {
+        setAlertMsg({ text: `Stok tidak mencukupi! Sisa stok: ${product.quantity_on_hand || 0}`, type: 'error' });
+        setTimeout(() => setAlertMsg(null), 3000);
+        return;
+      }
+    }
+
     if (queuedDiscount) {
       if (queuedDiscount.type === 'PERCENT') {
         manualDiscount = (product.selling_price * queuedDiscount.value) / 100;
@@ -860,12 +915,34 @@ export const POSTransaction = ({
     if (!productId) return;
     if (quantity <= 0) removeItem(productId);
     else {
+      const item = items.find(i => i.productId === productId);
+      if (item && !item.isService) {
+        const allowMinusStock = (() => {
+          try {
+            const userObj = JSON.parse(localStorage.getItem('pos_user'));
+            return userObj?.allow_minus_stock !== false;
+          } catch (e) {
+            return true;
+          }
+        })();
+
+        const prod = dbProducts.find(p => p.id === productId);
+        if (prod && !allowMinusStock && quantity > (prod.quantity_on_hand || 0)) {
+          setAlertMsg({ text: `Stok tidak mencukupi! Sisa stok: ${prod.quantity_on_hand || 0}`, type: 'error' });
+          setTimeout(() => setAlertMsg(null), 3000);
+          return;
+        }
+      }
       setItems(items.map(i => i.productId === productId ? { ...i, quantity } : i));
     }
   };
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * parseFloat(item.unitPrice)) - (item.quantity * (item.manualDiscount || 0)), 0);
-  const { totalDiscount, appliedPromos } = discountEngine.current.calculateTotalDiscount(items, { memberTier: 'REGULAR' }, subtotal);
+  const { totalDiscount, appliedPromos } = discountEngine.current.calculateTotalDiscount(
+    items,
+    selectedCustomer ? { memberTier: selectedCustomer.member_tier } : { memberTier: 'REGULAR' },
+    subtotal
+  );
   const finalAmount = subtotal - totalDiscount - manualTotalDiscount;
   const changeAmount = receivedAmount ? parseFloat(receivedAmount) - finalAmount : 0;
 
@@ -1010,6 +1087,8 @@ export const POSTransaction = ({
       await storeLocalTransaction(transaction);
       if (isOnline) await syncTransactions();
 
+      const currentCustomer = selectedCustomer;
+
       // Clear states BEFORE showing modal to avoid flicker
       setItems([]);
       setManualTotalDiscount(0);
@@ -1017,6 +1096,32 @@ export const POSTransaction = ({
       setInputValue('');
       setIsSubtotalMode(false);
       setSelectedBank(null);
+
+      // Update customer points locally if selected (offline-safe)
+      if (currentCustomer) {
+        const earnedPoints = Math.floor(currentFinalAmount / pointConversionRate);
+        const updatedPoints = (currentCustomer.points || 0) + earnedPoints;
+
+        // Recalculate tier locally
+        let updatedTier = 'BRONZE';
+        if (updatedPoints >= 10000) updatedTier = 'PLATINUM';
+        else if (updatedPoints >= 5000) updatedTier = 'GOLD';
+        else if (updatedPoints >= 1000) updatedTier = 'SILVER';
+
+        const updatedCustomer = {
+          ...currentCustomer,
+          points: updatedPoints,
+          member_tier: updatedTier
+        };
+
+        const updatedCustomersList = customers.map(c =>
+          c.id === currentCustomer.id ? updatedCustomer : c
+        );
+
+        setCustomers(updatedCustomersList);
+        safeSetItem('pos_cached_customers', JSON.stringify(updatedCustomersList));
+      }
+
       setSelectedCustomer(null);
       setIsBankSelectOpen(false);
       setIsReturnMode(false);
@@ -1026,9 +1131,10 @@ export const POSTransaction = ({
         setLastTransaction({
           ...transaction,
           branchName,
+          branchAddress,
           orgName,
           userName,
-          customerName: selectedCustomer?.name,
+          customerName: currentCustomer?.name,
           timestamp: nowCorrected.toISOString(),
         });
         safeSetItem('pos_last_sync_time', nowCorrected.getTime().toString());
@@ -1119,36 +1225,36 @@ export const POSTransaction = ({
 
       e.preventDefault();
       switch (setting.key_name) {
-        case 'btn_pay': 
-          processTransaction(); 
+        case 'btn_pay':
+          processTransaction();
           break;
-        case 'btn_subtotal': 
-          setIsSubtotalMode(true); 
-          barcodeInput.current?.focus(); 
+        case 'btn_subtotal':
+          setIsSubtotalMode(true);
+          barcodeInput.current?.focus();
           break;
-        case 'btn_disc_item_rp': 
-          requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL')); 
+        case 'btn_disc_item_rp':
+          requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL'));
           break;
-        case 'btn_disc_item_pct': 
-          requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT')); 
+        case 'btn_disc_item_pct':
+          requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT'));
           break;
-        case 'btn_disc_total_rp': 
-          requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL')); 
+        case 'btn_disc_total_rp':
+          requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL'));
           break;
-        case 'btn_disc_total_pct': 
-          requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT')); 
+        case 'btn_disc_total_pct':
+          requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT'));
           break;
-        case 'btn_tunai': 
-          startPayment('CASH'); 
+        case 'btn_tunai':
+          startPayment('CASH');
           break;
-        case 'btn_card': 
-          startPayment('CARD'); 
+        case 'btn_card':
+          startPayment('CARD');
           break;
-        case 'btn_void_item': 
-          requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0)); 
+        case 'btn_void_item':
+          requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0));
           break;
-        case 'btn_void_all': 
-          requestAuthorization("VOID", () => { setItems([]); setManualTotalDiscount(0); setIsReturnMode(false); }); 
+        case 'btn_void_all':
+          requestAuthorization("VOID", () => { setItems([]); setManualTotalDiscount(0); setIsReturnMode(false); });
           break;
         case 'handleClearDiscount':
         case 'btn_clear':
@@ -1174,7 +1280,7 @@ export const POSTransaction = ({
         case 'setIsReturnModalOpen':
           requestAuthorization("RETURN", () => setIsReturnModalOpen(true));
           break;
-        default: 
+        default:
           break;
       }
     };
@@ -1404,7 +1510,7 @@ export const POSTransaction = ({
             <div className="search-box-modern" style={{ width: '100%', marginTop: '1rem' }}>
               <input
                 type="text"
-                placeholder="Cari member (Nama/HP)..."
+                placeholder="Cari member berdasarkan nama atau nomor HP..."
                 className="modern-barcode-input"
                 style={{ paddingLeft: '1rem', marginBottom: '1rem' }}
                 value={memberSearchQuery}
@@ -1417,9 +1523,19 @@ export const POSTransaction = ({
                 .filter(c => c.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) || c.phone?.includes(memberSearchQuery))
                 .map(customer => (
                   <div key={customer.id} className="held-item" style={{ cursor: 'pointer', padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }} onClick={() => { setSelectedCustomer(customer); setIsMemberModalOpen(false); setMemberSearchQuery(''); }}>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontWeight: '700' }}>{customer.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{customer.phone || '-'} | {customer.member_tier || 'REGULAR'}</div>
+                    <div style={{ textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: '700', fontSize: '1rem', color: '#f8fafc' }}>{customer.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '2px' }}>
+                          No. HP: <span style={{ color: '#cbd5e1', fontWeight: '500' }}>{customer.phone || '-'}</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold' }}>{customer.points || 0} Pts</div>
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', display: 'inline-block', fontWeight: '600' }}>
+                          {customer.member_tier || 'BRONZE'}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -1455,6 +1571,7 @@ export const POSTransaction = ({
       {showReceiptPreview && lastTransaction && (
         <ReceiptPreview
           transaction={lastTransaction}
+          branchSettings={branchSettings}
           onPrint={() => { window.print(); setShowReceiptPreview(false); }}
           onClose={() => setShowReceiptPreview(false)}
         />

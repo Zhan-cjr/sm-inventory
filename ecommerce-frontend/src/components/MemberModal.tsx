@@ -1,0 +1,936 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  X, CheckCircle, Award, Phone, Mail, MapPin, User, 
+  History, LogOut, Receipt, ArrowRight, 
+  ShoppingBag, Loader2, Printer, Lock 
+} from 'lucide-react';
+import { useEcom } from '../context/EcomContext';
+import axios from 'axios';
+import { getImageUrl } from '../utils/api';
+
+const MemberModal = () => {
+  const { 
+    isMemberModalOpen, 
+    setIsMemberModalOpen, 
+    member, 
+    setMember, 
+    logoutMember,
+    syncMemberPoints
+  } = useEcom();
+
+  // Tab State: 'login' | 'register' (when logged out) or 'profile' | 'history' (when logged in)
+  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'forgot'>('login');
+  const [memberTab, setMemberTab] = useState<'profile' | 'history'>('profile');
+
+  // Form states
+  const [loginPhone, setLoginPhone] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [regName, setRegName] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regAddress, setRegAddress] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+
+  // UI state
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  
+  // History state
+  const [history, setHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+
+  // Settings
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState('Toserba Selamat');
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await axios.get('/ecommerce/settings');
+        if (response.data.logo_url) {
+          setLogoUrl(getImageUrl(response.data.logo_url));
+        }
+        if (response.data.name) {
+          setOrgName(response.data.name);
+        }
+      } catch (error) {
+        console.error('Error fetching settings for MemberModal:', error);
+      }
+    };
+    if (isMemberModalOpen) {
+      fetchSettings();
+      syncMemberPoints();
+    }
+  }, [isMemberModalOpen]);
+
+  // Fetch history when member changes or history tab is selected
+  useEffect(() => {
+    if (isMemberModalOpen && member && memberTab === 'history') {
+      fetchHistory();
+    }
+  }, [isMemberModalOpen, member, memberTab]);
+
+  const fetchHistory = async () => {
+    if (!member) return;
+    setIsLoadingHistory(true);
+    setError(null);
+    try {
+      const response = await axios.get('/ecommerce/members/history', {
+        params: { phone: member.phone }
+      });
+      setHistory(response.data.history || []);
+    } catch (err: any) {
+      console.error(err);
+      setError('Gagal mengambil riwayat belanja.');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  if (!isMemberModalOpen) return null;
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post('/ecommerce/members/forgot-password', {
+        phone: forgotPhone,
+      });
+      setSuccessMsg(response.data.message || 'OTP terkirim!');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      setForgotStep(2);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Gagal mengirim OTP.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post('/ecommerce/members/reset-password', {
+        phone: forgotPhone,
+        otp: forgotOtp,
+        password: forgotNewPassword,
+      });
+      setSuccessMsg(response.data.message || 'Password berhasil direset!');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      setForgotOtp('');
+      setForgotNewPassword('');
+      setForgotStep(1);
+      setLoginPhone(forgotPhone);
+      setActiveTab('login');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Gagal mereset kata sandi.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await axios.post('/ecommerce/members/login', {
+        phone: loginPhone,
+        password: loginPassword,
+      });
+
+      setMember(response.data.member);
+      setSuccessMsg('Selamat datang kembali!');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      setMemberTab('profile');
+      setLoginPassword('');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Nomor WhatsApp belum terdaftar.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await axios.post('/ecommerce/members', {
+        name: regName,
+        phone: regPhone,
+        email: regEmail || null,
+        address: regAddress || null,
+        password: regPassword,
+      });
+
+      setMember(response.data.member);
+      setSuccessMsg(response.data.message || 'Pendaftaran member berhasil!');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      setMemberTab('profile');
+      setRegPassword('');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Gagal mendaftar. Silakan coba lagi.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logoutMember();
+    setHistory([]);
+    setSelectedReceipt(null);
+    setActiveTab('login');
+  };
+
+  const handleClose = () => {
+    setIsMemberModalOpen(false);
+    setSelectedReceipt(null);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl max-w-lg w-full h-full sm:h-[85vh] flex flex-col overflow-hidden transform transition-all animate-scale-up border border-slate-100">
+        
+        {/* Header */}
+        <div className="relative p-6 border-b border-slate-100 flex justify-between items-center bg-white flex-shrink-0">
+          <div>
+            <h3 className="text-xl font-extrabold text-slate-800 tracking-tight">
+              {member ? 'Area Member' : 'Member Toserba Selamat'}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              {member 
+                ? `Hi, ${member.name} - Kelola kartu member dan poin Anda.` 
+                : 'Dapatkan keuntungan koin belanja & potongan harga eksklusif.'
+              }
+            </p>
+          </div>
+          <button 
+            onClick={handleClose}
+            className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-grow overflow-y-auto p-6 relative">
+          {error && (
+            <div className="mb-4 p-3.5 bg-red-50 text-red-600 rounded-xl text-sm font-semibold border border-red-100 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="mb-4 p-3.5 bg-emerald-50 text-emerald-700 rounded-xl text-sm font-semibold border border-emerald-100 flex items-center gap-2">
+              <CheckCircle className="text-emerald-600" size={16} />
+              {successMsg}
+            </div>
+          )}
+
+          {!member ? (
+            /* ================= LOGGED OUT STATE ================= */
+            <div className="space-y-6">
+              {activeTab !== 'forgot' && (
+                <>
+                  {/* Tab Selector */}
+                  <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+                    <button
+                      onClick={() => { setActiveTab('login'); setError(null); }}
+                      className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
+                        activeTab === 'login' 
+                          ? 'bg-white text-brand-blue shadow-sm' 
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Masuk Member
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab('register'); setError(null); }}
+                      className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
+                        activeTab === 'register' 
+                          ? 'bg-white text-brand-blue shadow-sm' 
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Daftar Baru
+                    </button>
+                  </div>
+
+                  {activeTab === 'login' ? (
+                    /* Login Form */
+                    <form onSubmit={handleLoginSubmit} className="space-y-4">
+                      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs text-blue-800 leading-relaxed">
+                        Masukkan nomor WhatsApp yang terdaftar untuk masuk dan melihat poin & riwayat belanja.
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">No. WhatsApp Member *</label>
+                        <div className="relative">
+                          <input
+                            type="tel"
+                            required
+                            value={loginPhone}
+                            onChange={(e) => setLoginPhone(e.target.value)}
+                            placeholder="Contoh: 08123456789"
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                          />
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Kata Sandi *</label>
+                        <div className="relative">
+                          <input
+                            type="password"
+                            required
+                            value={loginPassword}
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                            placeholder="Masukkan kata sandi Anda"
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                          />
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                        <div className="flex justify-end mt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForgotPhone(loginPhone);
+                              setActiveTab('forgot');
+                              setForgotStep(1);
+                              setError(null);
+                            }}
+                            className="text-xs font-bold text-brand-blue hover:underline"
+                          >
+                            Lupa Kata Sandi?
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3.5 bg-brand-blue text-white font-extrabold rounded-2xl hover:bg-brand-blue/95 hover:shadow-lg active:scale-[0.98] transition-all text-sm mt-4 disabled:opacity-50 flex items-center justify-center gap-2 shadow-md shadow-brand-blue/10"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="animate-spin" size={16} />
+                            Memproses...
+                          </>
+                        ) : (
+                          <>
+                            Masuk Sekarang
+                            <ArrowRight size={16} />
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
+                    /* Register Form */
+                    <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Nama Lengkap *</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            required
+                            value={regName}
+                            onChange={(e) => setRegName(e.target.value)}
+                            placeholder="Nama lengkap sesuai KTP"
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                          />
+                          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">No. WhatsApp *</label>
+                        <div className="relative">
+                          <input
+                            type="tel"
+                            required
+                            value={regPhone}
+                            onChange={(e) => setRegPhone(e.target.value)}
+                            placeholder="Contoh: 08123456789"
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                          />
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Alamat Email (Opsional)</label>
+                        <div className="relative">
+                          <input
+                            type="email"
+                            value={regEmail}
+                            onChange={(e) => setRegEmail(e.target.value)}
+                            placeholder="email@anda.com"
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                          />
+                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Alamat Lengkap (Opsional)</label>
+                        <div className="relative">
+                          <textarea
+                            value={regAddress}
+                            onChange={(e) => setRegAddress(e.target.value)}
+                            placeholder="Alamat lengkap untuk pengiriman e-commerce"
+                            rows={2}
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800 resize-none"
+                          />
+                          <MapPin className="absolute left-3.5 top-4 text-slate-400" size={16} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Buat Kata Sandi *</label>
+                        <div className="relative">
+                          <input
+                            type="password"
+                            required
+                            value={regPassword}
+                            onChange={(e) => setRegPassword(e.target.value)}
+                            placeholder="Minimal 6 karakter"
+                            minLength={6}
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                          />
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 bg-brand-blue text-white font-extrabold rounded-xl hover:bg-brand-blue/90 hover:shadow-lg active:scale-95 transition-all text-sm mt-4 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="animate-spin" size={16} />
+                            Mendaftarkan...
+                          </>
+                        ) : (
+                          'Daftar Member Baru'
+                        )}
+                      </button>
+                    </form>
+                  )}
+                </>
+              )}
+
+              {activeTab === 'forgot' && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('login');
+                        setError(null);
+                      }}
+                      className="text-xs font-bold text-brand-blue hover:underline flex items-center gap-1"
+                    >
+                      &larr; Kembali ke Login
+                    </button>
+                  </div>
+
+                  {forgotStep === 1 ? (
+                    <form onSubmit={handleSendOtp} className="space-y-4">
+                      <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
+                        Masukkan nomor WhatsApp Anda. Kami akan mengirimkan 6-digit kode OTP untuk mereset kata sandi Anda.
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">No. WhatsApp Member *</label>
+                        <div className="relative">
+                          <input
+                            type="tel"
+                            required
+                            value={forgotPhone}
+                            onChange={(e) => setForgotPhone(e.target.value)}
+                            placeholder="Contoh: 08123456789"
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                          />
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3.5 bg-brand-blue text-white font-extrabold rounded-2xl hover:bg-brand-blue/95 hover:shadow-lg active:scale-[0.98] transition-all text-sm mt-4 disabled:opacity-50 flex items-center justify-center gap-2 shadow-md shadow-brand-blue/10"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="animate-spin" size={16} />
+                            Mengirim OTP...
+                          </>
+                        ) : (
+                          <>
+                            Kirim Kode OTP via WA
+                            <ArrowRight size={16} />
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleResetSubmit} className="space-y-4">
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-xs text-emerald-800 leading-relaxed">
+                        Kode OTP telah dikirim ke WhatsApp Anda. Silakan masukkan kode tersebut dan buat kata sandi baru.
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Kode OTP (6 Digit) *</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            required
+                            maxLength={6}
+                            value={forgotOtp}
+                            onChange={(e) => setForgotOtp(e.target.value)}
+                            placeholder="Masukkan 6-digit OTP"
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800 text-center tracking-widest font-bold"
+                          />
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Kata Sandi Baru *</label>
+                        <div className="relative">
+                          <input
+                            type="password"
+                            required
+                            value={forgotNewPassword}
+                            onChange={(e) => setForgotNewPassword(e.target.value)}
+                            placeholder="Minimal 6 karakter"
+                            minLength={6}
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                          />
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3.5 bg-brand-blue text-white font-extrabold rounded-2xl hover:bg-brand-blue/95 hover:shadow-lg active:scale-[0.98] transition-all text-sm mt-4 disabled:opacity-50 flex items-center justify-center gap-2 shadow-md shadow-brand-blue/10"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="animate-spin" size={16} />
+                            Mereset Kata Sandi...
+                          </>
+                        ) : (
+                          'Reset & Simpan Kata Sandi'
+                        )}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ================= LOGGED IN STATE ================= */
+            <div className="space-y-6">
+              {/* Virtual Member Card */}
+              <div className="w-full bg-slate-950 text-white rounded-2xl p-5 shadow-xl relative overflow-hidden aspect-[1.586/1] border border-white/10 flex flex-col justify-between">
+                {/* Radial glows matching logo colors */}
+                <div className="absolute top-0 right-0 w-40 h-40 bg-[#E31E24]/20 rounded-full blur-[50px] pointer-events-none animate-pulse" style={{ animationDuration: '4s' }} />
+                <div className="absolute bottom-0 left-0 w-40 h-40 bg-[#9DCD38]/20 rounded-full blur-[50px] pointer-events-none animate-pulse" style={{ animationDuration: '6s' }} />
+                <div className="absolute top-1/2 left-1/4 w-28 h-28 bg-[#001C84]/35 rounded-full blur-[45px] pointer-events-none" />
+
+                {/* Subtle grid lines pattern */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:15px_15px] opacity-40 pointer-events-none" />
+
+                {/* Card Top: Brand & Tier */}
+                <div className="flex justify-between items-center relative z-10">
+                  {logoUrl ? (
+                    <div className="bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-lg flex items-center justify-center shadow-sm">
+                      <img src={logoUrl} alt={orgName} className="h-5 w-auto object-contain max-w-[100px]" />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col">
+                      <span className="text-sm font-extrabold tracking-tight text-white leading-none">
+                        toserba <span className="text-red-500">Selamat</span>
+                      </span>
+                      <span className="text-[0.4rem] tracking-widest text-slate-400 uppercase mt-0.5">The Moslem Family</span>
+                    </div>
+                  )}
+                  
+                  <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 border border-white/10 ${
+                    (member.member_tier || 'BRONZE') === 'BRONZE'
+                      ? 'bg-gradient-to-r from-amber-700 via-amber-800 to-amber-900 text-amber-100'
+                      : (member.member_tier || 'BRONZE') === 'SILVER'
+                      ? 'bg-gradient-to-r from-slate-400 via-slate-500 to-slate-600 text-slate-100'
+                      : (member.member_tier || 'BRONZE') === 'GOLD'
+                      ? 'bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 text-yellow-950'
+                      : 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white'
+                  }`}>
+                    <Award size={9} className="animate-pulse" />
+                    {member.member_tier || 'BRONZE'}
+                  </div>
+                </div>
+
+                {/* Smart Card Chip */}
+                <div className="flex justify-between items-start relative z-10">
+                  <svg className="w-8 h-6 text-amber-500 opacity-90" viewBox="0 0 50 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="2" width="46" height="34" rx="6" fill="url(#chip-grad)" stroke="#d97706" strokeWidth="1.5"/>
+                    <path d="M14 2v12m0 12v12M36 2v12m0 12v12M2 19h12m22 0h12" stroke="#d97706" strokeWidth="1.5"/>
+                    <rect x="20" y="10" width="10" height="18" rx="3" fill="#d97706" opacity="0.3"/>
+                    <defs>
+                      <linearGradient id="chip-grad" x1="0" y1="0" x2="50" y2="38" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#fef08a"/>
+                        <stop offset="1" stopColor="#eab308"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-white/10 to-white/30 border border-white/15 flex items-center justify-center backdrop-blur-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#9DCD38]" />
+                  </div>
+                </div>
+
+                {/* Holder Name & Information */}
+                <div className="relative z-10">
+                  <div className="flex flex-col">
+                    <span className="text-[8px] text-slate-400 uppercase tracking-widest leading-none font-semibold">NAMA LENGKAP</span>
+                    <span className="text-sm font-extrabold tracking-wide mt-1 text-white uppercase truncate max-w-[260px]">
+                      {member.name}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-end mt-1.5">
+                    <div className="flex flex-col">
+                      <span className="text-[8px] text-slate-400 uppercase tracking-widest leading-none font-semibold">ID MEMBER</span>
+                      <span className="font-mono text-[10px] tracking-wider text-slate-200 mt-1">
+                        {(() => {
+                          const cleanId = member.id.substring(0, 8).toUpperCase();
+                          return `${cleanId.substring(0, 4)} ${cleanId.substring(4, 8)}`;
+                        })()}
+                      </span>
+                    </div>
+                    <div className="text-right flex flex-col items-end">
+                      <span className="text-[8px] text-slate-400 uppercase tracking-widest leading-none font-semibold">POIN BELANJA</span>
+                      <span className="text-xs font-black text-[#9DCD38] mt-0.5 flex items-center gap-1 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+                        {member.points || 0} <span className="text-[8px] tracking-normal font-bold">PTS</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Tab Selector */}
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl flex-shrink-0">
+                <button
+                  onClick={() => setMemberTab('profile')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    memberTab === 'profile' 
+                      ? 'bg-white text-brand-blue shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <User size={14} />
+                  Profil & Poin
+                </button>
+                <button
+                  onClick={() => setMemberTab('history')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    memberTab === 'history' 
+                      ? 'bg-white text-brand-blue shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <History size={14} />
+                  Riwayat Belanja
+                </button>
+              </div>
+
+              {memberTab === 'profile' ? (
+                /* Profile & Points Tab */
+                <div className="space-y-4">
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Koin Selamat</span>
+                      <span className="text-2xl font-black text-slate-800 mt-1 block">
+                        {member.points || 0} <span className="text-xs font-bold text-slate-400">Poin Aktif</span>
+                      </span>
+                      <p className="text-[10px] text-slate-500 mt-1.5">Setiap Rp 1.000 belanja otomatis menghasilkan 1 poin.</p>
+                    </div>
+                    <div className="w-14 h-14 bg-gradient-to-tr from-emerald-400 to-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-md">
+                      <Award size={28} />
+                    </div>
+                  </div>
+
+                  <div className="border border-slate-100 rounded-2xl p-4 space-y-3 bg-slate-50/50">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Informasi Akun</span>
+                    
+                    <div className="flex items-center gap-3 py-1 border-b border-slate-100 text-xs">
+                      <Phone size={14} className="text-slate-400 flex-shrink-0" />
+                      <div className="flex-grow">
+                        <span className="text-[10px] text-slate-400 block font-medium">NO. WHATSAPP</span>
+                        <span className="font-bold text-slate-800 mt-0.5 block">{member.phone}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 py-1 border-b border-slate-100 text-xs">
+                      <Mail size={14} className="text-slate-400 flex-shrink-0" />
+                      <div className="flex-grow">
+                        <span className="text-[10px] text-slate-400 block font-medium">EMAIL</span>
+                        <span className="font-bold text-slate-800 mt-0.5 block">{member.email || '-'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 py-1 text-xs">
+                      <MapPin size={14} className="text-slate-400 flex-shrink-0" />
+                      <div className="flex-grow">
+                        <span className="text-[10px] text-slate-400 block font-medium">ALAMAT</span>
+                        <span className="font-semibold text-slate-700 mt-0.5 block leading-relaxed">
+                          {member.address || 'Belum diatur'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleLogout}
+                    className="w-full py-3.5 bg-red-50 text-red-600 font-bold rounded-2xl hover:bg-red-100 active:scale-95 transition-all text-xs flex items-center justify-center gap-2 border border-red-100"
+                  >
+                    <LogOut size={14} />
+                    Keluar Akun Member
+                  </button>
+                </div>
+              ) : (
+                /* History Tab */
+                <div className="space-y-3">
+                  {isLoadingHistory ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400 text-sm">
+                      <Loader2 className="animate-spin text-brand-blue" size={28} />
+                      Mengambil riwayat belanja...
+                    </div>
+                  ) : history.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 space-y-3">
+                      <ShoppingBag size={36} className="mx-auto text-slate-300" />
+                      <p className="text-xs font-semibold">Belum ada riwayat belanja yang tercatat.</p>
+                      <p className="text-[10px]">Poin belanja Anda akan muncul di sini setelah pesanan selesai.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 pr-1 max-h-[35vh] overflow-y-auto">
+                      {history.map((item) => (
+                        <div 
+                          key={item.id} 
+                          className="p-3.5 border border-slate-100 rounded-2xl bg-white hover:bg-slate-50 transition-all flex flex-col gap-2.5 shadow-sm"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                  item.type === 'STORE' 
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-100' 
+                                    : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                                }`}>
+                                  {item.type === 'STORE' ? 'TOKO (POS)' : 'ONLINE'}
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400">{item.invoice_number}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-400 block mt-1">
+                                {new Date(item.date).toLocaleDateString('id-ID', {
+                                  day: '2-digit', month: 'short', year: 'numeric',
+                                  hour: '2-digit', minute: '2-digit'
+                                })}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">
+                                Cabang: <span className="text-slate-700">{item.branch_name}</span>
+                              </span>
+                            </div>
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              item.status === 'SUCCESS' || item.status === 'COMPLETED'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                : item.status === 'VOID'
+                                ? 'bg-red-50 text-red-700 border border-red-100'
+                                : 'bg-blue-50 text-blue-700 border border-blue-100'
+                            }`}>
+                              {item.status === 'SUCCESS' || item.status === 'COMPLETED'
+                                ? 'Berhasil'
+                                : item.status === 'VOID'
+                                ? 'Batal (Void)'
+                                : item.status
+                              }
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block leading-none">Total Belanja</span>
+                              <span className="text-xs font-mono font-bold text-slate-800 mt-1 block">
+                                Rp {item.final_amount.toLocaleString('id-ID')}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => setSelectedReceipt(item)}
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-all text-[10px] flex items-center gap-1"
+                            >
+                              <Receipt size={12} />
+                              Lihat Struk
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Modal footer if logged in */}
+        {member && (
+          <div className="p-4 border-t border-slate-100 bg-slate-50 flex-shrink-0 flex justify-between items-center text-xs text-slate-500 font-medium">
+            <span>ID Member: {member.id.substring(0, 8).toUpperCase()}</span>
+            <span>Toserba Selamat E-Commerce</span>
+          </div>
+        )}
+
+        {/* ================= VIRTUAL RECEIPT MODAL OVERLAY ================= */}
+        {selectedReceipt && (
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-fade-in">
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col overflow-hidden max-h-[90%] border border-slate-100 animate-scale-up">
+              
+              {/* Receipt Header Actions */}
+              <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+                <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
+                  <Receipt size={14} className="text-brand-blue" />
+                  Detail Struk Belanja
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => window.print()}
+                    className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-all"
+                    title="Cetak"
+                  >
+                    <Printer size={12} />
+                  </button>
+                  <button 
+                    onClick={() => setSelectedReceipt(null)}
+                    className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-all"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Thermal Receipt Paper Layout */}
+              <div className="p-5 overflow-y-auto flex-grow bg-slate-50 print:bg-white">
+                <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-md flex flex-col font-mono text-[11px] text-slate-800 relative">
+                  
+                  {/* Jagged border simulation top & bottom */}
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-[linear-gradient(45deg,transparent_25%,#f8fafc_25%,#f8fafc_50%,transparent_50%,transparent_75%,#f8fafc_75%)] bg-[size:8px_8px]" />
+                  
+                  {/* Brand Header */}
+                  <div className="text-center border-b border-dashed border-slate-300 pb-3 mb-3">
+                    <h4 className="font-extrabold text-sm text-slate-900 tracking-tight">TOSERBA SELAMAT</h4>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wide mt-0.5">{selectedReceipt.branch_name}</p>
+                    <p className="text-[9px] text-slate-400 mt-1">THE MOSLEM FAMILY</p>
+                  </div>
+
+                  {/* Receipt Meta */}
+                  <div className="space-y-1 pb-3 border-b border-dashed border-slate-200 mb-3 text-slate-600">
+                    <div className="flex justify-between">
+                      <span>No Nota:</span>
+                      <span className="font-bold text-slate-900">{selectedReceipt.invoice_number}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Waktu:</span>
+                      <span>{new Date(selectedReceipt.date).toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Kasir:</span>
+                      <span>{selectedReceipt.cashier_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Metode:</span>
+                      <span>{selectedReceipt.payment_method}</span>
+                    </div>
+                    {selectedReceipt.is_voided && (
+                      <div className="bg-red-50 text-red-600 font-bold py-1 text-center rounded border border-red-100 text-[10px] mt-1.5">
+                        TRANSAKSI DIBATALKAN (VOID)
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Items List */}
+                  <div className="space-y-3 pb-3 border-b border-dashed border-slate-200 mb-3">
+                    {selectedReceipt.items?.map((item: any, idx: number) => (
+                      <div key={idx} className="flex flex-col">
+                        <span className="font-semibold text-slate-900">{item.product_name}</span>
+                        <div className="flex justify-between text-slate-500 mt-0.5">
+                          <span>{item.quantity} x Rp {item.price.toLocaleString('id-ID')}</span>
+                          <span className="font-bold text-slate-900">Rp {item.subtotal.toLocaleString('id-ID')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Calculations */}
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>Rp {selectedReceipt.total_amount.toLocaleString('id-ID')}</span>
+                    </div>
+                    {selectedReceipt.discount_amount > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>Diskon:</span>
+                        <span>-Rp {selectedReceipt.discount_amount.toLocaleString('id-ID')}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold text-sm text-slate-900 pt-1.5 border-t border-slate-100">
+                      <span>TOTAL:</span>
+                      <span>Rp {selectedReceipt.final_amount.toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+
+                  {/* Thank you Footer */}
+                  <div className="text-center pt-5 mt-4 border-t border-dashed border-slate-300 text-slate-400 text-[9px] leading-relaxed">
+                    <p className="font-bold">TERIMA KASIH ATAS KUNJUNGAN ANDA</p>
+                    <p className="mt-0.5">Barang yang sudah dibeli tidak dapat ditukar</p>
+                    <p className="mt-0.5">Semoga Berkah - Insya Allah</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Close virtual receipt button */}
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex-shrink-0">
+                <button
+                  onClick={() => setSelectedReceipt(null)}
+                  className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl transition-all text-xs"
+                >
+                  Kembali ke Riwayat
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+export default MemberModal;

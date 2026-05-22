@@ -65,6 +65,10 @@ class AdminPanelProvider extends PanelProvider
                 'panels::head.end',
                 fn (): string => '<link rel="stylesheet" href="/css/admin-custom.css?v=' . filemtime(public_path('css/admin-custom.css')) . '">' . view('filament.print-styles')->render(),
             )
+            ->renderHook(
+                'panels::body.end',
+                fn (): string => \Illuminate\Support\Facades\Blade::render('@livewire("import-progress-bar")'),
+            )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([

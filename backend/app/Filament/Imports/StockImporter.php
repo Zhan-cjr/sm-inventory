@@ -98,6 +98,10 @@ class StockImporter extends Importer
                 ->numeric()
                 ->example('14')
                 ->rules(['nullable', 'integer']),
+            ImportColumn::make('rack')
+                ->label('Rak (Nama/Kode)')
+                ->example('Rak Depan A1')
+                ->rules(['nullable', 'string', 'max:255']),
         ];
     }
 
@@ -147,5 +151,20 @@ class StockImporter extends Importer
         }
 
         return $body;
+    }
+
+    protected function afterSave(): void
+    {
+        $rackState = $this->data['rack'] ?? null;
+        if (!$rackState || !$this->record) return;
+        
+        $branchId = $this->record->branch_id;
+        
+        $rack = \App\Models\StockOpnameRack::firstOrCreate(
+            ['branch_id' => $branchId, 'rack_name' => $rackState],
+            ['rack_code' => \Illuminate\Support\Str::slug($rackState), 'is_active' => true]
+        );
+        
+        $this->record->racks()->syncWithoutDetaching([$rack->id]);
     }
 }

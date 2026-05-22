@@ -67,6 +67,7 @@ function App() {
             branchId: data.branch_id,
             branchName: data.branch_name,
             branchCode: data.branch_code,
+            branchAddress: data.branch_address,
             terminalId: data.terminal_id,
             terminalName: data.terminal_name
           });
@@ -75,6 +76,7 @@ function App() {
           localStorage.setItem('pos_device_branch_id', data.branch_id || '');
           localStorage.setItem('pos_device_branch_name', data.branch_name || '');
           localStorage.setItem('pos_device_branch_code', data.branch_code || '');
+          localStorage.setItem('pos_device_branch_address', data.branch_address || '');
           localStorage.setItem('pos_device_terminal_id', data.terminal_id || '');
           localStorage.setItem('pos_device_terminal_name', data.terminal_name || '');
         } else if (data.status === 'BLOCKED') {
@@ -95,6 +97,7 @@ function App() {
             branchId: localStorage.getItem('pos_device_branch_id'),
             branchName: localStorage.getItem('pos_device_branch_name'),
             branchCode: localStorage.getItem('pos_device_branch_code'),
+            branchAddress: localStorage.getItem('pos_device_branch_address') || '',
             terminalId: localStorage.getItem('pos_device_terminal_id'),
             terminalName: localStorage.getItem('pos_device_terminal_name')
           });
@@ -227,7 +230,7 @@ function App() {
           </div>
 
           <div className="device-auth-footer-brand">
-            SM Inventory &copy; 2026. Powered by <a href="https://instagram.com/zhan_soft" target="_blank" rel="noreferrer">Zhan_soft</a>
+            SM Inventory &copy; 2026. Powered by <a href="https://instagram.com/amn4ll" target="_blank" rel="noreferrer">Zhan_soft</a>
           </div>
         </div>
       </div>
@@ -297,6 +300,7 @@ function App() {
                 branchId={deviceInfo?.branchId || user.branch_id}
                 branchName={deviceInfo?.branchName || user.branch_name}
                 branchCode={deviceInfo?.branchCode || user.branch_code}
+                branchAddress={deviceInfo?.branchAddress || user.branch_address}
                 orgName={user.organization_name}
                 authToken={token}
                 userName={user.name}
