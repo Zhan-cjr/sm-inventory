@@ -17,14 +17,17 @@ use Filament\Actions\ExportAction;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+
 class LaporanPenjualan extends Page implements HasTable
 {
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-presentation-chart-line';
     protected static ?string $navigationLabel = 'Laporan Penjualan';
     protected static ?string $title = 'Laporan Penjualan';
-    protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
+    protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
     protected static bool $shouldRegisterNavigation = false;
 
     protected string $view = 'filament.pages.report-page';

@@ -18,14 +18,18 @@ use Filament\Actions\ExportAction;
 use Filament\Tables\Grouping\Group;
 use Illuminate\Support\Facades\Auth;
 
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+
 class LaporanPenjualanKasir extends Page implements HasTable
 {
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
     protected static ?string $navigationLabel = 'Penjualan Per Kassa';
     protected static ?string $title = 'Laporan Penjualan (Per Kassa)';
-    protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
+    protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
+    protected static ?int $navigationSort = 7;
 
     protected string $view = 'filament.pages.report-page';
 

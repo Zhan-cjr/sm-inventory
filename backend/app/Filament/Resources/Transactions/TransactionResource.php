@@ -23,7 +23,7 @@ class TransactionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Penjualan & Kasir';
+    protected static \UnitEnum|string|null $navigationGroup = 'TRANSAKSI';
 
     protected static bool $shouldRegisterNavigation = false;
 

@@ -9,6 +9,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
 
 class ProductsTable
@@ -16,7 +17,35 @@ class ProductsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function (\Illuminate\Database\Eloquent\Builder $query, \Filament\Tables\Contracts\HasTable $livewire) {
+                $user = \Illuminate\Support\Facades\Auth::user();
+
+                if ($user && $user->branch_id) {
+                    $query->with(['stocks' => function ($q) use ($user) {
+                        $q->where('branch_id', $user->branch_id)->with('racks');
+                    }]);
+                    return $query->withSum(['stocks' => function ($q) use ($user) {
+                        $q->where('branch_id', $user->branch_id);
+                    }], 'quantity_on_hand');
+                }
+
+                $branchId = $livewire->tableFilters['branch']['value'] ?? null;
+                if ($branchId) {
+                    $query->with(['stocks' => function ($q) use ($branchId) {
+                        $q->where('branch_id', $branchId)->with('racks');
+                    }]);
+                    return $query->withSum(['stocks' => function ($q) use ($branchId) {
+                        $q->where('branch_id', $branchId);
+                    }], 'quantity_on_hand');
+                }
+
+                $query->with('stocks.racks');
+                return $query->withSum('stocks', 'quantity_on_hand');
+            })
             ->columns([
+                ImageColumn::make('image_path')
+                    ->label('Foto')
+                    ->square(),
                 TextColumn::make('sku')
                     ->label('SKU')
                     ->searchable()
@@ -41,9 +70,17 @@ class ProductsTable
                     ->numeric()
                     ->sortable()
                     ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()),
+                TextColumn::make('stocks.racks.rack_code')
+                    ->label('No Rak')
+                    ->badge()
+                    ->separator(',')
+                    ->searchable()
+                    ->toggleable(),
                 IconColumn::make('is_active')
                     ->label('Status')
                     ->boolean(),
+                \Filament\Tables\Columns\ToggleColumn::make('is_ecommerce_active')
+                    ->label('Tampil E-Commerce'),
             ])
             ->filters([
                 \Filament\Tables\Filters\SelectFilter::make('branch')
@@ -60,7 +97,13 @@ class ProductsTable
                     ->modalHeading(fn ($record) => "Kartu Stok: {$record->name}")
                     ->modalWidth('4xl')
                     ->modalFooterActions([])
-                    ->modalContent(fn ($record) => view('filament.components.stock-card-livewire', ['record' => $record])),
+                    ->modalContent(fn ($record, \Filament\Tables\Contracts\HasTable $livewire) => view(
+                        'filament.components.stock-card-livewire', 
+                        [
+                            'record' => $record,
+                            'branchId' => $livewire->tableFilters['branch']['value'] ?? null
+                        ]
+                    )),
                 EditAction::make(),
             ])
             ->toolbarActions([

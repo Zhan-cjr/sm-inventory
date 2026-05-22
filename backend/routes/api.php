@@ -5,14 +5,37 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\TransactionController;
 
+use App\Http\Controllers\Api\V1\EcommerceController;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "api" middleware group. Make something great!
+|
 */
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\PosDeviceController;
+
+// E-Commerce Routes
+Route::prefix('v1/ecommerce')->group(function () {
+    Route::get('settings', [EcommerceController::class, 'getSettings']);
+    Route::get('products', [EcommerceController::class, 'getProducts']);
+    Route::get('nearest-branch', [EcommerceController::class, 'findNearestBranch']);
+    Route::get('branches', [EcommerceController::class, 'getBranches']);
+    Route::post('orders', [EcommerceController::class, 'createOrder']);
+    Route::post('members', [EcommerceController::class, 'registerMember']);
+    Route::post('members/login', [EcommerceController::class, 'memberLogin']);
+    Route::get('members/history', [EcommerceController::class, 'getMemberHistory']);
+    Route::get('members/profile', [EcommerceController::class, 'getMemberProfile']);
+    Route::post('members/forgot-password', [EcommerceController::class, 'forgotPassword']);
+    Route::get('members/debug-otp', [EcommerceController::class, 'debugLastOtp']);
+    Route::post('members/reset-password', [EcommerceController::class, 'resetPassword']);
+});
 
 Route::prefix('v1')->group(function () {
     
@@ -45,8 +68,11 @@ Route::prefix('v1')->group(function () {
                     'branch_id' => $user->branch_id,
                     'branch_name' => $user->branch?->name,
                     'branch_code' => $user->branch?->code,
+                    'branch_address' => $user->branch?->address,
                     'organization_id' => $user->organization_id,
                     'organization_name' => $user->organization?->name,
+                    'point_conversion_rate' => $user->organization?->point_conversion_rate ?? 1000,
+                    'allow_minus_stock' => (bool) ($user->organization?->allow_minus_stock ?? true),
                 ]
             ]);
         });
@@ -123,8 +149,13 @@ Route::prefix('v1')->group(function () {
         });
 
         // Get POS Settings
-        Route::get('/pos-settings', function () {
-            return response()->json(\App\Models\PosSetting::where('is_active', true)->get());
+        Route::get('/pos-settings', function (\Illuminate\Http\Request $request) {
+            $user = $request->user();
+            return response()->json(
+                \App\Models\PosSetting::where('organization_id', $user->organization_id)
+                    ->where('is_active', true)
+                    ->get()
+            );
         });
 
         // Get Branches

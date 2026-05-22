@@ -21,7 +21,9 @@ class ProductResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Data Master';
+    protected static \UnitEnum|string|null $navigationGroup = 'PERSEDIAAN';
+
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $modelLabel = 'Produk';
 
@@ -49,14 +51,9 @@ class ProductResource extends Resource
             $query->whereHas('stocks', function ($q) use ($user) {
                 $q->where('branch_id', $user->branch_id);
             });
-
-            // Hitung total stok hanya untuk cabang user
-            return $query->withSum(['stocks' => function ($q) use ($user) {
-                $q->where('branch_id', $user->branch_id);
-            }], 'quantity_on_hand');
         }
 
-        return $query->withSum('stocks', 'quantity_on_hand');
+        return $query;
     }
 
     public static function getRelations(): array

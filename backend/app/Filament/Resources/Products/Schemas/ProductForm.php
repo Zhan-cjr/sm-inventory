@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Products\Schemas;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\FileUpload;
 use Filament\Schemas\Schema;
 
 class ProductForm
@@ -13,6 +14,12 @@ class ProductForm
     {
         return $schema
             ->components([
+                FileUpload::make('image_path')
+                    ->label('Foto Produk')
+                    ->image()
+                    ->disk('public')
+                    ->directory('products')
+                    ->columnSpanFull(),
                 Select::make('organization_id')
                     ->relationship('organization', 'name')
                     ->required()
@@ -37,6 +44,8 @@ class ProductForm
                     ->relationship('category', 'name')
                     ->searchable()
                     ->preload(),
+                TextInput::make('sub_category')
+                    ->label('Sub Kategori'),
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')
                     ->searchable()
@@ -70,6 +79,28 @@ class ProductForm
                     ->default(5),
                 Toggle::make('is_active')
                     ->required(),
+                Toggle::make('is_ecommerce_active')
+                    ->label('Tampilkan di E-Commerce')
+                    ->default(false)
+                    ->reactive(),
+                Select::make('ecommerce_category')
+                    ->label('Kategori E-Commerce')
+                    ->options(function () {
+                        $orgId = \Illuminate\Support\Facades\Auth::user()->organization_id;
+                        $org = $orgId ? \App\Models\Organization::find($orgId) : \App\Models\Organization::first();
+                        if ($org && is_array($org->ecommerce_categories) && count($org->ecommerce_categories) > 0) {
+                            return array_combine($org->ecommerce_categories, $org->ecommerce_categories);
+                        }
+                        
+                        // Fallback: tampilkan semua kategori produk standar yang aktif jika kategori e-commerce belum dikustomisasi
+                        return \App\Models\Category::where('is_active', true)
+                            ->pluck('name', 'name')
+                            ->toArray();
+                    })
+                    ->visible(fn ($get) => $get('is_ecommerce_active'))
+                    ->placeholder('Pilih Kategori E-Commerce')
+                    ->searchable()
+                    ->preload(),
                 TextInput::make('metadata'),
             ]);
     }

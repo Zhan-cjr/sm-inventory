@@ -14,6 +14,15 @@ class ProductImporter extends Importer
 {
     protected static ?string $model = Product::class;
     
+    public static function getOptionsFormComponents(): array
+    {
+        return [
+            \Filament\Forms\Components\Checkbox::make('overwrite')
+                ->label('Timpa data yang sudah ada')
+                ->helperText('Jika dicentang, data dengan SKU yang sama akan diperbarui dengan data dari file import.'),
+        ];
+    }
+    
     protected static array $orgCache = [];
     protected static array $catCache = [];
     protected static array $supCache = [];
@@ -63,6 +72,11 @@ class ProductImporter extends Importer
                     }
                     $record->category_id = static::$catCache[$state];
                 }),
+
+            ImportColumn::make('sub_category')
+                ->label('Sub Kategori')
+                ->example('Minuman Ringan')
+                ->rules(['nullable', 'string', 'max:255']),
 
             ImportColumn::make('supplier_id')
                 ->label('Pemasok (ID/Kode/Nama)')
@@ -120,6 +134,23 @@ class ProductImporter extends Importer
                 ->boolean()
                 ->example('1')
                 ->rules(['nullable', 'boolean']),
+
+            ImportColumn::make('is_taxable')
+                ->label('Kena PPN (1/0)')
+                ->boolean()
+                ->example('1')
+                ->rules(['nullable', 'boolean']),
+
+            ImportColumn::make('is_ecommerce_active')
+                ->label('Tampil di E-Commerce (1/0)')
+                ->boolean()
+                ->example('0')
+                ->rules(['nullable', 'boolean']),
+
+            ImportColumn::make('ecommerce_category')
+                ->label('Kategori E-Commerce')
+                ->example('Minuman')
+                ->rules(['nullable', 'string', 'max:255']),
         ];
     }
 
@@ -136,11 +167,16 @@ class ProductImporter extends Importer
 
         if (!$resolvedOrgId) return null;
 
-        // Upsert by SKU + organization_id
-        return Product::firstOrNew([
+        $record = Product::firstOrNew([
             'organization_id' => $resolvedOrgId,
             'sku' => $this->data['sku'],
         ]);
+        
+        if ($record->exists && ! ($this->options['overwrite'] ?? false)) {
+            throw new \Exception('Data sudah ada. Centang opsi "Timpa data" untuk memperbarui.');
+        }
+        
+        return $record;
     }
 
     public static function getCompletedNotificationBody(Import $import): string

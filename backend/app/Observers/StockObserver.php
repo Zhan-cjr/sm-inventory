@@ -18,7 +18,7 @@ class StockObserver
             $newQty = $stock->quantity_on_hand;
             $change = $newQty - $oldQty;
 
-            InventoryLog::create([
+            $logData = [
                 'branch_id' => $stock->branch_id,
                 'product_id' => $stock->product_id,
                 'log_type' => $stock->log_type ?? 'ADJUSTMENT',
@@ -28,9 +28,17 @@ class StockObserver
                 'reason_code' => $stock->reason_code ?? 'MANUAL_UPDATE',
                 'reference_doc_type' => $stock->reference_doc_type ?? null,
                 'reference_doc_id' => $stock->reference_doc_id ?? null,
-                'recorded_by' => Auth::id() ?? '00000000-0000-0000-0000-000000000000',
+                'recorded_by' => $stock->recorded_by ?? Auth::id() ?? '00000000-0000-0000-0000-000000000000',
                 'notes' => $stock->notes ?? 'Updated via Stock Management',
-            ]);
+                'balance' => $newQty,
+            ];
+
+            if (!empty($stock->log_date)) {
+                $logData['created_at'] = $stock->log_date;
+                $logData['updated_at'] = $stock->log_date;
+            }
+
+            InventoryLog::create($logData);
         }
     }
 }

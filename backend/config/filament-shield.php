@@ -23,11 +23,12 @@ return [
         'slug' => 'shield/roles',
         'show_model_path' => true,
         'cluster' => null,
+        'navigation_sort' => 2,
         'tabs' => [
             'pages' => true,
             'widgets' => true,
             'resources' => true,
-            'custom_permissions' => false,
+            'custom_permissions' => true,
         ],
     ],
 
@@ -176,6 +177,14 @@ return [
                 'update',
                 'delete',
             ],
+            \App\Filament\Resources\ArsipTransaksiResource::class => [
+                'viewAny',
+                'view',
+            ],
+            \App\Filament\Resources\ArsipReturPenjualanResource::class => [
+                'viewAny',
+                'view',
+            ],
         ],
         'exclude' => [
             //
@@ -232,7 +241,9 @@ return [
     |
     */
 
-    'custom_permissions' => [],
+    'custom_permissions' => [
+        'Batalkan:Transaction',
+    ],
 
     /*
     |--------------------------------------------------------------------------

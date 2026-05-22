@@ -20,7 +20,9 @@ class UserResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Sistem & Pengaturan';
+    protected static \UnitEnum|string|null $navigationGroup = 'OPERATOR';
+
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $modelLabel = 'Pengguna';
 

@@ -27,6 +27,18 @@ class Promotion extends Model
         'max_discount_per_transaction' => 'decimal:2',
     ];
 
+    protected static function booted()
+    {
+        static::saving(function ($promotion) {
+            if ($promotion->discount_value === null || $promotion->discount_value === '') {
+                $promotion->discount_value = 0;
+            }
+            if ($promotion->applicable_to === null || $promotion->applicable_to === '') {
+                $promotion->applicable_to = 'ALL';
+            }
+        });
+    }
+
     public function organization(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Organization::class);

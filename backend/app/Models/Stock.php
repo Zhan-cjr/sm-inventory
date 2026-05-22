@@ -14,6 +14,8 @@ class Stock extends Model
     public $notes;
     public $reference_doc_type;
     public $reference_doc_id;
+    public $recorded_by;
+    public $log_date;
 
     protected $fillable = [
         'branch_id', 'product_id', 'cost_price', 'selling_price', 'quantity_on_hand', 
@@ -37,5 +39,10 @@ class Stock extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function racks(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(StockOpnameRack::class, 'stock_stock_opname_rack', 'stock_id', 'rack_id');
     }
 }

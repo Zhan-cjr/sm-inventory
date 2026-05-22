@@ -67,6 +67,7 @@ class PosDeviceController extends Controller
                 'branch_id' => $device->branch_id,
                 'branch_name' => $device->branch?->name,
                 'branch_code' => $device->branch?->code,
+                'branch_address' => $device->branch?->address,
                 'terminal_id' => $device->terminal_id,
                 'terminal_name' => $device->terminal?->name,
             ]);

@@ -13,7 +13,7 @@ class ListPosSettings extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            // No create action
         ];
     }
 }

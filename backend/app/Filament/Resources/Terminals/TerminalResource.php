@@ -23,7 +23,8 @@ class TerminalResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Data Master';
+    protected static \UnitEnum|string|null $navigationGroup = 'PENGATURAN';
+    protected static ?int $navigationSort = 4;
     protected static ?string $modelLabel = 'Terminal POS';
     protected static ?string $pluralModelLabel = 'Terminal POS';
 

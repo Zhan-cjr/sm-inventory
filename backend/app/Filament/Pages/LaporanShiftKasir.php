@@ -16,14 +16,18 @@ use Filament\Actions\ExportAction;
 use App\Filament\Exports\ShiftExporter;
 use Illuminate\Support\Facades\Auth;
 
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+
 class LaporanShiftKasir extends Page implements HasTable
 {
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clock';
     protected static ?string $navigationLabel = 'Laporan Shift Kasir';
     protected static ?string $title = 'Laporan Shift Kasir (Rekap Kas)';
-    protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
+    protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
+    protected static ?int $navigationSort = 5;
 
     protected string $view = 'filament.pages.report-page';
 

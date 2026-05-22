@@ -20,7 +20,9 @@ class PromotionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Penjualan & Kasir';
+    protected static \UnitEnum|string|null $navigationGroup = 'PENGATURAN';
+
+    protected static ?int $navigationSort = 6;
 
     protected static ?string $modelLabel = 'Promosi';
 

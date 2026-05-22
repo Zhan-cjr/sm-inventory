@@ -20,7 +20,9 @@ class OrganizationResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Data Master';
+    protected static \UnitEnum|string|null $navigationGroup = 'DATA MASTER';
+
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $modelLabel = 'Organisasi';
 

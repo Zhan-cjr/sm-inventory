@@ -17,14 +17,18 @@ use Filament\Actions\ExportAction;
 use App\Filament\Exports\LabaRugiExporter;
 use Illuminate\Support\Facades\Auth;
 
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+
 class LaporanLabaRugi extends Page implements HasTable
 {
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-currency-dollar';
     protected static ?string $navigationLabel = 'Laporan Laba Rugi';
     protected static ?string $title = 'Laporan Laba Rugi (Kotor)';
-    protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
+    protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
+    protected static ?int $navigationSort = 6;
 
     protected string $view = 'filament.pages.report-page';
 

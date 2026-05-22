@@ -14,6 +14,15 @@ class StockImporter extends Importer
 {
     protected static ?string $model = Stock::class;
 
+    public static function getOptionsFormComponents(): array
+    {
+        return [
+            \Filament\Forms\Components\Checkbox::make('overwrite')
+                ->label('Timpa data yang sudah ada')
+                ->helperText('Jika dicentang, data stok untuk cabang & produk yang sama akan diperbarui.'),
+        ];
+    }
+
     protected static array $branchCache = [];
     protected static array $productCache = [];
 
@@ -74,6 +83,21 @@ class StockImporter extends Importer
                 ->numeric()
                 ->example('500')
                 ->rules(['nullable', 'integer']),
+            ImportColumn::make('lead_time')
+                ->label('Lead Time (Hari)')
+                ->numeric()
+                ->example('3')
+                ->rules(['nullable', 'integer']),
+            ImportColumn::make('safety_stock')
+                ->label('Safety Stock')
+                ->numeric()
+                ->example('10')
+                ->rules(['nullable', 'integer']),
+            ImportColumn::make('desired_inventory_days')
+                ->label('Target Hari Persediaan')
+                ->numeric()
+                ->example('14')
+                ->rules(['nullable', 'integer']),
         ];
     }
 
@@ -102,10 +126,16 @@ class StockImporter extends Importer
         
         if (!$branchId || !$productId) return null;
 
-        return Stock::firstOrNew([
+        $record = Stock::firstOrNew([
             'branch_id' => $branchId,
             'product_id' => $productId,
         ]);
+        
+        if ($record->exists && ! ($this->options['overwrite'] ?? false)) {
+            throw new \Exception('Data sudah ada. Centang opsi "Timpa data" untuk memperbarui.');
+        }
+        
+        return $record;
     }
 
     public static function getCompletedNotificationBody(Import $import): string

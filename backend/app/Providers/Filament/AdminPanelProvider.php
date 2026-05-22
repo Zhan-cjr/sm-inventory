@@ -43,9 +43,27 @@ class AdminPanelProvider extends PanelProvider
             ->topNavigation()
             ->spa()
             ->databaseNotifications()
+            ->navigationGroups([
+                'FILE',
+                'OPERATOR',
+                'DATA MASTER',
+                'PERSEDIAAN',
+                'TRANSAKSI',
+                'LAPORAN/ARSIP',
+                'PENGATURAN',
+                'E-COMMERCE',
+            ])
+            ->navigationItems([
+                \Filament\Navigation\NavigationItem::make('LOGOUT')
+                    ->label('LOGOUT')
+                    ->icon('heroicon-o-arrow-left-on-rectangle')
+                    ->group('FILE')
+                    ->sort(3)
+                    ->url('/admin/logout-get'),
+            ])
             ->renderHook(
                 'panels::head.end',
-                fn (): string => '<link rel="stylesheet" href="/css/admin-custom.css">' . view('filament.print-styles')->render(),
+                fn (): string => '<link rel="stylesheet" href="/css/admin-custom.css?v=' . filemtime(public_path('css/admin-custom.css')) . '">' . view('filament.print-styles')->render(),
             )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
@@ -68,7 +86,8 @@ class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->plugins([
-                FilamentShieldPlugin::make(),
+                FilamentShieldPlugin::make()
+                    ->navigationGroup('OPERATOR'),
             ])
             ->authMiddleware([
                 Authenticate::class,

@@ -12,6 +12,15 @@ class CustomerImporter extends Importer
 {
     protected static ?string $model = Customer::class;
 
+    public static function getOptionsFormComponents(): array
+    {
+        return [
+            \Filament\Forms\Components\Checkbox::make('overwrite')
+                ->label('Timpa data yang sudah ada')
+                ->helperText('Jika dicentang, data pelanggan dengan email/telepon yang sama akan diperbarui.'),
+        ];
+    }
+
     public static function getColumns(): array
     {
         return [
@@ -64,24 +73,33 @@ class CustomerImporter extends Importer
 
         if (!$org) return null;
 
+        $record = null;
+
         // Upsert by email + organization_id if email exists
         if (! empty($this->data['email'])) {
-            return Customer::firstOrNew([
+            $record = Customer::firstOrNew([
                 'organization_id' => $org->id,
                 'email' => $this->data['email'],
             ]);
         }
         
-        if (! empty($this->data['phone'])) {
-            return Customer::firstOrNew([
+        if (! $record && ! empty($this->data['phone'])) {
+            $record = Customer::firstOrNew([
                 'organization_id' => $org->id,
                 'phone' => $this->data['phone'],
             ]);
         }
 
-        $customer = new Customer();
-        $customer->organization_id = $org->id;
-        return $customer;
+        if (! $record) {
+            $record = new Customer();
+            $record->organization_id = $org->id;
+        }
+
+        if ($record->exists && ! ($this->options['overwrite'] ?? false)) {
+            throw new \Exception('Data sudah ada. Centang opsi "Timpa data" untuk memperbarui.');
+        }
+
+        return $record;
     }
 
     public static function getCompletedNotificationBody(Import $import): string

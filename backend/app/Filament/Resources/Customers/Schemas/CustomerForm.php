@@ -24,13 +24,21 @@ class CustomerForm
                     ->email(),
                 TextInput::make('phone')
                     ->tel(),
+                TextInput::make('password')
+                    ->password()
+                    ->dehydrateStateUsing(fn ($state) => filled($state) ? bcrypt($state) : null)
+                    ->dehydrated(fn ($state) => filled($state))
+                    ->required(fn (string $context): bool => $context === 'create')
+                    ->label('Kata Sandi (Isi untuk reset/buat baru)'),
                 Textarea::make('address')
                     ->columnSpanFull(),
                 TextInput::make('member_tier')
-                    ->required()
-                    ->default('REGULAR'),
+                    ->disabled()
+                    ->dehydrated()
+                    ->default('BRONZE'),
                 TextInput::make('points')
-                    ->required()
+                    ->disabled()
+                    ->dehydrated()
                     ->numeric()
                     ->default(0),
                 Toggle::make('is_active')

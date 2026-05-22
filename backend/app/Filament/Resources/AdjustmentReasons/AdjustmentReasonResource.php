@@ -21,7 +21,8 @@ class AdjustmentReasonResource extends Resource
 {
     protected static ?string $model = AdjustmentReason::class;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Sistem & Pengaturan';
+    protected static \UnitEnum|string|null $navigationGroup = 'PENGATURAN';
+    protected static ?int $navigationSort = 2;
     protected static ?string $navigationLabel = 'Alasan Koreksi';
     protected static ?string $modelLabel = 'Alasan Koreksi';
     protected static ?string $pluralModelLabel = 'Alasan Koreksi';

@@ -8,11 +8,13 @@ use App\Models\Transaction;
 use App\Models\GoodsReceipt;
 use App\Models\GoodsReceiptItem;
 use App\Models\TransactionItem;
+use App\Models\EcommerceOrder;
 use App\Observers\StockObserver;
 use App\Observers\TransactionObserver;
 use App\Observers\TransactionItemObserver;
 use App\Observers\GoodsReceiptObserver;
 use App\Observers\GoodsReceiptItemObserver;
+use App\Observers\EcommerceOrderObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -39,5 +41,6 @@ class AppServiceProvider extends ServiceProvider
         TransactionItem::observe(TransactionItemObserver::class);
         GoodsReceipt::observe(GoodsReceiptObserver::class);
         GoodsReceiptItem::observe(GoodsReceiptItemObserver::class);
+        EcommerceOrder::observe(EcommerceOrderObserver::class);
     }
 }

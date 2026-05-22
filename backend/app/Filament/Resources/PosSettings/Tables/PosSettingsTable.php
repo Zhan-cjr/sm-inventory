@@ -15,24 +15,20 @@ class PosSettingsTable
     {
         return $table
             ->columns([
-                TextColumn::make('organization_id')
+                TextColumn::make('name')
+                    ->label('Nama Organisasi/Toko')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('code')
+                    ->label('Kode Unik')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('timezone')
+                    ->label('Zona Waktu')
                     ->searchable(),
-                TextColumn::make('key_name')
-                    ->searchable(),
-                TextColumn::make('display_name')
-                    ->searchable(),
-                TextColumn::make('shortcut_key')
-                    ->searchable(),
-                IconColumn::make('is_active')
+                IconColumn::make('allow_minus_stock')
+                    ->label('Izinkan Stok Minus')
                     ->boolean(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //
@@ -41,9 +37,7 @@ class PosSettingsTable
                 EditAction::make(),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+                // No create/delete to prevent messing with organization master records
             ]);
     }
 }

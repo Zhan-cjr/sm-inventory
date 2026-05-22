@@ -11,14 +11,18 @@ use Filament\Tables\Table;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+
 class SuggestedOrders extends Page implements HasTable
 {
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-presentation-chart-line';
     protected static ?string $navigationLabel = 'Saran Pemesanan';
     protected static ?string $title = 'Saran Pemesanan (Forecasting)';
-    protected static string|\UnitEnum|null $navigationGroup = 'Persediaan';
+    protected static string|\UnitEnum|null $navigationGroup = 'PERSEDIAAN';
+    protected static ?int $navigationSort = 4;
 
     protected string $view = 'filament.pages.suggested-orders';
 

@@ -21,7 +21,7 @@ class InventoryLogResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     protected static bool $shouldRegisterNavigation = false;
-    protected static \UnitEnum|string|null $navigationGroup = 'Stok & Inventori';
+    protected static \UnitEnum|string|null $navigationGroup = 'PERSEDIAAN';
 
     protected static ?string $modelLabel = 'Kartu Stok';
 

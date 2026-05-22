@@ -32,6 +32,19 @@ class StocksRelationManager extends RelationManager
                     ->default(fn() => auth()->user()->branch_id)
                     ->disabled(fn ($record) => $record !== null || auth()->user()->branch_id !== null)
                     ->dehydrated(),
+                \Filament\Forms\Components\Select::make('racks')
+                    ->label('No Rak')
+                    ->relationship('racks', 'rack_code', function ($query, $record) {
+                        $branchId = $record?->branch_id ?? auth()->user()->branch_id;
+                        if ($branchId) {
+                            return $query->where('branch_id', $branchId);
+                        }
+                        return $query;
+                    })
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->rack_code} - {$record->rack_name}")
+                    ->multiple()
+                    ->searchable()
+                    ->preload(),
                 TextInput::make('cost_price')
                     ->label('Harga Beli Cabang')
                     ->helperText('Kosongkan untuk menggunakan harga default produk')
@@ -86,6 +99,10 @@ class StocksRelationManager extends RelationManager
                     ->label('Cabang')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('racks.rack_code')
+                    ->label('No Rak')
+                    ->badge()
+                    ->separator(','),
                 TextColumn::make('cost_price')
                     ->label('Harga Beli (Cabang)')
                     ->money('IDR')

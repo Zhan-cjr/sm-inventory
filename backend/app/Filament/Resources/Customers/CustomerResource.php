@@ -20,7 +20,9 @@ class CustomerResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Penjualan & Kasir';
+    protected static \UnitEnum|string|null $navigationGroup = 'DATA MASTER';
+
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $modelLabel = 'Pelanggan';
 
@@ -41,7 +43,7 @@ class CustomerResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\PointHistoriesRelationManager::class,
         ];
     }
 

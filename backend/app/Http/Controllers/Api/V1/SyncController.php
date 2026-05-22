@@ -56,6 +56,8 @@ class SyncController extends Controller
                         }
                     }
 
+                    $txDate = $txData['transactionDate'] ?? $txData['transaction_date'] ?? $txData['date'] ?? now();
+
                     $tx = Transaction::create([
                         'organization_id' => $user->organization_id,
                         'branch_id' => $validated['branchId'],
@@ -63,7 +65,7 @@ class SyncController extends Controller
                         'customer_id' => $txData['customerId'] ?? null,
                         'shift_id' => $shiftId,
                         'transaction_type' => $txData['transaction_type'] ?? ($txData['finalAmount'] < 0 ? 'RETURN' : 'SALES'),
-                        'transaction_date' => now(),
+                        'transaction_date' => $txDate,
                         'cashier_id' => $user->id,
                         'total_amount' => $txData['totalAmount'],
                         'discount_amount' => $txData['discountAmount'] ?? 0,
@@ -81,8 +83,16 @@ class SyncController extends Controller
                     if ($tx->customer_id) {
                         $customer = \App\Models\Customer::find($tx->customer_id);
                         if ($customer) {
-                            $earnedPoints = floor($tx->final_amount / 1000); // 1 point per 1000
-                            $customer->increment('points', $earnedPoints);
+                            $pointConversionRate = 1000;
+                            if (auth()->user()) {
+                                $pointConversionRate = auth()->user()->organization?->point_conversion_rate ?? 1000;
+                            } else {
+                                $pointConversionRate = \App\Models\Organization::first()?->point_conversion_rate ?? 1000;
+                            }
+                            $earnedPoints = floor($tx->final_amount / $pointConversionRate);
+                            if ($earnedPoints > 0) {
+                                $customer->addPoints($earnedPoints, 'TRANSACTION', $tx->id, "Poin Belanja POS (Offline): #{$tx->receipt_number}");
+                            }
                         }
                     }
 

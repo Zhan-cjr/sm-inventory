@@ -26,7 +26,9 @@ class GoodsReceiptResource extends Resource
     protected static ?string $navigationLabel = 'Penerimaan Barang (GR)';
     protected static ?string $modelLabel = 'Penerimaan Barang';
     protected static ?string $pluralModelLabel = 'Penerimaan Barang';
-    protected static \UnitEnum|string|null $navigationGroup = 'Transaksi';
+    protected static \UnitEnum|string|null $navigationGroup = 'TRANSAKSI';
+
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'receipt_number';
 

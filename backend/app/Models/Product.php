@@ -25,9 +25,10 @@ class Product extends Model
 
     protected $fillable = [
         'organization_id', 'sku', 'barcode', 'name', 
-        'category_id', 'supplier_id', 'cost_price', 
+        'category_id', 'sub_category', 'supplier_id', 'cost_price', 
         'selling_price', 'unit_of_measure', 'reorder_point', 
-        'reorder_qty', 'lead_time_days', 'is_active', 'is_taxable', 'metadata'
+        'reorder_qty', 'lead_time_days', 'is_active', 'is_taxable', 'metadata', 
+        'is_ecommerce_active', 'ecommerce_category', 'image_path'
     ];
 
     protected $casts = [
@@ -35,6 +36,7 @@ class Product extends Model
         'selling_price' => 'decimal:2',
         'metadata' => 'array',
         'is_active' => 'boolean',
+        'is_ecommerce_active' => 'boolean',
         'is_taxable' => 'boolean',
     ];
 
@@ -47,6 +49,7 @@ class Product extends Model
     {
         return $this->hasMany(Stock::class);
     }
+
 
     public function category(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {

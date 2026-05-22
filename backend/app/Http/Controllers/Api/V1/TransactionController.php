@@ -32,6 +32,7 @@ class TransactionController extends Controller
             'discount_amount' => 'nullable|numeric',
             'final_amount' => 'required|numeric',
             'payment_method' => 'required|string',
+            'customer_id' => 'nullable|uuid|exists:customers,id',
             'items' => 'required|array',
             'items.*.product_id' => 'required|uuid',
             'items.*.quantity' => 'required|integer|not_in:0',
@@ -43,10 +44,11 @@ class TransactionController extends Controller
         $transaction = null;
 
         try {
-            DB::transaction(function () use ($validated, $user, &$transaction) {
+            DB::transaction(function () use ($validated, $user, $request, &$transaction) {
                 $transaction = Transaction::create([
                     'organization_id' => $user->organization_id,
                     'branch_id' => $user->branch_id,
+                    'customer_id' => $validated['customer_id'] ?? null,
                     'transaction_type' => 'SALES',
                     'transaction_date' => now(),
                     'cashier_id' => $user->id,
@@ -57,6 +59,18 @@ class TransactionController extends Controller
                     'sync_status' => 'SYNCED',
                     'receipt_number' => $request->receipt_number ?? ('SMI-' . strtoupper(substr(uniqid(), -6))),
                 ]);
+
+                // Update customer points if applicable
+                if ($transaction->customer_id) {
+                    $customer = \App\Models\Customer::find($transaction->customer_id);
+                    if ($customer) {
+                        $pointConversionRate = $user->organization?->point_conversion_rate ?? 1000;
+                        $earnedPoints = floor($transaction->final_amount / $pointConversionRate);
+                        if ($earnedPoints > 0) {
+                            $customer->addPoints($earnedPoints, 'TRANSACTION', $transaction->id, "Poin Belanja POS: #{$transaction->receipt_number}");
+                        }
+                    }
+                }
 
                 foreach ($validated['items'] as $item) {
                     $txItem = TransactionItem::create([

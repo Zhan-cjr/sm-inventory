@@ -20,7 +20,8 @@ class BankResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Data Master';
+    protected static \UnitEnum|string|null $navigationGroup = 'DATA MASTER';
+    protected static ?int $navigationSort = 2;
     protected static ?string $modelLabel = 'Bank';
     protected static ?string $pluralModelLabel = 'Bank';
 

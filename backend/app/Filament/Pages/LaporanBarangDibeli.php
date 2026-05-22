@@ -16,14 +16,18 @@ use Filament\Actions\ExportAction;
 use App\Filament\Exports\GoodsReceiptItemExporter;
 use Illuminate\Support\Facades\Auth;
 
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+
 class LaporanBarangDibeli extends Page implements HasTable
 {
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-cart';
     protected static ?string $navigationLabel = 'Laporan Barang Dibeli';
     protected static ?string $title = 'Laporan Barang Dibeli (Penerimaan)';
-    protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
+    protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
+    protected static ?int $navigationSort = 1;
 
     protected string $view = 'filament.pages.report-page';
 

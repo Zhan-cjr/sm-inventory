@@ -7,7 +7,7 @@ use App\Filament\Resources\PosSettings\Pages\EditPosSetting;
 use App\Filament\Resources\PosSettings\Pages\ListPosSettings;
 use App\Filament\Resources\PosSettings\Schemas\PosSettingForm;
 use App\Filament\Resources\PosSettings\Tables\PosSettingsTable;
-use App\Models\PosSetting;
+use App\Models\Organization;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -16,11 +16,12 @@ use Filament\Tables\Table;
 
 class PosSettingResource extends Resource
 {
-    protected static ?string $model = PosSetting::class;
+    protected static ?string $model = Organization::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Sistem & Pengaturan';
+    protected static \UnitEnum|string|null $navigationGroup = 'PENGATURAN';
+    protected static ?int $navigationSort = 1;
     protected static ?string $modelLabel = 'Pengaturan POS';
     protected static ?string $pluralModelLabel = 'Pengaturan POS';
 
@@ -45,7 +46,6 @@ class PosSettingResource extends Resource
     {
         return [
             'index' => ListPosSettings::route('/'),
-            'create' => CreatePosSetting::route('/create'),
             'edit' => EditPosSetting::route('/{record}/edit'),
         ];
     }

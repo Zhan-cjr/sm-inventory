@@ -21,6 +21,7 @@ class TransactionItemObserver
         // Update Stock
         $stock = Stock::where('branch_id', $tx->branch_id)
             ->where('product_id', $item->product_id)
+            ->lockForUpdate()
             ->first();
 
         if ($stock) {
@@ -28,8 +29,10 @@ class TransactionItemObserver
             $stock->reason_code = 'POS_SALE_ITEM';
             $stock->reference_doc_type = 'TRANSACTION';
             $stock->reference_doc_id = $tx->id;
+            $stock->log_date = $tx->transaction_date;
             
-            $stock->decrement('quantity_on_hand', $item->quantity);
+            $stock->quantity_on_hand -= $item->quantity;
+            $stock->save();
         }
 
         // FIFO Deduction from Stock Batches
@@ -66,6 +69,7 @@ class TransactionItemObserver
         // Return stock to main inventory
         $stock = Stock::where('branch_id', $tx->branch_id)
             ->where('product_id', $item->product_id)
+            ->lockForUpdate()
             ->first();
 
         if ($stock) {
@@ -74,7 +78,8 @@ class TransactionItemObserver
             $stock->reference_doc_type = 'TRANSACTION';
             $stock->reference_doc_id = $tx->id;
             
-            $stock->increment('quantity_on_hand', $item->quantity);
+            $stock->quantity_on_hand += $item->quantity;
+            $stock->save();
         }
 
         // Return stock to batches

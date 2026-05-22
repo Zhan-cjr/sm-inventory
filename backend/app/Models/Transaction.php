@@ -11,11 +11,11 @@ class Transaction extends Model
 
     protected $fillable = [
         'organization_id', 'branch_id', 'terminal_id', 'shift_id', 'transaction_type', 
-        'transaction_date', 'cashier_id', 'total_amount', 
+        'transaction_date', 'cashier_id', 'customer_id', 'total_amount', 
         'discount_amount', 'final_amount', 'payment_method', 
         'bank_id', 'received_amount', 'change_amount',
         'is_voided', 'void_reason', 'void_date', 'voided_by', 
-        'sync_status', 'local_transaction_id'
+        'sync_status', 'local_transaction_id', 'receipt_number'
     ];
 
     protected $casts = [

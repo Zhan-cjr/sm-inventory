@@ -18,6 +18,7 @@ class ValidatePosDevice
         $bypassPaths = [
             '*api/v1/devices/handshake',
             '*api/v1/login',
+            '*api/v1/ecommerce/*', // E-Commerce public endpoints
             '*print/transaction/*',
             '*print/report/*',
             '*up' // Health check

@@ -14,14 +14,18 @@ use Filament\Actions\ExportAction;
 use App\Filament\Exports\StockExporter;
 use Illuminate\Support\Facades\Auth;
 
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+
 class LaporanPersediaan extends Page implements HasTable
 {
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-archive-box';
     protected static ?string $navigationLabel = 'Laporan Persediaan';
     protected static ?string $title = 'Laporan Persediaan (Valuasi Stok)';
-    protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
+    protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
+    protected static ?int $navigationSort = 4;
 
     protected string $view = 'filament.pages.report-page';
 

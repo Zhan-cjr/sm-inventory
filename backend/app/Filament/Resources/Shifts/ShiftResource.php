@@ -27,7 +27,9 @@ class ShiftResource extends Resource
     protected static ?string $navigationLabel = 'Manajemen Shift';
     protected static ?string $modelLabel = 'Shift Kasir';
     protected static ?string $pluralModelLabel = 'Shift Kasir';
-    protected static \UnitEnum|string|null $navigationGroup = 'Penjualan & Kasir';
+    protected static \UnitEnum|string|null $navigationGroup = 'PENGATURAN';
+
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $recordTitleAttribute = 'id';
 

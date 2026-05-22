@@ -22,7 +22,8 @@ class PosDeviceResource extends Resource
     protected static ?string $navigationLabel = 'Otorisasi Device';
     protected static ?string $modelLabel = 'Otorisasi Device';
     protected static ?string $pluralModelLabel = 'Otorisasi Device';
-    protected static string|\UnitEnum|null $navigationGroup = 'Data Master';
+    protected static string|\UnitEnum|null $navigationGroup = 'PENGATURAN';
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $recordTitleAttribute = 'name';
 

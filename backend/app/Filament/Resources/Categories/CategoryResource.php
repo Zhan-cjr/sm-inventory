@@ -20,7 +20,9 @@ class CategoryResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Data Master';
+    protected static \UnitEnum|string|null $navigationGroup = 'PERSEDIAAN';
+
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $modelLabel = 'Kategori';
 

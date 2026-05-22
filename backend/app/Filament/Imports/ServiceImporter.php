@@ -12,6 +12,15 @@ class ServiceImporter extends Importer
 {
     protected static ?string $model = Service::class;
 
+    public static function getOptionsFormComponents(): array
+    {
+        return [
+            \Filament\Forms\Components\Checkbox::make('overwrite')
+                ->label('Timpa data yang sudah ada')
+                ->helperText('Jika dicentang, data jasa dengan kode yang sama akan diperbarui.'),
+        ];
+    }
+
     public static function getColumns(): array
     {
         return [
@@ -58,10 +67,16 @@ class ServiceImporter extends Importer
 
         if (!$org) return null;
 
-        return Service::firstOrNew([
+        $record = Service::firstOrNew([
             'organization_id' => $org->id,
             'code' => $this->data['code'],
         ]);
+
+        if ($record->exists && ! ($this->options['overwrite'] ?? false)) {
+            throw new \Exception('Data sudah ada. Centang opsi "Timpa data" untuk memperbarui.');
+        }
+
+        return $record;
     }
 
     public static function getCompletedNotificationBody(Import $import): string

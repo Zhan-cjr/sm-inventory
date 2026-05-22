@@ -29,7 +29,9 @@ class StockAdjustmentResource extends Resource
 
     protected static ?string $model = StockAdjustment::class;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Transaksi';
+    protected static \UnitEnum|string|null $navigationGroup = 'TRANSAKSI';
+
+    protected static ?int $navigationSort = 3;
     protected static ?string $navigationLabel = 'Koreksi Stok';
     protected static ?string $modelLabel = 'Koreksi Stok';
     protected static ?string $pluralModelLabel = 'Koreksi Stok';

@@ -39,6 +39,10 @@ class AuthController extends Controller
                 'branch_id' => $branchId,
                 'branch_name' => $user->branch?->name ?? 'Cabang Lain',
                 'branch_code' => $user->branch?->code,
+                'organization_id' => $user->organization_id,
+                'organization_name' => $user->organization?->name,
+                'point_conversion_rate' => $user->organization?->point_conversion_rate ?? 1000,
+                'allow_minus_stock' => (bool) ($user->organization?->allow_minus_stock ?? true),
             ],
             'token' => $token
         ]);

@@ -12,6 +12,15 @@ class SupplierImporter extends Importer
 {
     protected static ?string $model = Supplier::class;
     
+    public static function getOptionsFormComponents(): array
+    {
+        return [
+            \Filament\Forms\Components\Checkbox::make('overwrite')
+                ->label('Timpa data yang sudah ada')
+                ->helperText('Jika dicentang, data pemasok dengan kode yang sama akan diperbarui.'),
+        ];
+    }
+    
     protected static array $orgCache = [];
 
     public static function getColumns(): array
@@ -79,10 +88,16 @@ class SupplierImporter extends Importer
 
         if (!$resolvedOrgId) return null;
 
-        return Supplier::firstOrNew([
+        $record = Supplier::firstOrNew([
             'organization_id' => $resolvedOrgId,
             'code' => $this->data['code'],
         ]);
+
+        if ($record->exists && ! ($this->options['overwrite'] ?? false)) {
+            throw new \Exception('Data sudah ada. Centang opsi "Timpa data" untuk memperbarui.');
+        }
+
+        return $record;
     }
 
     public static function getCompletedNotificationBody(Import $import): string

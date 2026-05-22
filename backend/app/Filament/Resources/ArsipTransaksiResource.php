@@ -44,7 +44,9 @@ class ArsipTransaksiResource extends Resource
     protected static ?string $navigationLabel = 'Arsip Transaksi';
     protected static ?string $pluralModelLabel = 'Arsip Transaksi';
     protected static ?string $modelLabel = 'Arsip Transaksi';
-    protected static string|\UnitEnum|null $navigationGroup = 'Laporan & Arsip';
+    protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
+
+    protected static ?int $navigationSort = 8;
 
     public static function form(Schema $schema): Schema
     {
@@ -278,7 +280,7 @@ class ArsipTransaksiResource extends Resource
                             ->success()
                             ->send();
                     })
-                    ->hidden(fn (Transaction $record) => $record->is_voided),
+                    ->visible(fn (Transaction $record) => !$record->is_voided && Auth::user()->can('Batalkan:Transaction')),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
@@ -310,7 +312,8 @@ class ArsipTransaksiResource extends Resource
                                 ->success()
                                 ->send();
                         })
-                        ->deselectRecordsAfterCompletion(),
+                        ->deselectRecordsAfterCompletion()
+                        ->visible(fn () => Auth::user()->can('Batalkan:Transaction')),
                 ]),
             ])
             ->headerActions([

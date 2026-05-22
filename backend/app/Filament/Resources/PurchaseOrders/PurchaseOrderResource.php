@@ -26,7 +26,9 @@ class PurchaseOrderResource extends Resource
     protected static ?string $modelLabel = 'Pesanan Pembelian';
 
     protected static ?string $pluralModelLabel = 'Pesanan Pembelian';
-    protected static \UnitEnum|string|null $navigationGroup = 'Transaksi';
+    protected static \UnitEnum|string|null $navigationGroup = 'TRANSAKSI';
+
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $recordTitleAttribute = 'po_number';
 
