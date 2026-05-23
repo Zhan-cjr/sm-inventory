@@ -18,14 +18,28 @@ class Stock extends Model
     public $log_date;
 
     protected $fillable = [
-        'branch_id', 'product_id', 'cost_price', 'selling_price', 'quantity_on_hand', 
+        'branch_id', 'product_id', 'cost_price', 'cost_price_tax', 'selling_price', 
+        'margin_gol_1', 'harga_jual_1', 'qty_min_gol_1',
+        'margin_gol_2', 'harga_jual_2', 'qty_min_gol_2',
+        'margin_gol_3', 'harga_jual_3', 'qty_min_gol_3',
+        'quantity_on_hand', 
         'quantity_reserved', 'last_count_date', 'min_qty', 
         'max_qty', 'lead_time', 'safety_stock', 'desired_inventory_days', 'version'
     ];
 
     protected $casts = [
         'cost_price' => 'decimal:2',
+        'cost_price_tax' => 'decimal:2',
         'selling_price' => 'decimal:2',
+        'margin_gol_1' => 'decimal:2',
+        'harga_jual_1' => 'decimal:2',
+        'margin_gol_2' => 'decimal:2',
+        'harga_jual_2' => 'decimal:2',
+        'margin_gol_3' => 'decimal:2',
+        'harga_jual_3' => 'decimal:2',
+        'qty_min_gol_1' => 'integer',
+        'qty_min_gol_2' => 'integer',
+        'qty_min_gol_3' => 'integer',
         'lead_time' => 'integer',
         'safety_stock' => 'integer',
         'desired_inventory_days' => 'integer',

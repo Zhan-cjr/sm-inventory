@@ -22,6 +22,8 @@ class ReportPrintController extends Controller
                 return $this->printLaporanPenjualan($filters);
             case 'laporan-persediaan':
                 return $this->printLaporanPersediaan($filters);
+            case 'rekap-total-stok':
+                return $this->printRekapTotalStok($filters);
             case 'laporan-shift-kasir':
                 return $this->printLaporanShiftKasir($filters);
             case 'laporan-laba-rugi':
@@ -262,18 +264,98 @@ class ReportPrintController extends Controller
         $stocks = $query->orderBy('created_at', 'desc')->get();
         $period = $this->getPeriodString($filters);
 
-        $columns = ['Cabang', 'Produk', 'Kategori', 'Qty Saat Ini'];
+        $columns = ['Cabang', 'Produk', 'Kategori', 'Sisa Stok', 'Harga Pokok (+PPN)', 'Valuasi Stok'];
         $rows = [];
         foreach ($stocks as $s) {
+            $costPriceTax = $s->cost_price_tax > 0 ? $s->cost_price_tax : ($s->product->cost_price_tax ?? $s->product->cost_price ?? 0);
             $rows[] = [
-                $s->branch ? $s->branch->name : '-',
+                $s->branch ? $s->branch->name : 'Pusat / Global',
                 $s->product ? $s->product->name : '-',
                 ($s->product && $s->product->category) ? $s->product->category->name : '-',
-                $s->quantity
+                $s->quantity_on_hand,
+                number_format($costPriceTax, 0, ',', '.'),
+                number_format($s->quantity_on_hand * $costPriceTax, 0, ',', '.')
             ];
         }
 
         return view('print.reports.generic', ['title' => 'Laporan Persediaan', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printRekapTotalStok($filters)
+    {
+        $query = \App\Models\Stock::query()->with(['branch', 'product', 'product.category']);
+        // Apply branch filter if any
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+        
+        // Category filter
+        if (isset($filters['category_id']['value']) && !empty($filters['category_id']['value'])) {
+            $query->whereHas('product', function($q) use ($filters) {
+                $q->where('category_id', $filters['category_id']['value']);
+            });
+        }
+
+        $stocks = $query->get();
+        
+        $data = [];
+        $totalValuation = 0;
+        
+        foreach ($stocks as $stock) {
+            $catName = $stock->product && $stock->product->category ? $stock->product->category->name : 'Uncategorized';
+            $subCatName = $stock->product && $stock->product->sub_category ? $stock->product->sub_category : 'General';
+            $key = $catName . '|' . $subCatName;
+            
+            if (!isset($data[$key])) {
+                $data[$key] = [
+                    'kategori' => $catName,
+                    'sub_kategori' => $subCatName,
+                    'total_qty' => 0,
+                    'total_valuation' => 0,
+                ];
+            }
+            
+            $costPriceTax = $stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->product->cost_price_tax ?? $stock->product->cost_price ?? 0);
+            $valuation = $stock->quantity_on_hand * $costPriceTax;
+            
+            $data[$key]['total_qty'] += $stock->quantity_on_hand;
+            $data[$key]['total_valuation'] += $valuation;
+            $totalValuation += $valuation;
+        }
+
+        // Hitung rata-rata
+        foreach ($data as $key => $row) {
+            if ($row['total_qty'] > 0) {
+                $data[$key]['avg_price'] = $row['total_valuation'] / $row['total_qty'];
+            } else {
+                $data[$key]['avg_price'] = 0;
+            }
+        }
+
+        // Sort and group by category
+        usort($data, function($a, $b) {
+            $cmp = strcmp($a['kategori'], $b['kategori']);
+            if ($cmp === 0) {
+                return strcmp($a['sub_kategori'], $b['sub_kategori']);
+            }
+            return $cmp;
+        });
+        
+        $groupedData = [];
+        foreach ($data as $row) {
+            $groupedData[$row['kategori']][] = $row;
+        }
+
+        $period = date('d-m-Y H:i'); // Current time for recap
+
+        return view('print.reports.rekap-stok', [
+            'groupedData' => $groupedData,
+            'totalValuation' => $totalValuation,
+            'period' => $period,
+            'title' => 'Rekap Total Stok'
+        ]);
     }
 
     private function printLaporanShiftKasir($filters)

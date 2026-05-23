@@ -39,7 +39,7 @@ class LaporanPenjualanKasir extends Page implements HasTable
             ->query(
                 Transaction::query()
                     ->where('is_voided', false)
-                    ->with(['branch', 'cashier', 'terminal'])
+                    ->with(['branch', 'cashier', 'terminal', 'shift'])
             )
             ->defaultGroup('cashier.name')
             ->groups([
@@ -68,6 +68,12 @@ class LaporanPenjualanKasir extends Page implements HasTable
                     ->label('Kassa / Terminal'),
                 TextColumn::make('cashier.name')
                     ->label('Kasir'),
+                TextColumn::make('shift.shift_name')
+                    ->label('Shift')
+                    ->badge()
+                    ->color('info')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('final_amount')
                     ->label('Pendapatan Bersih')
                     ->money('IDR', true)

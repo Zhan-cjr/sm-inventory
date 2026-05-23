@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Shift;
 use App\Models\Transaction;
+use App\Models\CashMovement;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -158,6 +159,54 @@ class ShiftController extends Controller
         ]);
     }
 
+    public function cashMovement(Request $request)
+    {
+        $validated = $request->validate([
+            'shift_id' => 'required|uuid',
+            'terminal_id' => 'required|uuid',
+            'type' => 'required|in:CASH_IN,CASH_OUT',
+            'amount' => 'required|numeric|min:1',
+            'description' => 'required|string|max:255',
+        ]);
+
+        $shift = Shift::find($validated['shift_id']);
+        if (!$shift || $shift->status !== 'OPEN') {
+            return response()->json(['message' => 'Shift tidak aktif atau tidak ditemukan.'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            $movement = CashMovement::create([
+                'shift_id' => $shift->id,
+                'user_id' => auth()->id(),
+                'terminal_id' => $validated['terminal_id'],
+                'type' => $validated['type'],
+                'amount' => $validated['amount'],
+                'description' => $validated['description'],
+            ]);
+
+            if ($validated['type'] === 'CASH_IN') {
+                $shift->total_cash_in += $validated['amount'];
+            } else {
+                $shift->total_cash_out += $validated['amount'];
+            }
+            $shift->save();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Kas ' . ($validated['type'] === 'CASH_IN' ? 'Masuk' : 'Keluar') . ' berhasil dicatat.',
+                'movement' => $movement,
+                'shift' => $shift
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal mencatat pergerakan kas: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function closeShift(Request $request)
     {
         try {
@@ -177,23 +226,80 @@ class ShiftController extends Controller
                 return response()->json(['message' => 'Shift sudah ditutup sebelumnya.'], 422);
             }
 
-            // Calculate sales during this shift
+            // Calculate sales during this shift (Separating sales and returns)
             $sales = Transaction::where('shift_id', $shift->id)
+                ->where('is_voided', false)
                 ->select(
-                    DB::raw("SUM(CASE WHEN payment_method = 'CASH' THEN final_amount ELSE 0 END) as cash_sales"),
-                    DB::raw("SUM(CASE WHEN payment_method = 'CARD' THEN final_amount ELSE 0 END) as card_sales")
+                    DB::raw("SUM(CASE WHEN payment_method = 'CASH' AND final_amount > 0 THEN final_amount ELSE 0 END) as cash_sales"),
+                    DB::raw("SUM(CASE WHEN payment_method = 'CARD' AND final_amount > 0 THEN final_amount ELSE 0 END) as card_sales"),
+                    DB::raw("SUM(CASE WHEN payment_method = 'CASH' AND final_amount < 0 THEN ABS(final_amount) ELSE 0 END) as cash_returns"),
+                    DB::raw("SUM(CASE WHEN payment_method = 'CARD' AND final_amount < 0 THEN ABS(final_amount) ELSE 0 END) as card_returns")
                 )->first();
 
             $shift->end_time = now();
             $shift->total_cash_sales = $sales->cash_sales ?? 0;
             $shift->total_card_sales = $sales->card_sales ?? 0;
+            $shift->total_cash_returns = $sales->cash_returns ?? 0;
+            $shift->total_card_returns = $sales->card_returns ?? 0;
             $shift->actual_cash = $validated['actual_cash'];
             
-            $expectedCash = $shift->starting_cash + $shift->total_cash_sales;
+            // Expected cash physical in drawer: Start + Cash In - Cash Out + Cash Sales - Cash Returns
+            $expectedCash = $shift->starting_cash + $shift->total_cash_sales - $shift->total_cash_returns + $shift->total_cash_in - $shift->total_cash_out;
             $shift->difference = $shift->actual_cash - $expectedCash;
             $shift->status = 'CLOSED';
             $shift->notes = $validated['notes'] ?? null;
             $shift->save();
+
+            // Load cash movements and branch details for EOD report
+            $shift->load(['user', 'terminal', 'cashMovements', 'branch.organization']);
+            $shift->expected_cash = $expectedCash;
+
+            // 1. Sales by Bank
+            $cardSalesByBank = DB::table('transactions')
+                ->join('banks', 'transactions.bank_id', '=', 'banks.id')
+                ->where('transactions.shift_id', $shift->id)
+                ->where('transactions.payment_method', 'CARD')
+                ->where('transactions.is_voided', false)
+                ->select('banks.name', DB::raw('SUM(transactions.final_amount) as total_amount'))
+                ->groupBy('banks.id', 'banks.name')
+                ->get();
+
+            // 2. Returns Detail (Negative transactions or items with negative quantity)
+            $returns = Transaction::with(['items.product'])
+                ->where('shift_id', $shift->id)
+                ->where('is_voided', false)
+                ->where('final_amount', '<', 0)
+                ->get();
+            
+            $returnItems = [];
+            foreach ($returns as $tx) {
+                foreach ($tx->items as $item) {
+                    if ($item->quantity < 0) {
+                        $returnItems[] = [
+                            'product_name' => $item->product ? $item->product->name : 'Unknown Item',
+                            'quantity' => abs($item->quantity),
+                            'total' => abs($item->quantity * $item->unit_price)
+                        ];
+                    }
+                }
+            }
+
+            // 3. Discounts and Points Details
+            $totalDiscounts = Transaction::where('shift_id', $shift->id)
+                ->where('is_voided', false)
+                ->sum('discount_amount');
+
+            // Default breakdown as requested (since schema doesn't split these yet)
+            $discountDetails = [
+                'manual_discount' => $totalDiscounts,
+                'promo_discount' => 0,
+                'point_deduction' => 0
+            ];
+
+            // Add these details dynamically to the shift object without saving to DB
+            $shift->card_sales_by_bank = $cardSalesByBank;
+            $shift->returns_detail = $returnItems;
+            $shift->discount_details = $discountDetails;
 
             return response()->json([
                 'message' => 'Shift berhasil ditutup.',
@@ -205,5 +311,56 @@ class ShiftController extends Controller
                 'error_detail' => $e->getTraceAsString()
             ], 500);
         }
+    }
+    public function printEod(Shift $shift)
+    {
+        $shift->load(['user', 'terminal', 'cashMovements', 'branch.organization']);
+
+        $expectedCash = $shift->starting_cash + $shift->total_cash_sales - $shift->total_cash_returns + $shift->total_cash_in - $shift->total_cash_out;
+        $shift->expected_cash = $expectedCash;
+
+        $cardSalesByBank = DB::table('transactions')
+            ->join('banks', 'transactions.bank_id', '=', 'banks.id')
+            ->where('transactions.shift_id', $shift->id)
+            ->where('transactions.payment_method', 'CARD')
+            ->where('transactions.is_voided', false)
+            ->select('banks.name', DB::raw('SUM(transactions.final_amount) as total_amount'))
+            ->groupBy('banks.id', 'banks.name')
+            ->get();
+
+        $returns = Transaction::with(['items.product'])
+            ->where('shift_id', $shift->id)
+            ->where('is_voided', false)
+            ->where('final_amount', '<', 0)
+            ->get();
+        
+        $returnItems = [];
+        foreach ($returns as $tx) {
+            foreach ($tx->items as $item) {
+                if ($item->quantity < 0) {
+                    $returnItems[] = [
+                        'product_name' => $item->product ? $item->product->name : 'Unknown Item',
+                        'quantity' => abs($item->quantity),
+                        'total' => abs($item->quantity * $item->unit_price)
+                    ];
+                }
+            }
+        }
+
+        $totalDiscounts = Transaction::where('shift_id', $shift->id)
+            ->where('is_voided', false)
+            ->sum('discount_amount');
+
+        $discountDetails = [
+            'manual_discount' => $totalDiscounts,
+            'promo_discount' => 0,
+            'point_deduction' => 0
+        ];
+
+        $shift->card_sales_by_bank = $cardSalesByBank;
+        $shift->returns_detail = $returnItems;
+        $shift->discount_details = $discountDetails;
+
+        return view('print.eod-receipt', compact('shift'));
     }
 }

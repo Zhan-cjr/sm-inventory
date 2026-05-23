@@ -243,6 +243,7 @@ return [
 
     'custom_permissions' => [
         'Batalkan:Transaction',
+        'update_selling_price_goods_receipt',
     ],
 
     /*

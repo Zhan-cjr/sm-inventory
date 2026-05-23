@@ -55,14 +55,15 @@ class LaporanPersediaan extends Page implements HasTable
                     ->sortable()
                     ->badge()
                     ->color(fn ($state, Stock $record) => $state <= ($record->reorder_point ?? 0) ? 'danger' : 'success'),
-                TextColumn::make('product.cost_price')
-                    ->label('Harga Pokok')
+                TextColumn::make('cost_price_tax')
+                    ->label('Harga Pokok (+PPN)')
                     ->money('IDR', true)
+                    ->state(fn (Stock $record) => $record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0))
                     ->sortable(),
                 TextColumn::make('valuation')
                     ->label('Valuasi Stok')
                     ->money('IDR', true)
-                    ->state(fn (Stock $record): float => $record->quantity_on_hand * ($record->product->cost_price ?? 0))
+                    ->state(fn (Stock $record): float => $record->quantity_on_hand * ($record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0)))
                     ->sortable(),
             ])
             ->filters([
@@ -81,6 +82,14 @@ class LaporanPersediaan extends Page implements HasTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-persediaan',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
+                \Filament\Actions\Action::make('cetak_rekap')
+                    ->label('Cetak Rekap Total')
+                    ->icon('heroicon-o-document-chart-bar')
+                    ->color('warning')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'rekap-total-stok',
                         'tableFilters' => $livewire->tableFilters
                     ]), true),
                 ExportAction::make()

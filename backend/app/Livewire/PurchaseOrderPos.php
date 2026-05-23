@@ -348,7 +348,7 @@ class PurchaseOrderPos extends Component
     {
         $this->validate([
             'supplier_id' => 'required',
-            'branch_id' => 'required',
+            'branch_id' => 'nullable',
             'po_date' => 'required|date',
             'po_number' => 'required|unique:purchase_orders,po_number,' . ($this->purchaseOrder ? $this->purchaseOrder->id : 'NULL'),
         ]);
@@ -359,8 +359,8 @@ class PurchaseOrderPos extends Component
         }
 
         $data = [
-            'organization_id' => auth()->user()->organization_id,
-            'branch_id' => $this->branch_id,
+            'organization_id' => auth()->user()->organization_id ?? \App\Models\Organization::first()->id,
+            'branch_id' => empty($this->branch_id) ? null : $this->branch_id,
             'supplier_id' => $this->supplier_id,
             'po_number' => $this->po_number,
             'po_date' => $this->po_date,

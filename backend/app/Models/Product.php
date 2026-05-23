@@ -26,14 +26,28 @@ class Product extends Model
     protected $fillable = [
         'organization_id', 'sku', 'barcode', 'name', 
         'category_id', 'sub_category', 'supplier_id', 'cost_price', 
-        'selling_price', 'unit_of_measure', 'reorder_point', 
+        'cost_price_tax',
+        'selling_price', 'margin_gol_1', 'harga_jual_1', 'qty_min_gol_1',
+        'margin_gol_2', 'harga_jual_2', 'qty_min_gol_2',
+        'margin_gol_3', 'harga_jual_3', 'qty_min_gol_3',
+        'unit_of_measure', 'reorder_point', 
         'reorder_qty', 'lead_time_days', 'is_active', 'is_taxable', 'metadata', 
         'is_ecommerce_active', 'ecommerce_category', 'image_path'
     ];
 
     protected $casts = [
         'cost_price' => 'decimal:2',
+        'cost_price_tax' => 'decimal:2',
         'selling_price' => 'decimal:2',
+        'margin_gol_1' => 'decimal:2',
+        'harga_jual_1' => 'decimal:2',
+        'margin_gol_2' => 'decimal:2',
+        'harga_jual_2' => 'decimal:2',
+        'margin_gol_3' => 'decimal:2',
+        'harga_jual_3' => 'decimal:2',
+        'qty_min_gol_1' => 'integer',
+        'qty_min_gol_2' => 'integer',
+        'qty_min_gol_3' => 'integer',
         'metadata' => 'array',
         'is_active' => 'boolean',
         'is_ecommerce_active' => 'boolean',

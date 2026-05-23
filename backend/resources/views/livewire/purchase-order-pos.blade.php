@@ -56,7 +56,7 @@
                         <td class="pos-label">Lokasi Cabang</td>
                         <td>
                             <select class="pos-input" wire:model="branch_id" @if(auth()->user()->branch_id) disabled @endif>
-                                <option value="">Pilih Lokasi...</option>
+                                <option value="">-- Pusat / Global (Semua Cabang) --</option>
                                 @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                 @endforeach
@@ -126,7 +126,7 @@
                                     this.open = false;
                                     this.search = '';
                                 }
-                            }" class="relative">
+                            }" style="position: relative;">
                                 <button type="button" @click="open = !open" 
                                         class="pos-input flex-between bg-white dark:bg-gray-800" 
                                         style="display: flex; justify-content: space-between; align-items: center; width: 100%; cursor: pointer;">
@@ -370,12 +370,12 @@
     <div style="padding: 1rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;" class="bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
         
         <!-- Actions Button -->
-        <div style="display: flex; gap: 0.5rem;">
-            <button wire:click="save" style="background-color: #10b981; color: white; padding: 0.5rem 1.5rem; border-radius: 0.375rem; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors">
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-right: auto;">
+            <button wire:click="save" style="background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
-                Simpan Pesanan
+                SIMPAN
             </button>
-            <a href="{{ route('filament.admin.resources.purchase-orders.index') }}" style="background-color: #fff; color: #374151; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
+            <a href="{{ route('filament.admin.resources.purchase-orders.index') }}" style="background-color: #fff; color: #374151; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; font-size: 0.875rem; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
                 Batal
             </a>
         </div>

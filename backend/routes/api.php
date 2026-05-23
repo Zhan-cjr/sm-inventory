@@ -55,6 +55,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/authorize-action', [\App\Http\Controllers\Api\V1\PosAuthController::class, 'authorizeAction']);
         
         // Transaction retrieval for POS Return
+        Route::get('/transactions/latest', [\App\Http\Controllers\Api\V1\TransactionController::class, 'getLatestTransaction']);
         Route::get('/transactions/receipt/{receipt}', [\App\Http\Controllers\Api\V1\TransactionController::class, 'getTransactionByReceipt']);
 
         Route::get('/user', function (Request $request) {
@@ -73,6 +74,7 @@ Route::prefix('v1')->group(function () {
                     'organization_name' => $user->organization?->name,
                     'point_conversion_rate' => $user->organization?->point_conversion_rate ?? 1000,
                     'allow_minus_stock' => (bool) ($user->organization?->allow_minus_stock ?? true),
+                    'pos_authorizations' => $user->pos_authorizations,
                 ]
             ]);
         });
@@ -99,18 +101,38 @@ Route::prefix('v1')->group(function () {
                 ->select([
                     'products.*',
                     'stocks.cost_price as branch_cost_price',
+                    'stocks.cost_price_tax as branch_cost_price_tax',
                     'stocks.selling_price as branch_selling_price',
+                    'stocks.harga_jual_1 as branch_harga_jual_1',
+                    'stocks.qty_min_gol_1 as branch_qty_min_gol_1',
+                    'stocks.harga_jual_2 as branch_harga_jual_2',
+                    'stocks.qty_min_gol_2 as branch_qty_min_gol_2',
+                    'stocks.harga_jual_3 as branch_harga_jual_3',
+                    'stocks.qty_min_gol_3 as branch_qty_min_gol_3',
                     'stocks.quantity_on_hand'
                 ])
                 ->get()
                 ->map(function ($product) {
                     // Override with branch specific prices if set
-                    if ($product->branch_selling_price !== null) {
+                    if ($product->branch_selling_price !== null && $product->branch_selling_price > 0) {
                         $product->selling_price = $product->branch_selling_price;
                     }
-                    if ($product->branch_cost_price !== null) {
+                    if ($product->branch_cost_price !== null && $product->branch_cost_price > 0) {
                         $product->cost_price = $product->branch_cost_price;
                     }
+                    if ($product->branch_harga_jual_1 !== null && $product->branch_harga_jual_1 > 0) {
+                        $product->harga_jual_1 = $product->branch_harga_jual_1;
+                        $product->qty_min_gol_1 = $product->branch_qty_min_gol_1;
+                    }
+                    if ($product->branch_harga_jual_2 !== null && $product->branch_harga_jual_2 > 0) {
+                        $product->harga_jual_2 = $product->branch_harga_jual_2;
+                        $product->qty_min_gol_2 = $product->branch_qty_min_gol_2;
+                    }
+                    if ($product->branch_harga_jual_3 !== null && $product->branch_harga_jual_3 > 0) {
+                        $product->harga_jual_3 = $product->branch_harga_jual_3;
+                        $product->qty_min_gol_3 = $product->branch_qty_min_gol_3;
+                    }
+                    
                     return $product;
                 });
 
@@ -181,6 +203,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/shifts/active', [\App\Http\Controllers\Api\V1\ShiftController::class, 'getActiveShift']);
         Route::post('/shifts/open', [\App\Http\Controllers\Api\V1\ShiftController::class, 'openShift']);
         Route::post('/shifts/close', [\App\Http\Controllers\Api\V1\ShiftController::class, 'closeShift']);
+        Route::post('/shifts/cash-movement', [\App\Http\Controllers\Api\V1\ShiftController::class, 'cashMovement']);
 
         // Manager Dashboard Metrics
         Route::get('/dashboard/metrics', [\App\Http\Controllers\Api\V1\DashboardController::class, 'metrics']);

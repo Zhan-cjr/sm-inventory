@@ -45,16 +45,84 @@ class StocksRelationManager extends RelationManager
                     ->multiple()
                     ->searchable()
                     ->preload(),
-                TextInput::make('cost_price')
-                    ->label('Harga Beli Cabang')
-                    ->helperText('Kosongkan untuk menggunakan harga default produk')
-                    ->numeric()
-                    ->prefix('Rp'),
-                TextInput::make('selling_price')
-                    ->label('Harga Jual Cabang')
-                    ->helperText('Kosongkan untuk menggunakan harga default produk')
-                    ->numeric()
-                    ->prefix('Rp'),
+                \Filament\Schemas\Components\Section::make('Harga Bertingkat & Margin')
+                    ->columns(3)
+                    ->schema([
+                        \Filament\Schemas\Components\Group::make([
+                            \Filament\Forms\Components\TextInput::make('cost_price')
+                                ->label('Harga Beli Cabang')
+                                ->helperText('Kosongkan untuk menggunakan harga default produk')
+                                ->numeric()
+                                ->prefix('Rp')
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                    $cost = (float) $state;
+                                    $set('cost_price_tax', round($cost * 1.11, 2));
+                                    foreach([1, 2, 3] as $i) {
+                                        $margin = (float) $get("margin_gol_{$i}");
+                                        if ($margin > 0) {
+                                            $set("harga_jual_{$i}", round($cost * (1 + ($margin / 100)), 2));
+                                        }
+                                    }
+                                    $set('selling_price', $get('harga_jual_1'));
+                                }),
+                            \Filament\Forms\Components\TextInput::make('cost_price_tax')
+                                ->label('Harga Beli + PPN')
+                                ->numeric()
+                                ->prefix('Rp'),
+                        ])->columnSpanFull()->columns(2),
+                        \Filament\Schemas\Components\Group::make([
+                            \Filament\Forms\Components\TextInput::make('qty_min_gol_1')->label('Min Qty Gol 1')->numeric()->default(1)->required(),
+                            \Filament\Forms\Components\TextInput::make('margin_gol_1')->label('Margin Gol 1 (%)')->numeric()->default(0)->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                    $cost = (float) $get('cost_price_tax');
+                                    $margin = (float) $state;
+                                    $price = round($cost * (1 + ($margin / 100)), 2);
+                                    $set('harga_jual_1', $price);
+                                    $set('selling_price', $price);
+                                }),
+                            \Filament\Forms\Components\TextInput::make('harga_jual_1')->label('Harga Jual Gol 1')->numeric()->default(0)->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                    $cost = (float) $get('cost_price_tax');
+                                    $price = (float) $state;
+                                    if ($cost > 0) {
+                                        $set('margin_gol_1', round((($price - $cost) / $cost) * 100, 2));
+                                    }
+                                    $set('selling_price', $price);
+                                }),
+                        ])->columnSpan(1),
+                        \Filament\Schemas\Components\Group::make([
+                            \Filament\Forms\Components\TextInput::make('qty_min_gol_2')->label('Min Qty Gol 2')->numeric(),
+                            \Filament\Forms\Components\TextInput::make('margin_gol_2')->label('Margin Gol 2 (%)')->numeric()->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                    $cost = (float) $get('cost_price_tax');
+                                    $set('harga_jual_2', round($cost * (1 + ((float)$state / 100)), 2));
+                                }),
+                            \Filament\Forms\Components\TextInput::make('harga_jual_2')->label('Harga Jual Gol 2')->numeric()->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                    $cost = (float) $get('cost_price_tax');
+                                    if ($cost > 0) {
+                                        $set('margin_gol_2', round((((float)$state - $cost) / $cost) * 100, 2));
+                                    }
+                                }),
+                        ])->columnSpan(1),
+                        \Filament\Schemas\Components\Group::make([
+                            \Filament\Forms\Components\TextInput::make('qty_min_gol_3')->label('Min Qty Gol 3')->numeric(),
+                            \Filament\Forms\Components\TextInput::make('margin_gol_3')->label('Margin Gol 3 (%)')->numeric()->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                    $cost = (float) $get('cost_price_tax');
+                                    $set('harga_jual_3', round($cost * (1 + ((float)$state / 100)), 2));
+                                }),
+                            \Filament\Forms\Components\TextInput::make('harga_jual_3')->label('Harga Jual Gol 3')->numeric()->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                    $cost = (float) $get('cost_price_tax');
+                                    if ($cost > 0) {
+                                        $set('margin_gol_3', round((((float)$state - $cost) / $cost) * 100, 2));
+                                    }
+                                }),
+                        ])->columnSpan(1),
+                        \Filament\Forms\Components\Hidden::make('selling_price')->default(0)
+                    ]),
                 TextInput::make('quantity_on_hand')
                     ->label('Stok Saat Ini')
                     ->required()

@@ -51,10 +51,10 @@
                     <tr>
                         <td class="pos-label">Pilih PO (Opsional)</td>
                         <td>
-                            <select class="pos-input" wire:model.live="purchase_order_id" style="border-color: #3b82f6;">
+                            <select class="pos-input" wire:model.live="purchase_order_id" style="border-color: #3b82f6;" @if(!$supplier_id) disabled title="Pilih supplier terlebih dahulu" @endif>
                                 <option value="">-- Penerimaan Tanpa PO --</option>
                                 @foreach($purchaseOrders as $po)
-                                    <option value="{{ $po->id }}">{{ $po->po_number }} - {{ $po->supplier->name }}</option>
+                                    <option value="{{ $po->id }}">{{ $po->po_number }}</option>
                                 @endforeach
                             </select>
                         </td>
@@ -67,7 +67,7 @@
                         <td class="pos-label">Lokasi Cabang</td>
                         <td>
                             <select class="pos-input" wire:model="branch_id" @if(auth()->user()->branch_id) disabled @endif>
-                                <option value="">Pilih Lokasi...</option>
+                                <option value="">Pusat / Global (Master Produk)</option>
                                 @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                 @endforeach
@@ -102,7 +102,7 @@
                                     this.open = false;
                                     this.search = '';
                                 }
-                            }" class="relative">
+                            }" style="position: relative;">
                                 <button type="button" @click="!disabled && (open = !open)" 
                                         class="pos-input flex-between"
                                         :class="disabled ? 'bg-gray-100 cursor-not-allowed opacity-75' : 'bg-white dark:bg-gray-800 cursor-pointer'"
@@ -238,7 +238,7 @@
                 Pilih Kolom
             </button>
             <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 12rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="dark:bg-gray-800 dark:border-gray-700">
-                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga Satuan', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
+                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga Satuan', 'harga_beli_ppn' => 'Harga+PPN', 'harga_jual_1' => 'Harga Jual', 'margin_gol_1' => 'Margin', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
                     <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                         <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
                         <span class="text-xs">{{ $label }}</span>
@@ -260,6 +260,9 @@
                     @if(in_array('qty_ordered', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right;">Qty PO</th> @endif
                     @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right;">Qty Terima</th> @endif
                     @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Satuan</th> @endif
+                    @if(in_array('harga_beli_ppn', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Beli+PPN</th> @endif
+                    @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual</th> @endif
+                    @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Margin (%)</th> @endif
                     @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis1 (%)</th> @endif
                     @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis2 (%)</th> @endif
                     @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis3 (%)</th> @endif
@@ -277,7 +280,7 @@
                         @if(in_array('qty_ordered', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #6b7280;">{{ $item['qty_ordered'] > 0 ? number_format($item['qty_ordered'], 0) : '-' }}</td> @endif
                         @if(in_array('qty_received', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
+                            <input type="number" step="any" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
                                    wire:model.lazy="cart.{{ $index }}.qty_received"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('price-{{ $index }}').focus()">
@@ -285,10 +288,37 @@
                         @endif
                         @if(in_array('unit_price', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" id="price-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input type="number" step="any" id="price-{{ $index }}" class="pos-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.unit_price"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('dis1-{{ $index }}').focus()">
+                        </td>
+                        @endif
+                        @if(in_array('harga_beli_ppn', $visibleColumns))
+                        <td class="pos-grid-td" style="text-align: right; background-color: #f9fafb; color: #4b5563;">
+                            {{ $include_tax ? number_format($item['unit_price'] * 1.11, 2) : number_format($item['unit_price'], 2) }}
+                        </td>
+                        @endif
+                        @if(in_array('harga_jual_1', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                            @can('update_selling_price_goods_receipt')
+                                <input type="number" step="any" class="pos-input" style="text-align: right;" 
+                                       wire:model.lazy="cart.{{ $index }}.harga_jual_1"
+                                       wire:change="recalculateRow({{ $index }})">
+                            @else
+                                <div style="text-align: right; padding: 0.375rem 0.5rem; color: #6b7280;">{{ number_format($item['harga_jual_1'], 2) }}</div>
+                            @endcan
+                        </td>
+                        @endif
+                        @if(in_array('margin_gol_1', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem; background-color: #f9fafb;">
+                            @can('update_selling_price_goods_receipt')
+                                <input type="number" step="any" class="pos-input {{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
+                                       wire:model.lazy="cart.{{ $index }}.margin_gol_1"
+                                       wire:change="recalculateRow({{ $index }})">
+                            @else
+                                <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_1'], 2) }}</div>
+                            @endcan
                         </td>
                         @endif
                         @if(in_array('discount_1', $visibleColumns))
@@ -309,7 +339,7 @@
                         @endif
                         @if(in_array('discount_3', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" id="dis3-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input type="number" step="any" id="dis3-{{ $index }}" class="pos-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.discount_3"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('search-input').focus()">
@@ -339,12 +369,12 @@
     <div style="padding: 1rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;" class="bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
         
         <!-- Actions Button -->
-        <div style="display: flex; gap: 0.5rem;">
-            <button wire:click="save" style="background-color: #2563eb; color: white; padding: 0.75rem 2rem; border-radius: 0.375rem; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-blue-700 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
-                SIMPAN PENERIMAAN
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-right: auto;">
+            <button wire:click="save" style="background-color: #2563eb; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-blue-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
+                SIMPAN
             </button>
-            <a href="{{ route('filament.admin.resources.goods-receipts.index') }}" style="background-color: #fff; color: #374151; padding: 0.75rem 1.5rem; border-radius: 0.375rem; font-weight: 500; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
+            <a href="{{ route('filament.admin.resources.goods-receipts.index') }}" style="background-color: #fff; color: #374151; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; font-size: 0.875rem; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
                 Batal
             </a>
         </div>

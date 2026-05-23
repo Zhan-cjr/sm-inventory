@@ -59,6 +59,11 @@ class Transaction extends Model
         return $this->hasMany(TransactionItem::class);
     }
 
+    public function shift(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
+    }
+
     public function customer()
     {
         return $this->belongsTo(Customer::class);

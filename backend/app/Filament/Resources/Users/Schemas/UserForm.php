@@ -18,11 +18,13 @@ class UserForm
                 TextInput::make('email')
                     ->label('Email address')
                     ->email()
+                    ->unique(ignoreRecord: true)
                     ->required(),
                 DateTimePicker::make('email_verified_at'),
                 TextInput::make('password')
                     ->password()
-                    ->required(),
+                    ->required(fn (?\Illuminate\Database\Eloquent\Model $record): bool => $record === null)
+                    ->dehydrated(fn (?string $state): bool => filled($state)),
                 Select::make('organization_id')
                     ->relationship('organization', 'name')
                     ->searchable()
@@ -43,7 +45,8 @@ class UserForm
                         'VOID' => 'Void / Hapus Item',
                         'RETURN' => 'Retur Transaksi',
                         'CLOSE_SHIFT' => 'Tutup Kasir',
-                        'MENU' => 'Akses Menu (Pengaturan Kassa)',
+                        'REPRINT_LAST' => 'Reprint Nota Terakhir',
+                        'REPRINT_OLD' => 'Reprint Nota Lama',
                         'HOLD_RECALL' => 'Hold & Recall Transaksi',
                     ])
                     ->columns(2)

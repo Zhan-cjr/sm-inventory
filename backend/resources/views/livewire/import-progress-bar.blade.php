@@ -1,5 +1,6 @@
-<div wire:poll.1s>
-    @if($import)
+{{-- Poll setiap 2 detik hanya saat ada import aktif --}}
+<div {{ $import ? 'wire:poll.2s' : '' }}>
+    @if($import && !$import->completed_at && $import->processed_rows < $import->total_rows)
         @php
             $total = $import->total_rows > 0 ? $import->total_rows : 1;
             $processed = $import->processed_rows;
@@ -22,14 +23,15 @@
                     </p>
                 </div>
             </div>
-            
+
             <div style="width: 100%; background-color: #f3f4f6; border-radius: 9999px; height: 8px; margin-bottom: 8px; overflow: hidden;">
                 <div style="background-color: #3b82f6; height: 8px; border-radius: 9999px; width: {{ $percentage }}%; transition: width 0.5s ease-out;"></div>
             </div>
-            
+
             <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 500; color: #6b7280;">
                 <span>{{ number_format($processed) }} / {{ number_format($import->total_rows) }} baris selesai</span>
             </div>
         </div>
     @endif
 </div>
+

@@ -43,6 +43,7 @@ class AuthController extends Controller
                 'organization_name' => $user->organization?->name,
                 'point_conversion_rate' => $user->organization?->point_conversion_rate ?? 1000,
                 'allow_minus_stock' => (bool) ($user->organization?->allow_minus_stock ?? true),
+                'pos_authorizations' => $user->pos_authorizations,
             ],
             'token' => $token
         ]);

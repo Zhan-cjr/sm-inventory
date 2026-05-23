@@ -4,6 +4,7 @@ import { DiscountEngine } from '../utils/DiscountEngine';
 import { AuthorizationModal } from './AuthorizationModal';
 import { ReturnItemModal } from './ReturnItemModal';
 import { ReceiptPreview } from './ReceiptPreview';
+import { EODReportPreview } from './EODReportPreview';
 import {
   LogOut,
   ShoppingCart,
@@ -143,6 +144,21 @@ export const POSTransaction = ({
   const [discountInputVal, setDiscountInputVal] = useState('');
   const [lockScreenInfo, setLockScreenInfo] = useState(null);
   const [branchMismatchInfo, setBranchMismatchInfo] = useState(null);
+
+  // New State for Qty and Reprint
+  const [nextItemQty, setNextItemQty] = useState('');
+  const [isQtyModalOpen, setIsQtyModalOpen] = useState(false);
+  const [isReprintOldModalOpen, setIsReprintOldModalOpen] = useState(false);
+  const [oldReceiptInput, setOldReceiptInput] = useState('');
+
+  // Cash Management State
+  const [isCashMovementModalOpen, setIsCashMovementModalOpen] = useState(false);
+  const [cashMovementType, setCashMovementType] = useState('CASH_IN');
+  const [cashMovementAmount, setCashMovementAmount] = useState('');
+  const [cashMovementDesc, setCashMovementDesc] = useState('');
+
+  // EOD Report State
+  const [eodReportData, setEodReportData] = useState(null);
 
   const { storeLocalTransaction, syncTransactions, pendingCount, syncStatus } = useOfflineSync(branchId, authToken);
   const discountEngine = useRef(new DiscountEngine([]));
@@ -792,6 +808,61 @@ export const POSTransaction = ({
       });
   };
 
+  const handleCashMovement = () => {
+    if (!cashMovementAmount || isNaN(cashMovementAmount) || cashMovementAmount <= 0) {
+      setAlertMsg({ text: 'Nominal harus lebih besar dari 0.', type: 'error' });
+      return;
+    }
+    if (!cashMovementDesc.trim()) {
+      setAlertMsg({ text: 'Keterangan wajib diisi.', type: 'error' });
+      return;
+    }
+    if (!activeShift) {
+      setAlertMsg({ text: 'Tidak ada shift aktif.', type: 'error' });
+      return;
+    }
+
+    setIsProcessing(true);
+    fetch('/api/v1/shifts/cash-movement', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        shift_id: activeShift.id,
+        terminal_id: terminalInfo.id,
+        type: cashMovementType,
+        amount: parseFloat(cashMovementAmount),
+        description: cashMovementDesc
+      })
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(data => {
+        setIsProcessing(false);
+        setAlertMsg({ text: data.message, type: 'success' });
+        setIsCashMovementModalOpen(false);
+        setCashMovementAmount('');
+        setCashMovementDesc('');
+        // Update local active shift total cash
+        const newShift = { ...activeShift };
+        if (cashMovementType === 'CASH_IN') {
+          newShift.total_cash_in = (newShift.total_cash_in || 0) + parseFloat(cashMovementAmount);
+        } else {
+          newShift.total_cash_out = (newShift.total_cash_out || 0) + parseFloat(cashMovementAmount);
+        }
+        setActiveShift(newShift);
+        safeSetItem('pos_active_shift', JSON.stringify(newShift));
+      })
+      .catch(err => {
+        setIsProcessing(false);
+        setAlertMsg({ text: 'Gagal mencatat manajemen kas (pastikan online).', type: 'error' });
+      });
+  };
+
   const handleCloseShift = () => {
     if (!activeShift) {
       setAlertMsg({ text: 'Tidak ada shift aktif yang ditemukan.', type: 'error' });
@@ -837,8 +908,8 @@ export const POSTransaction = ({
           localStorage.removeItem('pos_active_shift');
           setActiveShift(null);
           setIsCloseShiftModalOpen(false);
-          setAlertMsg({ text: 'Shift berhasil ditutup. Terima kasih!', type: 'success', persist: true });
-          setTimeout(() => onLogout(), 2000);
+          setAlertMsg({ text: 'Shift berhasil ditutup. Menyiapkan Laporan EOD...', type: 'success' });
+          setEodReportData(data.shift);
         } else {
           setAlertMsg({ text: data.message || 'Gagal menutup shift.', type: 'error' });
         }
@@ -857,6 +928,7 @@ export const POSTransaction = ({
   const addItemToTransaction = (product) => {
     const existingItem = items.find(i => i.productId === product.id);
     let manualDiscount = 0;
+    const qtyToAdd = parseFloat(nextItemQty) || 1;
 
     const allowMinusStock = (() => {
       try {
@@ -869,7 +941,7 @@ export const POSTransaction = ({
 
     if (!product.is_service) {
       const currentQty = existingItem ? existingItem.quantity : 0;
-      if (!allowMinusStock && currentQty + 1 > (product.quantity_on_hand || 0)) {
+      if (!allowMinusStock && currentQty + qtyToAdd > (product.quantity_on_hand || 0)) {
         setAlertMsg({ text: `Stok tidak mencukupi! Sisa stok: ${product.quantity_on_hand || 0}`, type: 'error' });
         setTimeout(() => setAlertMsg(null), 3000);
         return;
@@ -888,7 +960,7 @@ export const POSTransaction = ({
 
     if (existingItem) {
       setItems(items.map(i =>
-        i.productId === product.id ? { ...i, quantity: i.quantity + 1, manualDiscount: manualDiscount || i.manualDiscount } : i
+        i.productId === product.id ? { ...i, quantity: i.quantity + qtyToAdd, manualDiscount: manualDiscount || i.manualDiscount } : i
       ));
     } else {
       setItems([...items, {
@@ -896,12 +968,17 @@ export const POSTransaction = ({
         categoryId: product.category_id,
         sku: product.sku,
         name: product.name,
-        quantity: 1,
+        quantity: qtyToAdd,
         unitPrice: product.selling_price,
         manualDiscount: manualDiscount,
         discountPerItem: 0,
         isService: product.is_service || false
       }]);
+    }
+
+    // Reset nextItemQty back to empty
+    if (nextItemQty !== '') {
+      setNextItemQty('');
     }
     setLastScannedProductId(product.id);
     setTimeout(() => setLastScannedProductId(null), 3000);
@@ -1007,7 +1084,24 @@ export const POSTransaction = ({
   };
 
   const requestAuthorization = (actionName, callback) => {
-    setPendingAuthAction({ name: actionName, callback });
+    const userObjStr = localStorage.getItem('pos_user');
+    let hasAuth = false;
+    if (userObjStr) {
+      try {
+        const userObj = JSON.parse(userObjStr);
+        if (userObj.pos_authorizations && Array.isArray(userObj.pos_authorizations)) {
+          if (userObj.pos_authorizations.includes(actionName)) {
+            hasAuth = true;
+          }
+        }
+      } catch (e) { }
+    }
+
+    if (hasAuth) {
+      callback();
+    } else {
+      setPendingAuthAction({ name: actionName, callback });
+    }
   };
 
   const handleReturnSuccess = (returnItems, originalReceiptId) => {
@@ -1187,6 +1281,68 @@ export const POSTransaction = ({
     setTimeout(() => setAlertMsg(null), 2000);
   };
 
+  const mapApiTransactionToLocal = (data) => {
+    return {
+      receiptNumber: data.receipt_number,
+      timestamp: data.created_at,
+      items: data.items.map(item => ({
+        name: item.product ? item.product.name : item.product_name,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        manualDiscount: item.manual_discount || 0
+      })),
+      totalAmount: data.total_amount,
+      totalDiscount: data.total_discount,
+      manualTotalDiscount: data.manual_discount || 0,
+      finalAmount: data.final_amount,
+      paymentMethod: data.payment_method,
+      receivedAmount: data.received_amount,
+      changeAmount: data.change_amount,
+      branchName: data.branch?.name || branchName,
+      branchAddress: data.branch?.address || branchAddress,
+      orgName: data.organization?.name || orgName,
+      userName: data.cashier?.name || userName,
+    };
+  };
+
+  const handleReprintLast = async () => {
+    try {
+      const res = await fetch('/api/v1/transactions/latest', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'X-Terminal-ID': terminalInfo?.id || ''
+        }
+      });
+      if (!res.ok) throw new Error('Tidak ada transaksi di kassa ini.');
+      const data = await res.json();
+
+      setLastTransaction({ ...mapApiTransactionToLocal(data), isReprint: true });
+      setShowReceiptPreview(true);
+    } catch (e) {
+      setAlertMsg({ text: e.message || 'Gagal memuat nota terakhir', type: 'error' });
+      setTimeout(() => setAlertMsg(null), 3000);
+    }
+  };
+
+  const handleReprintOld = async () => {
+    if (!oldReceiptInput) return;
+    try {
+      const res = await fetch(`/api/v1/transactions/receipt/${encodeURIComponent(oldReceiptInput)}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (!res.ok) throw new Error('Nota tidak ditemukan.');
+      const data = await res.json();
+
+      setLastTransaction({ ...mapApiTransactionToLocal(data), isReprint: true });
+      setIsReprintOldModalOpen(false);
+      setOldReceiptInput('');
+      setShowReceiptPreview(true);
+    } catch (e) {
+      setAlertMsg({ text: e.message || 'Gagal mencari nota', type: 'error' });
+      setTimeout(() => setAlertMsg(null), 3000);
+    }
+  };
+
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
   };
@@ -1207,6 +1363,15 @@ export const POSTransaction = ({
         { key_name: 'btn_disc_total_pct', shortcut_key: 'F4', is_active: 1 },
         { key_name: 'btn_tunai', shortcut_key: 'F5', is_active: 1 },
         { key_name: 'btn_card', shortcut_key: 'F6', is_active: 1 },
+        { key_name: 'btn_qty', shortcut_key: 'F7', is_active: 1 },
+        { key_name: 'btn_close_shift', shortcut_key: 'F8', is_active: 1 },
+        { key_name: 'btn_reprint_last', shortcut_key: 'F11', is_active: 1 },
+        { key_name: 'btn_reprint_old', shortcut_key: 'F12', is_active: 1 },
+        { key_name: 'btn_member', shortcut_key: 'Home', is_active: 1 },
+        { key_name: 'btn_retur', shortcut_key: 'End', is_active: 1 },
+        { key_name: 'btn_hold', shortcut_key: 'PageUp', is_active: 1 },
+        { key_name: 'btn_recall', shortcut_key: 'PageDown', is_active: 1 },
+        { key_name: 'btn_clear', shortcut_key: 'Insert', is_active: 1 },
         { key_name: 'btn_void_item', shortcut_key: 'Delete', is_active: 1 },
         { key_name: 'btn_void_all', shortcut_key: 'Escape', is_active: 1 }
       ];
@@ -1279,6 +1444,18 @@ export const POSTransaction = ({
         case 'btn_return':
         case 'setIsReturnModalOpen':
           requestAuthorization("RETURN", () => setIsReturnModalOpen(true));
+          break;
+        case 'btn_qty':
+          setIsQtyModalOpen(true);
+          break;
+        case 'btn_close_shift':
+          setIsCloseShiftModalOpen(true);
+          break;
+        case 'btn_reprint_last':
+          requestAuthorization("REPRINT_LAST", () => handleReprintLast());
+          break;
+        case 'btn_reprint_old':
+          requestAuthorization("REPRINT_OLD", () => setIsReprintOldModalOpen(true));
           break;
         default:
           break;
@@ -1458,11 +1635,97 @@ export const POSTransaction = ({
                 onClick={handleCloseShift}
                 disabled={isProcessing}
               >
-                {isProcessing ? 'MEMPROSES...' : 'TUTUP KASIR (LOGOUT)'}
+                {isProcessing ? 'MEMPROSES...' : 'TUTUP KASIR (BLIND CLOSE)'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Cash Movement (Kas Masuk/Keluar) Modal */}
+      {isCashMovementModalOpen && (
+        <div className="change-modal-overlay">
+          <div className="change-modal-content fade-in" style={{ maxWidth: '450px' }}>
+            <div className="modal-header-icon" style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#eab308', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+              <Banknote size={40} />
+            </div>
+            <h2 style={{ textAlign: 'center' }}>Manajemen Kas</h2>
+            <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Catat pengeluaran atau penambahan kas laci (Petty Cash).</p>
+
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Jenis Transaksi</label>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  className={`btn-${cashMovementType === 'CASH_IN' ? 'primary' : 'secondary'}`}
+                  style={{ flex: 1, padding: '0.75rem' }}
+                  onClick={() => setCashMovementType('CASH_IN')}
+                >
+                  <Plus size={16} style={{ display: 'inline', marginRight: '5px' }} /> KAS MASUK
+                </button>
+                <button
+                  className={`btn-${cashMovementType === 'CASH_OUT' ? 'danger' : 'secondary'}`}
+                  style={{ flex: 1, padding: '0.75rem' }}
+                  onClick={() => setCashMovementType('CASH_OUT')}
+                >
+                  <Minus size={16} style={{ display: 'inline', marginRight: '5px' }} /> KAS KELUAR
+                </button>
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Nominal (Rp)</label>
+              <input
+                type="number"
+                className="modern-barcode-input"
+                style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem' }}
+                placeholder="0"
+                value={cashMovementAmount}
+                onChange={(e) => setCashMovementAmount(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Keterangan / Catatan</label>
+              <input
+                type="text"
+                className="modern-barcode-input"
+                style={{ width: '100%', padding: '0.75rem' }}
+                placeholder="Contoh: Beli air minum galon..."
+                value={cashMovementDesc}
+                onChange={(e) => setCashMovementDesc(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsCashMovementModalOpen(false)}>BATAL</button>
+              <button
+                className="btn-primary"
+                style={{ flex: 2, background: isProcessing ? '#94a3b8' : undefined }}
+                onClick={handleCashMovement}
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'MENYIMPAN...' : 'SIMPAN CATATAN KAS'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EOD Report Preview */}
+      {eodReportData && (
+        <EODReportPreview
+          eodData={eodReportData}
+          branchSettings={branchSettings}
+          onPrint={() => {
+            // Lakukan print (opsional: panggil handlePrint langsung di komponen jika butuh grafis khusus)
+            // Di sini kita delegasikan ke EODReportPreview
+          }}
+          onClose={() => {
+            setEodReportData(null);
+            onLogout();
+          }}
+        />
       )}
 
       {/* Recall (HOLD) Modal */}
@@ -1717,6 +1980,75 @@ export const POSTransaction = ({
 
 
 
+      {isQtyModalOpen && (
+        <div className="change-modal-overlay">
+          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
+            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              Masukkan Qty Barang
+            </h3>
+            <input
+              type="number"
+              step="any"
+              className="modern-barcode-input"
+              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
+              placeholder="1"
+              value={nextItemQty}
+              onChange={(e) => setNextItemQty(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setIsQtyModalOpen(false);
+                  setTimeout(() => barcodeInput.current?.focus(), 100);
+                } else if (e.key === 'Escape') {
+                  setNextItemQty('');
+                  setIsQtyModalOpen(false);
+                  setTimeout(() => barcodeInput.current?.focus(), 100);
+                }
+              }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setNextItemQty(''); setIsQtyModalOpen(false); barcodeInput.current?.focus(); }}>BATAL (Esc)</button>
+              <button className="btn-success" style={{ flex: 1 }} onClick={() => { setIsQtyModalOpen(false); setTimeout(() => barcodeInput.current?.focus(), 100); }}>OK (Enter)</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isReprintOldModalOpen && (
+        <div className="change-modal-overlay">
+          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
+            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              Reprint Nota Lama
+            </h3>
+            <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '1rem', fontSize: '0.875rem' }}>
+              Masukkan nomor struk (Misal: SMI-ABCD12)
+            </p>
+            <input
+              type="text"
+              className="modern-barcode-input"
+              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
+              placeholder="SMI-..."
+              value={oldReceiptInput}
+              onChange={(e) => setOldReceiptInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleReprintOld();
+                } else if (e.key === 'Escape') {
+                  setIsReprintOldModalOpen(false);
+                  setOldReceiptInput('');
+                  setTimeout(() => barcodeInput.current?.focus(), 100);
+                }
+              }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsReprintOldModalOpen(false); setOldReceiptInput(''); barcodeInput.current?.focus(); }}>BATAL (Esc)</button>
+              <button className="btn-success" style={{ flex: 1 }} onClick={handleReprintOld}>CARI (Enter)</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="pos-main-layout">
         <main className="pos-cart-container">
           <div className="cart-header">
@@ -1825,24 +2157,26 @@ export const POSTransaction = ({
           </div>
 
           <div className="function-grid">
-            <button className="func-btn danger" onClick={handleClearDiscount} style={{ background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' }}><X size={18} /><span>Clear</span><span className="key-hint">{getShortcutHint('btn_clear', getShortcutHint('btn_clear_discount', getShortcutHint('handleClearDiscount', '')))}</span></button>
+            <button className="func-btn danger" onClick={handleClearDiscount} style={{ background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' }}><X size={18} /><span>Clear</span><span className="key-hint">{getShortcutHint('btn_clear', 'Insert')}</span></button>
             <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL'))}><Tag size={18} /><span>Disc Item Rp</span><span className="key-hint">{getShortcutHint('btn_disc_item_rp', 'F1')}</span></button>
             <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT'))}><Tag size={18} /><span>Disc Item %</span><span className="key-hint">{getShortcutHint('btn_disc_item_pct', 'F2')}</span></button>
-            <button className="func-btn primary"><Package size={18} /><span>Qty</span></button>
-            <button className="func-btn secondary" onClick={() => requestAuthorization("RETURN", () => setIsReturnModalOpen(true))}><RotateCcw size={18} /><span>Retur</span><span className="key-hint">{getShortcutHint('btn_retur', getShortcutHint('btn_return', getShortcutHint('setIsReturnModalOpen', '')))}</span></button>
+            <button className="func-btn primary" onClick={() => setIsQtyModalOpen(true)}><Package size={18} /><span>Qty</span><span className="key-hint">{getShortcutHint('btn_qty', 'F7')}</span></button>
+            <button className="func-btn secondary" onClick={() => requestAuthorization("RETURN", () => setIsReturnModalOpen(true))}><RotateCcw size={18} /><span>Retur</span><span className="key-hint">{getShortcutHint('btn_retur', 'End')}</span></button>
             <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL'))}><Tag size={18} /><span>Disc Total Rp</span><span className="key-hint">{getShortcutHint('btn_disc_total_rp', 'F3')}</span></button>
             <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT'))}><Tag size={18} /><span>Disc Total %</span><span className="key-hint">{getShortcutHint('btn_disc_total_pct', 'F4')}</span></button>
 
             <button className={`func-btn payment ${paymentMethod === 'CARD' ? 'active' : ''}`} onClick={() => startPayment('CARD')}><CreditCard size={18} /><span>Card</span><span className="key-hint">{getShortcutHint('btn_card', 'F6')}</span></button>
             <button className={`func-btn payment ${paymentMethod === 'CASH' ? 'active' : ''}`} onClick={() => startPayment('CASH')}><Banknote size={18} /><span>Tunai</span><span className="key-hint">{getShortcutHint('btn_tunai', 'F5')}</span></button>
 
-            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction())}><Lock size={18} /><span>Hold</span><span className="key-hint">{getShortcutHint('btn_hold', getShortcutHint('btn_hold_transaction', getShortcutHint('handleHoldTransaction', '')))}</span></button>
-            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true))}><History size={18} /><span>Recall</span><span className="key-hint">{getShortcutHint('btn_recall', getShortcutHint('btn_recall_transaction', getShortcutHint('setIsRecallModalOpen', '')))}</span></button>
-            <button className="func-btn action" onClick={() => setIsMemberModalOpen(true)}><User size={18} /><span>Member</span><span className="key-hint">{getShortcutHint('btn_member', getShortcutHint('setIsMemberModalOpen', ''))}</span></button>
-            <button className="func-btn secondary" onClick={() => setIsCloseShiftModalOpen(true)}><LogOut size={18} /><span>Tutup Kasir</span></button>
+            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction())}><Lock size={18} /><span>Hold</span><span className="key-hint">{getShortcutHint('btn_hold', 'PageUp')}</span></button>
+            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true))}><History size={18} /><span>Recall</span><span className="key-hint">{getShortcutHint('btn_recall', 'PageDown')}</span></button>
+            <button className="func-btn action" onClick={() => setIsMemberModalOpen(true)}><User size={18} /><span>Member</span><span className="key-hint">{getShortcutHint('btn_member', 'Home')}</span></button>
+            <button className="func-btn action" onClick={() => setIsCashMovementModalOpen(true)}><Banknote size={18} /><span>Kas Masuk/Keluar</span><span className="key-hint"></span></button>
+            <button className="func-btn secondary" onClick={() => setIsCloseShiftModalOpen(true)}><LogOut size={18} /><span>Tutup Kasir</span><span className="key-hint">{getShortcutHint('btn_close_shift', 'F8')}</span></button>
             <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0))}><Eraser size={18} /><span>Void Item</span><span className="key-hint">{getShortcutHint('btn_void_item', 'Del')}</span></button>
             <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={18} /><span>Void All</span><span className="key-hint">{getShortcutHint('btn_void_all', 'Esc')}</span></button>
-            <button className="func-btn secondary" onClick={() => requestAuthorization("SETTINGS", () => setIsTerminalModalOpen(true))}><Settings size={18} /><span>Menu</span></button>
+            <button className="func-btn secondary" onClick={() => requestAuthorization("REPRINT_LAST", () => handleReprintLast())}><History size={18} /><span>Reprint Terakhir</span><span className="key-hint">{getShortcutHint('btn_reprint_last', 'F11')}</span></button>
+            <button className="func-btn action" onClick={() => requestAuthorization("REPRINT_OLD", () => setIsReprintOldModalOpen(true))}><Search size={18} /><span>Reprint Lama</span><span className="key-hint">{getShortcutHint('btn_reprint_old', 'F12')}</span></button>
           </div>
 
           <div className="input-action-section" style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>

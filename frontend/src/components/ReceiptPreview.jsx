@@ -6,7 +6,7 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
   const { 
     items, totalAmount, discountAmount, finalAmount, paymentMethod, 
     terminalId, receivedAmount, changeAmount, branchName, branchAddress, orgName, 
-    userName, customerName, timestamp, receipt_number 
+    userName, customerName, timestamp, receipt_number, isReprint 
   } = transaction;
 
   const pad = (str, len, char = ' ') => {
@@ -72,6 +72,10 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
     headerLines.forEach(text => {
       lines.push(center(text, columns));
     });
+  }
+  
+  if (isReprint) {
+    lines.push(center('*** COPY / REPRINT ***', columns));
   }
 
   lines.push(divider);
@@ -179,7 +183,7 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
 };
 
 export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }) => {
-  const { items, totalAmount, discountAmount, finalAmount, paymentMethod, bankId, terminalId, receivedAmount, changeAmount, appliedPromos, branchName, branchAddress, orgName, userName, customerName, timestamp, receipt_number } = transaction;
+  const { items, totalAmount, discountAmount, finalAmount, paymentMethod, bankId, terminalId, receivedAmount, changeAmount, appliedPromos, branchName, branchAddress, orgName, userName, customerName, timestamp, receipt_number, isReprint } = transaction;
 
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
@@ -299,6 +303,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }
                 </p>
               ))
             )}
+            {isReprint && <p style={{ textAlign: 'center', fontWeight: 'bold', margin: '4px 0', fontSize: '12px' }}>*** COPY / REPRINT ***</p>}
             <p className="divider">--------------------------------</p>
           </div>
           

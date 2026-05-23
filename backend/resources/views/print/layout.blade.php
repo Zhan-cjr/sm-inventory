@@ -53,6 +53,7 @@
     @php
         $org = \App\Models\Organization::first();
         $org_name = $org ? strtoupper($org->name) : 'SM INVENTORY';
+        $org_address = $org ? $org->address : '';
         
         $filters = request()->input('tableFilters', []);
         $branch_id = $filters['branch_id']['value'] ?? null;
@@ -61,15 +62,17 @@
         }
 
         $branch = $branch_id ? \App\Models\Branch::find($branch_id) : null;
-        $branch_name = $branch ? strtoupper($branch->name) : 'SEMUA CABANG';
-        $branch_address = $branch ? $branch->address : '';
+        $branch_name = $branch ? strtoupper($branch->name) : '';
+        $header_address = $branch ? $branch->address : $org_address;
     @endphp
 
     <div class="header">
         <h1 style="margin: 0; font-size: 18px;">{{ $org_name }}</h1>
-        <h3 style="margin: 3px 0; font-size: 14px;">{{ $branch_name }}</h3>
-        @if($branch_address)
-            <p style="margin: 0 0 10px 0; font-size: 11px;">{{ $branch_address }}</p>
+        @if($branch_name)
+            <h3 style="margin: 3px 0; font-size: 14px;">{{ $branch_name }}</h3>
+        @endif
+        @if($header_address)
+            <p style="margin: 0 0 10px 0; font-size: 11px;">{{ $header_address }}</p>
         @endif
         <hr style="border: 1px solid #000; margin-bottom: 15px;">
         

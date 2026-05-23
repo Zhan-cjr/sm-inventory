@@ -27,7 +27,7 @@ class GoodsReceiptPos extends Component
     public $include_tax = true;
     public $tax_amount = 0;
 
-    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
+    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'harga_beli_ppn', 'harga_jual_1', 'margin_gol_1', 'harga_jual_2', 'margin_gol_2', 'harga_jual_3', 'margin_gol_3', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
 
     public $searchQuery = '';
     public $cart = [];
@@ -67,6 +67,9 @@ class GoodsReceiptPos extends Component
                     'qty_ordered' => $item->quantity_ordered,
                     'qty_received' => $item->quantity_received,
                     'unit_price' => $item->unit_price,
+                    'harga_jual_1' => 0, 'margin_gol_1' => 0,
+                    'harga_jual_2' => 0, 'margin_gol_2' => 0,
+                    'harga_jual_3' => 0, 'margin_gol_3' => 0,
                     'discount_1' => $item->discount_1,
                     'discount_2' => $item->discount_2,
                     'discount_3' => $item->discount_3,
@@ -90,6 +93,11 @@ class GoodsReceiptPos extends Component
                 $this->supplier_id = $po->supplier_id;
                 $this->cart = [];
                 foreach ($po->items as $item) {
+                    $stock = null;
+                    if ($this->branch_id) {
+                        $stock = Stock::where('product_id', $item->product_id)->where('branch_id', $this->branch_id)->first();
+                    }
+
                     $this->cart[] = [
                         'product_id' => $item->product_id,
                         'sku' => $item->product->sku,
@@ -98,6 +106,8 @@ class GoodsReceiptPos extends Component
                         'qty_ordered' => $item->quantity_ordered,
                         'qty_received' => $item->quantity_ordered, // Default to ordered qty
                         'unit_price' => $item->unit_cost,
+                        'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($item->product->harga_jual_1 ?? 0),
+                        'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($item->product->margin_gol_1 ?? 0),
                         'discount_1' => $item->discount_1,
                         'discount_2' => $item->discount_2,
                         'discount_3' => $item->discount_3,
@@ -163,6 +173,13 @@ class GoodsReceiptPos extends Component
             $this->recalculateRow($existingIndex);
             $this->dispatch('item-added', index: $existingIndex);
         } else {
+            $stock = null;
+            if ($this->branch_id) {
+                $stock = Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->first();
+            }
+
+            $costPrice = ($stock && $stock->cost_price > 0) ? $stock->cost_price : $product->cost_price;
+
             $this->cart[] = [
                 'product_id' => $product->id,
                 'sku' => $product->sku,
@@ -170,7 +187,13 @@ class GoodsReceiptPos extends Component
                 'name' => $product->name,
                 'qty_ordered' => 0,
                 'qty_received' => 1,
-                'unit_price' => $product->cost_price,
+                'unit_price' => $costPrice,
+                'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($product->harga_jual_1 ?? 0),
+                'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($product->margin_gol_1 ?? 0),
+                'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($product->harga_jual_2 ?? 0),
+                'margin_gol_2' => ($stock && $stock->margin_gol_2 > 0) ? $stock->margin_gol_2 : ($product->margin_gol_2 ?? 0),
+                'harga_jual_3' => ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($product->harga_jual_3 ?? 0),
+                'margin_gol_3' => ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($product->margin_gol_3 ?? 0),
                 'discount_1' => 0,
                 'discount_2' => 0,
                 'discount_3' => 0,
@@ -195,11 +218,54 @@ class GoodsReceiptPos extends Component
         $this->calculateTotals();
     }
 
+    public function updatedCart($name, $value)
+    {
+        $parts = explode('.', $name);
+        if (count($parts) === 2) {
+            $index = $parts[0];
+            $field = $parts[1];
+            
+            $item = $this->cart[$index];
+            $basePrice = (float) ($item['unit_price'] ?? 0);
+            $price = $this->include_tax ? round($basePrice * 1.11, 2) : $basePrice;
+
+            if (in_array($field, ['margin_gol_1', 'margin_gol_2', 'margin_gol_3'])) {
+                $gol = substr($field, -1);
+                $margin = (float) $value;
+                if ($price > 0) {
+                    $this->cart[$index]["harga_jual_{$gol}"] = round($price * (1 + ($margin / 100)), 2);
+                }
+            } elseif (in_array($field, ['harga_jual_1', 'harga_jual_2', 'harga_jual_3'])) {
+                $gol = substr($field, -1);
+                $sellingPrice = (float) $value;
+                if ($price > 0) {
+                    $this->cart[$index]["margin_gol_{$gol}"] = round((($sellingPrice - $price) / $price) * 100, 2);
+                } else {
+                    $this->cart[$index]["margin_gol_{$gol}"] = 100;
+                }
+            } elseif ($field === 'unit_price') {
+                // If unit price changes, keep the selling price the same and recalculate margins
+                foreach([1, 2, 3] as $i) {
+                    $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
+                    if ($price > 0) {
+                        $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $price) / $price) * 100, 2);
+                    } else {
+                        $this->cart[$index]["margin_gol_{$i}"] = 100;
+                    }
+                }
+            }
+            
+            // Re-calculate subtotals for this row
+            $this->recalculateRow($index);
+            $this->calculateTotals();
+        }
+    }
+
     public function recalculateRow($index)
     {
         $item = $this->cart[$index];
-        $qty = (float) $item['qty_received'];
-        $price = (float) $item['unit_price'];
+        $qty = (float) ($item['qty_received'] ?? 0);
+        $price = (float) ($item['unit_price'] ?? 0);
         
         $baseTotal = $qty * $price;
         
@@ -218,6 +284,20 @@ class GoodsReceiptPos extends Component
 
     public function updatedIncludeTax()
     {
+        // Recalculate all margins since the cost basis changed
+        foreach ($this->cart as $index => $item) {
+            $basePrice = (float) ($item['unit_price'] ?? 0);
+            $price = $this->include_tax ? round($basePrice * 1.11, 2) : $basePrice;
+            
+            foreach([1, 2, 3] as $i) {
+                $sellingPrice = (float) ($item["harga_jual_{$i}"] ?? 0);
+                if ($price > 0) {
+                    $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $price) / $price) * 100, 2);
+                } else {
+                    $this->cart[$index]["margin_gol_{$i}"] = 100;
+                }
+            }
+        }
         $this->calculateTotals();
     }
 
@@ -255,7 +335,7 @@ class GoodsReceiptPos extends Component
     {
         $this->validate([
             'supplier_id' => 'required',
-            'branch_id' => 'required',
+            'branch_id' => 'nullable',
             'receipt_date' => 'required|date',
             'receipt_number' => 'required|unique:goods_receipts,receipt_number,' . ($this->goodsReceipt ? $this->goodsReceipt->id : 'NULL'),
         ]);
@@ -303,6 +383,34 @@ class GoodsReceiptPos extends Component
                     'discount_3' => $item['discount_3'] ?? 0,
                     'subtotal' => $item['subtotal']
                 ]);
+
+                // Update selling price if permitted and changed
+                if (auth()->user()->can('update_selling_price_goods_receipt')) {
+                    if (empty($this->branch_id)) {
+                        // Update Global Product
+                        $product = Product::find($item['product_id']);
+                        if ($product) {
+                            $product->update([
+                                'cost_price' => $item['unit_price'],
+                                'harga_jual_1' => $item['harga_jual_1'] ?? $product->harga_jual_1,
+                                'margin_gol_1' => $item['margin_gol_1'] ?? $product->margin_gol_1,
+                                'selling_price' => $item['harga_jual_1'] ?? $product->harga_jual_1
+                            ]);
+                        }
+                    } else {
+                        // Update Branch Stock
+                        $stock = Stock::where('product_id', $item['product_id'])->where('branch_id', $this->branch_id)->first();
+                        if ($stock) {
+                            $stock->update([
+                                'cost_price' => $item['unit_price'],
+                                'cost_price_tax' => $this->include_tax ? round($item['unit_price'] * 1.11, 2) : $item['unit_price'],
+                                'harga_jual_1' => $item['harga_jual_1'] ?? $stock->harga_jual_1,
+                                'margin_gol_1' => $item['margin_gol_1'] ?? $stock->margin_gol_1,
+                                'selling_price' => $item['harga_jual_1'] ?? $stock->harga_jual_1
+                            ]);
+                        }
+                    }
+                }
             }
 
             // Update PO Status if all items received (optional logic)
@@ -319,10 +427,18 @@ class GoodsReceiptPos extends Component
 
     public function render()
     {
+        $purchaseOrdersQuery = PurchaseOrder::whereIn('status', ['DRAFT', 'SENT']);
+        
+        if ($this->supplier_id) {
+            $purchaseOrdersQuery->where('supplier_id', $this->supplier_id);
+        } else {
+            $purchaseOrdersQuery->where('id', null); // Don't show any PO if no supplier is selected
+        }
+
         return view('livewire.goods-receipt-pos', [
             'branches' => Branch::all(),
             'suppliers' => Supplier::all(),
-            'purchaseOrders' => PurchaseOrder::whereIn('status', ['DRAFT', 'SENT'])->get(),
+            'purchaseOrders' => $purchaseOrdersQuery->get(),
         ]);
     }
 }

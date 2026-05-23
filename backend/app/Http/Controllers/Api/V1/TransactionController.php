@@ -35,7 +35,7 @@ class TransactionController extends Controller
             'customer_id' => 'nullable|uuid|exists:customers,id',
             'items' => 'required|array',
             'items.*.product_id' => 'required|uuid',
-            'items.*.quantity' => 'required|integer|not_in:0',
+            'items.*.quantity' => 'required|numeric|not_in:0',
             'items.*.unit_price' => 'required|numeric',
             'items.*.discount_per_item' => 'nullable|numeric',
         ]);
@@ -105,6 +105,31 @@ class TransactionController extends Controller
                 'error' => $e->getMessage()
             ], 422);
         }
+    }
+
+    public function getLatestTransaction(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $terminalId = $request->header('X-Terminal-ID'); // If provided from frontend
+        
+        $query = Transaction::where('branch_id', $user->branch_id)
+            ->with(['items.product']);
+            
+        if ($terminalId) {
+            $query->where('terminal_id', $terminalId);
+        }
+
+        $transaction = $query->latest('created_at')->first();
+
+        if (!$transaction) {
+            return response()->json(['message' => 'Belum ada transaksi di kassa ini.'], 404);
+        }
+
+        return response()->json($transaction);
     }
 
     public function getTransactionByReceipt($receipt)

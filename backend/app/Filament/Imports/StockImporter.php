@@ -101,7 +101,12 @@ class StockImporter extends Importer
             ImportColumn::make('rack')
                 ->label('Rak (Nama/Kode)')
                 ->example('Rak Depan A1')
-                ->rules(['nullable', 'string', 'max:255']),
+                ->rules(['nullable', 'string', 'max:255'])
+                ->fillRecordUsing(function (Stock $record, ?string $state): void {
+                    // Kolom 'rack' tidak ada di tabel stocks.
+                    // Nilai ini dipakai di afterSave() untuk relasi StockOpnameRack.
+                    // Sengaja dikosongkan agar tidak ada SQL error.
+                }),
         ];
     }
 
