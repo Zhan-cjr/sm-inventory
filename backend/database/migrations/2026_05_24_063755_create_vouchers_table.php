@@ -1,0 +1,35 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('vouchers', function (Blueprint $table) {
+            $table->id();
+            $table->string('code')->unique();
+            $table->string('name')->nullable();
+            $table->decimal('nominal_value', 15, 2);
+            $table->timestamp('valid_until')->nullable();
+            $table->boolean('is_used')->default(false);
+            $table->timestamp('used_at')->nullable();
+            $table->uuid('transaction_id')->nullable();
+            $table->foreign('transaction_id')->references('id')->on('transactions')->onDelete('set null');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('vouchers');
+    }
+};

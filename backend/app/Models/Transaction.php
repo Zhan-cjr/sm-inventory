@@ -12,10 +12,10 @@ class Transaction extends Model
     protected $fillable = [
         'organization_id', 'branch_id', 'terminal_id', 'shift_id', 'transaction_type', 
         'transaction_date', 'cashier_id', 'customer_id', 'total_amount', 
-        'discount_amount', 'final_amount', 'payment_method', 
+        'discount_amount', 'manual_discount', 'promo_discount', 'final_amount', 'payment_method', 
         'bank_id', 'received_amount', 'change_amount',
         'is_voided', 'void_reason', 'void_date', 'voided_by', 
-        'sync_status', 'local_transaction_id', 'receipt_number'
+        'sync_status', 'local_transaction_id', 'receipt_number', 'payment_details'
     ];
 
     protected $casts = [
@@ -27,6 +27,7 @@ class Transaction extends Model
         'change_amount' => 'decimal:2',
         'is_voided' => 'boolean',
         'void_date' => 'datetime',
+        'payment_details' => 'array',
     ];
 
     public function terminal()

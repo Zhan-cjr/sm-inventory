@@ -15,7 +15,7 @@ class Shift extends Model
     protected $fillable = [
         'user_id', 'branch_id', 'terminal_id', 'shift_name', 'start_time', 
         'end_time', 'starting_cash', 'total_cash_in', 'total_cash_out', 'total_cash_sales', 
-        'total_card_sales', 'total_cash_returns', 'total_card_returns', 'actual_cash', 'difference', 
+        'total_card_sales', 'total_voucher_sales', 'total_cash_returns', 'total_card_returns', 'actual_cash', 'difference', 
         'status', 'notes'
     ];
 

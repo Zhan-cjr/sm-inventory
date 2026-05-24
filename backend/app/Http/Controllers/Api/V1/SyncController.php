@@ -58,6 +58,17 @@ class SyncController extends Controller
 
                     $txDate = $txData['transactionDate'] ?? $txData['transaction_date'] ?? $txData['date'] ?? now();
 
+                    $paymentMethod = $txData['paymentMethod'] ?? 'CASH';
+                    $paymentDetails = null;
+
+                    if (isset($txData['payments']) && is_array($txData['payments']) && count($txData['payments']) > 1) {
+                        $paymentMethod = 'MULTI';
+                        $paymentDetails = $txData['payments'];
+                    } else if (isset($txData['payments']) && is_array($txData['payments']) && count($txData['payments']) === 1) {
+                        $paymentMethod = $txData['payments'][0]['method'];
+                        $paymentDetails = $txData['payments'];
+                    }
+
                     $tx = Transaction::create([
                         'organization_id' => $user->organization_id,
                         'branch_id' => $validated['branchId'],
@@ -69,8 +80,11 @@ class SyncController extends Controller
                         'cashier_id' => $user->id,
                         'total_amount' => $txData['totalAmount'],
                         'discount_amount' => $txData['discountAmount'] ?? 0,
+                        'manual_discount' => $txData['manualDiscount'] ?? ($txData['discountAmount'] ?? 0),
+                        'promo_discount' => $txData['promoDiscount'] ?? 0,
                         'final_amount' => $txData['finalAmount'] ?? $txData['totalAmount'],
-                        'payment_method' => $txData['paymentMethod'],
+                        'payment_method' => $paymentMethod,
+                        'payment_details' => $paymentDetails,
                         'bank_id' => $txData['bankId'] ?? null,
                         'received_amount' => $txData['receivedAmount'] ?? 0,
                         'change_amount' => $txData['changeAmount'] ?? 0,
@@ -78,6 +92,18 @@ class SyncController extends Controller
                         'local_transaction_id' => $txData['localId'],
                         'receipt_number' => $txData['receipt_number'] ?? ('SMI-' . strtoupper(substr(uniqid(), -6))),
                     ]);
+
+                    if (isset($txData['payments']) && is_array($txData['payments'])) {
+                        foreach ($txData['payments'] as $payment) {
+                            if (($payment['method'] === 'VOUCHER' || $payment['method'] === 'MULTI') && isset($payment['voucherId'])) {
+                                \App\Models\Voucher::where('id', $payment['voucherId'])->update([
+                                    'is_used' => true,
+                                    'used_at' => now(),
+                                    'transaction_id' => $tx->id,
+                                ]);
+                            }
+                        }
+                    }
 
                     // Update customer points if applicable
                     if ($tx->customer_id) {

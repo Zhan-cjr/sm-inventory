@@ -107,7 +107,7 @@ class ReportPrintController extends Controller
     {
         $query = Transaction::query()
             ->where('is_voided', false)
-            ->with(['terminal']);
+            ->with(['cashier', 'shift']);
 
         $query = $this->applyDateFilters($query, $filters);
 
@@ -124,68 +124,100 @@ class ReportPrintController extends Controller
         }
 
         $transactions = $query->get();
+        $banks = \App\Models\Bank::where('is_active', true)->orderBy('name')->get();
 
-        // Agregasi per Tanggal dan Terminal (KS)
+        // Agregasi per Tanggal, Kasir, dan Shift
         $data = [];
         foreach ($transactions as $t) {
             $date = \Carbon\Carbon::parse($t->transaction_date)->format('d-m-Y');
-            $terminal = $t->terminal ? $t->terminal->name : 'Unk';
-            $key = $date . '|' . $terminal;
+            $kasir = $t->cashier ? $t->cashier->name : 'Unk';
+            $shift = $t->shift ? $t->shift->shift_name : 'Unk';
+            $key = $date . '|' . $kasir . '|' . $shift;
 
             if (!isset($data[$key])) {
                 $data[$key] = [
                     'tanggal' => $date,
-                    'ks' => $terminal,
+                    'kasir' => $kasir,
+                    'shift' => $shift,
                     'jml_nota' => 0,
                     'penjualan' => 0,
                     'tunai' => 0,
-                    'kredit' => 0,
-                    'card' => 0,
-                    'charge' => 0,
                     'voucher' => 0,
-                    'gift' => 0,
                     'diskon' => 0,
                     'retur' => 0,
                     'jual_netto' => 0,
                 ];
+                foreach ($banks as $bank) {
+                    $data[$key]['bank_'.$bank->id] = 0;
+                }
             }
 
             $data[$key]['jml_nota'] += 1;
-
-            if ($t->transaction_type === 'RETURN') {
-                $abs_amount = abs($t->final_amount);
-                $data[$key]['retur'] += $abs_amount;
-                $data[$key]['jual_netto'] += $t->final_amount; // final_amount is negative, so adding it reduces net sales
-                
-                $method = strtolower($t->payment_method);
-                if ($method === 'cash') {
-                    $data[$key]['tunai'] += $t->final_amount;
-                } elseif (in_array($method, ['card', 'debit', 'credit', 'transfer', 'qris'])) {
-                    $data[$key]['card'] += $t->final_amount;
-                } else {
-                    $data[$key]['tunai'] += $t->final_amount;
-                }
+            $isReturn = $t->transaction_type === 'RETURN';
+            
+            if ($isReturn) {
+                // Untuk retur, gross penjualan tidak bertambah, dicatat sebagai pengurang di retur
+                $data[$key]['retur'] += abs($t->final_amount);
+                $data[$key]['jual_netto'] += $t->final_amount; // final_amount is negative
             } else {
                 $data[$key]['penjualan'] += $t->total_amount;
-                $data[$key]['diskon'] += $t->discount_amount;
+                // Total diskon meliputi discount item, manual diskon total, dan promo
+                $total_discount = ($t->discount_amount ?? 0) + ($t->manual_discount ?? 0) + ($t->promo_discount ?? 0);
+                $data[$key]['diskon'] += $total_discount;
                 $data[$key]['jual_netto'] += $t->final_amount;
+            }
 
-                $method = strtolower($t->payment_method);
-                if ($method === 'cash') {
-                    $data[$key]['tunai'] += $t->final_amount;
-                } elseif (in_array($method, ['card', 'debit', 'credit', 'transfer', 'qris'])) {
-                    $data[$key]['card'] += $t->final_amount;
+            // Memproses Pembayaran (mendukung multi payment dan single payment fallback)
+            if (!empty($t->payment_details) && is_array($t->payment_details)) {
+                foreach ($t->payment_details as $p) {
+                    $pMethod = strtoupper($p['method'] ?? 'CASH');
+                    $pAmt = floatval($p['amount'] ?? 0);
+                    
+                    if ($isReturn && $pAmt > 0) {
+                        $pAmt = -$pAmt; // pastikan pengurang karena ini retur
+                    }
+
+                    if ($pMethod === 'CASH') {
+                        $data[$key]['tunai'] += $pAmt;
+                    } elseif ($pMethod === 'VOUCHER') {
+                        $data[$key]['voucher'] += $pAmt;
+                    } elseif ($pMethod === 'CARD') {
+                        $bId = $p['bankId'] ?? null;
+                        if ($bId && isset($data[$key]['bank_'.$bId])) {
+                            $data[$key]['bank_'.$bId] += $pAmt;
+                        } else {
+                            $data[$key]['tunai'] += $pAmt; // Fallback jika bank tak dikenal / tak aktif
+                        }
+                    } else {
+                        $data[$key]['tunai'] += $pAmt;
+                    }
+                }
+            } else {
+                $method = strtoupper($t->payment_method);
+                $amt = $t->final_amount; // final_amount includes negative sign for return
+
+                if ($method === 'CASH') {
+                    $data[$key]['tunai'] += $amt;
+                } elseif ($method === 'VOUCHER') {
+                    $data[$key]['voucher'] += $amt;
+                } elseif (in_array($method, ['CARD', 'DEBIT', 'CREDIT', 'TRANSFER', 'QRIS'])) {
+                    $bId = $t->bank_id;
+                    if ($bId && isset($data[$key]['bank_'.$bId])) {
+                        $data[$key]['bank_'.$bId] += $amt;
+                    } else {
+                        $data[$key]['tunai'] += $amt;
+                    }
                 } else {
-                    $data[$key]['tunai'] += $t->final_amount;
+                    $data[$key]['tunai'] += $amt;
                 }
             }
         }
 
-        // Sort by Date, then by KS
+        // Sort by Date, then by Kasir
         usort($data, function($a, $b) {
             $dateCompare = strtotime($a['tanggal']) - strtotime($b['tanggal']);
             if ($dateCompare === 0) {
-                return strcmp($a['ks'], $b['ks']);
+                return strcmp($a['kasir'], $b['kasir']);
             }
             return $dateCompare;
         });
@@ -194,7 +226,8 @@ class ReportPrintController extends Controller
 
         return view('print.reports.penjualan-kasir', [
             'data' => $data,
-            'period' => $period
+            'period' => $period,
+            'banks' => $banks
         ]);
     }
 

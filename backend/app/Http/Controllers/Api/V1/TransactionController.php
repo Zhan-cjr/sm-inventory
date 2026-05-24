@@ -45,6 +45,18 @@ class TransactionController extends Controller
 
         try {
             DB::transaction(function () use ($validated, $user, $request, &$transaction) {
+                $paymentMethod = $validated['payment_method'] ?? 'CASH';
+                $paymentDetails = null;
+                $requestPayments = $request->input('payments');
+
+                if (is_array($requestPayments) && count($requestPayments) > 1) {
+                    $paymentMethod = 'MULTI';
+                    $paymentDetails = json_encode($requestPayments);
+                } else if (is_array($requestPayments) && count($requestPayments) === 1) {
+                    $paymentMethod = $requestPayments[0]['method'];
+                    $paymentDetails = json_encode($requestPayments);
+                }
+
                 $transaction = Transaction::create([
                     'organization_id' => $user->organization_id,
                     'branch_id' => $user->branch_id,
@@ -54,11 +66,26 @@ class TransactionController extends Controller
                     'cashier_id' => $user->id,
                     'total_amount' => $validated['total_amount'] ?? 0,
                     'discount_amount' => $validated['discount_amount'] ?? 0,
+                    'manual_discount' => $request->input('manualDiscount', $validated['discount_amount'] ?? 0),
+                    'promo_discount' => $request->input('promoDiscount', 0),
                     'final_amount' => $validated['final_amount'] ?? 0,
-                    'payment_method' => $validated['payment_method'],
+                    'payment_method' => $paymentMethod,
+                    'payment_details' => $paymentDetails,
                     'sync_status' => 'SYNCED',
                     'receipt_number' => $request->receipt_number ?? ('SMI-' . strtoupper(substr(uniqid(), -6))),
                 ]);
+
+                if (is_array($requestPayments)) {
+                    foreach ($requestPayments as $payment) {
+                        if (($payment['method'] === 'VOUCHER' || $payment['method'] === 'MULTI') && isset($payment['voucherId'])) {
+                            \App\Models\Voucher::where('id', $payment['voucherId'])->update([
+                                'is_used' => true,
+                                'used_at' => now(),
+                                'transaction_id' => $transaction->id,
+                            ]);
+                        }
+                    }
+                }
 
                 // Update customer points if applicable
                 if ($transaction->customer_id) {

@@ -130,7 +130,15 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
     lines.push(formatRow('Total Diskon', -discountAmount));
   }
   lines.push(formatRow('GRAND TOTAL', finalAmount));
-  lines.push(formatRow(`Bayar (${paymentMethod})`, receivedAmount));
+  if (transaction.payments && transaction.payments.length > 1) {
+    lines.push(formatRow('Pembayaran:', ''));
+    transaction.payments.forEach(p => {
+      lines.push(formatRow(`  ${p.label || p.method}`, p.amount));
+    });
+    lines.push(formatRow('Total Bayar', receivedAmount));
+  } else {
+    lines.push(formatRow(`Bayar (${paymentMethod})`, receivedAmount));
+  }
   lines.push(formatRow('Kembalian', changeAmount));
 
   // PPN / Tax information
@@ -349,10 +357,30 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }
               <span>GRAND TOTAL</span>
               <span>{formatCurrency(finalAmount)}</span>
             </div>
-            <div className="summary-row">
-              <span>Bayar ({paymentMethod})</span>
-              <span>{formatCurrency(receivedAmount)}</span>
-            </div>
+
+            {transaction.payments && transaction.payments.length > 1 ? (
+              <>
+                <div className="summary-row" style={{ fontWeight: 'bold', marginTop: '4px' }}>
+                  <span>Pembayaran:</span>
+                </div>
+                {transaction.payments.map((p, idx) => (
+                  <div key={idx} className="summary-row" style={{ fontSize: '10px' }}>
+                    <span style={{ paddingLeft: '8px' }}>- {p.label || p.method}</span>
+                    <span>{formatCurrency(p.amount)}</span>
+                  </div>
+                ))}
+                <div className="summary-row" style={{ marginTop: '2px' }}>
+                  <span>Total Bayar</span>
+                  <span>{formatCurrency(receivedAmount)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="summary-row">
+                <span>Bayar ({paymentMethod})</span>
+                <span>{formatCurrency(receivedAmount)}</span>
+              </div>
+            )}
+
             <div className="summary-row">
               <span>Kembalian</span>
               <span>{formatCurrency(changeAmount)}</span>

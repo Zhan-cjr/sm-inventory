@@ -170,6 +170,39 @@ Route::prefix('v1')->group(function () {
             return response()->json($query->orderBy('name')->get());
         });
 
+        // Voucher Validation
+        Route::get('/vouchers/validate', function (Request $request) {
+            $code = $request->query('code');
+            if (!$code) {
+                return response()->json(['valid' => false, 'message' => 'Kode voucher tidak valid'], 400);
+            }
+            
+            $voucher = \App\Models\Voucher::where('code', $code)->first();
+            
+            if (!$voucher) {
+                return response()->json(['valid' => false, 'message' => 'Voucher tidak ditemukan'], 404);
+            }
+            
+            if ($voucher->is_used) {
+                return response()->json(['valid' => false, 'message' => 'Voucher sudah digunakan'], 400);
+            }
+            
+            if ($voucher->valid_until && $voucher->valid_until < now()) {
+                return response()->json(['valid' => false, 'message' => 'Voucher sudah kadaluarsa'], 400);
+            }
+            
+            return response()->json([
+                'valid' => true,
+                'voucher' => [
+                    'id' => $voucher->id,
+                    'code' => $voucher->code,
+                    'name' => $voucher->name,
+                    'nominal_value' => $voucher->nominal_value,
+                ]
+            ]);
+        });
+
+
         // Get POS Settings
         Route::get('/pos-settings', function (\Illuminate\Http\Request $request) {
             $user = $request->user();

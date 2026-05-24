@@ -30,7 +30,11 @@ import {
   Unlock,
   CheckCircle,
   X,
-  Clock
+  Clock,
+  Ticket,
+  Layers,
+  Edit3,
+  Wallet
 } from 'lucide-react';
 
 const safeSetItem = (key, value) => {
@@ -84,11 +88,25 @@ export const POSTransaction = ({
   const [manualTotalDiscount, setManualTotalDiscount] = useState(0);
   const [isSubtotalMode, setIsSubtotalMode] = useState(false);
   const [receivedAmount, setReceivedAmount] = useState('');
+  const [payments, setPayments] = useState([]); // Array of { method: 'CASH'|'CARD'|'VOUCHER', amount: number, bankId: string|null, voucherId: string|null, label: string }
+  const [isMultiPaymentModalOpen, setIsMultiPaymentModalOpen] = useState(false);
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [voucherInput, setVoucherInput] = useState('');
+  const [voucherSource, setVoucherSource] = useState(null); // 'MULTI' or null
+  const [isMultiCashModalOpen, setIsMultiCashModalOpen] = useState(false);
+  const [multiCashInput, setMultiCashInput] = useState('');
+  const [isOpenPriceModalOpen, setIsOpenPriceModalOpen] = useState(false);
+  const [openPriceTargetItem, setOpenPriceTargetItem] = useState(null);
+  const [newOpenPrice, setNewOpenPrice] = useState('');
   const [banks, setBanks] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pos_cached_banks') || '[]'); } catch (e) { return []; }
   });
   const [selectedBank, setSelectedBank] = useState(null);
   const [isBankSelectOpen, setIsBankSelectOpen] = useState(false);
+  const [isMultiBankSelectOpen, setIsMultiBankSelectOpen] = useState(false);
+  const [isMultiCardAmountModalOpen, setIsMultiCardAmountModalOpen] = useState(false);
+  const [multiCardInput, setMultiCardInput] = useState('');
+  const [pendingCardAmount, setPendingCardAmount] = useState(0);
 
   // Initialize terminalInfo: locked terminal takes absolute priority, then local storage cache
   const [terminalInfo, setTerminalInfo] = useState(() => {
@@ -211,10 +229,6 @@ export const POSTransaction = ({
 
   useEffect(() => {
     const checkServerConnection = async () => {
-      if (!navigator.onLine) {
-        setIsOnline(false);
-        return;
-      }
       try {
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), 3000);
@@ -228,11 +242,6 @@ export const POSTransaction = ({
         setIsOnline(false);
       }
     };
-
-    const handleOnline = () => checkServerConnection();
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
 
     checkServerConnection();
     const connectionInterval = setInterval(checkServerConnection, 10000);
@@ -257,8 +266,6 @@ export const POSTransaction = ({
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
       window.removeEventListener('keydown', handleGlobalKeyPress);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       clearInterval(timer);
@@ -1021,7 +1028,10 @@ export const POSTransaction = ({
     subtotal
   );
   const finalAmount = subtotal - totalDiscount - manualTotalDiscount;
-  const changeAmount = receivedAmount ? parseFloat(receivedAmount) - finalAmount : 0;
+  const totalPaid = payments.length > 0
+    ? payments.reduce((sum, p) => sum + p.amount, 0)
+    : (receivedAmount ? parseFloat(receivedAmount) : 0);
+  const changeAmount = totalPaid - finalAmount;
 
   const handleManualDiscountItem = (type) => {
     setDiscountModal({ target: 'ITEM', type });
@@ -1066,6 +1076,7 @@ export const POSTransaction = ({
     setManualTotalDiscount(0);
     setQueuedDiscount(null);
     setReceivedAmount('');
+    setPayments([]);
     setInputValue('');
     setIsSubtotalMode(false);
     setSelectedBank(null);
@@ -1147,7 +1158,9 @@ export const POSTransaction = ({
       }
 
       const currentFinalAmount = finalAmount;
-      const currentReceived = overrideReceived !== null ? parseFloat(overrideReceived) : (parseFloat(receivedAmount) || finalAmount);
+      const currentReceived = payments.length > 0
+        ? payments.reduce((sum, p) => sum + p.amount, 0)
+        : (overrideReceived !== null ? parseFloat(overrideReceived) : (parseFloat(receivedAmount) || finalAmount));
 
       if (currentReceived < currentFinalAmount) {
         setAlertMsg({ text: `Pembayaran kurang! Kurang: ${formatCurrency(currentFinalAmount - currentReceived)}`, type: 'error' });
@@ -1161,12 +1174,17 @@ export const POSTransaction = ({
       const grossTotal = items.reduce((sum, item) => sum + (item.quantity * parseFloat(item.unitPrice)), 0);
       const totalItemManualDiscount = items.reduce((sum, item) => sum + (item.quantity * (item.manualDiscount || 0)), 0);
 
+      const actualPaymentMethod = payments.length > 1 ? 'MULTI' : (payments.length === 1 ? payments[0].method : method);
+
       const transaction = {
         items,
         totalAmount: grossTotal,
         discountAmount: totalItemManualDiscount + totalDiscount + manualTotalDiscount,
+        manualDiscount: totalItemManualDiscount + manualTotalDiscount,
+        promoDiscount: totalDiscount,
         finalAmount: currentFinalAmount,
-        paymentMethod: method,
+        paymentMethod: actualPaymentMethod,
+        payments: payments.length > 0 ? payments : [{ method, amount: currentReceived, bankId }],
         bankId: bankId,
         terminalId: terminalInfo.id,
         customerId: selectedCustomer?.id,
@@ -1185,6 +1203,7 @@ export const POSTransaction = ({
 
       // Clear states BEFORE showing modal to avoid flicker
       setItems([]);
+      setPayments([]);
       setManualTotalDiscount(0);
       setReceivedAmount('');
       setInputValue('');
@@ -1264,7 +1283,9 @@ export const POSTransaction = ({
     setHeldTransactions(newHeld);
     safeSetItem('pos_held_transactions', JSON.stringify(newHeld));
     setItems([]);
+    setPayments([]);
     setManualTotalDiscount(0);
+    setIsReturnMode(false);
     setAlertMsg({ text: 'Transaksi ditunda (HOLD).', type: 'info' });
     setTimeout(() => setAlertMsg(null), 2000);
   };
@@ -1419,7 +1440,7 @@ export const POSTransaction = ({
           requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0));
           break;
         case 'btn_void_all':
-          requestAuthorization("VOID", () => { setItems([]); setManualTotalDiscount(0); setIsReturnMode(false); });
+          requestAuthorization("VOID", () => { setItems([]); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); });
           break;
         case 'handleClearDiscount':
         case 'btn_clear':
@@ -1568,9 +1589,9 @@ export const POSTransaction = ({
                 value={selectedShiftName}
                 onChange={(e) => setSelectedShiftName(e.target.value)}
               >
-                <option value="Shift 1">Shift 1 (Pagi)</option>
-                <option value="Shift 2">Shift 2 (Siang)</option>
-                <option value="Shift 3">Shift 3 (Malam)</option>
+                <option value="Shift 1">Shift 1</option>
+                <option value="Shift 2">Shift 2</option>
+                <option value="Shift 3">Shift 3</option>
                 <option value="Shift Umum">Shift Umum</option>
               </select>
             </div>
@@ -1859,6 +1880,29 @@ export const POSTransaction = ({
         </div>
       )}
 
+      {/* Multi Payment Bank Selection Modal */}
+      {isMultiBankSelectOpen && (
+        <div className="change-modal-overlay">
+          <div className="change-modal-content bank-select-card fade-in">
+            <CreditCard size={48} className="text-primary" />
+            <h2>Pilih Bank / Mesin EDC (Multi Payment)</h2>
+            <div className="bank-grid-large">
+              {banks.map(bank => (
+                <button key={bank.id} className="bank-item-btn" onClick={() => {
+                  setPayments([...payments, { method: 'CARD', amount: pendingCardAmount, bankId: bank.id, label: `Card: ${bank.name}` }]);
+                  setIsMultiBankSelectOpen(false);
+                  setIsMultiPaymentModalOpen(true);
+                }}>
+                  <span className="bank-name">{bank.name}</span>
+                  <span className="bank-code">{bank.code || 'EDC'}</span>
+                </button>
+              ))}
+            </div>
+            <button className="btn-secondary" onClick={() => { setIsMultiBankSelectOpen(false); setIsMultiPaymentModalOpen(true); }}>BATAL (ESC)</button>
+          </div>
+        </div>
+      )}
+
       {/* --- MAIN UI --- */}
 
       <header className="pos-header-modern glassmorphism">
@@ -1979,6 +2023,274 @@ export const POSTransaction = ({
       )}
 
 
+
+      {isVoucherModalOpen && (() => {
+        const handleProcessVoucher = async () => {
+          try {
+            const res = await fetch(`/api/v1/vouchers/validate?code=${voucherInput}`, {
+              headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const data = await res.json();
+            if (!res.ok || !data.valid) {
+              setAlertMsg({ text: data.message || 'Voucher tidak valid', type: 'error' });
+              return;
+            }
+
+            setPayments(prev => [...prev, {
+              method: 'VOUCHER',
+              amount: parseFloat(data.voucher.nominal_value),
+              voucherId: data.voucher.id,
+              label: `Voucher: ${data.voucher.code}`
+            }]);
+            setAlertMsg({ text: `Voucher Rp ${formatCurrency(data.voucher.nominal_value)} ditambahkan!`, type: 'success' });
+            setIsVoucherModalOpen(false);
+            setVoucherInput('');
+            if (voucherSource === 'MULTI') {
+              setIsMultiPaymentModalOpen(true);
+              setVoucherSource(null);
+            } else {
+              setTimeout(() => barcodeInput.current?.focus(), 100);
+            }
+          } catch (err) {
+            setAlertMsg({ text: 'Gagal memvalidasi voucher (offline/error)', type: 'error' });
+          }
+        };
+
+        return (
+          <div className="change-modal-overlay">
+            <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
+              <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Validasi Voucher</h3>
+              <input
+                type="text"
+                className="modern-barcode-input"
+                style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
+                placeholder="Masukkan Kode Voucher"
+                value={voucherInput}
+                onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleProcessVoucher();
+                  } else if (e.key === 'Escape') {
+                    setIsVoucherModalOpen(false);
+                    setVoucherInput('');
+                    if (voucherSource === 'MULTI') {
+                      setIsMultiPaymentModalOpen(true);
+                      setVoucherSource(null);
+                    } else {
+                      setTimeout(() => barcodeInput.current?.focus(), 100);
+                    }
+                  }
+                }}
+                autoFocus
+              />
+              <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+                <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsVoucherModalOpen(false); setVoucherInput(''); if (voucherSource === 'MULTI') { setIsMultiPaymentModalOpen(true); setVoucherSource(null); } else { barcodeInput.current?.focus(); } }}>BATAL (Esc)</button>
+                <button className="btn-success" style={{ flex: 1 }} onClick={handleProcessVoucher}>PROSES (Enter)</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {isOpenPriceModalOpen && openPriceTargetItem && (
+        <div className="change-modal-overlay">
+          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
+            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Open Price</h3>
+            <div style={{ textAlign: 'center', marginBottom: '1rem', fontWeight: 'bold' }}>{openPriceTargetItem.name}</div>
+            <div style={{ textAlign: 'center', marginBottom: '1rem', fontSize: '0.85rem' }}>Harga Asli: {formatCurrency(openPriceTargetItem.originalUnitPrice || openPriceTargetItem.unitPrice)}</div>
+            <input
+              type="text"
+              className="modern-barcode-input"
+              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
+              placeholder="Harga Baru"
+              value={newOpenPrice}
+              onChange={(e) => setNewOpenPrice(e.target.value.replace(/[^0-9]/g, ''))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = parseFloat(newOpenPrice);
+                  if (!isNaN(val) && val >= 0) {
+                    setItems(items.map(i => i.productId === openPriceTargetItem.productId ? { ...i, unitPrice: val, originalUnitPrice: i.originalUnitPrice || i.unitPrice } : i));
+                    setAlertMsg({ text: 'Harga berhasil diubah', type: 'success' });
+                    setIsOpenPriceModalOpen(false);
+                    setNewOpenPrice('');
+                    setOpenPriceTargetItem(null);
+                    setTimeout(() => barcodeInput.current?.focus(), 100);
+                  }
+                } else if (e.key === 'Escape') {
+                  setIsOpenPriceModalOpen(false);
+                  setNewOpenPrice('');
+                  setOpenPriceTargetItem(null);
+                  setTimeout(() => barcodeInput.current?.focus(), 100);
+                }
+              }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsOpenPriceModalOpen(false); setNewOpenPrice(''); setOpenPriceTargetItem(null); barcodeInput.current?.focus(); }}>BATAL (Esc)</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isMultiPaymentModalOpen && (
+        <div className="change-modal-overlay">
+          <div className="change-modal-content fade-in" style={{ maxWidth: '600px', width: '90%' }}>
+            <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Multi Payment</h2>
+
+            <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                <span>Tagihan:</span>
+                <span style={{ fontWeight: 'bold' }}>{formatCurrency(finalAmount)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', marginBottom: '0.5rem', color: '#10b981' }}>
+                <span>Total Dibayar:</span>
+                <span style={{ fontWeight: 'bold' }}>{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 'bold', color: payments.reduce((sum, p) => sum + p.amount, 0) >= finalAmount ? '#10b981' : '#ef4444' }}>
+                <span>{payments.reduce((sum, p) => sum + p.amount, 0) >= finalAmount ? 'Kembali:' : 'Sisa:'}</span>
+                <span>{formatCurrency(Math.abs(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0)))}</span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem', maxHeight: '150px', overflowY: 'auto' }}>
+              {payments.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#6b7280', padding: '1rem' }}>Belum ada pembayaran ditambahkan</div>
+              ) : (
+                <table className="modern-table" style={{ width: '100%', fontSize: '0.9rem' }}>
+                  <tbody>
+                    {payments.map((p, idx) => (
+                      <tr key={idx}>
+                        <td>{p.label || p.method}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(p.amount)}</td>
+                        <td style={{ width: '40px', textAlign: 'center' }}>
+                          <button onClick={() => setPayments(payments.filter((_, i) => i !== idx))} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              <button className="btn-secondary" style={{ flex: 1, padding: '0.75rem', fontSize: '0.9rem' }} onClick={() => { setVoucherSource('MULTI'); setIsVoucherModalOpen(true); setIsMultiPaymentModalOpen(false); }}>+ Voucher</button>
+              <button className="btn-secondary" style={{ flex: 1, padding: '0.75rem', fontSize: '0.9rem' }} onClick={() => {
+                const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
+                setMultiCashInput(sisa > 0 ? sisa.toString() : '');
+                setIsMultiCashModalOpen(true);
+                setIsMultiPaymentModalOpen(false);
+              }}>+ Tunai</button>
+              <button className="btn-secondary" style={{ flex: 1, padding: '0.75rem', fontSize: '0.9rem' }} onClick={() => {
+                const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
+                if (sisa > 0) {
+                  setMultiCardInput(sisa.toString());
+                  setIsMultiCardAmountModalOpen(true);
+                  setIsMultiPaymentModalOpen(false);
+                }
+              }}>+ Card</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsMultiPaymentModalOpen(false); barcodeInput.current?.focus(); }}>TUTUP</button>
+              <button className="btn-success" style={{ flex: 1 }} disabled={payments.reduce((sum, p) => sum + p.amount, 0) < finalAmount} onClick={() => { setIsMultiPaymentModalOpen(false); processTransaction('MULTI'); }}>PROSES BAYAR</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isMultiCashModalOpen && (
+        <div className="change-modal-overlay">
+          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
+            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Input Nominal Tunai</h3>
+            <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
+              Sisa Tagihan: {formatCurrency(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0))}
+            </p>
+            <input
+              type="text"
+              className="modern-barcode-input"
+              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
+              placeholder="0"
+              value={multiCashInput}
+              onChange={(e) => setMultiCashInput(e.target.value.replace(/[^0-9]/g, ''))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = parseFloat(multiCashInput);
+                  if (!isNaN(val) && val > 0) {
+                    setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
+                    setIsMultiCashModalOpen(false);
+                    setMultiCashInput('');
+                    setIsMultiPaymentModalOpen(true);
+                  }
+                } else if (e.key === 'Escape') {
+                  setIsMultiCashModalOpen(false);
+                  setMultiCashInput('');
+                  setIsMultiPaymentModalOpen(true);
+                }
+              }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsMultiCashModalOpen(false); setMultiCashInput(''); setIsMultiPaymentModalOpen(true); }}>BATAL (Esc)</button>
+              <button className="btn-success" style={{ flex: 1 }} onClick={() => {
+                const val = parseFloat(multiCashInput);
+                if (!isNaN(val) && val > 0) {
+                  setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
+                  setIsMultiCashModalOpen(false);
+                  setMultiCashInput('');
+                  setIsMultiPaymentModalOpen(true);
+                }
+              }}>TAMBAH (Enter)</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isMultiCardAmountModalOpen && (
+        <div className="change-modal-overlay">
+          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
+            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Input Nominal Card</h3>
+            <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
+              Sisa Tagihan: {formatCurrency(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0))}
+            </p>
+            <input
+              type="text"
+              className="modern-barcode-input"
+              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
+              placeholder="0"
+              value={multiCardInput}
+              onChange={(e) => setMultiCardInput(e.target.value.replace(/[^0-9]/g, ''))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = parseFloat(multiCardInput);
+                  if (!isNaN(val) && val > 0) {
+                    setPendingCardAmount(val);
+                    setIsMultiCardAmountModalOpen(false);
+                    setMultiCardInput('');
+                    setIsMultiBankSelectOpen(true);
+                  }
+                } else if (e.key === 'Escape') {
+                  setIsMultiCardAmountModalOpen(false);
+                  setMultiCardInput('');
+                  setIsMultiPaymentModalOpen(true);
+                }
+              }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsMultiCardAmountModalOpen(false); setMultiCardInput(''); setIsMultiPaymentModalOpen(true); }}>BATAL (Esc)</button>
+              <button className="btn-success" style={{ flex: 1 }} onClick={() => {
+                const val = parseFloat(multiCardInput);
+                if (!isNaN(val) && val > 0) {
+                  setPendingCardAmount(val);
+                  setIsMultiCardAmountModalOpen(false);
+                  setMultiCardInput('');
+                  setIsMultiBankSelectOpen(true);
+                }
+              }}>LANJUT (Enter)</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isQtyModalOpen && (
         <div className="change-modal-overlay">
@@ -2156,27 +2468,44 @@ export const POSTransaction = ({
             )}
           </div>
 
-          <div className="function-grid">
-            <button className="func-btn danger" onClick={handleClearDiscount} style={{ background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' }}><X size={18} /><span>Clear</span><span className="key-hint">{getShortcutHint('btn_clear', 'Insert')}</span></button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL'))}><Tag size={18} /><span>Disc Item Rp</span><span className="key-hint">{getShortcutHint('btn_disc_item_rp', 'F1')}</span></button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT'))}><Tag size={18} /><span>Disc Item %</span><span className="key-hint">{getShortcutHint('btn_disc_item_pct', 'F2')}</span></button>
-            <button className="func-btn primary" onClick={() => setIsQtyModalOpen(true)}><Package size={18} /><span>Qty</span><span className="key-hint">{getShortcutHint('btn_qty', 'F7')}</span></button>
-            <button className="func-btn secondary" onClick={() => requestAuthorization("RETURN", () => setIsReturnModalOpen(true))}><RotateCcw size={18} /><span>Retur</span><span className="key-hint">{getShortcutHint('btn_retur', 'End')}</span></button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL'))}><Tag size={18} /><span>Disc Total Rp</span><span className="key-hint">{getShortcutHint('btn_disc_total_rp', 'F3')}</span></button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT'))}><Tag size={18} /><span>Disc Total %</span><span className="key-hint">{getShortcutHint('btn_disc_total_pct', 'F4')}</span></button>
+          <div className="function-grid" style={{ display: 'grid', gap: '8px', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            {/* Kategori Pembayaran */}
+            <button className={`func-btn payment ${paymentMethod === 'CASH' ? 'active' : ''}`} onClick={() => startPayment('CASH')}><Banknote size={16} /><span>Tunai (F5)</span></button>
+            <button className={`func-btn payment ${paymentMethod === 'CARD' ? 'active' : ''}`} onClick={() => startPayment('CARD')}><CreditCard size={16} /><span>Card (F6)</span></button>
+            <button className="func-btn payment" onClick={() => requestAuthorization("VOUCHER", () => setIsVoucherModalOpen(true))}><Ticket size={16} /><span>Voucher</span></button>
+            <button className="func-btn payment" onClick={() => requestAuthorization("MULTI_PAYMENT", () => setIsMultiPaymentModalOpen(true))}><Layers size={16} /><span>Multi-Pay</span></button>
+            <button className={`func-btn payment ${isSubtotalMode ? 'active' : ''}`} onClick={() => { setIsSubtotalMode(true); barcodeInput.current.focus(); }}><Calculator size={16} /><span>Subtotal (F9)</span></button>
 
-            <button className={`func-btn payment ${paymentMethod === 'CARD' ? 'active' : ''}`} onClick={() => startPayment('CARD')}><CreditCard size={18} /><span>Card</span><span className="key-hint">{getShortcutHint('btn_card', 'F6')}</span></button>
-            <button className={`func-btn payment ${paymentMethod === 'CASH' ? 'active' : ''}`} onClick={() => startPayment('CASH')}><Banknote size={18} /><span>Tunai</span><span className="key-hint">{getShortcutHint('btn_tunai', 'F5')}</span></button>
+            {/* Kategori Diskon & Harga */}
+            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL'))}><Tag size={16} /><span>Disc Item Rp (F1)</span></button>
+            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT'))}><Tag size={16} /><span>Disc Item % (F2)</span></button>
+            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL'))}><Tag size={16} /><span>Disc Total Rp (F3)</span></button>
+            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT'))}><Tag size={16} /><span>Disc Total % (F4)</span></button>
+            <button className="func-btn discount" onClick={() => requestAuthorization("OPEN_PRICE", () => {
+              if (items.length > 0) {
+                setOpenPriceTargetItem(items[items.length - 1]);
+                setIsOpenPriceModalOpen(true);
+              } else {
+                setAlertMsg({ text: 'Pilih item terlebih dahulu', type: 'error' });
+                setTimeout(() => setAlertMsg(null), 2000);
+              }
+            })}><Edit3 size={16} /><span>Open Price</span></button>
 
-            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction())}><Lock size={18} /><span>Hold</span><span className="key-hint">{getShortcutHint('btn_hold', 'PageUp')}</span></button>
-            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true))}><History size={18} /><span>Recall</span><span className="key-hint">{getShortcutHint('btn_recall', 'PageDown')}</span></button>
-            <button className="func-btn action" onClick={() => setIsMemberModalOpen(true)}><User size={18} /><span>Member</span><span className="key-hint">{getShortcutHint('btn_member', 'Home')}</span></button>
-            <button className="func-btn action" onClick={() => setIsCashMovementModalOpen(true)}><Banknote size={18} /><span>Kas Masuk/Keluar</span><span className="key-hint"></span></button>
-            <button className="func-btn secondary" onClick={() => setIsCloseShiftModalOpen(true)}><LogOut size={18} /><span>Tutup Kasir</span><span className="key-hint">{getShortcutHint('btn_close_shift', 'F8')}</span></button>
-            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0))}><Eraser size={18} /><span>Void Item</span><span className="key-hint">{getShortcutHint('btn_void_item', 'Del')}</span></button>
-            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={18} /><span>Void All</span><span className="key-hint">{getShortcutHint('btn_void_all', 'Esc')}</span></button>
-            <button className="func-btn secondary" onClick={() => requestAuthorization("REPRINT_LAST", () => handleReprintLast())}><History size={18} /><span>Reprint Terakhir</span><span className="key-hint">{getShortcutHint('btn_reprint_last', 'F11')}</span></button>
-            <button className="func-btn action" onClick={() => requestAuthorization("REPRINT_OLD", () => setIsReprintOldModalOpen(true))}><Search size={18} /><span>Reprint Lama</span><span className="key-hint">{getShortcutHint('btn_reprint_old', 'F12')}</span></button>
+            {/* Kategori Aksi */}
+            <button className="func-btn primary" onClick={() => setIsQtyModalOpen(true)}><Package size={16} /><span>Qty (F7)</span></button>
+            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction())}><Lock size={16} /><span>Hold (PgUp)</span></button>
+            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true))}><History size={16} /><span>Recall (PgDn)</span></button>
+            <button className="func-btn action" onClick={() => setIsMemberModalOpen(true)}><User size={16} /><span>Member (Home)</span></button>
+            <button className="func-btn action" onClick={() => setIsCashMovementModalOpen(true)}><Wallet size={16} /><span>Kas M/K</span></button>
+            <button className="func-btn secondary" onClick={() => requestAuthorization("RETURN", () => setIsReturnModalOpen(true))}><RotateCcw size={16} /><span>Retur (End)</span></button>
+            <button className="func-btn secondary" onClick={() => requestAuthorization("REPRINT_LAST", () => handleReprintLast())}><History size={16} /><span>Reprint 1 (F11)</span></button>
+            <button className="func-btn action" onClick={() => requestAuthorization("REPRINT_OLD", () => setIsReprintOldModalOpen(true))}><Search size={16} /><span>Reprint L (F12)</span></button>
+
+            {/* Kategori Void/Clear */}
+            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0))}><Eraser size={16} /><span>Void Item (Del)</span></button>
+            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={16} /><span>Void All (Esc)</span></button>
+            <button className="func-btn danger" onClick={handleClearDiscount} style={{ background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' }}><X size={16} /><span>Clear (Ins)</span></button>
+            <button className="func-btn secondary" onClick={() => setIsCloseShiftModalOpen(true)}><LogOut size={16} /><span>Tutup Shift (F8)</span></button>
           </div>
 
           <div className="input-action-section" style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -2260,24 +2589,6 @@ export const POSTransaction = ({
                   ))}
                 </div>
               )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                className={`btn-subtotal ${isSubtotalMode ? 'active' : ''}`}
-                style={{ flex: 1, padding: '1rem' }}
-                onClick={() => { setIsSubtotalMode(true); barcodeInput.current.focus(); }}
-              >
-                SUBTOTAL ({getShortcutHint('btn_subtotal', 'F9')})
-              </button>
-              <button
-                className="btn-process-payment"
-                style={{ flex: 2, padding: '1rem', fontSize: '1.25rem', background: activeShift ? '#10b981' : '#64748b' }}
-                disabled={isProcessing || items.length === 0 || (isSubtotalMode && !receivedAmount) || !activeShift}
-                onClick={() => processTransaction()}
-              >
-                {isProcessing ? '...' : (activeShift ? `BAYAR (${getShortcutHint('btn_pay', 'F10')})` : 'BELUM BUKA SHIFT')}
-              </button>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem' }}>

@@ -42,6 +42,9 @@ class UserForm
                     ->label('Izin Otorisasi POS Kasir')
                     ->options([
                         'DISCOUNT' => 'Diskon (Manual & Total)',
+                        'OPEN_PRICE' => 'Ubah Harga (Open Price)',
+                        'MULTI_PAYMENT' => 'Multi Payment',
+                        'VOUCHER' => 'Bayar dgn Voucher',
                         'VOID' => 'Void / Hapus Item',
                         'RETURN' => 'Retur Transaksi',
                         'CLOSE_SHIFT' => 'Tutup Kasir',

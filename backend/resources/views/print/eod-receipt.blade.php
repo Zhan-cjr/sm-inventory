@@ -109,7 +109,7 @@
         </div>
         <div class="summary-row">
             <span>Penjualan Non-Tunai</span>
-            <span>{{ number_format($shift->total_card_sales, 0, ',', '.') }}</span>
+            <span>{{ number_format(($shift->total_card_sales ?? 0) + ($shift->total_voucher_sales ?? 0), 0, ',', '.') }}</span>
         </div>
 
         @if($shift->card_sales_by_bank && count($shift->card_sales_by_bank) > 0)
@@ -124,6 +124,13 @@
                 <span>- Belum ada rincian bank</span>
                 <span>0</span>
             </div>
+        @endif
+
+        @if(($shift->total_voucher_sales ?? 0) > 0)
+        <div class="sub-row">
+            <span>- Voucher</span>
+            <span>{{ number_format($shift->total_voucher_sales, 0, ',', '.') }}</span>
+        </div>
         @endif
 
         @if($shift->total_cash_returns > 0)

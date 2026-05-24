@@ -133,32 +133,94 @@ class ArsipTransaksiResource extends Resource
                     ->summarize(Sum::make()->label('Total')->money('IDR')),
                 Tables\Columns\TextColumn::make('tunai')
                     ->label('Tunai')
-                    ->state(fn (Transaction $record) => strtoupper($record->payment_method) === 'CASH' ? $record->final_amount : 0)
+                    ->state(function (Transaction $record) {
+                        if (strtoupper($record->payment_method) === 'CASH') return $record->final_amount;
+                        if (strtoupper($record->payment_method) === 'MULTI') {
+                            $details = $record->payment_details;
+                            if (is_string($details)) $details = json_decode($details, true);
+                            if (is_array($details)) {
+                                $cashAmount = collect($details)->where('method', 'CASH')->sum('amount');
+                                if ($cashAmount > 0) {
+                                    return max(0, $cashAmount - $record->change_amount);
+                                }
+                            }
+                        }
+                        return 0;
+                    })
                     ->money('IDR', true)
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn ($query) => $query->where('payment_method', 'CASH')->orWhere('payment_method', 'cash')->sum('final_amount'))
+                            ->using(function ($query) {
+                                $cashOnly = (clone $query)->whereIn('payment_method', ['CASH', 'cash'])->sum('final_amount');
+                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details', 'change_amount']);
+                                $multiCash = $multiRecords->sum(function ($record) {
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    if (!is_array($details)) return 0;
+                                    $cashAmount = collect($details)->where('method', 'CASH')->sum('amount');
+                                    return $cashAmount > 0 ? max(0, $cashAmount - $record->change_amount) : 0;
+                                });
+                                return $cashOnly + $multiCash;
+                            })
                             ->money('IDR')
                     ),
                 Tables\Columns\TextColumn::make('card')
                     ->label('Card')
-                    ->state(fn (Transaction $record) => strtoupper($record->payment_method) === 'CARD' ? $record->final_amount : 0)
+                    ->state(function (Transaction $record) {
+                        if (strtoupper($record->payment_method) === 'CARD') return $record->final_amount;
+                        if (strtoupper($record->payment_method) === 'MULTI') {
+                            $details = $record->payment_details;
+                            if (is_string($details)) $details = json_decode($details, true);
+                            if (is_array($details)) {
+                                return collect($details)->where('method', 'CARD')->sum('amount');
+                            }
+                        }
+                        return 0;
+                    })
                     ->money('IDR', true)
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn ($query) => $query->where('payment_method', 'CARD')->orWhere('payment_method', 'card')->sum('final_amount'))
+                            ->using(function ($query) {
+                                $cardOnly = (clone $query)->whereIn('payment_method', ['CARD', 'card'])->sum('final_amount');
+                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details']);
+                                $multiCard = $multiRecords->sum(function ($record) {
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return is_array($details) ? collect($details)->where('method', 'CARD')->sum('amount') : 0;
+                                });
+                                return $cardOnly + $multiCard;
+                            })
                             ->money('IDR')
                     ),
                 Tables\Columns\TextColumn::make('voucher')
                     ->label('Voucher')
-                    ->state(fn () => 0)
+                    ->state(function (Transaction $record) {
+                        if (strtoupper($record->payment_method) === 'VOUCHER') return $record->final_amount;
+                        if (strtoupper($record->payment_method) === 'MULTI') {
+                            $details = $record->payment_details;
+                            if (is_string($details)) $details = json_decode($details, true);
+                            if (is_array($details)) {
+                                return collect($details)->where('method', 'VOUCHER')->sum('amount');
+                            }
+                        }
+                        return 0;
+                    })
                     ->money('IDR', true)
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn () => 0)
+                            ->using(function ($query) {
+                                $voucherOnly = (clone $query)->whereIn('payment_method', ['VOUCHER', 'voucher'])->sum('final_amount');
+                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details']);
+                                $multiVoucher = $multiRecords->sum(function ($record) {
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return is_array($details) ? collect($details)->where('method', 'VOUCHER')->sum('amount') : 0;
+                                });
+                                return $voucherOnly + $multiVoucher;
+                            })
                             ->money('IDR')
                     ),
                 Tables\Columns\TextColumn::make('discount_amount')

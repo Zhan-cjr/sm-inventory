@@ -48,7 +48,8 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
     
     lines.push(formatRow('Modal Awal', eodData.starting_cash));
     lines.push(formatRow('Penjualan Tunai', eodData.total_cash_sales));
-    lines.push(formatRow('Penjualan Non-Tunai', eodData.total_card_sales));
+    const nonCashTotal = (eodData.total_card_sales || 0) + (eodData.total_voucher_sales || 0);
+    lines.push(formatRow('Penjualan Non-Tunai', nonCashTotal));
     if ((eodData.total_cash_returns || 0) > 0) {
       lines.push(formatRow('Retur Tunai', `-${eodData.total_cash_returns}`));
     }
@@ -62,6 +63,10 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
       });
     } else {
       lines.push(formatRow(`  - Belum ada rincian bank`, 0));
+    }
+    
+    if ((eodData.total_voucher_sales || 0) > 0) {
+      lines.push(formatRow(`  - Voucher`, eodData.total_voucher_sales));
     }
 
     lines.push(formatRow('Kas Masuk', eodData.total_cash_in || 0));
@@ -170,7 +175,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
             </div>
             <div className="summary-row" style={{ marginBottom: 0 }}>
               <span>Penjualan Non-Tunai</span>
-              <span>{formatCurrency(eodData.total_card_sales)}</span>
+              <span>{formatCurrency((eodData.total_card_sales || 0) + (eodData.total_voucher_sales || 0))}</span>
             </div>
             <div style={{ paddingLeft: '15px', fontSize: '0.85em', color: '#555', marginBottom: '8px' }}>
               {eodData.card_sales_by_bank && eodData.card_sales_by_bank.length > 0 ? (
@@ -184,6 +189,12 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>- Belum ada rincian bank</span>
                   <span>{formatCurrency(0)}</span>
+                </div>
+              )}
+              {(eodData.total_voucher_sales || 0) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>- Voucher</span>
+                  <span>{formatCurrency(eodData.total_voucher_sales)}</span>
                 </div>
               )}
             </div>
