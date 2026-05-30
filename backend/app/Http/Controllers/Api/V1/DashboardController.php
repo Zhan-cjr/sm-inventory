@@ -14,12 +14,16 @@ class DashboardController extends Controller
     public function metrics(Request $request)
     {
         $user = $request->user();
-        // Ensure only MANAGER can access
-        if ($user->role !== 'MANAGER') {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        // If user has no branch_id (like ADMIN) or is an admin, allow them to specify branch_id
+        $branchId = $user->branch_id;
+        $isAdmin = in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN']);
+        if (!$branchId || $isAdmin) {
+            $branchId = $request->query('branch_id') ?: $branchId;
         }
 
-        $branchId = $user->branch_id;
+        if (!$branchId) {
+            return response()->json(['message' => 'Silakan pilih cabang terlebih dahulu.'], 400);
+        }
         $today = Carbon::today();
 
         // 1. Total Penjualan & Transaksi Hari Ini
@@ -40,7 +44,7 @@ class DashboardController extends Controller
             })
             ->where('transactions.branch_id', $branchId)
             ->whereDate('transactions.transaction_date', $today)
-            ->sum(DB::raw('transaction_items.quantity * stocks.cost_price'));
+            ->sum(DB::raw('transaction_items.quantity * COALESCE(NULLIF(stocks.cost_price_tax, 0), stocks.cost_price, 0)'));
 
         $grossProfit = $todaySales - $todayCogs;
         $profitMargin = $todaySales > 0 ? ($grossProfit / $todaySales) * 100 : 0;
@@ -79,6 +83,8 @@ class DashboardController extends Controller
                 $day['sales'] = (int) $weeklySales[$day['date']]->total;
             }
         }
+        
+        \Illuminate\Support\Facades\Log::info('Weekly Chart Data', ['last7Days' => $last7Days, 'weeklySales' => $weeklySales]);
 
         // 5. Stock Health (Low Stock Count)
         $lowStockCount = DB::table('stocks')
@@ -103,11 +109,15 @@ class DashboardController extends Controller
     public function lowStockProducts(Request $request)
     {
         $user = $request->user();
-        if ($user->role !== 'MANAGER') {
-            return response()->json(['message' => 'Unauthorized'], 403);
+        $branchId = $user->branch_id;
+        $isAdmin = in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN']);
+        if (!$branchId || $isAdmin) {
+            $branchId = $request->query('branch_id') ?: $branchId;
         }
 
-        $branchId = $user->branch_id;
+        if (!$branchId) {
+            return response()->json([]);
+        }
 
         $products = DB::table('stocks')
             ->join('products', 'stocks.product_id', '=', 'products.id')

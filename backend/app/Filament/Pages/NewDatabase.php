@@ -111,7 +111,7 @@ class NewDatabase extends Page
             );
 
             $user = DB::connection('dynamic')->table('users')->where('email', 'admin@selamat.id')->first();
-            $superAdminRole = DB::connection('dynamic')->table('roles')->where('name', 'super_admin')->first();
+            $superAdminRole = DB::connection('dynamic')->table('roles')->where('name', 'superadmin')->first();
             
             if ($user && $superAdminRole) {
                 DB::connection('dynamic')->table('model_has_roles')->insertOrIgnore([

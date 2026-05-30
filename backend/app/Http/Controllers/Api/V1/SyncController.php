@@ -21,6 +21,24 @@ class SyncController extends Controller
         ];
     }
 
+    private function extractCustomerName($data) {
+        $customerName = $data['customer_name'] ?? null;
+        $sn = $data['sn'] ?? null;
+        if (!$customerName && $sn) {
+            $parts = explode('/', $sn);
+            if (count($parts) > 1) {
+                foreach($parts as $part) {
+                    $part = trim($part);
+                    if (preg_match('/[A-Za-z]{3,}/', $part) && !preg_match('/^(R\d|B\d|S\d)/i', $part)) {
+                        $customerName = str_ireplace('SN:', '', $part);
+                        return trim($customerName);
+                    }
+                }
+            }
+        }
+        return $customerName;
+    }
+
     public function batchSync(Request $request)
     {
         $validated = $request->validate([
@@ -32,8 +50,9 @@ class SyncController extends Controller
         $user = $this->getUser();
         $syncedIds = [];
         $conflicts = [];
+        $ppobData = [];
 
-        DB::transaction(function () use ($validated, $user, &$syncedIds, &$conflicts) {
+        DB::transaction(function () use ($validated, $user, &$syncedIds, &$conflicts, &$ppobData) {
             foreach ($validated['transactions'] as $txData) {
                 try {
                     $existing = Transaction::where('local_transaction_id', $txData['localId'])->first();
@@ -102,6 +121,19 @@ class SyncController extends Controller
                                     'transaction_id' => $tx->id,
                                 ]);
                             }
+
+                            // Handle Point Redemption
+                            if ($payment['method'] === 'POINT' && isset($payment['points_deducted'])) {
+                                $customer = \App\Models\Customer::find($tx->customer_id);
+                                if ($customer) {
+                                    $customer->deductPoints(
+                                        $payment['points_deducted'], 
+                                        'REDEMPTION', 
+                                        $tx->id, 
+                                        "Penukaran Poin di Kasir: #{$tx->receipt_number}"
+                                    );
+                                }
+                            }
                         }
                     }
 
@@ -126,7 +158,7 @@ class SyncController extends Controller
                         $isService = isset($item['isService']) && $item['isService'] === true;
 
                         // Stock deduction is handled by TransactionItemObserver automatically
-                        TransactionItem::create([
+                        $txItem = TransactionItem::create([
                             'transaction_id' => $tx->id,
                             'product_id' => $isService ? null : $item['productId'],
                             'service_id' => $isService ? $item['productId'] : null,
@@ -134,6 +166,49 @@ class SyncController extends Controller
                             'unit_price' => $item['unitPrice'],
                             'discount_per_item' => $item['manualDiscount'] ?? 0,
                         ]);
+
+                        if (!$isService && isset($item['productType']) && $item['productType'] === 'digital') {
+                            $product = \App\Models\Product::find($item['productId']);
+                            if ($product && !empty($product->ppob_sku)) {
+                                $customerNo = $item['customerNo'] ?? null;
+                                if ($customerNo) {
+                                    $refId = $tx->receipt_number . '-' . strtoupper(substr(uniqid(), -4));
+                                    $digiflazzService = new \App\Services\DigiflazzService();
+                                    $res = $digiflazzService->topup($product->ppob_sku, $customerNo, $refId);
+
+                                    $status = 'Pending';
+                                    if (isset($res['data']['status'])) {
+                                        $status = $res['data']['status'];
+                                    }
+                                    
+                                    $customerName = isset($res['data']) ? $this->extractCustomerName($res['data']) : null;
+                                    
+                                    \App\Models\PpobTransaction::create([
+                                        'transaction_id' => $tx->id,
+                                        'ref_id' => $refId,
+                                        'customer_no' => $customerNo,
+                                        'customer_name' => $customerName,
+                                        'buyer_sku_code' => $product->ppob_sku,
+                                        'price' => $res['data']['price'] ?? 0,
+                                        'status' => $status,
+                                        'rc' => $res['data']['rc'] ?? null,
+                                        'sn' => $res['data']['sn'] ?? null,
+                                        'message' => $res['data']['message'] ?? null,
+                                        'raw_response' => json_encode($res),
+                                    ]);
+                                    
+                                    if (!isset($ppobData[$txData['localId']])) {
+                                        $ppobData[$txData['localId']] = [];
+                                    }
+                                    $ppobData[$txData['localId']][] = [
+                                        'productId' => $item['productId'],
+                                        'sn' => $res['data']['sn'] ?? null,
+                                        'status' => $status,
+                                        'message' => $res['data']['message'] ?? null,
+                                    ];
+                                }
+                            }
+                        }
                     }
 
                     $syncedIds[] = $txData['localId'];
@@ -154,6 +229,7 @@ class SyncController extends Controller
             'conflicts' => $conflicts,
             'syncedCount' => count($syncedIds),
             'conflictCount' => count($conflicts),
+            'ppobData' => $ppobData,
         ]);
     }
 }

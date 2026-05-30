@@ -25,27 +25,38 @@ class Customer extends Model
         'points' => 'integer',
     ];
 
+    protected $appends = ['tier_discount_percent'];
+
+    public function getTierDiscountPercentAttribute()
+    {
+        $tier = \App\Models\MemberTier::where('organization_id', $this->organization_id)
+            ->where('name', $this->member_tier)
+            ->first();
+
+        return $tier ? (float) $tier->discount_percent : 0;
+    }
+
     protected static function boot()
     {
         parent::boot();
 
         static::saving(function ($customer) {
-            $customer->member_tier = static::calculateTier($customer->points);
+            $customer->member_tier = static::calculateTier($customer);
         });
     }
 
-    public static function calculateTier($points)
+    public static function calculateTier($customer)
     {
-        $points = (int) $points;
-        if ($points >= 10000) {
-            return 'PLATINUM';
-        } elseif ($points >= 5000) {
-            return 'GOLD';
-        } elseif ($points >= 1000) {
-            return 'SILVER';
-        } else {
-            return 'BRONZE';
-        }
+        $points = (int) $customer->points;
+        $organizationId = $customer->organization_id;
+
+        // Fetch the highest tier the user qualifies for
+        $tier = \App\Models\MemberTier::where('organization_id', $organizationId)
+            ->where('min_points', '<=', $points)
+            ->orderBy('min_points', 'desc')
+            ->first();
+
+        return $tier ? strtoupper($tier->name) : 'REGULAR';
     }
 
     public function organization(): BelongsTo

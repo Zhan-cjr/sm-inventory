@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Printer, X } from 'lucide-react';
 import Barcode from 'react-barcode';
 
@@ -97,6 +97,12 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
 
   items.forEach(item => {
     lines.push(pad(item.name || 'Item', columns));
+    if (item.customerNo) lines.push(pad(`  Tujuan: ${item.customerNo}`, columns));
+    if (item.customerName) lines.push(pad(`  Atas Nama: ${item.customerName}`, columns));
+    if (item.sn) lines.push(pad(`  SN: ${item.sn}`, columns));
+    if (item.ppobStatus) lines.push(pad(`  Status: ${item.ppobStatus}`, columns));
+    if (item.ppobMessage) lines.push(pad(`  Ket: ${item.ppobMessage}`, columns));
+
     const qtyPrice = `${item.quantity} x ${item.unitPrice.toLocaleString('id-ID')}`;
     const sub = (item.quantity * item.unitPrice).toLocaleString('id-ID');
     const space = columns - qtyPrice.length - sub.length;
@@ -144,7 +150,7 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
   // PPN / Tax information
   if (branchSettings?.receipt_show_tax) {
     const taxRate = parseFloat(branchSettings.receipt_tax_rate ?? 11);
-    const dppRate = parseFloat(branchSettings.receipt_dpp_rate ?? 1.11);
+    const dppRate = 1 + (taxRate / 100);
     const taxMessage = branchSettings.receipt_tax_message || 'Harga di atas sudah termasuk PPN';
     const taxRateMsg = branchSettings.receipt_tax_rate_message || 'Tarif PPn';
     const dppMsg = branchSettings.receipt_dpp_message || 'SblmPPn';
@@ -190,37 +196,78 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
   return lines.join('\n');
 };
 
-export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }) => {
+export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, autoPrintSettings }) => {
   const { items, totalAmount, discountAmount, finalAmount, paymentMethod, bankId, terminalId, receivedAmount, changeAmount, appliedPromos, branchName, branchAddress, orgName, userName, customerName, timestamp, receipt_number, isReprint } = transaction;
 
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
   };
 
+  const hasPrinted = useRef(false);
+
+  const executeGraphicPrint = () => {
+    if (window.electronAPI) {
+      let css = '';
+      try {
+        css = Array.from(document.styleSheets)
+          .map(styleSheet => {
+            try { return Array.from(styleSheet.cssRules).map(rule => rule.cssText).join(''); } 
+            catch (e) { return ''; }
+          }).join('\n');
+      } catch (e) {}
+      
+      const receiptHtml = document.getElementById('printable-receipt').outerHTML;
+      const fullHtml = `<html><head><style>${css}</style></head><body style="background: white;">${receiptHtml}</body></html>`;
+      window.electronAPI.silentPrint(fullHtml, autoPrintSettings?.printerName);
+      if (onClose) onClose();
+    } else {
+      if (onPrint) onPrint();
+    }
+  };
+
+  useEffect(() => {
+    if (autoPrintSettings?.autoPrint && !hasPrinted.current) {
+      hasPrinted.current = true;
+      if (autoPrintSettings.printMode === 'TEXT') {
+        handlePrintRawText();
+      } else {
+        // Graphic mode
+        setTimeout(() => { executeGraphicPrint(); }, 200); // give it time to render
+      }
+    }
+  }, []);
+
   const handlePrintRawText = () => {
-    const rawText = generateRawTextReceipt(transaction, branchSettings, 32);
+    // ESC p 0 25 250 (Buka Cash Drawer 1)
+    const rawText = '\x1B\x70\x00\x19\xFA' + generateRawTextReceipt(transaction, branchSettings, 35);
+    const htmlString = '<html><head><title>Struk ESC/POS</title><style>@page { margin: 0; } body { margin: 0; padding: 0 0 0 12mm; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>';
     
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
-    
-    const doc = iframe.contentWindow.document || iframe.contentDocument;
-    doc.open();
-    doc.write('<html><head><title>Struk ESC/POS</title><style>@page { margin: 0; size: auto; } body { margin: 0; padding: 0; font-family: "Courier New", Courier, monospace; font-size: 10px; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>');
-    doc.close();
-    
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
+    if (window.electronAPI) {
+      window.electronAPI.silentPrint(htmlString, autoPrintSettings?.printerName);
+      if (onClose) onClose();
+    } else {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'absolute';
+      iframe.style.width = '0px';
+      iframe.style.height = '0px';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+      
+      const doc = iframe.contentWindow.document || iframe.contentDocument;
+      doc.open();
+      doc.write(htmlString);
+      doc.close();
       
       setTimeout(() => {
-        document.body.removeChild(iframe);
-        if (onClose) onClose();
-      }, 1000);
-    }, 500);
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+          if (onClose) onClose();
+        }, 1000);
+      }, 500);
+    }
   };
 
   const formatPlaceholder = (lineText) => {
@@ -273,9 +320,12 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }
     }
   }
 
+  const isHidden = autoPrintSettings?.autoPrint;
+  const overlayStyle = isHidden ? { position: 'fixed', top: 0, left: 0, width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' } : {};
+
   return (
-    <div className="change-modal-overlay">
-      <div className="receipt-preview-card fade-in">
+    <div className={isHidden ? "" : "change-modal-overlay"} style={overlayStyle}>
+      <div className={`receipt-preview-card ${!isHidden ? 'fade-in' : ''}`}>
         <header className="receipt-preview-header">
           <h3>Pratinjau Struk</h3>
           <button onClick={onClose} className="btn-close-preview"><X size={20} /></button>
@@ -312,7 +362,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }
               ))
             )}
             {isReprint && <p style={{ textAlign: 'center', fontWeight: 'bold', margin: '4px 0', fontSize: '12px' }}>*** COPY / REPRINT ***</p>}
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
           </div>
           
           <div className="receipt-info">
@@ -320,13 +370,18 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }
             {customerName && <p>Member: {customerName}</p>}
             <p>Tgl  : {new Date(timestamp).toLocaleString('id-ID')}</p>
             <p>Kassa: {terminalId?.split('-')[0] || 'T01'}</p>
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
           </div>
 
           <div className="receipt-items">
             {items.map((item, idx) => (
               <div key={idx} className="receipt-item">
                 <div className="item-name">{item.name}</div>
+                {item.customerNo && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563' }}>Tujuan: {item.customerNo}</div>}
+                {item.customerName && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563', fontWeight: 'bold' }}>Atas Nama: {item.customerName}</div>}
+                {item.sn && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563', fontWeight: 'bold' }}>SN: {item.sn}</div>}
+                {item.ppobStatus && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563' }}>Status: {item.ppobStatus}</div>}
+                {item.ppobMessage && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563' }}>Ket: {item.ppobMessage}</div>}
                 <div className="item-detail">
                   <span>{item.quantity} x {formatCurrency(item.unitPrice)}</span>
                   <span>{formatCurrency(item.quantity * item.unitPrice)}</span>
@@ -339,7 +394,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }
                 )}
               </div>
             ))}
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
           </div>
 
           <div className="receipt-summary">
@@ -387,24 +442,31 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }
             </div>
 
             {/* PPN / Tax Details */}
-            {!!branchSettings?.receipt_show_tax && (
-              <div style={{ fontSize: '10px', marginTop: '6px', borderTop: '1px dashed #ccc', paddingTop: '6px' }}>
-                <p style={{ textAlign: 'center', margin: '2px 0', fontStyle: 'italic' }}>{branchSettings.receipt_tax_message || 'Harga di atas sudah termasuk PPN'}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-                  <span>{branchSettings.receipt_dpp_message || 'SblmPPn'}</span>
-                  <span>{formatCurrency(Math.round(finalAmount / (branchSettings.receipt_dpp_rate ?? 1.11)))}</span>
+            {!!branchSettings?.receipt_show_tax && (() => {
+              const taxRate = parseFloat(branchSettings.receipt_tax_rate ?? 11);
+              const dppRate = 1 + (taxRate / 100);
+              const dppVal = Math.round(finalAmount / dppRate);
+              const taxVal = finalAmount - dppVal;
+
+              return (
+                <div style={{ fontSize: '10px', marginTop: '6px', borderTop: '1px dashed #ccc', paddingTop: '6px' }}>
+                  <p style={{ textAlign: 'center', margin: '2px 0', fontStyle: 'italic' }}>{branchSettings.receipt_tax_message || 'Harga di atas sudah termasuk PPN'}</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                    <span>{branchSettings.receipt_dpp_message || 'SblmPPn'}</span>
+                    <span>{formatCurrency(dppVal)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                    <span>{branchSettings.receipt_tax_rate_message || 'Tarif PPn'} ({taxRate}%)</span>
+                    <span>{formatCurrency(taxVal)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
+                    <span>{branchSettings.receipt_total_tax_message || 'NilPPn'}</span>
+                    <span>{formatCurrency(taxVal)}</span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-                  <span>{branchSettings.receipt_tax_rate_message || 'Tarif PPn'} ({branchSettings.receipt_tax_rate ?? 11}%)</span>
-                  <span>{formatCurrency(finalAmount - Math.round(finalAmount / (branchSettings.receipt_dpp_rate ?? 1.11)))}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', margin: '2px 0' }}>
-                  <span>{branchSettings.receipt_total_tax_message || 'NilPPn'}</span>
-                  <span>{formatCurrency(finalAmount - Math.round(finalAmount / (branchSettings.receipt_dpp_rate ?? 1.11)))}</span>
-                </div>
-              </div>
-            )}
-            <p className="divider">--------------------------------</p>
+              );
+            })()}
+            <p className="divider">----------------------------------------</p>
           </div>
 
           {appliedPromos?.length > 0 && (
@@ -413,7 +475,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }
               {appliedPromos.map((p, idx) => (
                 <p key={idx}>* {p.promoName || p.name}</p>
               ))}
-              <p className="divider">--------------------------------</p>
+              <p className="divider">----------------------------------------</p>
             </div>
           )}
 
@@ -455,7 +517,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose }
         </div>
 
         <footer className="receipt-preview-footer" style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn-print-now" onClick={onPrint} style={{ flex: 1 }}>
+          <button className="btn-print-now" onClick={executeGraphicPrint} style={{ flex: 1 }}>
             <Printer size={18} /> CETAK GRAFIS
           </button>
           <button className="btn-print-now" onClick={handlePrintRawText} style={{ flex: 1, backgroundColor: '#0284c7' }}>

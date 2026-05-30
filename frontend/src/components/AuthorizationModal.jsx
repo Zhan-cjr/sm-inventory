@@ -25,6 +25,8 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [remoteAuthId, setRemoteAuthId] = useState(null);
+  const [isPolling, setIsPolling] = useState(false);
 
   useEffect(() => {
     // Fetch users who have POS authorization for this branch
@@ -158,6 +160,71 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
     }
   };
 
+  const requestRemoteAuth = async () => {
+    if (!isOnline) {
+      setError('Otorisasi jarak jauh membutuhkan koneksi internet (Online).');
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/authorizations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ action: actionName, details: {} })
+      });
+
+      if (!res.ok) throw new Error('Gagal meminta otorisasi jarak jauh');
+      const json = await res.json();
+      setRemoteAuthId(json.data.id);
+      setIsPolling(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let interval;
+    if (isPolling && remoteAuthId) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/v1/authorizations/${remoteAuthId}?t=${Date.now()}`, {
+            headers: { 
+              'Authorization': `Bearer ${authToken}`,
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          });
+          if (res.ok) {
+            const json = await res.json();
+            if (json.data.status === 'APPROVED') {
+              setIsPolling(false);
+              // Lanjut eksekusi
+              onSuccess({ id: json.data.supervisor_id, name: 'Remote Supervisor' });
+            } else if (json.data.status === 'REJECTED') {
+              setIsPolling(false);
+              setError('Permintaan otorisasi DITOLAK oleh Supervisor.');
+            }
+          }
+        } catch (err) {
+          console.warn('Polling error', err);
+        }
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [isPolling, remoteAuthId, authToken]);
+
+  const handleCancelRemote = () => {
+    setIsPolling(false);
+    setRemoteAuthId(null);
+  };
+
   return (
     <div className="change-modal-overlay">
       <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
@@ -174,6 +241,15 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
             {error}
           </div>
         )}
+
+        {isPolling ? (
+          <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+            <div className="spin" style={{ margin: '0 auto 1rem', width: '30px', height: '30px', border: '3px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+            <p style={{ color: '#f59e0b', fontWeight: 'bold' }}>Menunggu persetujuan Supervisor...</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Silakan cek aplikasi mobile PWA.</p>
+            <button type="button" className="btn-secondary" style={{ marginTop: '1rem' }} onClick={handleCancelRemote}>Batal Menunggu</button>
+          </div>
+        ) : (
 
         <form onSubmit={handleAuthorize}>
           <div className="form-group" style={{ marginBottom: '1rem' }}>
@@ -207,13 +283,26 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+          <div style={{ display: 'flex', gap: '1rem', width: '100%', marginBottom: '1rem' }}>
             <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={onCancel} disabled={isLoading}>BATAL</button>
             <button type="submit" className="btn-danger" style={{ flex: 1 }} disabled={isLoading}>
               {isLoading ? 'MEMERIKSA...' : 'OTORISASI'}
             </button>
           </div>
+          
+          <div style={{ width: '100%' }}>
+            <button 
+              type="button" 
+              className="btn-primary" 
+              style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem', background: 'transparent', border: '1px dashed var(--primary)', color: 'var(--primary)' }} 
+              onClick={requestRemoteAuth} 
+              disabled={isLoading || !isOnline}
+            >
+              MINTA OTORISASI JARAK JAUH
+            </button>
+          </div>
         </form>
+        )}
       </div>
     </div>
   );

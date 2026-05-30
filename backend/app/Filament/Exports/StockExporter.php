@@ -19,8 +19,10 @@ class StockExporter extends Exporter
             ExportColumn::make('product.name')->label('Nama Barang'),
             ExportColumn::make('product.category.name')->label('Kategori'),
             ExportColumn::make('quantity_on_hand')->label('Sisa Stok'),
-            ExportColumn::make('product.cost_price')->label('Harga Pokok'),
-            ExportColumn::make('valuation')->label('Valuasi Stok')->state(fn (Stock $record): float => $record->quantity_on_hand * ($record->product->cost_price ?? 0)),
+            ExportColumn::make('product.cost_price_tax')
+                ->label('Harga Pokok')
+                ->state(fn (Stock $record): float => $record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0)),
+            ExportColumn::make('valuation')->label('Valuasi Stok')->state(fn (Stock $record): float => $record->quantity_on_hand * ($record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0))),
         ];
     }
 

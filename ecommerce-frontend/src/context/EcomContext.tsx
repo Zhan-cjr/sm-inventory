@@ -70,6 +70,10 @@ interface EcomContextType {
   setMember: (member: Member | null) => void;
   logoutMember: () => void;
   syncMemberPoints: () => Promise<void>;
+  selectedProductForModal: Product | null;
+  setSelectedProductForModal: (product: Product | null) => void;
+  isProductModalOpen: boolean;
+  setIsProductModalOpen: (open: boolean) => void;
 }
 
 const EcomContext = createContext<EcomContextType | undefined>(undefined);
@@ -97,6 +101,8 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [checkoutSuccessOrder, setCheckoutSuccessOrder] = useState<any | null>(null);
+  const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('ecom_cart', JSON.stringify(cart));
@@ -214,6 +220,10 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setMember,
         logoutMember,
         syncMemberPoints,
+        selectedProductForModal,
+        setSelectedProductForModal,
+        isProductModalOpen,
+        setIsProductModalOpen,
       }}
     >
       {children}

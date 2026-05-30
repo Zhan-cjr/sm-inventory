@@ -73,14 +73,19 @@ class LaporanBarangDijual extends Page implements HasTable
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('cost_price')
-                    ->label('Harga Beli')
+                    ->label('Harga Beli + PPN')
                     ->money('IDR', true)
                     ->state(function (TransactionItem $record) {
                         $branch_id = $record->transaction?->branch_id;
                         $stock = \App\Models\Stock::where('product_id', $record->product_id)
                                 ->where('branch_id', $branch_id)
                                 ->first();
-                        return ($stock && $stock->cost_price > 0) ? $stock->cost_price : ($record->product?->cost_price ?? 0);
+                                
+                        if ($stock) {
+                            return $stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->cost_price ?? 0);
+                        }
+                        
+                        return $record->product?->cost_price_tax > 0 ? $record->product?->cost_price_tax : ($record->product?->cost_price ?? 0);
                     })
                     ->sortable(),
                 TextColumn::make('unit_price')

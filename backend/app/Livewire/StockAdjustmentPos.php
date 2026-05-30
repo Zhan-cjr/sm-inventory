@@ -18,6 +18,7 @@ class StockAdjustmentPos extends Component
     public $notes;
     public $adjustment_reason_id;
     public $reason_type = 'PLUS'; // PLUS or MINUS
+    public $cetak_nota = false;
 
     public $visibleColumns = ['barcode', 'name', 'stock', 'qty', 'unit_cost', 'subtotal'];
 
@@ -216,13 +217,25 @@ class StockAdjustmentPos extends Component
             return;
         }
 
+        $organization = \App\Models\Organization::find(auth()->user()->organization_id ?? \App\Models\Organization::first()->id);
+        
+        $needsApproval = false;
+        if ($organization && $organization->stock_adjustment_approval_amount_limit !== null) {
+            if ($this->grandTotal > $organization->stock_adjustment_approval_amount_limit) {
+                $needsApproval = true;
+            }
+        }
+
+        $status = $needsApproval ? 'PENDING_APPROVAL' : 'COMPLETED';
+
         $data = [
+            'organization_id' => $organization->id,
             'branch_id' => $this->branch_id,
             'adjustment_number' => $this->adjustment_number,
             'adjustment_date' => $this->adjustment_date,
             'adjustment_reason_id' => $this->adjustment_reason_id,
             'notes' => $this->notes,
-            'status' => 'COMPLETED',
+            'status' => $status,
             'total_value' => $this->grandTotal,
             'recorded_by' => auth()->user()->id, // Storing UUID
         ];
@@ -246,18 +259,32 @@ class StockAdjustmentPos extends Component
                 'total_cost' => $item['subtotal']
             ]);
             
-            // Execute stock adjustment to actual stock
-            $stockRec = \App\Models\Stock::firstOrCreate([
-                'product_id' => $item['product_id'],
-                'branch_id' => $this->branch_id
-            ], [
-                'quantity_on_hand' => 0
-            ]);
-            $stockRec->quantity_on_hand = $item['new_qty'];
-            $stockRec->save();
+            // Execute stock adjustment to actual stock ONLY IF it does not need approval
+            if (!$needsApproval) {
+                $stockRec = \App\Models\Stock::firstOrCreate([
+                    'product_id' => $item['product_id'],
+                    'branch_id' => $this->branch_id
+                ], [
+                    'quantity_on_hand' => 0
+                ]);
+                $stockRec->quantity_on_hand = $item['new_qty'];
+                $stockRec->save();
+            }
         }
 
-        Notification::make()->title('Koreksi Stok berhasil disimpan.')->success()->send();
+        if ($needsApproval) {
+            $adj->requestApproval('Otomatis: Nominal koreksi melebihi batas (Rp ' . number_format($organization->stock_adjustment_approval_amount_limit, 0, ',', '.') . ')');
+            Notification::make()->title('Koreksi Stok memerlukan persetujuan Manajer.')->warning()->send();
+        } else {
+            Notification::make()->title('Koreksi Stok berhasil disimpan.')->success()->send();
+        }
+        
+        if ($this->cetak_nota && !$needsApproval) {
+            $printUrl = route('print.document', ['type' => 'adjustment', 'ids' => [$adj->id]]);
+            $indexUrl = route('filament.admin.resources.stock-adjustments.index');
+            $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+            return;
+        }
         
         return redirect()->to(route('filament.admin.resources.stock-adjustments.index'));
     }

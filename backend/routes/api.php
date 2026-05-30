@@ -20,6 +20,8 @@ use App\Http\Controllers\Api\V1\EcommerceController;
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\PosDeviceController;
+use App\Http\Controllers\Api\V1\AuthorizationController;
+use App\Http\Controllers\Api\V1\StockOpnameApiController;
 
 // E-Commerce Routes
 Route::prefix('v1/ecommerce')->group(function () {
@@ -42,6 +44,7 @@ Route::prefix('v1')->group(function () {
     // Public Routes
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/devices/handshake', [PosDeviceController::class, 'handshake']);
+    Route::post('/webhook/digiflazz', [\App\Http\Controllers\Api\DigiflazzWebhookController::class, 'handle']);
 
 
 
@@ -54,9 +57,23 @@ Route::prefix('v1')->group(function () {
         Route::get('/pos-authorizers', [\App\Http\Controllers\Api\V1\PosAuthController::class, 'getAuthorizers']);
         Route::post('/authorize-action', [\App\Http\Controllers\Api\V1\PosAuthController::class, 'authorizeAction']);
         
+        // Remote Authorization
+        Route::post('/authorizations', [AuthorizationController::class, 'requestAuthorization']);
+        Route::get('/authorizations/pending', [AuthorizationController::class, 'getPendingRequests']);
+        Route::get('/authorizations/{id}', [AuthorizationController::class, 'checkStatus']);
+        Route::post('/authorizations/{id}/approve', [AuthorizationController::class, 'approveRequest']);
+        Route::post('/authorizations/{id}/reject', [AuthorizationController::class, 'rejectRequest']);
+        
+        // Document Approvals (PO & Stock Adjustments)
+        Route::get('/document-approvals/pending', [\App\Http\Controllers\Api\V1\DocumentApprovalController::class, 'pending']);
+        Route::get('/document-approvals/{id}/details', [\App\Http\Controllers\Api\V1\DocumentApprovalController::class, 'details']);
+        Route::post('/document-approvals/{id}/{action}', [\App\Http\Controllers\Api\V1\DocumentApprovalController::class, 'action']);
+        
         // Transaction retrieval for POS Return
         Route::get('/transactions/latest', [\App\Http\Controllers\Api\V1\TransactionController::class, 'getLatestTransaction']);
         Route::get('/transactions/receipt/{receipt}', [\App\Http\Controllers\Api\V1\TransactionController::class, 'getTransactionByReceipt']);
+        Route::get('/transactions/ppob/today', [\App\Http\Controllers\Api\V1\TransactionController::class, 'getTodayPpobTransactions']);
+        Route::post('/transactions/ppob/{ppobTransactionId}/check-status', [\App\Http\Controllers\Api\V1\TransactionController::class, 'checkPpobStatus']);
 
         Route::get('/user', function (Request $request) {
             $user = $request->user();
@@ -89,6 +106,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/products', function (Request $request) {
             $user = $request->user();
             $branchId = $user->branch_id;
+            $isAdmin = in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN']);
+            if (!$branchId || $isAdmin) {
+                $branchId = $request->query('branch_id') ?: $branchId;
+            }
             
             if (!$branchId) {
                 return response()->json([]);
@@ -237,6 +258,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/shifts/open', [\App\Http\Controllers\Api\V1\ShiftController::class, 'openShift']);
         Route::post('/shifts/close', [\App\Http\Controllers\Api\V1\ShiftController::class, 'closeShift']);
         Route::post('/shifts/cash-movement', [\App\Http\Controllers\Api\V1\ShiftController::class, 'cashMovement']);
+
+        // Mobile Stock Opname
+        Route::get('/stock-opname/active', [StockOpnameApiController::class, 'getActiveSessions']);
+        Route::post('/stock-opname/scan', [StockOpnameApiController::class, 'scanProduct']);
+        Route::post('/stock-opname/lock-rack', [StockOpnameApiController::class, 'lockRack']);
 
         // Manager Dashboard Metrics
         Route::get('/dashboard/metrics', [\App\Http\Controllers\Api\V1\DashboardController::class, 'metrics']);

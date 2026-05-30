@@ -32,6 +32,11 @@ class OrganizationForm
                                 ->label('Mata Uang')
                                 ->required()
                                 ->default('IDR'),
+                            TextInput::make('tax_rate')
+                                ->label('Persentase PPN (%)')
+                                ->numeric()
+                                ->default(11)
+                                ->required(),
                             TextInput::make('point_conversion_rate')
                                 ->label('Nilai Belanja per 1 Poin (Rp)')
                                 ->required()
@@ -87,6 +92,27 @@ class OrganizationForm
                                 ->password()
                                 ->helperText('Token atau API Key otorisasi WhatsApp Gateway Anda.')
                                 ->required(fn ($get) => $get('wa_gateway_type') !== null)
+                                ->columnSpanFull(),
+                        ])
+                    ]),
+                Section::make('Pengaturan Persetujuan (Approval Settings)')
+                    ->description('Tentukan batas-batas transaksi yang membutuhkan persetujuan Manajer/Supervisor.')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            TextInput::make('po_approval_limit')
+                                ->label('Limit Nominal Persetujuan PO (Rp)')
+                                ->numeric()
+                                ->nullable()
+                                ->helperText('Jika total pesanan pembelian (PO) melebihi nominal ini, PO harus disetujui (Approval) terlebih dahulu. Kosongkan jika tidak ada batas.'),
+                            \Filament\Forms\Components\Toggle::make('po_approval_max_qty_enabled')
+                                ->label('Wajib Approval Jika Qty PO Melebihi Saran Sistem')
+                                ->default(false)
+                                ->helperText('Aktifkan jika PO memerlukan persetujuan saat Qty pesanan melebihi jumlah batas maksimal yang disarankan sistem (berdasarkan Min/Max).'),
+                            TextInput::make('stock_adjustment_approval_amount_limit')
+                                ->label('Batas Kewajaran Nominal Koreksi Stok (Rp)')
+                                ->numeric()
+                                ->nullable()
+                                ->helperText('Jika total nilai nominal koreksi melebihi batas ini, koreksi stok wajib di-approve sebelum memotong/menambah stok riil. Kosongkan jika tidak ada batas.')
                                 ->columnSpanFull(),
                         ])
                     ])

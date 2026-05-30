@@ -57,12 +57,13 @@ class EcommerceSettingForm
                                 ->placeholder('Contoh: Dan InsyaAllah Berkah. Temukan berbagai kebutuhan keluarga muslim...')
                                 ->default('Dan InsyaAllah Berkah. Temukan berbagai kebutuhan keluarga muslim dengan harga terbaik dari cabang Toserba Selamat terdekat Anda.')
                                 ->columnSpanFull(),
-                            FileUpload::make('ecommerce_banner_image')
-                                ->label('Foto/Gambar Banner Utama (Hero Image)')
+                            FileUpload::make('ecommerce_banner_images')
+                                ->label('Gambar Banner Promo Carousel (Multiple)')
                                 ->image()
+                                ->multiple()
                                 ->disk('public')
                                 ->directory('ecommerce_banners')
-                                ->helperText('Unggah gambar untuk menggantikan visual default di sebelah kanan banner utama.')
+                                ->helperText('Unggah satu atau banyak gambar (rekomendasi: 1200x400px) untuk ditampilkan sebagai Promo Carousel yang bergeser. Fitur banner tunggal lama sudah diabaikan.')
                                 ->columnSpanFull(),
                             TextInput::make('ecommerce_banner_cta_text')
                                 ->label('Teks Tombol CTA')

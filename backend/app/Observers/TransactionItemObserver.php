@@ -18,6 +18,9 @@ class TransactionItemObserver
         // Skip if service
         if ($item->service_id) return;
 
+        // Skip if digital product
+        if ($item->product && $item->product->product_type === 'digital') return;
+
         // Update Stock
         $stock = Stock::where('branch_id', $tx->branch_id)
             ->where('product_id', $item->product_id)
@@ -65,6 +68,12 @@ class TransactionItemObserver
     {
         $tx = $item->transaction;
         if (!$tx) return;
+
+        // Skip if service
+        if ($item->service_id) return;
+
+        // Skip if digital product
+        if ($item->product && $item->product->product_type === 'digital') return;
 
         // Return stock to main inventory
         $stock = Stock::where('branch_id', $tx->branch_id)

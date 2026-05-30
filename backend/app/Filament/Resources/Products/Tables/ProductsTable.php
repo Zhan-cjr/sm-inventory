@@ -57,17 +57,18 @@ class ProductsTable
                 TextColumn::make('barcode')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('cost_price')
-                    ->label('Harga Beli')
+                TextColumn::make('cost_price_tax')
+                    ->label('Harga Beli (+PPN)')
                     ->money('IDR')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('selling_price')
                     ->label('Harga Jual')
                     ->money('IDR')
                     ->sortable(),
                 TextColumn::make('stocks_sum_quantity_on_hand')
                     ->label('Stok')
-                    ->numeric()
+                    ->formatStateUsing(fn ($state) => (float) $state)
                     ->sortable()
                     ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()),
                 TextColumn::make('stocks.racks.rack_code')
@@ -138,6 +139,46 @@ class ProductsTable
                                     ]
                                 );
                             });
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                    BulkAction::make('cetak_label_barcode')
+                        ->label('Cetak Label Barcode')
+                        ->icon('heroicon-o-qr-code')
+                        ->color('success')
+                        ->form([
+                            \Filament\Forms\Components\TextInput::make('copies')
+                                ->label('Jumlah Label per Produk')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->required(),
+                        ])
+                        ->action(function (\Illuminate\Support\Collection $records, array $data) {
+                            $productIds = $records->pluck('id')->toArray();
+                            return redirect()->route('print.barcode.label', [
+                                'product_ids' => $productIds,
+                                'copies' => $data['copies'],
+                            ]);
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                    BulkAction::make('cetak_pricecard_rak')
+                        ->label('Cetak Pricecard Rak')
+                        ->icon('heroicon-o-tag')
+                        ->color('warning')
+                        ->form([
+                            \Filament\Forms\Components\TextInput::make('copies')
+                                ->label('Jumlah Pricecard per Produk')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->required(),
+                        ])
+                        ->action(function (\Illuminate\Support\Collection $records, array $data) {
+                            $productIds = $records->pluck('id')->toArray();
+                            return redirect()->route('print.barcode.pricecard', [
+                                'product_ids' => $productIds,
+                                'copies' => $data['copies'],
+                            ]);
                         })
                         ->deselectRecordsAfterCompletion(),
                     DeleteBulkAction::make(),

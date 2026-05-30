@@ -7,6 +7,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Checkbox;
 use Filament\Schemas\Schema;
 
 class PurchaseOrderForm
@@ -43,18 +44,15 @@ class PurchaseOrderForm
                     ->required()
                     ->numeric()
                     ->default(0.0),
-                Toggle::make('include_tax')
-                    ->label('Include PPN')
-                    ->default(true)
-                    ->required(),
-                TextInput::make('tax_amount')
-                    ->label('Nominal PPN')
-                    ->numeric()
-                    ->default(0.0),
+
                 Textarea::make('notes')
                     ->columnSpanFull(),
                 TextInput::make('created_by')
                     ->required(),
+                Checkbox::make('cetak_nota')
+                    ->label('Cetak Nota setelah simpan')
+                    ->dehydrated(false)
+                    ->default(false),
             ]);
     }
 }

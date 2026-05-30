@@ -92,8 +92,8 @@
                                 get filteredSuppliers() {
                                     if (this.search === '') return this.suppliers;
                                     return this.suppliers.filter(s => 
-                                        s.name.toLowerCase().includes(this.search.toLowerCase()) || 
-                                        s.code.toLowerCase().includes(this.search.toLowerCase())
+                                        (s.name || '').toLowerCase().includes(this.search.toLowerCase()) || 
+                                        (s.code || '').toLowerCase().includes(this.search.toLowerCase())
                                     );
                                 },
                                 selectSupplier(id) {
@@ -238,7 +238,7 @@
                 Pilih Kolom
             </button>
             <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; background: white; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 12rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="dark:bg-gray-800 dark:border-gray-700">
-                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga Satuan', 'harga_beli_ppn' => 'Harga+PPN', 'harga_jual_1' => 'Harga Jual', 'margin_gol_1' => 'Margin', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
+                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga Satuan', 'harga_jual_1' => 'Harga Jual', 'margin_gol_1' => 'Margin', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
                     <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                         <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
                         <span class="text-xs">{{ $label }}</span>
@@ -260,7 +260,7 @@
                     @if(in_array('qty_ordered', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right;">Qty PO</th> @endif
                     @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right;">Qty Terima</th> @endif
                     @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Satuan</th> @endif
-                    @if(in_array('harga_beli_ppn', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Beli+PPN</th> @endif
+
                     @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual</th> @endif
                     @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Margin (%)</th> @endif
                     @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis1 (%)</th> @endif
@@ -294,31 +294,27 @@
                                    x-on:keydown.enter.prevent="document.getElementById('dis1-{{ $index }}').focus()">
                         </td>
                         @endif
-                        @if(in_array('harga_beli_ppn', $visibleColumns))
-                        <td class="pos-grid-td" style="text-align: right; background-color: #f9fafb; color: #4b5563;">
-                            {{ $include_tax ? number_format($item['unit_price'] * 1.11, 2) : number_format($item['unit_price'], 2) }}
-                        </td>
-                        @endif
+
                         @if(in_array('harga_jual_1', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            @can('update_selling_price_goods_receipt')
+                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
                                 <input type="number" step="any" class="pos-input" style="text-align: right;" 
                                        wire:model.lazy="cart.{{ $index }}.harga_jual_1"
                                        wire:change="recalculateRow({{ $index }})">
                             @else
                                 <div style="text-align: right; padding: 0.375rem 0.5rem; color: #6b7280;">{{ number_format($item['harga_jual_1'], 2) }}</div>
-                            @endcan
+                            @endif
                         </td>
                         @endif
                         @if(in_array('margin_gol_1', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem; background-color: #f9fafb;">
-                            @can('update_selling_price_goods_receipt')
+                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
                                 <input type="number" step="any" class="pos-input {{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
                                        wire:model.lazy="cart.{{ $index }}.margin_gol_1"
                                        wire:change="recalculateRow({{ $index }})">
                             @else
                                 <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_1'], 2) }}</div>
-                            @endcan
+                            @endif
                         </td>
                         @endif
                         @if(in_array('discount_1', $visibleColumns))
@@ -370,13 +366,17 @@
         
         <!-- Actions Button -->
         <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-right: auto;">
-            <button wire:click="save" style="background-color: #2563eb; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-blue-700 transition-colors">
+            <button wire:click="save" style="background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
                 SIMPAN
             </button>
             <a href="{{ route('filament.admin.resources.goods-receipts.index') }}" style="background-color: #fff; color: #374151; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; font-size: 0.875rem; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
                 Batal
             </a>
+            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 ml-4 cursor-pointer">
+                <input type="checkbox" wire:model="cetak_nota" class="rounded text-blue-600">
+                Cetak Nota setelah simpan
+            </label>
         </div>
         
         <!-- Totals -->
@@ -384,7 +384,7 @@
             <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; margin-right: 1rem;">
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" wire:model.live="include_tax" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Include PPN (11%)</span>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Include PPN ({{ (float)(\App\Models\Organization::first()->tax_rate ?? 11) }}%)</span>
                 </label>
             </div>
 
@@ -410,7 +410,7 @@
             </div>
 
             <div style="text-align: right; min-width: 8rem;">
-                <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN (11%)</div>
+                <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN ({{ (float)(\App\Models\Organization::first()->tax_rate ?? 11) }}%)</div>
                 <div class="flex items-center justify-end gap-1">
                     <span style="font-size: 0.75rem; color: #6b7280;">Rp</span>
                     <input type="number" wire:model.live="tax_amount" class="pos-input" style="width: 7rem; padding: 0.125rem 0.25rem; text-align: right; border-style: dashed; background: transparent;">

@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export const Login = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('cashier@selamat.id');
   const [password, setPassword] = useState('password');
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const hashPasswordLocal = (email, password) => {
     const salt = "sminventory_salt_2026";
@@ -38,7 +45,13 @@ export const Login = ({ onLoginSuccess }) => {
             },
             body: JSON.stringify({ email, password })
           });
-          data = await res.json();
+          
+          if (!res.ok && res.status >= 500) {
+            // Cloudflare (530, 521, etc) atau server error -> anggap offline
+            isOffline = true;
+          } else {
+            data = await res.json();
+          }
         } catch (fetchErr) {
           isOffline = true;
         }
@@ -137,6 +150,34 @@ export const Login = ({ onLoginSuccess }) => {
           <button type="submit" className="btn-primary btn-login" disabled={isLoading} style={{ marginTop: '0.5rem' }}>
             {isLoading ? <span className="spinner"></span> : 'Masuk POS Terminal'}
           </button>
+          <button 
+            type="button" 
+            className="btn-secondary" 
+            disabled={!isMobile || isLoading}
+            onClick={() => {
+              if (isMobile) window.location.href = '/mobile';
+            }}
+            style={{ 
+              marginTop: '0.75rem', 
+              width: '100%', 
+              padding: '1rem', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '0.5rem',
+              opacity: isMobile ? 1 : 0.5,
+              cursor: isMobile ? 'pointer' : 'not-allowed',
+              border: isMobile ? '1px solid #10b981' : '1px solid var(--border-light)',
+              color: isMobile ? '#10b981' : 'var(--text-muted)'
+            }}
+            title={!isMobile ? "Hanya tersedia di perangkat HP/Mobile" : "Buka versi PWA Mobile"}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+            Mode Mobile PWA
+          </button>
         </form>
       </div>
 
@@ -149,7 +190,7 @@ export const Login = ({ onLoginSuccess }) => {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            color: 'rgba(255, 255, 255, 0.6)',
+            color: 'var(--text-muted)',
             textDecoration: 'none',
             fontSize: '0.85rem',
             fontWeight: '500',
@@ -157,11 +198,11 @@ export const Login = ({ onLoginSuccess }) => {
           }}
           onMouseEnter={(e) => {
             const link = e.currentTarget;
-            link.style.color = '#fff';
+            link.style.color = 'var(--text-main)';
           }}
           onMouseLeave={(e) => {
             const link = e.currentTarget;
-            link.style.color = 'rgba(255, 255, 255, 0.6)';
+            link.style.color = 'var(--text-muted)';
           }}
         >
           <svg width="20" height="20" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '6px' }}>

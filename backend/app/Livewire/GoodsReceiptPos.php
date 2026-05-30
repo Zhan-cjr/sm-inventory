@@ -26,8 +26,9 @@ class GoodsReceiptPos extends Component
     public $purchase_order_id;
     public $include_tax = true;
     public $tax_amount = 0;
+    public $cetak_nota = false;
 
-    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'harga_beli_ppn', 'harga_jual_1', 'margin_gol_1', 'harga_jual_2', 'margin_gol_2', 'harga_jual_3', 'margin_gol_3', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
+    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'harga_jual_1', 'margin_gol_1', 'harga_jual_2', 'margin_gol_2', 'harga_jual_3', 'margin_gol_3', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
 
     public $searchQuery = '';
     public $cart = [];
@@ -59,6 +60,11 @@ class GoodsReceiptPos extends Component
             $this->tax_amount = $goodsReceipt->tax_amount;
 
             foreach ($goodsReceipt->items as $item) {
+                $stock = null;
+                if ($this->branch_id) {
+                    $stock = Stock::where('product_id', $item->product_id)->where('branch_id', $this->branch_id)->first();
+                }
+
                 $this->cart[] = [
                     'product_id' => $item->product_id,
                     'sku' => $item->product->sku,
@@ -67,9 +73,12 @@ class GoodsReceiptPos extends Component
                     'qty_ordered' => $item->quantity_ordered,
                     'qty_received' => $item->quantity_received,
                     'unit_price' => $item->unit_price,
-                    'harga_jual_1' => 0, 'margin_gol_1' => 0,
-                    'harga_jual_2' => 0, 'margin_gol_2' => 0,
-                    'harga_jual_3' => 0, 'margin_gol_3' => 0,
+                    'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($item->product->harga_jual_1 ?? 0),
+                    'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($item->product->margin_gol_1 ?? 0),
+                    'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($item->product->harga_jual_2 ?? 0),
+                    'margin_gol_2' => ($stock && $stock->margin_gol_2 > 0) ? $stock->margin_gol_2 : ($item->product->margin_gol_2 ?? 0),
+                    'harga_jual_3' => ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($item->product->harga_jual_3 ?? 0),
+                    'margin_gol_3' => ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($item->product->margin_gol_3 ?? 0),
                     'discount_1' => $item->discount_1,
                     'discount_2' => $item->discount_2,
                     'discount_3' => $item->discount_3,
@@ -218,8 +227,9 @@ class GoodsReceiptPos extends Component
         $this->calculateTotals();
     }
 
-    public function updatedCart($name, $value)
+    public function updatedCart($value, $name)
     {
+        $name = (string) $name;
         $parts = explode('.', $name);
         if (count($parts) === 2) {
             $index = $parts[0];
@@ -323,7 +333,8 @@ class GoodsReceiptPos extends Component
         $netTotal = $this->subtotal - $discountAmount;
 
         if ($this->include_tax) {
-            $this->tax_amount = round($netTotal * 0.11, 2);
+            $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
+            $this->tax_amount = round($netTotal * ($taxRate / 100), 2);
         } else {
             $this->tax_amount = 0;
         }
@@ -345,7 +356,8 @@ class GoodsReceiptPos extends Component
             return;
         }
 
-        DB::transaction(function () {
+        $gr = null;
+        DB::transaction(function () use (&$gr) {
             $data = [
                 'purchase_order_id' => $this->purchase_order_id,
                 'supplier_id' => $this->supplier_id,
@@ -365,11 +377,19 @@ class GoodsReceiptPos extends Component
                 // Warning: Re-calculating stock for update is complex. 
                 // For simplicity, we only allow creating new GR for now or handle update carefully.
                 $this->goodsReceipt->update($data);
-                $this->goodsReceipt->items()->delete();
+                
+                // Fetch the items collection and delete individually to trigger Eloquent Observers (Stock deduction)
+                foreach ($this->goodsReceipt->items as $oldItem) {
+                    $oldItem->delete();
+                }
+
                 $gr = $this->goodsReceipt;
             } else {
                 $gr = GoodsReceipt::create($data);
             }
+
+            $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
+            $taxMultiplier = 1 + ($taxRate / 100);
 
             foreach ($this->cart as $item) {
                 GoodsReceiptItem::create([
@@ -384,31 +404,37 @@ class GoodsReceiptPos extends Component
                     'subtotal' => $item['subtotal']
                 ]);
 
-                // Update selling price if permitted and changed
-                if (auth()->user()->can('update_selling_price_goods_receipt')) {
-                    if (empty($this->branch_id)) {
-                        // Update Global Product
-                        $product = Product::find($item['product_id']);
-                        if ($product) {
-                            $product->update([
-                                'cost_price' => $item['unit_price'],
-                                'harga_jual_1' => $item['harga_jual_1'] ?? $product->harga_jual_1,
-                                'margin_gol_1' => $item['margin_gol_1'] ?? $product->margin_gol_1,
-                                'selling_price' => $item['harga_jual_1'] ?? $product->harga_jual_1
-                            ]);
+                $costPriceTax = $this->include_tax ? round($item['unit_price'] * $taxMultiplier, 2) : $item['unit_price'];
+
+                if (empty($this->branch_id)) {
+                    // Update Global Product
+                    $product = Product::find($item['product_id']);
+                    if ($product) {
+                        $updateData = [
+                            'cost_price' => $item['unit_price'],
+                            'cost_price_tax' => $costPriceTax,
+                        ];
+                        if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
+                            $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
+                            $updateData['margin_gol_1'] = $item['margin_gol_1'] ?? $product->margin_gol_1;
+                            $updateData['selling_price'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
                         }
-                    } else {
-                        // Update Branch Stock
-                        $stock = Stock::where('product_id', $item['product_id'])->where('branch_id', $this->branch_id)->first();
-                        if ($stock) {
-                            $stock->update([
-                                'cost_price' => $item['unit_price'],
-                                'cost_price_tax' => $this->include_tax ? round($item['unit_price'] * 1.11, 2) : $item['unit_price'],
-                                'harga_jual_1' => $item['harga_jual_1'] ?? $stock->harga_jual_1,
-                                'margin_gol_1' => $item['margin_gol_1'] ?? $stock->margin_gol_1,
-                                'selling_price' => $item['harga_jual_1'] ?? $stock->harga_jual_1
-                            ]);
+                        $product->update($updateData);
+                    }
+                } else {
+                    // Update Branch Stock
+                    $stock = Stock::where('product_id', $item['product_id'])->where('branch_id', $this->branch_id)->first();
+                    if ($stock) {
+                        $updateData = [
+                            'cost_price' => $item['unit_price'],
+                            'cost_price_tax' => $costPriceTax,
+                        ];
+                        if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
+                            $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $stock->harga_jual_1;
+                            $updateData['margin_gol_1'] = $item['margin_gol_1'] ?? $stock->margin_gol_1;
+                            $updateData['selling_price'] = $item['harga_jual_1'] ?? $stock->harga_jual_1;
                         }
+                        $stock->update($updateData);
                     }
                 }
             }
@@ -422,12 +448,19 @@ class GoodsReceiptPos extends Component
 
         Notification::make()->title('Penerimaan Barang berhasil disimpan dan stok telah diupdate.')->success()->send();
         
+        if ($this->cetak_nota && $gr) {
+            $printUrl = route('print.document', ['type' => 'receipt', 'ids' => [$gr->id]]);
+            $indexUrl = route('filament.admin.resources.goods-receipts.index');
+            $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+            return;
+        }
+        
         return redirect()->to(route('filament.admin.resources.goods-receipts.index'));
     }
 
     public function render()
     {
-        $purchaseOrdersQuery = PurchaseOrder::whereIn('status', ['DRAFT', 'SENT']);
+        $purchaseOrdersQuery = PurchaseOrder::whereIn('status', ['DRAFT', 'SENT', 'APPROVED', 'approved']);
         
         if ($this->supplier_id) {
             $purchaseOrdersQuery->where('supplier_id', $this->supplier_id);

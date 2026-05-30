@@ -5,7 +5,7 @@ import axios from 'axios';
 import { getImageUrl } from '../utils/api';
 
 const ProductCard = ({ product }: { product: Product }) => {
-  const { addToCart, selectedBranch, cart, member, setIsMemberModalOpen } = useEcom();
+  const { addToCart, selectedBranch, cart, member, setIsMemberModalOpen, setSelectedProductForModal, setIsProductModalOpen } = useEcom();
   const [isAdded, setIsAdded] = useState(false);
   const [showPlusOne, setShowPlusOne] = useState(false);
 
@@ -24,7 +24,6 @@ const ProductCard = ({ product }: { product: Product }) => {
 
   const handleAddToCart = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!member) {
-      alert('Silakan masuk ke akun member Anda terlebih dahulu untuk dapat berbelanja.');
       setIsMemberModalOpen(true);
       return;
     }
@@ -102,6 +101,11 @@ const ProductCard = ({ product }: { product: Product }) => {
     }, 800);
   };
 
+  const handleCardClick = () => {
+    setSelectedProductForModal(product);
+    setIsProductModalOpen(true);
+  };
+
   return (
     <div className={`group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl hover:border-brand-blue/20 transition-all duration-300 flex flex-col h-full relative ${isOutOfStock ? 'opacity-60 grayscale-[10%]' : ''}`}>
       
@@ -114,7 +118,10 @@ const ProductCard = ({ product }: { product: Product }) => {
       )}
 
       {/* Image Container */}
-      <div className="relative aspect-square overflow-hidden bg-slate-50 flex items-center justify-center">
+      <div 
+        className="relative aspect-square overflow-hidden bg-slate-50 flex items-center justify-center cursor-pointer"
+        onClick={handleCardClick}
+      >
         {product.image_url ? (
           <img 
             src={product.image_url} 
@@ -152,7 +159,10 @@ const ProductCard = ({ product }: { product: Product }) => {
 
       {/* Content Container */}
       <div className="p-3 sm:p-4 flex flex-col flex-grow">
-        <h3 className="font-semibold text-slate-800 leading-snug mb-1 line-clamp-2 group-hover:text-brand-blue transition-colors mt-1 text-xs sm:text-sm">
+        <h3 
+          className="font-semibold text-slate-800 leading-snug mb-1 line-clamp-2 group-hover:text-brand-blue transition-colors mt-1 text-xs sm:text-sm cursor-pointer"
+          onClick={handleCardClick}
+        >
           {product.name}
         </h3>
         
@@ -269,15 +279,22 @@ const ProductGrid = () => {
 
   // Local/real-time filter based on category and search query
   const filteredProducts = products.filter((product: any) => {
-    const matchesCategory = 
-      selectedCategory === 'all' || 
-      (product.ecommerce_category && product.ecommerce_category.toLowerCase() === selectedCategory.toLowerCase()) ||
-      (!product.ecommerce_category && (
-        product.category_id === selectedCategory || 
-        (product.category && product.category.id === selectedCategory) ||
-        (product.category && product.category.name.toLowerCase() === selectedCategory.toLowerCase()) ||
-        (product.category && product.category.name.toLowerCase().includes(selectedCategory.toLowerCase()))
-      ));
+    let matchesCategory = false;
+    
+    if (selectedCategory === 'all') {
+      matchesCategory = true;
+    } else if (selectedCategory === 'promo') {
+      matchesCategory = product.is_promo === true || product.is_promo === 1;
+    } else {
+      matchesCategory = 
+        (product.ecommerce_category && product.ecommerce_category.toLowerCase() === selectedCategory.toLowerCase()) ||
+        (!product.ecommerce_category && (
+          product.category_id === selectedCategory || 
+          (product.category && product.category.id === selectedCategory) ||
+          (product.category && product.category.name.toLowerCase() === selectedCategory.toLowerCase()) ||
+          (product.category && product.category.name.toLowerCase().includes(selectedCategory.toLowerCase()))
+        ));
+    }
       
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;

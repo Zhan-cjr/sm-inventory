@@ -1,5 +1,8 @@
-import HeroSection from '../components/HeroSection';
+
+import PromoCarousel from '../components/PromoCarousel';
+import CategoryIcons from '../components/CategoryIcons';
 import ProductGrid from '../components/ProductGrid';
+import MemberWidget from '../components/MemberWidget';
 import { Truck, Clock, CreditCard, RotateCcw } from 'lucide-react';
 import { useEcom } from '../context/EcomContext';
 
@@ -8,10 +11,12 @@ const Home = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
-      <HeroSection />
+      <MemberWidget />
+      <PromoCarousel />
+      <CategoryIcons />
       
       {/* Value Propositions / Features */}
-      <div className="bg-white border-y border-slate-100 py-6 sm:py-10">
+      <div className="bg-white border-y border-slate-100 py-6 sm:py-10 mt-2">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8">
             <div className="flex items-center gap-3 sm:gap-4">

@@ -46,6 +46,19 @@ class ProductForm
                     ->preload(),
                 TextInput::make('sub_category')
                     ->label('Sub Kategori'),
+                Select::make('product_type')
+                    ->label('Tipe Produk')
+                    ->options([
+                        'physical' => 'Fisik (Barang)',
+                        'digital' => 'Digital (PPOB/Pulsa)',
+                    ])
+                    ->default('physical')
+                    ->required()
+                    ->live(),
+                TextInput::make('ppob_sku')
+                    ->label('Kode SKU Digiflazz (PPOB SKU)')
+                    ->visible(fn ($get) => $get('product_type') === 'digital')
+                    ->helperText('Contoh: xld10 (Lihat daftar harga di Digiflazz)'),
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')
                     ->searchable()

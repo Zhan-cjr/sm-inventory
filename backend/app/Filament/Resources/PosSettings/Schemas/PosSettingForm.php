@@ -67,8 +67,19 @@ class PosSettingForm
                                                     ->label('Label Tombol')
                                                     ->required(),
                                                 TextInput::make('shortcut_key')
-                                                    ->label('Shortcut (e.g. F10, Esc)')
-                                                    ->required(),
+                                                    ->label('Shortcut (Klik & Tekan)')
+                                                    ->extraInputAttributes([
+                                                        'x-on:keydown.prevent' => "
+                                                            let k = \$event.key;
+                                                            if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab', 'ContextMenu'].includes(k)) return;
+                                                            \$el.value = k === ' ' ? 'Space' : k === 'Backspace' ? '' : k;
+                                                            \$el.dispatchEvent(new Event('input', { bubbles: true }));
+                                                            \$el.blur();
+                                                        ",
+                                                        'readonly' => true,
+                                                        'style' => 'cursor: pointer; caret-color: transparent;',
+                                                        'title' => 'Klik pada kotak ini lalu tekan tombol pada keyboard. Tekan Backspace untuk menghapus.'
+                                                    ]),
                                                 Toggle::make('is_active')
                                                     ->label('Aktif')
                                                     ->default(true),
@@ -278,6 +289,47 @@ class PosSettingForm
                                                     ])->visible(fn ($get) => in_array($i, [1, 2]) || ($get('receipt_footer_layout') >= $i));
                                                 }, range(1, 6))
                                             ),
+                                    ])
+                            ]),
+
+                        Tabs\Tab::make('Pengaturan Timbangan')
+                            ->icon('heroicon-o-scale')
+                            ->schema([
+                                Section::make('Barcode Timbangan Digital')
+                                    ->description('Konfigurasi untuk membaca barcode yang dihasilkan oleh timbangan digital (misal format 20XXXXXWWWWWC).')
+                                    ->schema([
+                                        Toggle::make('scale_barcode_enabled')
+                                            ->label('Aktifkan Barcode Timbangan')
+                                            ->helperText('Otomatis mendeteksi dan mengekstrak kuantitas (berat) dari barcode timbangan saat di-scan di kasir.')
+                                            ->default(false)
+                                            ->reactive(),
+                                        Grid::make(2)->schema([
+                                            TextInput::make('scale_barcode_prefix')
+                                                ->label('Prefix Barcode')
+                                                ->helperText('Angka awalan dari barcode timbangan (contoh: 20)')
+                                                ->default('20')
+                                                ->required()
+                                                ->visible(fn ($get) => $get('scale_barcode_enabled')),
+                                            TextInput::make('scale_barcode_item_code_length')
+                                                ->label('Panjang Kode Barang (SKU)')
+                                                ->numeric()
+                                                ->default(5)
+                                                ->required()
+                                                ->visible(fn ($get) => $get('scale_barcode_enabled')),
+                                            TextInput::make('scale_barcode_weight_length')
+                                                ->label('Panjang Angka Berat/Qty')
+                                                ->numeric()
+                                                ->default(5)
+                                                ->required()
+                                                ->visible(fn ($get) => $get('scale_barcode_enabled')),
+                                            TextInput::make('scale_barcode_weight_decimal_places')
+                                                ->label('Jumlah Angka Desimal Berat')
+                                                ->helperText('Berapa digit terakhir yang dianggap sebagai desimal (contoh: 3 berarti 00125 = 0.125)')
+                                                ->numeric()
+                                                ->default(3)
+                                                ->required()
+                                                ->visible(fn ($get) => $get('scale_barcode_enabled')),
+                                        ])
                                     ])
                             ])
                     ])

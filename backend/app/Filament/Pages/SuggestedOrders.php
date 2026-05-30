@@ -83,6 +83,8 @@ class SuggestedOrders extends Page implements HasTable
                     ->action(function ($record) {
                         $suggestion = app(SuggestedOrderService::class)->calculateForStock($record);
                         
+                        $costPrice = $record->product->cost_price_tax > 0 ? $record->product->cost_price_tax : $record->product->cost_price;
+                        
                         $po = \App\Models\PurchaseOrder::create([
                             'organization_id' => $record->product->organization_id,
                             'branch_id' => $record->branch_id,
@@ -90,7 +92,7 @@ class SuggestedOrders extends Page implements HasTable
                             'po_number' => 'PO-' . date('YmdHis'),
                             'po_date' => now(),
                             'status' => 'DRAFT',
-                            'total_amount' => $suggestion['suggested_qty'] * $record->product->cost_price,
+                            'total_amount' => $suggestion['suggested_qty'] * $costPrice,
                             'created_by' => auth()->id(),
                         ]);
 
@@ -98,8 +100,8 @@ class SuggestedOrders extends Page implements HasTable
                             'purchase_order_id' => $po->id,
                             'product_id' => $record->product_id,
                             'quantity_ordered' => $suggestion['suggested_qty'],
-                            'unit_cost' => $record->product->cost_price,
-                            'subtotal' => $suggestion['suggested_qty'] * $record->product->cost_price,
+                            'unit_cost' => $costPrice,
+                            'subtotal' => $suggestion['suggested_qty'] * $costPrice,
                         ]);
 
                         \Filament\Notifications\Notification::make()
@@ -136,12 +138,13 @@ class SuggestedOrders extends Page implements HasTable
                             $suggestion = app(SuggestedOrderService::class)->calculateForStock($record);
                             if ($suggestion['suggested_qty'] <= 0) continue;
 
-                            $subtotal = $suggestion['suggested_qty'] * $record->product->cost_price;
+                            $costPrice = $record->product->cost_price_tax > 0 ? $record->product->cost_price_tax : $record->product->cost_price;
+                            $subtotal = $suggestion['suggested_qty'] * $costPrice;
                             \App\Models\PurchaseOrderItem::create([
                                 'purchase_order_id' => $po->id,
                                 'product_id' => $record->product_id,
                                 'quantity_ordered' => $suggestion['suggested_qty'],
-                                'unit_cost' => $record->product->cost_price,
+                                'unit_cost' => $costPrice,
                                 'subtotal' => $subtotal,
                             ]);
                             $totalAmount += $subtotal;

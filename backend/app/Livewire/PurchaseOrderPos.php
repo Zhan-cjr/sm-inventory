@@ -18,8 +18,9 @@ class PurchaseOrderPos extends Component
     public $branch_id;
     public $notes;
     public $supplier_id;
-    public $include_tax = true;
+    public $include_tax = false;
     public $tax_amount = 0;
+    public $cetak_nota = false;
 
     public $visibleColumns = ['barcode', 'name', 'stock', 'min_qty', 'max_qty', 'qty', 'unit_cost', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
 
@@ -150,10 +151,20 @@ class PurchaseOrderPos extends Component
             // Dispatch event to focus the row's Qty input
             $this->dispatch('item-added', index: $existingIndex);
         } else {
-            // Get stock
-            $stock = \App\Models\Stock::where('product_id', $product->id)
-                ->where('branch_id', $this->branch_id)
-                ->value('quantity_on_hand') ?? 0;
+            $finalCost = $product->cost_price_tax > 0 ? $product->cost_price_tax : ($product->cost_price ?? 0);
+            
+            $stock = null;
+            if ($this->branch_id) {
+                $stock = \App\Models\Stock::where('product_id', $product->id)
+                    ->where('branch_id', $this->branch_id)
+                    ->first();
+                
+                if ($stock && $stock->cost_price_tax > 0) {
+                    $finalCost = $stock->cost_price_tax;
+                } elseif ($stock && $stock->cost_price > 0) {
+                    $finalCost = $stock->cost_price;
+                }
+            }
 
             $this->cart[] = [
                 'product_id' => $product->id,
@@ -163,15 +174,15 @@ class PurchaseOrderPos extends Component
                 'max_order' => 0,
                 'avg_bln' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(30)))->sum('quantity'),
                 'avg_minggu' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(7)))->sum('quantity'),
-                'stock' => $stock,
-                'min_qty' => \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->value('min_qty') ?? 0,
-                'max_qty' => \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->value('max_qty') ?? 0,
+                'stock' => $stock ? $stock->quantity_on_hand : 0,
+                'min_qty' => $stock ? $stock->min_qty : 0,
+                'max_qty' => $stock ? $stock->max_qty : 0,
                 'qty' => 1,
-                'unit_cost' => $product->cost_price,
+                'unit_cost' => $finalCost,
                 'discount_1' => 0,
                 'discount_2' => 0,
                 'discount_3' => 0,
-                'subtotal' => $product->cost_price
+                'subtotal' => $finalCost
             ];
         }
 
@@ -288,10 +299,19 @@ class PurchaseOrderPos extends Component
             $this->cart[$existingIndex]['qty'] = $qty;
             $this->recalculateRow($existingIndex);
         } else {
-            if (!$stockRec) {
+            if (!$stockRec && $this->branch_id) {
                 $stockRec = \App\Models\Stock::where('product_id', $product->id)
                     ->where('branch_id', $this->branch_id)
                     ->first();
+            }
+
+            $finalCost = $product->cost_price_tax > 0 ? $product->cost_price_tax : ($product->cost_price ?? 0);
+            if ($stockRec) {
+                if ($stockRec->cost_price_tax > 0) {
+                    $finalCost = $stockRec->cost_price_tax;
+                } elseif ($stockRec->cost_price > 0) {
+                    $finalCost = $stockRec->cost_price;
+                }
             }
 
             $this->cart[] = [
@@ -306,11 +326,11 @@ class PurchaseOrderPos extends Component
                 'min_qty' => $stockRec->min_qty ?? 0,
                 'max_qty' => $stockRec->max_qty ?? 0,
                 'qty' => $qty,
-                'unit_cost' => $product->cost_price,
+                'unit_cost' => $finalCost,
                 'discount_1' => 0,
                 'discount_2' => 0,
                 'discount_3' => 0,
-                'subtotal' => $product->cost_price * $qty
+                'subtotal' => $finalCost * $qty
             ];
             
             $this->recalculateRow(count($this->cart) - 1);
@@ -335,13 +355,8 @@ class PurchaseOrderPos extends Component
 
         $netTotal = $this->subtotal - $discountAmount;
 
-        if ($this->include_tax) {
-            $this->tax_amount = round($netTotal * 0.11, 2);
-        } else {
-            $this->tax_amount = 0;
-        }
-
-        $this->grandTotal = $netTotal + $this->tax_amount;
+        $this->tax_amount = 0;
+        $this->grandTotal = $netTotal;
     }
 
     public function save()
@@ -358,17 +373,46 @@ class PurchaseOrderPos extends Component
             return;
         }
 
+        $organization = \App\Models\Organization::find(auth()->user()->organization_id ?? \App\Models\Organization::first()->id);
+
+        $needsApproval = false;
+        $approvalReason = [];
+
+        if ($organization) {
+            if ($organization->po_approval_limit !== null && $this->grandTotal > $organization->po_approval_limit) {
+                $needsApproval = true;
+                $approvalReason[] = 'Nominal PO melebihi batas persetujuan: Rp ' . number_format($organization->po_approval_limit, 0, ',', '.');
+            }
+
+            if ($organization->po_approval_max_qty_enabled) {
+                foreach ($this->cart as $item) {
+                    $maxQty = $item['max_qty'];
+                    $stock = $item['stock'];
+                    $saran = $maxQty - $stock;
+                    if ($saran < 0) $saran = 0;
+
+                    if ($item['qty'] > $saran) {
+                        $needsApproval = true;
+                        $approvalReason[] = "Kuantitas {$item['name']} melebihi saran order ($saran).";
+                        break;
+                    }
+                }
+            }
+        }
+
+        $status = $needsApproval ? 'PENDING_APPROVAL' : 'APPROVED';
+        
         $data = [
-            'organization_id' => auth()->user()->organization_id ?? \App\Models\Organization::first()->id,
+            'organization_id' => $organization->id,
             'branch_id' => empty($this->branch_id) ? null : $this->branch_id,
             'supplier_id' => $this->supplier_id,
             'po_number' => $this->po_number,
             'po_date' => $this->po_date,
             'faktur' => $this->faktur,
-            'status' => 'DRAFT',
+            'status' => $status,
             'total_amount' => $this->grandTotal,
-            'include_tax' => $this->include_tax,
-            'tax_amount' => $this->tax_amount,
+            'include_tax' => false,
+            'tax_amount' => 0,
             'notes' => $this->notes,
             'created_by' => auth()->user()->name,
         ];
@@ -394,8 +438,20 @@ class PurchaseOrderPos extends Component
             ]);
         }
 
-        Notification::make()->title('Pesanan Pembelian berhasil disimpan.')->success()->send();
+        if ($needsApproval) {
+            $po->requestApproval('Otomatis: ' . implode(', ', $approvalReason));
+            Notification::make()->title('PO memerlukan persetujuan Manajer.')->warning()->send();
+        } else {
+            Notification::make()->title('Pesanan Pembelian berhasil disimpan.')->success()->send();
+        }
         
+        if ($this->cetak_nota && !$needsApproval) {
+            $printUrl = route('print.document', ['type' => 'po', 'ids' => [$po->id]]);
+            $indexUrl = route('filament.admin.resources.purchase-orders.index');
+            $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+            return;
+        }
+
         return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
     }
 

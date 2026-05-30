@@ -18,6 +18,7 @@ class StockTransferPos extends Component
     public $to_branch_id;
     public $notes;
     public $status;
+    public $cetak_nota = false;
 
     public $visibleColumns = ['barcode', 'name', 'stock_available', 'qty_transfer', 'unit_price', 'subtotal', 'notes'];
 
@@ -254,7 +255,8 @@ class StockTransferPos extends Component
             return;
         }
 
-        DB::transaction(function () {
+        $st = null;
+        DB::transaction(function () use (&$st) {
             $data = [
                 'reference_number' => $this->reference_number,
                 'from_branch_id' => $this->from_branch_id,
@@ -289,6 +291,13 @@ class StockTransferPos extends Component
         });
 
         Notification::make()->title('Mutasi Stok berhasil disimpan.')->success()->send();
+        
+        if ($this->cetak_nota && $st) {
+            $printUrl = route('print.document', ['type' => 'transfer', 'ids' => [$st->id]]);
+            $indexUrl = route('filament.admin.resources.stock-transfers.index');
+            $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+            return;
+        }
         
         return redirect()->to(route('filament.admin.resources.stock-transfers.index'));
     }

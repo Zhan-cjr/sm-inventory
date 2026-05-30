@@ -6,6 +6,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Checkbox;
 use Filament\Schemas\Schema;
 
 class StockTransferForm
@@ -45,6 +46,10 @@ class StockTransferForm
                     ->default(now()),
                 Textarea::make('notes')
                     ->columnSpanFull(),
+                Checkbox::make('cetak_nota')
+                    ->label('Cetak Nota setelah simpan')
+                    ->dehydrated(false)
+                    ->default(false),
             ]);
     }
 }

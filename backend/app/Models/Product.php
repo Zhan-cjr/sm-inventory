@@ -4,10 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Product extends Model
 {
-    use HasUuids;
+    use HasUuids, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     protected static function booted()
     {
@@ -32,7 +42,8 @@ class Product extends Model
         'margin_gol_3', 'harga_jual_3', 'qty_min_gol_3',
         'unit_of_measure', 'reorder_point', 
         'reorder_qty', 'lead_time_days', 'is_active', 'is_taxable', 'metadata', 
-        'is_ecommerce_active', 'ecommerce_category', 'image_path'
+        'is_ecommerce_active', 'ecommerce_category', 'image_path',
+        'product_type', 'ppob_sku'
     ];
 
     protected $casts = [

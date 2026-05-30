@@ -21,6 +21,14 @@
             <p style="font-size: 0.875rem; color: #6b7280;" class="dark:text-gray-400">Silakan pilih salah satu cabang pada filter tabel Produk terlebih dahulu untuk dapat melihat Kartu Stok.</p>
         </div>
     @else
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+            <a href="{{ route('print.stock-card', ['productId' => $productId, 'branchId' => $branchId ?? (\Illuminate\Support\Facades\Auth::user()->branch_id ?? \App\Models\Branch::first()->id)]) }}" 
+               target="_blank" 
+               style="background-color: #2563eb; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Cetak Kartu Stok
+            </a>
+        </div>
         <div class="overflow-x-auto">
             <table class="stock-table">
                 <thead>
@@ -43,15 +51,15 @@
                                 <div style="font-weight: bold;">{{ $log->log_type }}</div>
                                 <div style="font-size: 10px; color: #6b7280;">{{ $log->reason_code }} - {{ $log->notes }}</div>
                             </td>
-                            <td class="text-right">{{ $log->quantity_before }}</td>
+                            <td class="text-right">{{ (float) $log->quantity_before }}</td>
                             <td class="text-right" style="color: #059669; font-weight: bold;">
-                                {{ $log->quantity_change > 0 ? $log->quantity_change : '' }}
+                                {{ $log->quantity_change > 0 ? (float) $log->quantity_change : '' }}
                             </td>
                             <td class="text-right" style="color: #dc2626; font-weight: bold;">
-                                {{ $log->quantity_change < 0 ? abs($log->quantity_change) : '' }}
+                                {{ $log->quantity_change < 0 ? abs((float) $log->quantity_change) : '' }}
                             </td>
                             <td class="text-right qty-box {{ $log->quantity_after < 0 ? 'qty-minus' : '' }}">
-                                {{ $log->quantity_after }}
+                                {{ (float) $log->quantity_after }}
                             </td>
                         </tr>
                     @empty

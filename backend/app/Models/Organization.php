@@ -10,16 +10,21 @@ class Organization extends Model
     use HasUuids;
 
     protected $fillable = [
-        'name', 'code', 'timezone', 'currency_code', 'logo_path', 'address', 'phone', 'email', 
-        'point_conversion_rate', 'ecommerce_banner_title', 'ecommerce_banner_subtitle', 
-        'ecommerce_banner_image', 'ecommerce_banner_cta_text', 'ecommerce_announcement', 'ecommerce_categories',
+        'name', 'code', 'timezone', 'currency_code', 'tax_rate', 'logo_path', 'address', 'phone', 'email', 
+        'point_conversion_rate', 'point_redemption_value', 'minimum_points_to_redeem', 'ecommerce_banner_title', 'ecommerce_banner_subtitle', 
+        'ecommerce_banner_image', 'ecommerce_banner_images', 'ecommerce_banner_cta_text', 'ecommerce_announcement', 'ecommerce_categories',
         'wa_gateway_type', 'wa_gateway_token', 'wa_gateway_domain', 'wa_gateway_sender',
-        'allow_minus_stock'
+        'allow_minus_stock', 'po_approval_limit', 'po_approval_max_qty_enabled', 'stock_adjustment_approval_amount_limit',
+        'scale_barcode_enabled', 'scale_barcode_prefix', 'scale_barcode_item_code_length', 'scale_barcode_weight_length', 'scale_barcode_weight_decimal_places'
     ];
 
     protected $casts = [
         'ecommerce_categories' => 'array',
         'allow_minus_stock' => 'boolean',
+        'scale_barcode_enabled' => 'boolean',
+        'ecommerce_banner_images' => 'array',
+        'po_approval_max_qty_enabled' => 'boolean',
+        'tax_rate' => 'decimal:2',
     ];
 
     protected static function booted()
@@ -37,6 +42,7 @@ class Organization extends Model
                 ['key_name' => 'btn_close_shift', 'display_name' => 'Tutup Shift', 'shortcut_key' => 'F8'],
                 ['key_name' => 'btn_reprint_last', 'display_name' => 'Reprint Terakhir', 'shortcut_key' => 'F11'],
                 ['key_name' => 'btn_reprint_old', 'display_name' => 'Reprint Lama', 'shortcut_key' => 'F12'],
+                ['key_name' => 'btn_ppob_menu', 'display_name' => 'Menu PPOB', 'shortcut_key' => 'F10'],
                 ['key_name' => 'btn_member', 'display_name' => 'Member', 'shortcut_key' => 'Home'],
                 ['key_name' => 'btn_retur', 'display_name' => 'Retur', 'shortcut_key' => 'End'],
                 ['key_name' => 'btn_hold', 'display_name' => 'Hold', 'shortcut_key' => 'PageUp'],
@@ -44,6 +50,10 @@ class Organization extends Model
                 ['key_name' => 'btn_clear', 'display_name' => 'Clear', 'shortcut_key' => 'Insert'],
                 ['key_name' => 'btn_void_item', 'display_name' => 'Void Item', 'shortcut_key' => 'Delete'],
                 ['key_name' => 'btn_void_all', 'display_name' => 'Void All', 'shortcut_key' => 'Escape'],
+                ['key_name' => 'btn_voucher', 'display_name' => 'Voucher', 'shortcut_key' => ''],
+                ['key_name' => 'btn_multi_pay', 'display_name' => 'Multi-Pay', 'shortcut_key' => ''],
+                ['key_name' => 'btn_open_price', 'display_name' => 'Open Price', 'shortcut_key' => ''],
+                ['key_name' => 'btn_kas', 'display_name' => 'Kas M/K', 'shortcut_key' => ''],
             ];
 
             foreach ($settings as $setting) {

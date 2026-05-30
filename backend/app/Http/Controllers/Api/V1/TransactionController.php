@@ -25,6 +25,24 @@ class TransactionController extends Controller
         ];
     }
 
+    private function extractCustomerName($data) {
+        $customerName = $data['customer_name'] ?? null;
+        $sn = $data['sn'] ?? null;
+        if (!$customerName && $sn) {
+            $parts = explode('/', $sn);
+            if (count($parts) > 1) {
+                foreach($parts as $part) {
+                    $part = trim($part);
+                    if (preg_match('/[A-Za-z]{3,}/', $part) && !preg_match('/^(R\d|B\d|S\d)/i', $part)) {
+                        $customerName = str_ireplace('SN:', '', $part);
+                        return trim($customerName);
+                    }
+                }
+            }
+        }
+        return $customerName;
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -38,6 +56,7 @@ class TransactionController extends Controller
             'items.*.quantity' => 'required|numeric|not_in:0',
             'items.*.unit_price' => 'required|numeric',
             'items.*.discount_per_item' => 'nullable|numeric',
+            'items.*.customer_no' => 'nullable|string',
         ]);
 
         $user = $this->getUser();
@@ -84,6 +103,19 @@ class TransactionController extends Controller
                                 'transaction_id' => $transaction->id,
                             ]);
                         }
+                        
+                        // Handle Point Redemption
+                        if ($payment['method'] === 'POINT' && isset($payment['points_deducted'])) {
+                            $customer = \App\Models\Customer::find($transaction->customer_id);
+                            if ($customer) {
+                                $customer->deductPoints(
+                                    $payment['points_deducted'], 
+                                    'REDEMPTION', 
+                                    $transaction->id, 
+                                    "Penukaran Poin di Kasir: #{$transaction->receipt_number}"
+                                );
+                            }
+                        }
                     }
                 }
 
@@ -108,6 +140,36 @@ class TransactionController extends Controller
                         'discount_per_item' => $item['discount_per_item'] ?? 0,
                     ]);
 
+                    $product = \App\Models\Product::find($item['product_id']);
+                    if ($product && $product->product_type === 'digital' && !empty($product->ppob_sku)) {
+                        $customerNo = $item['customer_no'] ?? null;
+                        if ($customerNo) {
+                            $refId = $transaction->receipt_number . '-' . strtoupper(substr(uniqid(), -4));
+                            $digiflazzService = new \App\Services\DigiflazzService();
+                            $res = $digiflazzService->topup($product->ppob_sku, $customerNo, $refId);
+
+                            $status = 'Pending';
+                            if (isset($res['data']['status'])) {
+                                $status = $res['data']['status'];
+                            }
+                            
+                            $customerName = isset($res['data']) ? $this->extractCustomerName($res['data']) : null;
+                            
+                            \App\Models\PpobTransaction::create([
+                                'transaction_id' => $transaction->id,
+                                'ref_id' => $refId,
+                                'customer_no' => $customerNo,
+                                'customer_name' => $customerName,
+                                'buyer_sku_code' => $product->ppob_sku,
+                                'price' => $res['data']['price'] ?? 0,
+                                'status' => $status,
+                                'rc' => $res['data']['rc'] ?? null,
+                                'sn' => $res['data']['sn'] ?? null,
+                                'message' => $res['data']['message'] ?? null,
+                                'raw_response' => json_encode($res)
+                            ]);
+                        }
+                    }
                 }
 
                 Cache::tags(['inventory', "branch:{$user->branch_id}"])->flush();
@@ -134,6 +196,47 @@ class TransactionController extends Controller
         }
     }
 
+    private function refreshPendingPpobTransactions($transaction)
+    {
+        if (!$transaction || !$transaction->ppobTransactions) return;
+
+        $hasPending = false;
+        $digiflazz = null;
+
+        foreach ($transaction->ppobTransactions as $ppob) {
+            if ($ppob->status === 'Pending') {
+                if (!$digiflazz) $digiflazz = new \App\Services\DigiflazzService();
+                $hasPending = true;
+
+                $res = $digiflazz->topup($ppob->buyer_sku_code, $ppob->customer_no, $ppob->ref_id);
+
+                if (isset($res['data'])) {
+                    $newStatus = $res['data']['status'] ?? 'Pending';
+                    if ($newStatus !== 'Pending') {
+                        $updateData = [
+                            'status' => $newStatus,
+                            'sn' => $res['data']['sn'] ?? $ppob->sn,
+                            'rc' => $res['data']['rc'] ?? $ppob->rc,
+                            'message' => $res['data']['message'] ?? $ppob->message,
+                            'raw_response' => json_encode($res),
+                        ];
+                        
+                        $customerName = $this->extractCustomerName($res['data']);
+                        if ($customerName) {
+                            $updateData['customer_name'] = $customerName;
+                        }
+                        
+                        $ppob->update($updateData);
+                    }
+                }
+            }
+        }
+
+        if ($hasPending) {
+            $transaction->load('ppobTransactions');
+        }
+    }
+
     public function getLatestTransaction(Request $request)
     {
         $user = $request->user();
@@ -141,10 +244,10 @@ class TransactionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $terminalId = $request->header('X-Terminal-ID'); // If provided from frontend
+        $terminalId = $request->header('X-Terminal-ID');
         
         $query = Transaction::where('branch_id', $user->branch_id)
-            ->with(['items.product']);
+            ->with(['items.product', 'ppobTransactions']);
             
         if ($terminalId) {
             $query->where('terminal_id', $terminalId);
@@ -156,6 +259,8 @@ class TransactionController extends Controller
             return response()->json(['message' => 'Belum ada transaksi di kassa ini.'], 404);
         }
 
+        $this->refreshPendingPpobTransactions($transaction);
+
         return response()->json($transaction);
     }
 
@@ -164,13 +269,79 @@ class TransactionController extends Controller
         $transaction = Transaction::where('id', $receipt)
             ->orWhere('receipt_number', $receipt)
             ->orWhere('local_transaction_id', $receipt)
-            ->with(['items.product'])
+            ->with(['items.product', 'ppobTransactions'])
             ->first();
 
         if (!$transaction) {
             return response()->json(['message' => 'Transaksi tidak ditemukan.'], 404);
         }
 
+        $this->refreshPendingPpobTransactions($transaction);
+
         return response()->json($transaction);
+    }
+
+    public function getTodayPpobTransactions(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $branchId = $user->branch_id;
+        $today = \Carbon\Carbon::today();
+
+        $transactions = Transaction::where('branch_id', $branchId)
+            ->whereDate('created_at', $today)
+            ->whereHas('ppobTransactions')
+            ->with(['ppobTransactions', 'items.product', 'cashier'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($transactions);
+    }
+
+    public function checkPpobStatus(Request $request, $ppobTransactionId)
+    {
+        $ppob = \App\Models\PpobTransaction::with('transaction.items.product')->find($ppobTransactionId);
+
+        if (!$ppob) {
+            return response()->json(['message' => 'PPOB Transaction not found'], 404);
+        }
+
+        if ($ppob->status !== 'Pending') {
+            return response()->json([
+                'message' => 'Status is already updated',
+                'data' => $ppob
+            ]);
+        }
+
+        $digiflazz = new \App\Services\DigiflazzService();
+        $res = $digiflazz->topup($ppob->buyer_sku_code, $ppob->customer_no, $ppob->ref_id);
+
+        if (isset($res['data'])) {
+            $newStatus = $res['data']['status'] ?? 'Pending';
+            if ($newStatus !== 'Pending') {
+                $updateData = [
+                    'status' => $newStatus,
+                    'sn' => $res['data']['sn'] ?? $ppob->sn,
+                    'rc' => $res['data']['rc'] ?? $ppob->rc,
+                    'message' => $res['data']['message'] ?? $ppob->message,
+                    'raw_response' => json_encode($res),
+                ];
+                
+                $customerName = $this->extractCustomerName($res['data']);
+                if ($customerName) {
+                    $updateData['customer_name'] = $customerName;
+                }
+                
+                $ppob->update($updateData);
+            }
+        }
+
+        return response()->json([
+            'message' => 'Status checked successfully',
+            'data' => $ppob->fresh()
+        ]);
     }
 }

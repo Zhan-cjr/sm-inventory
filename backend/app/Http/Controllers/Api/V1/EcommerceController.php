@@ -67,9 +67,9 @@ class EcommerceController extends Controller
             'ecommerce_categories' => $organization?->ecommerce_categories ?? [],
             'ecommerce_banner_title' => $organization?->ecommerce_banner_title ?? 'Belanja Untung, Murah, Manfaat',
             'ecommerce_banner_subtitle' => $organization?->ecommerce_banner_subtitle ?? 'Dan InsyaAllah Berkah. Temukan berbagai kebutuhan keluarga muslim dengan harga terbaik dari cabang Toserba Selamat terdekat Anda.',
-            'ecommerce_banner_image_url' => $organization && $organization->ecommerce_banner_image 
-                ? asset('storage/' . $organization->ecommerce_banner_image) 
-                : null,
+            'ecommerce_banner_images_urls' => $organization && is_array($organization->ecommerce_banner_images) 
+                ? array_map(fn($path) => asset('storage/' . $path), $organization->ecommerce_banner_images) 
+                : [],
             'ecommerce_banner_cta_text' => $organization?->ecommerce_banner_cta_text ?? 'Mulai Belanja',
             'ecommerce_announcement' => $organization?->ecommerce_announcement ?? 'Selamat datang di toko online resmi kami! Nikmati promo menarik dan poin di setiap transaksi.',
             'point_redemption_value' => (float)($organization?->point_redemption_value ?? 1.00),

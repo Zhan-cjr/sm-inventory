@@ -342,7 +342,7 @@ class ArsipTransaksiResource extends Resource
                             ->success()
                             ->send();
                     })
-                    ->visible(fn (Transaction $record) => !$record->is_voided && Auth::user()->can('Batalkan:Transaction')),
+                    ->visible(fn (Transaction $record) => !$record->is_voided && Auth::user()->hasCustomAuthorization('CANCEL_TRANSACTION')),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
@@ -375,7 +375,7 @@ class ArsipTransaksiResource extends Resource
                                 ->send();
                         })
                         ->deselectRecordsAfterCompletion()
-                        ->visible(fn () => Auth::user()->can('Batalkan:Transaction')),
+                        ->visible(fn () => Auth::user()->hasCustomAuthorization('CANCEL_TRANSACTION')),
                 ]),
             ])
             ->headerActions([

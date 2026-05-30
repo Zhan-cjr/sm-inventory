@@ -69,9 +69,9 @@ return [
     |
     */
 
-    'super_admin' => [
+    'superadmin' => [
         'enabled' => true,
-        'name' => 'super_admin',
+        'name' => 'superadmin',
         'define_via_gate' => false,
         'intercept_gate' => 'before',
     ],
@@ -242,8 +242,7 @@ return [
     */
 
     'custom_permissions' => [
-        'Batalkan:Transaction',
-        'update_selling_price_goods_receipt',
+        'access_pos',
     ],
 
     /*

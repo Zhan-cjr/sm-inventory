@@ -7,6 +7,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Checkbox;
 use Filament\Schemas\Schema;
 
 class GoodsReceiptForm
@@ -16,7 +17,13 @@ class GoodsReceiptForm
         return $schema
             ->components([
                 Select::make('purchase_order_id')
-                    ->relationship('purchaseOrder', 'id'),
+                    ->relationship(
+                        name: 'purchaseOrder', 
+                        titleAttribute: 'po_number', 
+                        modifyQueryUsing: fn (\Illuminate\Database\Eloquent\Builder $query) => $query->where('status', 'approved')
+                    )
+                    ->searchable()
+                    ->preload(),
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')
                     ->required()
@@ -53,6 +60,10 @@ class GoodsReceiptForm
                     ->default('RECEIVED'),
                 Textarea::make('notes')
                     ->columnSpanFull(),
+                Checkbox::make('cetak_nota')
+                    ->label('Cetak Nota setelah simpan')
+                    ->dehydrated(false)
+                    ->default(false),
             ]);
     }
 }

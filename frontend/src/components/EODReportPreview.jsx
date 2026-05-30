@@ -9,7 +9,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
   };
 
   const handlePrintRawText = () => {
-    const columns = 32;
+    const columns = 35;
     const divider = '-'.repeat(columns);
     const center = (str, len) => {
       str = String(str);
@@ -113,7 +113,8 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
     // Feed paper
     lines.push('\n\n\n\n\n');
 
-    const rawText = lines.join('\n');
+    // Buka Cash Drawer 1 sebelum cetak
+    const rawText = '\x1B\x70\x00\x19\xFA' + lines.join('\n');
     
     const iframe = document.createElement('iframe');
     iframe.style.position = 'absolute';
@@ -124,7 +125,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
     
     const doc = iframe.contentWindow.document || iframe.contentDocument;
     doc.open();
-    doc.write('<html><head><title>EOD ESC/POS</title><style>@page { margin: 0; size: auto; } body { margin: 0; padding: 0; font-family: "Courier New", Courier, monospace; font-size: 10px; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>');
+    doc.write('<html><head><title>EOD ESC/POS</title><style>@page { margin: 0; } body { margin: 0; padding: 0 0 0 12mm; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>');
     doc.close();
     
     setTimeout(() => {
@@ -150,9 +151,9 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
             {eodData.branch?.address && (
               <p style={{ textAlign: 'center', margin: '0 0 10px 0', fontSize: '0.85em' }}>{eodData.branch.address}</p>
             )}
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
             <h2 style={{ fontSize: '1.1rem', textAlign: 'center', margin: '10px 0' }}>LAPORAN END OF DAY</h2>
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
           </div>
           
           <div className="receipt-info" style={{ marginBottom: '10px' }}>
@@ -161,7 +162,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
             <p>Shift : {eodData.shift_name}</p>
             <p>Mulai : {new Date(eodData.start_time).toLocaleString('id-ID')}</p>
             <p>Selesai: {new Date(eodData.end_time).toLocaleString('id-ID')}</p>
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
           </div>
 
           <div className="receipt-summary">
@@ -220,7 +221,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
               <span>Kas Keluar</span>
               <span>{formatCurrency(eodData.total_cash_out || 0)}</span>
             </div>
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
 
             <p style={{ textAlign: 'center', fontWeight: 'bold' }}>POTONGAN & DISKON</p>
             <div className="summary-row">
@@ -235,7 +236,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
               <span>Poin Member</span>
               <span>{formatCurrency(eodData.discount_details?.point_deduction || 0)}</span>
             </div>
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
             
             <div className="summary-row" style={{ fontWeight: 'bold' }}>
               <span>EXPECTED CASH</span>
@@ -249,7 +250,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
               <span>SELISIH</span>
               <span>{formatCurrency(eodData.difference)}</span>
             </div>
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
           </div>
 
           {eodData.cash_movements && eodData.cash_movements.length > 0 && (
@@ -263,7 +264,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
                   </div>
                 </div>
               ))}
-              <p className="divider">--------------------------------</p>
+              <p className="divider">----------------------------------------</p>
             </div>
           )}
 
@@ -281,7 +282,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
             ) : (
               <p style={{ textAlign: 'center', margin: 0 }}>Tidak ada retur</p>
             )}
-            <p className="divider">--------------------------------</p>
+            <p className="divider">----------------------------------------</p>
           </div>
           
           <div className="receipt-footer" style={{ marginTop: '30px' }}>

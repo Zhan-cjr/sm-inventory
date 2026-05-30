@@ -16,7 +16,7 @@ use Spatie\Permission\Traits\HasRoles;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 
-#[Fillable(['name', 'email', 'password', 'organization_id', 'branch_id', 'role', 'pos_authorizations'])]
+#[Fillable(['name', 'email', 'password', 'organization_id', 'branch_id', 'role', 'pos_authorizations', 'custom_authorizations', 'telegram_chat_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
@@ -34,6 +34,7 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'pos_authorizations' => 'array',
+            'custom_authorizations' => 'array',
         ];
     }
 
@@ -51,5 +52,11 @@ class User extends Authenticatable implements FilamentUser
     {
         // Allow access to the panel, but Filament Shield will handle resource permissions
         return true;
+    }
+
+    public function hasCustomAuthorization(string $action): bool
+    {
+        $auths = $this->custom_authorizations ?? [];
+        return in_array($action, $auths);
     }
 }

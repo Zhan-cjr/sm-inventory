@@ -12,6 +12,8 @@ Route::get('/print/transaction/{transaction}', function (\App\Models\Transaction
 
 Route::get('/print/report/{type}', [\App\Http\Controllers\ReportPrintController::class, 'print'])->name('print.report')->middleware('web');
 
+Route::get('/print/document/{type}', [\App\Http\Controllers\DocumentPrintController::class, 'print'])->name('print.document')->middleware(['web', 'auth']);
+
 Route::get('/print/eod/{shift}', [\App\Http\Controllers\Api\V1\ShiftController::class, 'printEod'])->name('print.eod')->middleware('web');
 
 // ============================================================
@@ -113,3 +115,21 @@ Route::get('/admin/logout-get', function () {
     request()->session()->regenerateToken();
     return redirect('/admin/login');
 })->name('admin.logout-get')->middleware('web');
+
+Route::get('/print/stock-card/{productId}/{branchId}', function ($productId, $branchId) {
+    $product = \App\Models\Product::findOrFail($productId);
+    $branch = \App\Models\Branch::findOrFail($branchId);
+    $logs = \App\Models\InventoryLog::where('product_id', $productId)
+        ->where('branch_id', $branchId)
+        ->latest('id')
+        ->get();
+        
+    return view('print.documents.stock-card-print', compact('product', 'branch', 'logs'));
+})->name('print.stock-card')->middleware(['web', 'auth']);
+
+// Print Barcodes
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/print/barcodes/label', [\App\Http\Controllers\BarcodePrintController::class, 'printLabel'])->name('print.barcode.label');
+    Route::get('/print/barcodes/pricecard', [\App\Http\Controllers\BarcodePrintController::class, 'printPricecard'])->name('print.barcode.pricecard');
+});
+

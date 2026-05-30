@@ -260,6 +260,10 @@
             <a href="{{ route('filament.admin.resources.stock-transfers.index') }}" style="background-color: #fff; color: #374151; padding: 0.75rem 1.5rem; border-radius: 0.375rem; font-weight: 500; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
                 Batal
             </a>
+            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 ml-4 cursor-pointer">
+                <input type="checkbox" wire:model="cetak_nota" class="rounded text-blue-600">
+                Cetak Nota setelah simpan
+            </label>
         </div>
         
         <!-- Totals -->

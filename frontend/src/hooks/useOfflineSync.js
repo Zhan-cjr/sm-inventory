@@ -67,16 +67,17 @@ export const useOfflineSync = (branchId, authToken) => {
     };
 
     return new Promise((resolve, reject) => {
-      const store = db.current
-        .transaction('transactions', 'readwrite')
-        .objectStore('transactions');
+      const tx = db.current.transaction('transactions', 'readwrite');
+      const store = tx.objectStore('transactions');
       
       const req = store.add(localTx);
-      req.onsuccess = () => {
+      req.onerror = () => reject(req.error);
+      
+      tx.oncomplete = () => {
         setPendingCount(prev => prev + 1);
         resolve(localTx);
       };
-      req.onerror = () => reject(req.error);
+      tx.onerror = () => reject(tx.error);
     });
   }, [branchId]);
 
@@ -181,7 +182,8 @@ export const useOfflineSync = (branchId, authToken) => {
 
       return {
         synced: result.syncedIds.length,
-        conflicts: result.conflicts
+        conflicts: result.conflicts,
+        ppobData: result.ppobData
       };
 
     } catch (error) {

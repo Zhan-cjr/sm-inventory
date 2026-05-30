@@ -10,6 +10,20 @@ export class DiscountEngine {
 
     if (!items || items.length === 0) return { totalDiscount: 0, appliedPromos: [] };
 
+    // Apply base tier discount first
+    if (customer && customer.tierDiscountPercent && customer.tierDiscountPercent > 0) {
+      const tierDiscountValue = Math.floor(subtotal * (parseFloat(customer.tierDiscountPercent) / 100));
+      if (tierDiscountValue > 0) {
+        totalDiscount += tierDiscountValue;
+        appliedPromos.push({
+          promoId: `TIER_${customer.memberTier}`,
+          promoName: `Diskon Member ${customer.memberTier} (${customer.tierDiscountPercent}%)`,
+          discountAmount: tierDiscountValue
+        });
+        subtotal -= tierDiscountValue; // reduce subtotal for subsequent promos
+      }
+    }
+
     // Sort promos to apply most aggressive/specific ones first
     const sortedPromos = this.sortPromosByPriority(this.promos);
 

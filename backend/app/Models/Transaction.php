@@ -4,10 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Transaction extends Model
 {
-    use HasUuids;
+    use HasUuids, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     protected $fillable = [
         'organization_id', 'branch_id', 'terminal_id', 'shift_id', 'transaction_type', 
@@ -80,5 +90,10 @@ class Transaction extends Model
     public function getGrossProfitAttribute()
     {
         return $this->final_amount - $this->cogs;
+    }
+
+    public function ppobTransactions()
+    {
+        return $this->hasMany(PpobTransaction::class);
     }
 }

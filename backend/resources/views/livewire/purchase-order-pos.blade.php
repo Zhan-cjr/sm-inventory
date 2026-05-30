@@ -117,8 +117,8 @@
                                 get filteredSuppliers() {
                                     if (this.search === '') return this.suppliers;
                                     return this.suppliers.filter(s => 
-                                        s.name.toLowerCase().includes(this.search.toLowerCase()) || 
-                                        s.code.toLowerCase().includes(this.search.toLowerCase())
+                                        (s.name || '').toLowerCase().includes(this.search.toLowerCase()) || 
+                                        (s.code || '').toLowerCase().includes(this.search.toLowerCase())
                                     );
                                 },
                                 selectSupplier(id) {
@@ -249,7 +249,7 @@
                         <div style="font-weight: 700; color: #1f2937;" class="dark:text-gray-200">{{ $result->sku }}</div>
                         <div style="font-size: 0.75rem; color: #6b7280;" class="dark:text-gray-400">{{ $result->name }}</div>
                     </div>
-                    <div style="font-weight: 600; color: #3b82f6;">Rp {{ number_format($result->cost_price, 0) }}</div>
+                    <div style="font-weight: 600; color: #3b82f6;">Rp {{ number_format($result->cost_price_tax > 0 ? $result->cost_price_tax : $result->cost_price, 0) }}</div>
                 </div>
                 @endforeach
             </div>
@@ -378,17 +378,15 @@
             <a href="{{ route('filament.admin.resources.purchase-orders.index') }}" style="background-color: #fff; color: #374151; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; font-size: 0.875rem; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
                 Batal
             </a>
+            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 ml-4 cursor-pointer">
+                <input type="checkbox" wire:model="cetak_nota" class="rounded text-blue-600">
+                Cetak Nota setelah simpan
+            </label>
         </div>
         
         <!-- Totals -->
         <div style="display: flex; align-items: center; gap: 2rem;">
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; margin-right: 1rem;">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" wire:model.live="include_tax" class="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500">
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Include PPN (11%)</span>
-                </label>
-            </div>
-            
+
             <div style="text-align: right;">
                 <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Total Baris / Qty</div>
                 <div style="font-weight: 600; font-size: 1rem; color: #374151;" class="dark:text-gray-200">{{ $totalLines }} Baris / {{ number_format($totalQty, 0) }} Qty</div>
@@ -410,13 +408,7 @@
                 </div>
             </div>
 
-            <div style="text-align: right; min-width: 8rem;">
-                <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN (11%)</div>
-                <div class="flex items-center justify-end gap-1">
-                    <span style="font-size: 0.75rem; color: #6b7280;">Rp</span>
-                    <input type="number" wire:model.live="tax_amount" class="pos-input" style="width: 7rem; padding: 0.125rem 0.25rem; text-align: right; border-style: dashed; background: transparent;">
-                </div>
-            </div>
+
 
             <div style="text-align: right; min-width: 10rem;">
                 <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Grand Total</div>

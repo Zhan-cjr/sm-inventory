@@ -3,6 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { POSTransaction } from './components/POSTransaction';
 import { ManagerDashboard } from './components/ManagerDashboard';
 import { Login } from './components/Login';
+import { MobileLayout } from './components/Mobile/MobileLayout';
+import { MobileAuthQueue } from './components/Mobile/MobileAuthQueue';
+import { MobileDashboard } from './components/Mobile/MobileDashboard';
+import { MobileProductScanner } from './components/Mobile/MobileProductScanner';
 import './index.css';
 
 // Interceptor global fetch untuk otomatis menyertakan header X-Device-UUID di semua request API v1
@@ -39,6 +43,20 @@ function App() {
   const [deviceInfo, setDeviceInfo] = useState(null); // { branchId, branchName, terminalId, terminalName }
   const [deviceError, setDeviceError] = useState(null); // Branch mismatch error messages
   const [copied, setCopied] = useState(false);
+
+  const [isMobileDevice, setIsMobileDevice] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileDevice(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Apply initial theme
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('pos_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
 
   // Initialize and handshake device UUID
   useEffect(() => {
@@ -284,17 +302,17 @@ function App() {
     );
   }
 
-  const isManagerOrAdmin = user?.role === 'MANAGER' || user?.role === 'ADMIN';
+  const isManagerOrAdmin = ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SPV', 'EDP', 'SUPERADMIN', 'SUPER_ADMIN'].includes(user?.role?.toUpperCase());
 
   return (
     <Router>
       <Routes>
         <Route path="/" element={
-          isManagerOrAdmin ? <Navigate to="/dashboard" replace /> : <Navigate to="/pos" replace />
+          isMobileDevice ? <Navigate to="/mobile" replace /> : (isManagerOrAdmin ? <Navigate to="/dashboard" replace /> : (user.can_access_pos ? <Navigate to="/pos" replace /> : <div style={{padding:'2rem', textAlign:'center', marginTop:'10vh'}}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{padding:'10px 20px', marginTop:'20px'}}>Logout</button></div>))
         } />
 
         <Route path="/pos" element={
-          user.role === 'CASHIER' || isManagerOrAdmin ? (
+          isMobileDevice ? <Navigate to="/mobile" replace /> : (user.can_access_pos ? (
             <div className="app-container">
               <POSTransaction
                 branchId={deviceInfo?.branchId || user.branch_id}
@@ -311,14 +329,23 @@ function App() {
                 lockedTerminalName={deviceInfo?.terminalName}
               />
             </div>
-          ) : <Navigate to="/dashboard" replace />
+          ) : <div style={{padding:'2rem', textAlign:'center', marginTop:'10vh'}}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{padding:'10px 20px', marginTop:'20px'}}>Logout</button></div>)
         } />
 
         <Route path="/dashboard" element={
-          isManagerOrAdmin ? (
+          isMobileDevice ? <Navigate to="/mobile" replace /> : (isManagerOrAdmin ? (
             <ManagerDashboard user={user} authToken={token} onLogout={handleLogout} />
-          ) : <Navigate to="/pos" replace />
+          ) : <Navigate to="/pos" replace />)
         } />
+
+        <Route path="/mobile" element={
+          user ? <MobileLayout user={user} onLogout={handleLogout} /> : <Navigate to="/" replace />
+        }>
+          <Route index element={<Navigate to={(!isManagerOrAdmin) ? "scanner" : "dashboard"} replace />} />
+          <Route path="dashboard" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileDashboard user={user} authToken={token} />} />
+          <Route path="scanner" element={<MobileProductScanner user={user} authToken={token} />} />
+          <Route path="auth" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileAuthQueue user={user} authToken={token} />} />
+        </Route>
       </Routes>
     </Router>
   );

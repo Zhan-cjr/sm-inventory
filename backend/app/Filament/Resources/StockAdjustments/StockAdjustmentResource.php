@@ -9,6 +9,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
 use Filament\Schemas\Components\Html;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
@@ -22,6 +23,11 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use App\Traits\HasBranchScope;
 use Filament\Tables\Table;
+use App\Filament\Filters\DateFilterHelper;
+use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Eloquent\Collection;
+use Filament\Forms\Components\Checkbox;
+use Illuminate\Support\Facades\Auth;
 
 class StockAdjustmentResource extends Resource
 {
@@ -78,6 +84,10 @@ class StockAdjustmentResource extends Resource
                         TextInput::make('notes')
                             ->label('Catatan')
                             ->columnSpan(1),
+                        Checkbox::make('cetak_nota')
+                            ->label('Cetak Nota setelah simpan')
+                            ->dehydrated(false)
+                            ->default(false),
                     ]),
 
                 Section::make('Cari & Scan Barang')
@@ -137,7 +147,7 @@ class StockAdjustmentResource extends Resource
                                         $reasonId = $get('../../adjustment_reason_id');
                                         $reason = \App\Models\AdjustmentReason::find($reasonId);
                                         $multiplier = ($reason && $reason->type === 'MINUS') ? -1 : 1;
-                                        $set('new_quantity', (int)$get('previous_quantity') + ((int)$state * $multiplier));
+                                        $set('new_quantity', (float)$get('previous_quantity') + ((float)$state * $multiplier));
                                     })
                                     ->extraAttributes(['class' => 'qty-input']),
                                 TextInput::make('new_quantity')
@@ -199,11 +209,31 @@ class StockAdjustmentResource extends Resource
                     ->limit(50),
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'COMPLETED' => 'success',
-                        'PENDING' => 'warning',
+                    ->color(fn (string $state): string => match (strtolower($state)) {
+                        'completed', 'approved' => 'success',
+                        'pending', 'draft' => 'gray',
+                        'pending_approval' => 'warning',
+                        'pending_approval' => 'warning',
+                        'rejected' => 'danger',
                         default => 'gray',
                     }),
+                TextColumn::make('computed_approver_name')
+                    ->label('Diperiksa Oleh')
+                    ->state(function ($record) {
+                        $latestApproval = $record->approvals()->latest()->first();
+                        return $latestApproval && $latestApproval->status !== 'pending' 
+                            ? $latestApproval->user?->name 
+                            : '-';
+                    }),
+                TextColumn::make('computed_approval_notes')
+                    ->label('Catatan Approval')
+                    ->state(function ($record) {
+                        $latestApproval = $record->approvals()->latest()->first();
+                        return $latestApproval && $latestApproval->status !== 'pending' 
+                            ? $latestApproval->notes 
+                            : '-';
+                    })
+                    ->limit(50),
                 TextColumn::make('created_at')
                     ->label('Dibuat Pada')
                     ->dateTime()
@@ -211,9 +241,49 @@ class StockAdjustmentResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                DateFilterHelper::make('adjustment_date'),
+                SelectFilter::make('branch_id')
+                    ->label('Cabang')
+                    ->relationship('branch', 'name')
+                    ->hidden(fn () => Auth::user()->branch_id !== null),
             ])
             ->recordActions([
+                Action::make('cetak_nota')
+                    ->label('Cetak Nota')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\App\Models\StockAdjustment $record) => route('print.document', ['type' => 'adjustment', 'ids' => [$record->id]]))
+                    ->openUrlInNewTab(),
+                Action::make('request_approval')
+                    ->label('Request Approval')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->visible(fn (\App\Models\StockAdjustment $record) => in_array(strtolower($record->status), ['pending', 'draft', 'rejected']))
+                    ->action(fn (\App\Models\StockAdjustment $record) => $record->requestApproval()),
+
+                Action::make('approve')
+                    ->label('Approve')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->visible(fn (\App\Models\StockAdjustment $record) => strtolower($record->status) === 'pending_approval' && auth()->user()->hasCustomAuthorization('APPROVE_STOCK_ADJUSTMENT'))
+                    ->form([
+                        \Filament\Forms\Components\Textarea::make('notes')->label('Catatan (Opsional)')
+                    ])
+                    ->action(fn (\App\Models\StockAdjustment $record, array $data) => $record->approve(auth()->id(), $data['notes'] ?? null)),
+
+                Action::make('reject')
+                    ->label('Reject')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(fn (\App\Models\StockAdjustment $record) => strtolower($record->status) === 'pending_approval' && auth()->user()->hasCustomAuthorization('APPROVE_STOCK_ADJUSTMENT'))
+                    ->form([
+                        \Filament\Forms\Components\Textarea::make('notes')->label('Alasan Penolakan')->required()
+                    ])
+                    ->action(fn (\App\Models\StockAdjustment $record, array $data) => $record->reject(auth()->id(), $data['notes'])),
+
                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
@@ -221,6 +291,17 @@ class StockAdjustmentResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
+                    \Filament\Actions\BulkAction::make('cetak_nota_massal')
+                        ->label('Cetak Nota')
+                        ->icon('heroicon-o-printer')
+                        ->color('info')
+                        ->action(function (Collection $records) {
+                            $ids = $records->pluck('id')->toArray();
+                            if (empty($ids)) return;
+                        })
+                        ->url(fn (Collection $records) => route('print.document', ['type' => 'adjustment', 'ids' => $records->pluck('id')->toArray()]))
+                        ->openUrlInNewTab()
+                        ->deselectRecordsAfterCompletion(),
                 ]),
             ]);
     }
