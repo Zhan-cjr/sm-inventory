@@ -40,4 +40,9 @@ class Branch extends Model
     {
         return $this->hasMany(StockTransfer::class, 'to_branch_id');
     }
+
+    public function promotions()
+    {
+        return $this->belongsToMany(Promotion::class, 'branch_promotion');
+    }
 }

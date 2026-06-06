@@ -170,6 +170,10 @@ class ViewStockOpnameSession extends ViewRecord
                 'approved_by'  => Auth::id(),
                 'completed_at' => now(),
             ]);
+            
+            // Catat jurnal akuntansi Stok Opname
+            $accountingService = new \App\Services\AccountingService();
+            $accountingService->recordStockOpnameJournal($session);
         });
     }
 }

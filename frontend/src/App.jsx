@@ -5,6 +5,7 @@ import { ManagerDashboard } from './components/ManagerDashboard';
 import { Login } from './components/Login';
 import { MobileLayout } from './components/Mobile/MobileLayout';
 import { MobileAuthQueue } from './components/Mobile/MobileAuthQueue';
+import { MobileEcommerceQueue } from './components/Mobile/MobileEcommerceQueue';
 import { MobileDashboard } from './components/Mobile/MobileDashboard';
 import { MobileProductScanner } from './components/Mobile/MobileProductScanner';
 import './index.css';
@@ -345,6 +346,7 @@ function App() {
           <Route path="dashboard" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileDashboard user={user} authToken={token} />} />
           <Route path="scanner" element={<MobileProductScanner user={user} authToken={token} />} />
           <Route path="auth" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileAuthQueue user={user} authToken={token} />} />
+          <Route path="ecommerce" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileEcommerceQueue user={user} authToken={token} />} />
         </Route>
       </Routes>
     </Router>

@@ -213,7 +213,7 @@ const ProductCard = ({ product }: { product: Product }) => {
 };
 
 const ProductGrid = () => {
-  const { selectedBranch, searchQuery, selectedCategory, setSelectedCategory } = useEcom();
+  const { selectedBranch, searchQuery, selectedCategory, setSelectedCategory, setAvailableCategories } = useEcom();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [ecommerceCategories, setEcommerceCategories] = useState<string[]>([]);
@@ -262,6 +262,7 @@ const ProductGrid = () => {
   // Extract unique categories from settings, and fallback to products' categories if settings are empty
   const categories = [
     { id: 'all', name: 'Semua Kategori' },
+    { id: 'promo', name: '🔥 Sedang Promo' },
     ...(ecommerceCategories.length > 0
       ? ecommerceCategories.map((name) => ({ id: name, name }))
       : Array.from(
@@ -276,6 +277,13 @@ const ProductGrid = () => {
         ).map(([id, name]) => ({ id, name }))
     )
   ];
+
+  // Update global context so other components (Footer, CategoryIcons) can sync
+  useEffect(() => {
+    // Only update if it actually changed to prevent infinite loops
+    // We can just set it directly since React batches state updates, but let's be safe
+    setAvailableCategories(categories);
+  }, [products.length, ecommerceCategories.length, setAvailableCategories]);
 
   // Local/real-time filter based on category and search query
   const filteredProducts = products.filter((product: any) => {

@@ -168,6 +168,36 @@ const ProductDetailModal = () => {
               </div>
             </div>
 
+            {product.applied_promo && (
+              <div className="mb-6 bg-brand-blue/5 border border-brand-blue/20 p-4 rounded-2xl">
+                <h3 className="font-bold text-brand-blue text-sm mb-3 flex items-center gap-1.5">
+                  <Sparkles size={14} />
+                  Syarat & Ketentuan Promo: {product.applied_promo.name}
+                </h3>
+                <ul className="text-xs text-slate-600 space-y-2 list-disc list-inside ml-1">
+                  {product.applied_promo.promo_type === 'BUNDLING' && (
+                    <li>Tipe Promo: <strong>Paket Bundling</strong> (Diskon Rp {parseFloat(product.applied_promo.promo_config?.bundleDiscount || 0).toLocaleString('id-ID')})</li>
+                  )}
+                  {parseFloat(product.applied_promo.min_purchase_amount || 0) > 0 && (
+                    <li>Min. Belanja: <strong>Rp {parseFloat(product.applied_promo.min_purchase_amount).toLocaleString('id-ID')}</strong></li>
+                  )}
+                  {parseFloat(product.applied_promo.max_discount_per_transaction || 0) > 0 && (
+                    <li>Maks. Diskon: <strong>Rp {parseFloat(product.applied_promo.max_discount_per_transaction).toLocaleString('id-ID')}</strong> ({product.applied_promo.promo_config?.discount_limit_type === 'PER_ITEM' ? 'Per Item' : 'Per Transaksi'})</li>
+                  )}
+                  {product.applied_promo.promo_config?.payment_methods?.length > 0 && (
+                    <li>Metode Pembayaran: <strong>{product.applied_promo.promo_config.payment_methods.join(', ')}</strong></li>
+                  )}
+                  {product.applied_promo.promo_config?.applicable_days?.length > 0 && (
+                    <li>Hanya berlaku hari: <strong>{product.applied_promo.promo_config.applicable_days.join(', ')}</strong></li>
+                  )}
+                  {(product.applied_promo.promo_config?.start_time || product.applied_promo.promo_config?.end_time) && (
+                    <li>Jam Berlaku: <strong>{product.applied_promo.promo_config?.start_time || '00:00'} - {product.applied_promo.promo_config?.end_time || '23:59'}</strong></li>
+                  )}
+                  <li>Berakhir pada: <strong>{new Date(product.applied_promo.valid_until).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></li>
+                </ul>
+              </div>
+            )}
+
             <div className="mb-8">
               <h3 className="font-bold text-slate-800 mb-2">Deskripsi Produk</h3>
               <p className="text-sm text-slate-600 leading-relaxed">

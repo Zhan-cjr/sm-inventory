@@ -36,6 +36,13 @@ class AppServiceProvider extends ServiceProvider
         }
 
         ini_set('memory_limit', '512M');
+        
+        \Filament\Tables\Table::configureUsing(function (\Filament\Tables\Table $table): void {
+            $table->filtersTriggerAction(
+                fn (\Filament\Actions\Action $action) => $action->slideOver(),
+            );
+        });
+
         Stock::observe(StockObserver::class);
         Transaction::observe(TransactionObserver::class);
         TransactionItem::observe(TransactionItemObserver::class);

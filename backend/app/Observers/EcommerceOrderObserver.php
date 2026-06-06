@@ -31,6 +31,15 @@ class EcommerceOrderObserver
                         : 'telah selesai diproses dan sedang dalam perjalanan/pengiriman ke alamat Anda.';
                     
                     $message = "Halo *{$name}*,\n\nKabar gembira! Pesanan Anda dengan nomor ID *#{$orderId}* {$deliveryText}\n\nTerima kasih telah berbelanja di Toserba Selamat!";
+                    
+                    // Create Accounting Journal for Ecommerce Order
+                    try {
+                        $accountingService = new \App\Services\AccountingService();
+                        $accountingService->recordEcommerceOrderJournal($order);
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to create journal for ecommerce order: ' . $e->getMessage());
+                    }
+                    
                     break;
                 case 'CANCELLED':
                     $message = "Halo *{$name}*,\n\nInformasi: Pesanan Anda dengan nomor ID *#{$orderId}* *telah dibatalkan*.\n\nSilakan hubungi admin atau customer service kami jika Anda memerlukan informasi lebih lanjut. Terima kasih.";
@@ -41,6 +50,20 @@ class EcommerceOrderObserver
 
             if (!empty($message) && !empty($phone)) {
                 WhatsappService::sendMessage($phone, $message);
+            }
+
+            // Backup notifikasi via Email
+            $customerEmail = \App\Models\Customer::where('phone', $order->customer_phone)->value('email');
+            if (!empty($message) && !empty($customerEmail)) {
+                $emailMessage = str_replace('*', '', $message); // Remove WhatsApp bold formatting
+                try {
+                    \Mail::raw($emailMessage, function ($mailMsg) use ($customerEmail, $orderId) {
+                        $mailMsg->to($customerEmail)
+                            ->subject("Update Pesanan E-Commerce #{$orderId}");
+                    });
+                } catch (\Exception $e) {
+                    \Log::error('Failed to send order email: ' . $e->getMessage());
+                }
             }
         }
     }

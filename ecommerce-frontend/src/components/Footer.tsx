@@ -13,7 +13,7 @@ interface Settings {
 }
 
 const Footer = () => {
-  const { setIsMemberModalOpen, setSelectedCategory } = useEcom();
+  const { setIsMemberModalOpen, setSelectedCategory, availableCategories } = useEcom();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [infoModal, setInfoModal] = useState<{
     isOpen: boolean;
@@ -220,11 +220,25 @@ const Footer = () => {
           <div>
             <h3 className="text-white font-bold mb-6 uppercase tracking-wider text-sm">Kategori Favorit</h3>
             <ul className="flex flex-col gap-3 text-sm">
-              <li><a href="#catalog-section" onClick={(e) => handleCategoryClick(e, 'Kebutuhan Dapur')} className="hover:text-brand-green transition-colors">Kebutuhan Dapur</a></li>
-              <li><a href="#catalog-section" onClick={(e) => handleCategoryClick(e, 'Makanan & Minuman')} className="hover:text-brand-green transition-colors">Makanan & Minuman</a></li>
-              <li><a href="#catalog-section" onClick={(e) => handleCategoryClick(e, 'Kesehatan & Herbal')} className="hover:text-brand-green transition-colors">Kesehatan & Herbal</a></li>
-              <li><a href="#catalog-section" onClick={(e) => handleCategoryClick(e, 'Perlengkapan Ibadah')} className="hover:text-brand-green transition-colors">Perlengkapan Ibadah</a></li>
-              <li><a href="#catalog-section" onClick={(e) => handleCategoryClick(e, 'Sembako')} className="hover:text-brand-green transition-colors">Sembako</a></li>
+              {availableCategories.length === 0 ? (
+                <li className="text-slate-500 text-xs">Memuat kategori...</li>
+              ) : (
+                // Hanya ambil 5 kategori pertama selain 'all' dan 'promo' untuk footer
+                availableCategories
+                  .filter(cat => cat.id !== 'all' && cat.id !== 'promo')
+                  .slice(0, 5)
+                  .map(cat => (
+                    <li key={cat.id}>
+                      <a 
+                        href="#catalog-section" 
+                        onClick={(e) => handleCategoryClick(e, cat.name)} 
+                        className="hover:text-brand-green transition-colors"
+                      >
+                        {cat.name}
+                      </a>
+                    </li>
+                  ))
+              )}
             </ul>
           </div>
 

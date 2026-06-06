@@ -172,6 +172,10 @@ class TransactionController extends Controller
                     }
                 }
 
+                // Panggil AccountingService untuk catat Jurnal
+                $accountingService = new \App\Services\AccountingService();
+                $accountingService->recordTransactionJournal($transaction);
+
                 Cache::tags(['inventory', "branch:{$user->branch_id}"])->flush();
             });
 

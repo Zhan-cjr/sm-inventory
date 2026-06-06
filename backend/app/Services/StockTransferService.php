@@ -97,6 +97,9 @@ class StockTransferService
                 $stock->save();
             }
 
+            // Catat jurnal akuntansi
+            app(\App\Services\AccountingService::class)->recordStockTransferJournal($transfer);
+
             DB::commit();
             return true;
         } catch (Exception $e) {

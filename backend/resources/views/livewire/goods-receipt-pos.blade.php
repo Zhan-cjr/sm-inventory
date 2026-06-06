@@ -51,12 +51,18 @@
                     <tr>
                         <td class="pos-label">Pilih PO (Opsional)</td>
                         <td>
-                            <select class="pos-input" wire:model.live="purchase_order_id" style="border-color: #3b82f6;" @if(!$supplier_id) disabled title="Pilih supplier terlebih dahulu" @endif>
-                                <option value="">-- Penerimaan Tanpa PO --</option>
-                                @foreach($purchaseOrders as $po)
-                                    <option value="{{ $po->id }}">{{ $po->po_number }}</option>
-                                @endforeach
-                            </select>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <select class="pos-input" wire:model.live="purchase_order_id" style="border-color: #3b82f6; flex: 1;" @if(!$supplier_id) disabled title="Pilih supplier terlebih dahulu" @endif>
+                                    <option value="">-- Penerimaan Tanpa PO --</option>
+                                    @foreach($purchaseOrders as $po)
+                                        <option value="{{ $po->id }}">{{ $po->po_number }}</option>
+                                    @endforeach
+                                </select>
+                                <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: #4b5563; white-space: nowrap; cursor: pointer;" class="dark:text-gray-400">
+                                    <input type="checkbox" wire:model.live="only_latest_po" style="border-radius: 0.25rem; color: #2563eb;">
+                                    PO Terbaru Saja
+                                </label>
+                            </div>
                         </td>
                     </tr>
                     <tr>

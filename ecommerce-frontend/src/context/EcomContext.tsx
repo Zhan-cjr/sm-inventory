@@ -15,6 +15,7 @@ export interface Product {
   sold?: number;
   image_url: string | null;
   is_promo: boolean;
+  applied_promo?: any;
   quantity_on_hand?: number;
   stock: number;
 }
@@ -74,6 +75,8 @@ interface EcomContextType {
   setSelectedProductForModal: (product: Product | null) => void;
   isProductModalOpen: boolean;
   setIsProductModalOpen: (open: boolean) => void;
+  availableCategories: {id: string, name: string}[];
+  setAvailableCategories: (categories: {id: string, name: string}[]) => void;
 }
 
 const EcomContext = createContext<EcomContextType | undefined>(undefined);
@@ -103,10 +106,60 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [checkoutSuccessOrder, setCheckoutSuccessOrder] = useState<any | null>(null);
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<{id: string, name: string}[]>([]);
 
   useEffect(() => {
     localStorage.setItem('ecom_cart', JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    if (!selectedBranch) {
+      const fetchFallback = async () => {
+        try {
+          const res = await axios.get('/ecommerce/nearest-branch');
+          if (res.data && res.data.branch) {
+            setSelectedBranch(res.data.branch);
+          } else {
+            const bRes = await axios.get('/ecommerce/branches');
+            if (bRes.data && bRes.data.length > 0) {
+              setSelectedBranch(bRes.data[0]);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to auto-select branch:', error);
+        }
+      };
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              const res = await axios.get('/ecommerce/nearest-branch', {
+                params: {
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                },
+              });
+              if (res.data && res.data.branch) {
+                setSelectedBranch(res.data.branch);
+              } else {
+                fetchFallback();
+              }
+            } catch (err) {
+              fetchFallback();
+            }
+          },
+          () => {
+            // Error or denied
+            fetchFallback();
+          },
+          { timeout: 5000 }
+        );
+      } else {
+        fetchFallback();
+      }
+    }
+  }, []);
 
   const setSelectedBranch = (branch: Branch | null) => {
     setSelectedBranchState(branch);
@@ -224,6 +277,8 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSelectedProductForModal,
         isProductModalOpen,
         setIsProductModalOpen,
+        availableCategories,
+        setAvailableCategories,
       }}
     >
       {children}

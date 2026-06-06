@@ -18,7 +18,13 @@ class EcommerceOrder extends Model
         'delivery_address',
         'status',
         'total_amount',
-        'notes'
+        'points_redeemed',
+        'points_redeemed_discount',
+        'payment_method',
+        'payment_status',
+        'snap_token',
+        'notes',
+        'processed_by'
     ];
 
     public function organization()
@@ -29,6 +35,11 @@ class EcommerceOrder extends Model
     public function branch()
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function processedBy()
+    {
+        return $this->belongsTo(User::class, 'processed_by');
     }
 
     public function items()

@@ -18,7 +18,7 @@ export function MobileLayout({ user, onLogout }) {
     <div className="mobile-layout">
       {/* Top Header */}
       <div className="mobile-header">
-        <div className="mobile-header-title">SM Inventory PWA</div>
+        <div className="mobile-header-title">SM Inventory PWA (v1.2)</div>
         <div className="mobile-header-user">
           <span className="mobile-user-name">{user.name}</span>
           <button className="mobile-logout-btn" onClick={onLogout}>
@@ -77,6 +77,20 @@ export function MobileLayout({ user, onLogout }) {
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
             </svg>
             <span>Otorisasi</span>
+          </button>
+        )}
+
+        {!isRestrictedRole && (
+          <button
+            className={`nav-item ${isActive('/mobile/ecommerce') ? 'active' : ''}`}
+            onClick={() => navigate('/mobile/ecommerce')}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <path d="M16 10a4 4 0 0 1-8 0"></path>
+            </svg>
+            <span>E-Commerce</span>
           </button>
         )}
 

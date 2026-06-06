@@ -27,6 +27,10 @@ class StockTransfersTable
                 TextColumn::make('fromBranch.name')->label('Dari Cabang'),
                 TextColumn::make('toBranch.name')->label('Ke Cabang'),
                 TextColumn::make('transfer_date')->date(),
+                TextColumn::make('total_amount')
+                    ->label('Nominal')
+                    ->numeric()
+                    ->sortable(),
                 TextColumn::make('status')
                     ->badge()
                     ->colors([
@@ -104,6 +108,16 @@ class StockTransfersTable
                         ->openUrlInNewTab()
                         ->deselectRecordsAfterCompletion(),
                 ]),
+            ])
+            ->headerActions([
+                \Filament\Actions\Action::make('cetak_daftar')
+                    ->label('Cetak Daftar')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'stock-transfer',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
             ]);
     }
 }

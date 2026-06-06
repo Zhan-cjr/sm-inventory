@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, CheckCircle, Award, Phone, Mail, MapPin, User, 
   History, LogOut, Receipt, ArrowRight, 
-  ShoppingBag, Loader2, Printer, Lock 
+  ShoppingBag, Loader2, Printer, Lock, CreditCard
 } from 'lucide-react';
 import { useEcom } from '../context/EcomContext';
 import axios from 'axios';
@@ -34,6 +34,13 @@ const MemberModal = () => {
   const [forgotOtp, setForgotOtp] = useState('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
   const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+
+  // Profile Edit states
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editAddress, setEditAddress] = useState('');
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
@@ -185,6 +192,44 @@ const MemberModal = () => {
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.message || 'Gagal mendaftar. Silakan coba lagi.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditProfileClick = () => {
+    if (member) {
+      setEditName(member.name);
+      setEditPhone(member.phone);
+      setEditEmail(member.email || '');
+      setEditAddress(member.address || '');
+      setIsEditingProfile(true);
+      setError(null);
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!member) return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await axios.put('/ecommerce/customer/profile', {
+        id: member.id,
+        name: editName,
+        phone: editPhone,
+        email: editEmail || null,
+        address: editAddress || null,
+      });
+
+      setMember(response.data.user);
+      setSuccessMsg(response.data.message || 'Profil berhasil diperbarui!');
+      setTimeout(() => setSuccessMsg(null), 3000);
+      setIsEditingProfile(false);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.error || err.response?.data?.message || 'Gagal memperbarui profil.');
     } finally {
       setIsLoading(false);
     }
@@ -677,35 +722,102 @@ const MemberModal = () => {
                     </div>
                   </div>
 
-                  <div className="border border-slate-100 rounded-2xl p-4 space-y-3 bg-slate-50/50">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Informasi Akun</span>
-                    
-                    <div className="flex items-center gap-3 py-1 border-b border-slate-100 text-xs">
-                      <Phone size={14} className="text-slate-400 flex-shrink-0" />
-                      <div className="flex-grow">
-                        <span className="text-[10px] text-slate-400 block font-medium">NO. WHATSAPP</span>
-                        <span className="font-bold text-slate-800 mt-0.5 block">{member.phone}</span>
+                  {isEditingProfile ? (
+                    <form onSubmit={handleUpdateProfile} className="border border-slate-100 rounded-2xl p-4 space-y-4 bg-slate-50/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Edit Profil</span>
+                        <button type="button" onClick={() => setIsEditingProfile(false)} className="text-xs text-slate-500 hover:text-slate-700 font-bold">Batal</button>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-3 py-1 border-b border-slate-100 text-xs">
-                      <Mail size={14} className="text-slate-400 flex-shrink-0" />
-                      <div className="flex-grow">
-                        <span className="text-[10px] text-slate-400 block font-medium">EMAIL</span>
-                        <span className="font-bold text-slate-800 mt-0.5 block">{member.email || '-'}</span>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">NAMA LENGKAP *</label>
+                        <input
+                          type="text"
+                          required
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                        />
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-3 py-1 text-xs">
-                      <MapPin size={14} className="text-slate-400 flex-shrink-0" />
-                      <div className="flex-grow">
-                        <span className="text-[10px] text-slate-400 block font-medium">ALAMAT</span>
-                        <span className="font-semibold text-slate-700 mt-0.5 block leading-relaxed">
-                          {member.address || 'Belum diatur'}
-                        </span>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">NO. WHATSAPP *</label>
+                        <input
+                          type="tel"
+                          required
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">EMAIL</label>
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">ALAMAT LENGKAP</label>
+                        <textarea
+                          value={editAddress}
+                          onChange={(e) => setEditAddress(e.target.value)}
+                          rows={2}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800 resize-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-2.5 bg-brand-blue text-white font-bold rounded-xl hover:bg-brand-blue/90 active:scale-95 transition-all text-sm mt-2 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isLoading ? <Loader2 className="animate-spin" size={16} /> : 'Simpan Perubahan'}
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="border border-slate-100 rounded-2xl p-4 space-y-3 bg-slate-50/50 relative">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Informasi Akun</span>
+                        <button 
+                          onClick={handleEditProfileClick}
+                          className="text-xs font-bold text-brand-blue hover:underline"
+                        >
+                          Edit Profil
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 py-1 border-b border-slate-100 text-xs">
+                        <Phone size={14} className="text-slate-400 flex-shrink-0" />
+                        <div className="flex-grow">
+                          <span className="text-[10px] text-slate-400 block font-medium">NO. WHATSAPP</span>
+                          <span className="font-bold text-slate-800 mt-0.5 block">{member.phone}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 py-1 border-b border-slate-100 text-xs">
+                        <Mail size={14} className="text-slate-400 flex-shrink-0" />
+                        <div className="flex-grow">
+                          <span className="text-[10px] text-slate-400 block font-medium">EMAIL</span>
+                          <span className="font-bold text-slate-800 mt-0.5 block">{member.email || '-'}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 py-1 text-xs">
+                        <MapPin size={14} className="text-slate-400 flex-shrink-0" />
+                        <div className="flex-grow">
+                          <span className="text-[10px] text-slate-400 block font-medium">ALAMAT</span>
+                          <span className="font-semibold text-slate-700 mt-0.5 block leading-relaxed">
+                            {member.address || 'Belum diatur'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   <button
                     onClick={handleLogout}
@@ -781,13 +893,56 @@ const MemberModal = () => {
                                 Rp {item.final_amount.toLocaleString('id-ID')}
                               </span>
                             </div>
-                            <button
-                              onClick={() => setSelectedReceipt(item)}
-                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-all text-[10px] flex items-center gap-1"
-                            >
-                              <Receipt size={12} />
-                              Lihat Struk
-                            </button>
+                            <div className="flex items-center gap-2">
+                              {item.snap_token && ['UNPAID', 'PENDING'].includes(item.payment_status) && (
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => {
+                                      if (window.snap) {
+                                        window.snap.pay(item.snap_token, {
+                                          onSuccess: function() { fetchHistory(); },
+                                          onPending: function() { fetchHistory(); },
+                                          onError: function() { fetchHistory(); },
+                                          onClose: function() { fetchHistory(); }
+                                        });
+                                      }
+                                    }}
+                                    className="px-2 py-1.5 bg-brand-blue text-white font-bold rounded-lg transition-all text-[10px] flex items-center gap-1 hover:bg-brand-blue/90"
+                                  >
+                                    <CreditCard size={12} />
+                                    Bayar
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await axios.post(`/ecommerce/orders/${item.id}/refresh-payment`);
+                                        if (window.snap) {
+                                          window.snap.pay(res.data.snap_token, {
+                                            onSuccess: function() { fetchHistory(); },
+                                            onPending: function() { fetchHistory(); },
+                                            onError: function() { fetchHistory(); },
+                                            onClose: function() { fetchHistory(); }
+                                          });
+                                        }
+                                      } catch (err) {
+                                        alert('Gagal mengganti metode pembayaran.');
+                                      }
+                                    }}
+                                    className="px-2 py-1.5 bg-white text-brand-blue border border-brand-blue font-bold rounded-lg transition-all text-[10px] hover:bg-slate-50"
+                                    title="Ganti Metode Bayar"
+                                  >
+                                    Ganti Metode
+                                  </button>
+                                </div>
+                              )}
+                              <button
+                                onClick={() => setSelectedReceipt(item)}
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-all text-[10px] flex items-center gap-1"
+                              >
+                                <Receipt size={12} />
+                                Lihat Struk
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}

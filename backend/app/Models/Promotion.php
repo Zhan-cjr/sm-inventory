@@ -43,4 +43,9 @@ class Promotion extends Model
     {
         return $this->belongsTo(Organization::class);
     }
+
+    public function branches(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Branch::class, 'branch_promotion');
+    }
 }

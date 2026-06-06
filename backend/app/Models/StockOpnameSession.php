@@ -74,7 +74,7 @@ class StockOpnameSession extends Model
      */
     public function getDiscrepancyCountAttribute(): int
     {
-        return $this->items()->where('status', 'DISCREPANCY')->count();
+        return $this->getProductSummary()->where('is_discrepancy', true)->count();
     }
 
     /**

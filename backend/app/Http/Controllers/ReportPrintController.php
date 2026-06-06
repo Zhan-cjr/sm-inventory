@@ -34,6 +34,24 @@ class ReportPrintController extends Controller
                 return $this->printLaporanJasaTerjual($filters);
             case 'laporan-barang-dibeli':
                 return $this->printLaporanBarangDibeli($filters);
+            case 'laporan-stok-opname-ringkas':
+                return $this->printLaporanStokOpnameRingkas($filters);
+            case 'laporan-stok-opname-detail':
+                return $this->printLaporanStokOpnameDetail($filters);
+            case 'pesanan-pembelian':
+                return $this->printPesananPembelian($filters);
+            case 'penerimaan-barang':
+                return $this->printPenerimaanBarang($filters);
+            case 'retur-pembelian':
+                return $this->printReturPembelian($filters);
+            case 'koreksi-stok':
+                return $this->printKoreksiStok($filters);
+            case 'stock-transfer':
+                return $this->printStockTransfer($filters);
+            case 'expense_list':
+                return $this->printExpenseList($filters);
+            case 'laporan_keuangan':
+                return $this->printLaporanKeuangan($request);
             default:
                 abort(404, 'Tipe laporan tidak ditemukan');
         }
@@ -49,25 +67,37 @@ class ReportPrintController extends Controller
         $from = $filterData['created_from'] ?? null;
         $until = $filterData['created_until'] ?? null;
 
-        if ($period === 'today') {
-            return $query->whereDate($dateColumn, Carbon::today());
-        } elseif ($period === 'yesterday') {
-            return $query->whereDate($dateColumn, Carbon::yesterday());
-        } elseif ($period === 'this_week') {
-            return $query->whereBetween($dateColumn, [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
-        } elseif ($period === 'last_week') {
-            return $query->whereBetween($dateColumn, [Carbon::now()->subWeek()->startOfWeek(), Carbon::now()->subWeek()->endOfWeek()]);
-        } elseif ($period === 'this_month') {
-            return $query->whereMonth($dateColumn, Carbon::now()->month)->whereYear($dateColumn, Carbon::now()->year);
-        } elseif ($period === 'last_month') {
-            return $query->whereMonth($dateColumn, Carbon::now()->subMonth()->month)->whereYear($dateColumn, Carbon::now()->subMonth()->year);
-        } elseif ($period === 'custom' || $from || $until) {
-            if ($from) $query->whereDate($dateColumn, '>=', $from);
-            if ($until) $query->whereDate($dateColumn, '<=', $until);
-            return $query;
-        }
+        $applyClause = function($q, $period, $col, $from, $until) {
+            if ($period === 'today') {
+                return $q->whereDate($col, Carbon::today());
+            } elseif ($period === 'yesterday') {
+                return $q->whereDate($col, Carbon::yesterday());
+            } elseif ($period === 'this_week') {
+                return $q->whereBetween($col, [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
+            } elseif ($period === 'last_week') {
+                return $q->whereBetween($col, [Carbon::now()->subWeek()->startOfWeek(), Carbon::now()->subWeek()->endOfWeek()]);
+            } elseif ($period === 'this_month') {
+                return $q->whereMonth($col, Carbon::now()->month)->whereYear($col, Carbon::now()->year);
+            } elseif ($period === 'last_month') {
+                return $q->whereMonth($col, Carbon::now()->subMonth()->month)->whereYear($col, Carbon::now()->subMonth()->year);
+            } elseif ($period === 'custom' || $from || $until) {
+                if ($from) $q->whereDate($col, '>=', $from);
+                if ($until) $q->whereDate($col, '<=', $until);
+                return $q;
+            }
+            return $q;
+        };
 
-        return $query;
+        if (str_contains($dateColumn, '.')) {
+            $parts = explode('.', $dateColumn);
+            $relColumn = array_pop($parts);
+            $relation = implode('.', $parts);
+            return $query->whereHas($relation, function($q) use ($applyClause, $period, $relColumn, $from, $until) {
+                return $applyClause($q, $period, $relColumn, $from, $until);
+            });
+        } else {
+            return $applyClause($query, $period, $dateColumn, $from, $until);
+        }
     }
 
     private function getPeriodString($filters, $filterName = 'date_filter')
@@ -636,5 +666,511 @@ class ReportPrintController extends Controller
         $rows[] = ['<strong>TOTAL</strong>', '', '', '<strong>'.$t_qty.'</strong>', '', '<strong>'.number_format($t_total, 0, ',', '.').'</strong>'];
 
         return view('print.reports.generic', ['title' => 'Laporan Barang Dibeli', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printLaporanStokOpnameRingkas($filters)
+    {
+        $query = \App\Models\StockOpnameSession::query()->with(['branch', 'creator', 'approver']);
+        $query = $this->applyDateFilters($query, $filters, 'opname_date', 'date_filter');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+        
+        if (isset($filters['status']['value']) && !empty($filters['status']['value'])) {
+            $query->where('status', $filters['status']['value']);
+        }
+        
+        $sessions = $query->orderBy('created_at', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'date_filter');
+
+        $columns = ['No Sesi', 'Cabang', 'Tgl Opname', 'Status', 'Progress Hitung', 'Item Selisih', 'Nominal (+)', 'Nominal (-)'];
+        $rows = [];
+        
+        $grandTotalPlus = 0;
+        $grandTotalMinus = 0;
+        $grandTotalItems = 0;
+        
+        foreach ($sessions as $s) {
+            $c1 = $s->count1_progress;
+            $c2 = $s->count2_progress;
+            
+            $summary = $s->getProductSummary();
+            $grandTotalItems += count($summary);
+            
+            $totalNominalPlus = 0;
+            $totalNominalMinus = 0;
+            $stocks = [];
+            if ($s->branch_id) {
+                $productIds = $summary->pluck('product_id')->filter()->toArray();
+                if (!empty($productIds)) {
+                    $stocks = \App\Models\Stock::where('branch_id', $s->branch_id)
+                                ->whereIn('product_id', $productIds)
+                                ->with('product')
+                                ->get()
+                                ->keyBy('product_id');
+                }
+            }
+
+            foreach($summary as $prodSummary) {
+                $diff = $prodSummary['final_disc'];
+                if ($diff == 0) continue;
+                
+                $pid = $prodSummary['product_id'];
+                $price = 0;
+                if ($s->branch_id && isset($stocks[$pid])) {
+                    $st = $stocks[$pid];
+                    $price = $st->cost_price_tax > 0 ? $st->cost_price_tax : ($st->product->cost_price_tax ?? $st->product->cost_price ?? 0);
+                } else {
+                    $p = \App\Models\Product::find($pid);
+                    if ($p) {
+                        $price = $p->cost_price_tax ?? $p->cost_price ?? 0;
+                    }
+                }
+                if ($diff > 0) {
+                    $totalNominalPlus += ($diff * $price);
+                } else {
+                    $totalNominalMinus += (abs($diff) * $price);
+                }
+            }
+            
+            $grandTotalPlus += $totalNominalPlus;
+            $grandTotalMinus += $totalNominalMinus;
+            
+            $rows[] = [
+                $s->session_number,
+                $s->branch ? $s->branch->name : 'Pusat / Global',
+                \Carbon\Carbon::parse($s->opname_date)->format('d M Y'),
+                $s->status,
+                "H1: {$c1['done']}/{$c1['total']} | H2: {$c2['done']}/{$c2['total']}",
+                $s->discrepancy_count,
+                number_format($totalNominalPlus, 0, ',', '.'),
+                number_format($totalNominalMinus, 0, ',', '.')
+            ];
+        }
+
+        $summaryBox = [
+            'Total Sesi Opname' => count($sessions) . ' Sesi',
+            'Total Item Diopname' => $grandTotalItems . ' Item',
+            'Total Nominal (+)' => 'Rp ' . number_format($grandTotalPlus, 0, ',', '.'),
+            'Total Nominal (-)' => 'Rp ' . number_format($grandTotalMinus, 0, ',', '.')
+        ];
+
+        return view('print.reports.generic', [
+            'title' => 'Laporan Stok Opname (Ringkas)', 
+            'period' => $period, 
+            'columns' => $columns, 
+            'rows' => $rows,
+            'summaryBox' => $summaryBox
+        ]);
+    }
+
+    private function printLaporanStokOpnameDetail($filters)
+    {
+        $query = \App\Models\StockOpnameItem::query()->with(['session.branch', 'product', 'rackSession.rack']);
+        $query = $this->applyDateFilters($query, $filters, 'session.opname_date', 'date_filter');
+        
+        // Filter by branch
+        if (auth()->user()->branch_id !== null) {
+            $query->whereHas('session', fn($q) => $q->where('branch_id', auth()->user()->branch_id));
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->whereHas('session', fn($q) => $q->where('branch_id', $filters['branch_id']['value']));
+        }
+        
+        if (isset($filters['status']['value']) && !empty($filters['status']['value'])) {
+            $query->where('status', $filters['status']['value']);
+        }
+        
+        $items = $query->orderBy('created_at', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'date_filter');
+
+        $columns = ['No Sesi', 'Cabang', 'Rak', 'SKU', 'Barang', 'Stok Sistem', 'Hitung 1', 'Hitung 2', 'Akhir', 'S.Plus', 'Nom.Plus', 'S.Minus', 'Nom.Minus'];
+        $rows = [];
+        
+        $grandTotalPlus = 0;
+        $grandTotalMinus = 0;
+        
+        // Eager load stocks if any branch opname exists in items
+        $branchIds = $items->pluck('session.branch_id')->filter()->unique()->toArray();
+        $productIds = $items->pluck('product_id')->filter()->unique()->toArray();
+        $stocks = [];
+        if (!empty($branchIds) && !empty($productIds)) {
+            $stocksList = \App\Models\Stock::whereIn('branch_id', $branchIds)
+                        ->whereIn('product_id', $productIds)
+                        ->with('product')
+                        ->get();
+            foreach ($stocksList as $st) {
+                $stocks[$st->branch_id . '-' . $st->product_id] = $st;
+            }
+        }
+        
+        foreach ($items as $i) {
+            $selisih = 0;
+            if ($i->final_quantity !== null) {
+                $selisih = $i->final_quantity - $i->system_quantity;
+            } elseif ($i->count2_quantity !== null) {
+                $selisih = $i->count2_quantity - $i->system_quantity;
+            } elseif ($i->count1_quantity !== null) {
+                $selisih = $i->count1_quantity - $i->system_quantity;
+            }
+            
+            $nominalPlus = 0;
+            $nominalMinus = 0;
+            if ($selisih != 0) {
+                $price = 0;
+                if ($i->session && $i->session->branch_id) {
+                    $key = $i->session->branch_id . '-' . $i->product_id;
+                    if (isset($stocks[$key])) {
+                        $st = $stocks[$key];
+                        $price = $st->cost_price_tax > 0 ? $st->cost_price_tax : ($st->product->cost_price_tax ?? $st->product->cost_price ?? 0);
+                    } else {
+                        $price = $i->product->cost_price_tax ?? $i->product->cost_price ?? 0;
+                    }
+                } else {
+                    $price = $i->product->cost_price_tax ?? $i->product->cost_price ?? 0;
+                }
+                
+                if ($selisih > 0) {
+                    $nominalPlus = $selisih * $price;
+                } else {
+                    $nominalMinus = abs($selisih) * $price;
+                }
+            }
+            
+            $grandTotalPlus += $nominalPlus;
+            $grandTotalMinus += $nominalMinus;
+            
+            $rows[] = [
+                $i->session ? $i->session->session_number : '-',
+                ($i->session && $i->session->branch) ? $i->session->branch->name : 'Pusat',
+                ($i->rackSession && $i->rackSession->rack) ? $i->rackSession->rack->rack_code : '-',
+                $i->product ? $i->product->sku : '-',
+                $i->product ? $i->product->name : '-',
+                (float)$i->system_quantity,
+                $i->count1_quantity !== null ? (float)$i->count1_quantity : '-',
+                $i->count2_quantity !== null ? (float)$i->count2_quantity : '-',
+                $i->final_quantity !== null ? (float)$i->final_quantity : '-',
+                $selisih > 0 ? $selisih : '-',
+                $nominalPlus > 0 ? number_format($nominalPlus, 0, ',', '.') : '-',
+                $selisih < 0 ? abs($selisih) : '-',
+                $nominalMinus > 0 ? number_format($nominalMinus, 0, ',', '.') : '-'
+            ];
+        }
+
+        $summaryBox = [
+            'Total Item Teropname' => count($items) . ' Item',
+            'Total Nominal (+)' => 'Rp ' . number_format($grandTotalPlus, 0, ',', '.'),
+            'Total Nominal (-)' => 'Rp ' . number_format($grandTotalMinus, 0, ',', '.')
+        ];
+
+        return view('print.reports.generic', [
+            'title' => 'Laporan Stok Opname (Detail)', 
+            'period' => $period, 
+            'columns' => $columns, 
+            'rows' => $rows,
+            'summaryBox' => $summaryBox
+        ]);
+    }
+
+    private function printPesananPembelian($filters)
+    {
+        $query = \App\Models\PurchaseOrder::query()->with(['supplier', 'branch']);
+        $query = $this->applyDateFilters($query, $filters, 'po_date', 'date_filter');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+        
+        $orders = $query->orderBy('po_date', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'date_filter');
+
+        $columns = ['Tanggal PO', 'No. PO', 'Supplier', 'Cabang', 'Total', 'Status'];
+        $rows = [];
+        $t_total = 0;
+        foreach ($orders as $o) {
+            $t_total += $o->total_amount;
+            $rows[] = [
+                \Carbon\Carbon::parse($o->po_date)->format('d-m-Y'),
+                $o->po_number,
+                $o->supplier ? $o->supplier->name : '-',
+                $o->branch ? $o->branch->name : 'Pusat',
+                number_format($o->total_amount, 0, ',', '.'),
+                strtoupper($o->status)
+            ];
+        }
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
+
+        return view('print.reports.generic', ['title' => 'Daftar Pesanan Pembelian', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printPenerimaanBarang($filters)
+    {
+        $query = \App\Models\GoodsReceipt::query()->with(['supplier', 'branch']);
+        $query = $this->applyDateFilters($query, $filters, 'receipt_date', 'date_filter');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+        
+        $receipts = $query->orderBy('receipt_date', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'date_filter');
+
+        $columns = ['Tgl Terima', 'No. Terima', 'No. PO', 'Supplier', 'Cabang', 'Total', 'Status'];
+        $rows = [];
+        $t_total = 0;
+        foreach ($receipts as $r) {
+            $t_total += $r->total_amount;
+            $rows[] = [
+                \Carbon\Carbon::parse($r->receipt_date)->format('d-m-Y'),
+                $r->receipt_number,
+                $r->purchaseOrder ? $r->purchaseOrder->po_number : '-',
+                $r->supplier ? $r->supplier->name : '-',
+                $r->branch ? $r->branch->name : 'Pusat',
+                number_format($r->total_amount, 0, ',', '.'),
+                strtoupper($r->status)
+            ];
+        }
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
+
+        return view('print.reports.generic', ['title' => 'Daftar Penerimaan Barang', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printReturPembelian($filters)
+    {
+        $query = \App\Models\PurchaseReturn::query()->with(['supplier', 'branch']);
+        $query = $this->applyDateFilters($query, $filters, 'return_date', 'date_filter');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+        
+        $returns = $query->orderBy('return_date', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'date_filter');
+
+        $columns = ['Tgl Retur', 'No. Retur', 'Supplier', 'Cabang', 'Total', 'Status'];
+        $rows = [];
+        $t_total = 0;
+        foreach ($returns as $r) {
+            $t_total += $r->total_amount;
+            $rows[] = [
+                \Carbon\Carbon::parse($r->return_date)->format('d-m-Y'),
+                $r->return_number,
+                $r->supplier ? $r->supplier->name : '-',
+                $r->branch ? $r->branch->name : 'Pusat',
+                number_format($r->total_amount, 0, ',', '.'),
+                strtoupper($r->status)
+            ];
+        }
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
+
+        return view('print.reports.generic', ['title' => 'Daftar Retur Pembelian', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printKoreksiStok($filters)
+    {
+        $query = \App\Models\StockAdjustment::query()->with(['branch', 'recorder', 'adjustmentReason']);
+        $query = $this->applyDateFilters($query, $filters, 'adjustment_date', 'date_filter');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+        
+        $adjustments = $query->orderBy('adjustment_date', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'date_filter');
+
+        $columns = ['Tgl Koreksi', 'Cabang', 'Sifat', 'Nominal (+)', 'Nominal (-)', 'Dibuat Oleh', 'Status'];
+        $rows = [];
+        $t_plus = 0;
+        $t_minus = 0;
+        foreach ($adjustments as $a) {
+            $type = $a->adjustmentReason ? strtoupper($a->adjustmentReason->type) : 'PLUS';
+            $sifat = $a->adjustmentReason ? $a->adjustmentReason->name : '-';
+            
+            $nominal_plus = ($type === 'PLUS') ? $a->total_value : 0;
+            $nominal_minus = ($type === 'MINUS') ? $a->total_value : 0;
+            
+            $t_plus += $nominal_plus;
+            $t_minus += $nominal_minus;
+            
+            $rows[] = [
+                \Carbon\Carbon::parse($a->adjustment_date)->format('d-m-Y'),
+                $a->branch ? $a->branch->name : 'Pusat',
+                $sifat,
+                $nominal_plus > 0 ? number_format($nominal_plus, 0, ',', '.') : '-',
+                $nominal_minus > 0 ? number_format($nominal_minus, 0, ',', '.') : '-',
+                $a->recorder ? $a->recorder->name : '-',
+                strtoupper($a->status)
+            ];
+        }
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '<strong>Rp ' . number_format($t_plus, 0, ',', '.') . '</strong>', '<strong>Rp ' . number_format($t_minus, 0, ',', '.') . '</strong>', '', ''];
+
+        return view('print.reports.generic', ['title' => 'Daftar Koreksi Stok', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printStockTransfer($filters)
+    {
+        $query = \App\Models\StockTransfer::query()->with(['fromBranch', 'toBranch']);
+        $query = $this->applyDateFilters($query, $filters, 'transfer_date', 'date_filter');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where(function($q) {
+                $q->where('from_branch_id', auth()->user()->branch_id)
+                  ->orWhere('to_branch_id', auth()->user()->branch_id);
+            });
+        } elseif (isset($filters['from_branch_id']['value']) && !empty($filters['from_branch_id']['value'])) {
+            $query->where('from_branch_id', $filters['from_branch_id']['value']);
+        }
+        
+        $transfers = $query->orderBy('transfer_date', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'date_filter');
+
+        $columns = ['Tgl Transfer', 'No. Transfer', 'Cabang Asal', 'Cabang Tujuan', 'Nominal', 'Status'];
+        $rows = [];
+        $t_total = 0;
+        foreach ($transfers as $t) {
+            $t_total += $t->total_amount;
+            $rows[] = [
+                \Carbon\Carbon::parse($t->transfer_date)->format('d-m-Y'),
+                $t->reference_number,
+                $t->fromBranch ? $t->fromBranch->name : 'Pusat',
+                $t->toBranch ? $t->toBranch->name : 'Pusat',
+                number_format($t->total_amount, 0, ',', '.'),
+                strtoupper($t->status)
+            ];
+        }
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
+
+        return view('print.reports.generic', ['title' => 'Daftar Stock Transfer', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printExpenseList($filters)
+    {
+        $query = \App\Models\Expense::query()->with(['branch', 'expenseAccount', 'paymentAccount', 'creator']);
+        $query = $this->applyDateFilters($query, $filters, 'expense_date', 'expense_date');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+        
+        $expenses = $query->orderBy('expense_date', 'desc')->orderBy('created_at', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'expense_date');
+
+        $columns = ['Tgl', 'No. Ref', 'Cabang', 'Akun Pengeluaran (Debit)', 'Sumber Dana (Kredit)', 'Nominal', 'Keterangan'];
+        $rows = [];
+        $t_total = 0;
+        foreach ($expenses as $e) {
+            $t_total += $e->amount;
+            $rows[] = [
+                \Carbon\Carbon::parse($e->expense_date)->format('d-m-Y'),
+                $e->reference_number,
+                $e->branch ? $e->branch->name : 'Pusat',
+                $e->expenseAccount ? $e->expenseAccount->name : '-',
+                $e->paymentAccount ? $e->paymentAccount->name : '-',
+                number_format($e->amount, 0, ',', '.'),
+                $e->description ?: '-'
+            ];
+        }
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
+
+        return view('print.reports.generic', ['title' => 'Daftar Pengeluaran (Expenses)', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printLaporanKeuangan(Request $request)
+    {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $branchId = $request->input('branch_id');
+        
+        $organizationId = auth()->user()->organization_id ?? \App\Models\Organization::first()?->id;
+
+        if (!$organizationId) {
+            abort(404, 'Organisasi tidak ditemukan');
+        }
+
+        $accounts = \App\Models\Account::where('organization_id', $organizationId)
+            ->where('is_active', true)
+            ->orderBy('account_code')
+            ->get();
+
+        $accountBalances = [];
+        $netProfit = 0;
+
+        foreach ($accounts as $account) {
+            $lines = \App\Models\JournalEntryLine::where('account_id', $account->id)
+                ->whereHas('journalEntry', function ($query) use ($startDate, $endDate, $branchId) {
+                    $query->where('status', 'posted');
+                    if ($startDate) {
+                        $query->whereDate('entry_date', '>=', $startDate);
+                    }
+                    if ($endDate) {
+                        $query->whereDate('entry_date', '<=', $endDate);
+                    }
+                    if ($branchId) {
+                        $query->where('branch_id', $branchId);
+                    }
+                })
+                ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
+                ->first();
+
+            $debit = $lines->total_debit ?? 0;
+            $credit = $lines->total_credit ?? 0;
+            $balance = 0;
+
+            if (in_array($account->type, ['asset', 'expense'])) {
+                $balance = $debit - $credit;
+            } else {
+                $balance = $credit - $debit;
+            }
+
+            if ($account->type === 'revenue') {
+                $netProfit += $balance;
+            } elseif ($account->type === 'expense') {
+                $netProfit -= $balance;
+            }
+
+            $accountBalances[$account->id] = [
+                'account' => $account,
+                'debit' => $debit,
+                'credit' => $credit,
+                'balance' => $balance
+            ];
+        }
+
+        $assets = array_filter($accountBalances, fn($item) => $item['account']->type === 'asset');
+        $liabilities = array_filter($accountBalances, fn($item) => $item['account']->type === 'liability');
+        $equities = array_filter($accountBalances, fn($item) => $item['account']->type === 'equity');
+        $revenues = array_filter($accountBalances, fn($item) => $item['account']->type === 'revenue');
+        $expenses = array_filter($accountBalances, fn($item) => $item['account']->type === 'expense');
+
+        $period = ($startDate && $endDate) ? \Carbon\Carbon::parse($startDate)->format('d M Y') . ' s/d ' . \Carbon\Carbon::parse($endDate)->format('d M Y') : 'Semua Waktu';
+        $branchName = 'Semua Cabang (Global)';
+        if ($branchId) {
+            $branch = \App\Models\Branch::find($branchId);
+            if ($branch) $branchName = $branch->name;
+        }
+
+        return view('print.reports.laporan-keuangan', [
+            'assets' => $assets,
+            'liabilities' => $liabilities,
+            'equities' => $equities,
+            'revenues' => $revenues,
+            'expenses' => $expenses,
+            'netProfit' => $netProfit,
+            'period' => $period,
+            'branchName' => $branchName,
+            'title' => 'Laporan Keuangan'
+        ]);
     }
 }

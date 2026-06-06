@@ -204,6 +204,25 @@ class StockAdjustmentResource extends Resource
                 TextColumn::make('branch.name')
                     ->label('Cabang')
                     ->searchable(),
+                TextColumn::make('adjustmentReason.name')
+                    ->label('Sifat')
+                    ->searchable(),
+                TextColumn::make('total_value_plus')
+                    ->label('Nominal (+)')
+                    ->state(function ($record) {
+                        $type = $record->adjustmentReason ? $record->adjustmentReason->type : '';
+                        return strtoupper($type) === 'PLUS' ? $record->total_value : null;
+                    })
+                    ->numeric()
+                    ->sortable(['total_value']),
+                TextColumn::make('total_value_minus')
+                    ->label('Nominal (-)')
+                    ->state(function ($record) {
+                        $type = $record->adjustmentReason ? $record->adjustmentReason->type : '';
+                        return strtoupper($type) === 'MINUS' ? $record->total_value : null;
+                    })
+                    ->numeric()
+                    ->sortable(['total_value']),
                 TextColumn::make('notes')
                     ->label('Catatan')
                     ->limit(50),
@@ -303,6 +322,16 @@ class StockAdjustmentResource extends Resource
                         ->openUrlInNewTab()
                         ->deselectRecordsAfterCompletion(),
                 ]),
+            ])
+            ->headerActions([
+                \Filament\Actions\Action::make('cetak_daftar')
+                    ->label('Cetak Daftar')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'koreksi-stok',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
             ]);
     }
 

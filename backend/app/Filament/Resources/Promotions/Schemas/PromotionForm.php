@@ -60,8 +60,17 @@ class PromotionForm
                             ->prefix('Rp')
                             ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FIXED']))
                             ->helperText('Minimal total belanja untuk mengaktifkan diskon ini.'),
+                        Select::make('promo_config.discount_limit_type')
+                            ->label('Tipe Batas Maksimal Diskon')
+                            ->options([
+                                'PER_TRANSACTION' => 'Per Transaksi (Total Keseluruhan)',
+                                'PER_ITEM' => 'Per Item / Produk',
+                            ])
+                            ->default('PER_TRANSACTION')
+                            ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FLASH_SALE']))
+                            ->helperText('Pilih apakah batas maksimal diskon berlaku untuk total 1 struk, atau untuk setiap item/produk.'),
                         TextInput::make('max_discount_per_transaction')
-                            ->label('Maksimal Diskon')
+                            ->label('Maksimal Diskon (Nominal)')
                             ->numeric()
                             ->prefix('Rp')
                             ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FLASH_SALE']))
@@ -97,6 +106,13 @@ class PromotionForm
                                 }
                                 return [];
                             }),
+                        Select::make('branches')
+                            ->relationship('branches', 'name')
+                            ->multiple()
+                            ->preload()
+                            ->label('Berlaku di Cabang')
+                            ->helperText('Pilih cabang mana saja promosi ini berlaku. Jika tidak ada yang dipilih, promosi dianggap tidak berlaku di cabang manapun (atau sesuaikan dengan kebijakan sistem).')
+                            ->columnSpanFull(),
                     ])
                     ->columns(2),
 
@@ -179,6 +195,17 @@ class PromotionForm
                                 'SUNDAY' => 'Minggu',
                             ])
                             ->helperText('Pilih hari-hari tertentu ketika promo aktif. Jika kosong, berlaku setiap hari.'),
+                        Select::make('promo_config.payment_methods')
+                            ->label('Metode Pembayaran Khusus')
+                            ->multiple()
+                            ->options([
+                                'CASH' => 'Tunai (Cash)',
+                                'DEBIT' => 'Kartu Debit',
+                                'CREDIT' => 'Kartu Kredit',
+                                'QRIS' => 'QRIS',
+                                'TRANSFER' => 'Transfer Bank',
+                            ])
+                            ->helperText('Promo hanya berlaku jika menggunakan metode pembayaran tertentu. Biarkan kosong jika berlaku untuk semua metode.'),
                         Grid::make(2)
                             ->schema([
                                 TextInput::make('promo_config.start_time')
@@ -189,6 +216,16 @@ class PromotionForm
                                     ->label('Jam Selesai Berlaku')
                                     ->placeholder('Contoh: 17:00')
                                     ->helperText('Format HH:MM (24 jam)'),
+                                TextInput::make('promo_config.max_usage_limit')
+                                    ->label('Batas Kuota Penggunaan')
+                                    ->numeric()
+                                    ->placeholder('Contoh: 100')
+                                    ->helperText('Maksimal promo ini dapat digunakan (Total dari seluruh transaksi). Kosongkan jika tanpa batas.'),
+                                TextInput::make('promo_config.max_usage_per_user')
+                                    ->label('Batas Penggunaan Per Member')
+                                    ->numeric()
+                                    ->placeholder('Contoh: 1')
+                                    ->helperText('Maksimal promo digunakan oleh satu member yang sama. Kosongkan jika tanpa batas.'),
                             ]),
                     ]),
 

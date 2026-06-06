@@ -146,6 +146,16 @@ class PurchaseOrdersTable
                         ->openUrlInNewTab()
                         ->deselectRecordsAfterCompletion(),
                 ]),
+            ])
+            ->headerActions([
+                \Filament\Actions\Action::make('cetak_daftar')
+                    ->label('Cetak Daftar')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'pesanan-pembelian',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
             ]);
     }
 }

@@ -73,6 +73,25 @@ class EcommerceOrderResource extends Resource
                     ->disabled()
                     ->required()
                     ->numeric(),
+                Select::make('payment_method')
+                    ->options([
+                        'CASH' => 'Tunai (CASH)',
+                        'MIDTRANS' => 'Payment Gateway (Midtrans)',
+                        'QRIS' => 'QRIS',
+                        'TRANSFER' => 'Transfer Bank',
+                    ])
+                    ->disabled(),
+                Select::make('payment_status')
+                    ->options([
+                        'UNPAID' => 'Belum Dibayar',
+                        'PAID' => 'Lunas',
+                        'CHALLENGE' => 'Challenge / Review',
+                        'PENDING' => 'Menunggu Pembayaran',
+                        'FAILED' => 'Gagal',
+                        'EXPIRED' => 'Kedaluwarsa',
+                        'CANCELED' => 'Dibatalkan',
+                    ])
+                    ->required(),
                 TextInput::make('points_redeemed')
                     ->label('Poin Ditukarkan')
                     ->disabled()
@@ -154,6 +173,23 @@ class EcommerceOrderResource extends Resource
                                         'CANCELLED' => 'danger',
                                         default => 'gray',
                                     }),
+                                TextEntry::make('processedBy.name')
+                                    ->label('Diproses Oleh')
+                                    ->placeholder('-'),
+                                TextEntry::make('payment_method')
+                                    ->label('Metode Bayar')
+                                    ->badge()
+                                    ->color('info'),
+                                TextEntry::make('payment_status')
+                                    ->label('Status Bayar')
+                                    ->badge()
+                                    ->color(fn (string $state): string => match ($state) {
+                                        'UNPAID', 'PENDING' => 'warning',
+                                        'PAID' => 'success',
+                                        'FAILED', 'EXPIRED', 'CANCELED' => 'danger',
+                                        'CHALLENGE' => 'info',
+                                        default => 'gray',
+                                    }),
                                 TextEntry::make('points_redeemed')
                                     ->label('Poin Ditukarkan')
                                     ->numeric()
@@ -204,6 +240,25 @@ class EcommerceOrderResource extends Resource
                         'PROCESSING' => 'info',
                         'COMPLETED' => 'success',
                         'CANCELLED' => 'danger',
+                        default => 'gray',
+                    }),
+                TextColumn::make('processedBy.name')
+                    ->label('Diproses Oleh')
+                    ->placeholder('-')
+                    ->searchable(),
+                TextColumn::make('payment_method')
+                    ->label('Tipe Bayar')
+                    ->badge()
+                    ->color('info')
+                    ->toggleable(),
+                TextColumn::make('payment_status')
+                    ->label('Status Bayar')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'UNPAID', 'PENDING' => 'warning',
+                        'PAID' => 'success',
+                        'FAILED', 'EXPIRED', 'CANCELED' => 'danger',
+                        'CHALLENGE' => 'info',
                         default => 'gray',
                     }),
                 TextColumn::make('points_redeemed_discount')

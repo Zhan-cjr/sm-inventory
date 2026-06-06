@@ -94,6 +94,8 @@ class GoodsReceiptPos extends Component
         $this->calculateTotals();
     }
 
+    public $only_latest_po = false;
+
     public function updatedPurchaseOrderId($value)
     {
         if ($value) {
@@ -102,6 +104,11 @@ class GoodsReceiptPos extends Component
                 $this->supplier_id = $po->supplier_id;
                 $this->cart = [];
                 foreach ($po->items as $item) {
+                    $remainingQty = $item->quantity_ordered - $item->quantity_received;
+                    if ($remainingQty <= 0) {
+                        continue; // Skip if already fully received
+                    }
+
                     $stock = null;
                     if ($this->branch_id) {
                         $stock = Stock::where('product_id', $item->product_id)->where('branch_id', $this->branch_id)->first();
@@ -113,14 +120,14 @@ class GoodsReceiptPos extends Component
                         'barcode' => $item->product->barcode,
                         'name' => $item->product->name,
                         'qty_ordered' => $item->quantity_ordered,
-                        'qty_received' => $item->quantity_ordered, // Default to ordered qty
+                        'qty_received' => $remainingQty, // Default to remaining qty
                         'unit_price' => $item->unit_cost,
                         'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($item->product->harga_jual_1 ?? 0),
                         'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($item->product->margin_gol_1 ?? 0),
                         'discount_1' => $item->discount_1,
                         'discount_2' => $item->discount_2,
                         'discount_3' => $item->discount_3,
-                        'subtotal' => $item->subtotal
+                        'subtotal' => $remainingQty * $item->unit_cost // Subtotal uses remaining qty
                     ];
                 }
                 $this->include_tax = $po->include_tax;
@@ -237,7 +244,8 @@ class GoodsReceiptPos extends Component
             
             $item = $this->cart[$index];
             $basePrice = (float) ($item['unit_price'] ?? 0);
-            $price = $this->include_tax ? round($basePrice * 1.11, 2) : $basePrice;
+            $product = \App\Models\Product::find($item['product_id']);
+            $price = ($this->include_tax && $product && $product->is_taxable) ? round($basePrice * 1.11, 2) : $basePrice;
 
             if (in_array($field, ['margin_gol_1', 'margin_gol_2', 'margin_gol_3'])) {
                 $gol = substr($field, -1);
@@ -297,7 +305,8 @@ class GoodsReceiptPos extends Component
         // Recalculate all margins since the cost basis changed
         foreach ($this->cart as $index => $item) {
             $basePrice = (float) ($item['unit_price'] ?? 0);
-            $price = $this->include_tax ? round($basePrice * 1.11, 2) : $basePrice;
+            $product = \App\Models\Product::find($item['product_id']);
+            $price = ($this->include_tax && $product && $product->is_taxable) ? round($basePrice * 1.11, 2) : $basePrice;
             
             foreach([1, 2, 3] as $i) {
                 $sellingPrice = (float) ($item["harga_jual_{$i}"] ?? 0);
@@ -334,7 +343,20 @@ class GoodsReceiptPos extends Component
 
         if ($this->include_tax) {
             $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
-            $this->tax_amount = round($netTotal * ($taxRate / 100), 2);
+            
+            $taxAmount = 0;
+            foreach ($this->cart as $item) {
+                $product = \App\Models\Product::find($item['product_id']);
+                if ($product && $product->is_taxable) {
+                    // Apply proportion of global discount to this item
+                    $itemProportion = $this->subtotal > 0 ? ($item['subtotal'] / $this->subtotal) : 0;
+                    $itemDiscount = $discountAmount * $itemProportion;
+                    $itemNet = $item['subtotal'] - $itemDiscount;
+                    
+                    $taxAmount += round($itemNet * ($taxRate / 100), 2);
+                }
+            }
+            $this->tax_amount = $taxAmount;
         } else {
             $this->tax_amount = 0;
         }
@@ -439,11 +461,33 @@ class GoodsReceiptPos extends Component
                 }
             }
 
-            // Update PO Status if all items received (optional logic)
+            // Update PO Status if all items received
             if ($this->purchase_order_id) {
-                $po = PurchaseOrder::find($this->purchase_order_id);
-                $po->update(['status' => 'RECEIVED']);
+                $po = PurchaseOrder::with('items')->find($this->purchase_order_id);
+                $allReceived = true;
+                foreach ($po->items as $poItem) {
+                    // Update quantity_received for each po item based on this receipt
+                    $cartItem = collect($this->cart)->firstWhere('product_id', $poItem->product_id);
+                    if ($cartItem) {
+                        $poItem->quantity_received += $cartItem['qty_received'];
+                        $poItem->save();
+                    }
+
+                    if ($poItem->quantity_received < $poItem->quantity_ordered) {
+                        $allReceived = false;
+                    }
+                }
+                
+                if ($allReceived) {
+                    $po->update(['status' => 'RECEIVED']);
+                } else {
+                    $po->update(['status' => 'PARTIALLY_RECEIVED']); // Or keep it APPROVED, but PARTIALLY_RECEIVED is better if it exists. Let's just use PARTIAL if possible, but the requirement only cares if ALL are received.
+                }
             }
+
+            // Panggil AccountingService untuk mencatat Jurnal
+            $accountingService = new \App\Services\AccountingService();
+            $accountingService->recordGoodsReceiptJournal($gr);
         });
 
         Notification::make()->title('Penerimaan Barang berhasil disimpan dan stok telah diupdate.')->success()->send();
@@ -460,10 +504,17 @@ class GoodsReceiptPos extends Component
 
     public function render()
     {
-        $purchaseOrdersQuery = PurchaseOrder::whereIn('status', ['DRAFT', 'SENT', 'APPROVED', 'approved']);
+        $purchaseOrdersQuery = PurchaseOrder::whereIn('status', ['DRAFT', 'SENT', 'APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
+            ->whereHas('items', function ($query) {
+                $query->whereColumn('quantity_received', '<', 'quantity_ordered');
+            });
         
         if ($this->supplier_id) {
             $purchaseOrdersQuery->where('supplier_id', $this->supplier_id);
+            
+            if ($this->only_latest_po) {
+                $purchaseOrdersQuery->latest('created_at')->limit(1);
+            }
         } else {
             $purchaseOrdersQuery->where('id', null); // Don't show any PO if no supplier is selected
         }

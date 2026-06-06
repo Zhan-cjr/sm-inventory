@@ -272,6 +272,12 @@ class StockAdjustmentPos extends Component
             }
         }
 
+        if (!$needsApproval) {
+            // MENCATAT JURNAL PENYESUAIAN STOK
+            $accountingService = new \App\Services\AccountingService();
+            $accountingService->recordStockAdjustmentJournal($adj);
+        }
+
         if ($needsApproval) {
             $adj->requestApproval('Otomatis: Nominal koreksi melebihi batas (Rp ' . number_format($organization->stock_adjustment_approval_amount_limit, 0, ',', '.') . ')');
             Notification::make()->title('Koreksi Stok memerlukan persetujuan Manajer.')->warning()->send();

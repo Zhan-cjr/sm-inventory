@@ -49,32 +49,43 @@ export class DiscountEngine {
       const baseAmount = eligibleItems.reduce((sum, i) => sum + (i.quantity * parseFloat(i.unitPrice)), 0);
       const discountValue = parseFloat(promo.discount_value || 0);
       let discount = 0;
-
-      switch (promo.promo_type) {
-        case 'PERCENTAGE':
-          discount = Math.floor(baseAmount * (discountValue / 100));
-          break;
-
-        case 'FIXED':
-          discount = Math.min(discountValue, baseAmount);
-          break;
-
-        case 'TIERED':
-          discount = this.applyTieredDiscount(baseAmount, promo);
-          break;
-
-        case 'BUNDLING':
-          discount = this.applyBundlingDiscount(eligibleItems, promo);
-          break;
-
-        case 'FLASH_SALE':
-          discount = this.applyFlashSaleDiscount(eligibleItems, promo);
-          break;
-      }
-
+      const limitType = promo.promo_config?.discount_limit_type || 'PER_TRANSACTION';
       const maxDiscount = parseFloat(promo.max_discount_per_transaction || 0);
-      if (maxDiscount > 0) {
-        discount = Math.min(discount, maxDiscount);
+
+      if (limitType === 'PER_ITEM' && maxDiscount > 0 && (promo.promo_type === 'PERCENTAGE' || promo.promo_type === 'FLASH_SALE')) {
+        // Calculate discount per item line and cap it
+        discount = eligibleItems.reduce((sum, item) => {
+           let itemDiscount = 0;
+           const itemBase = item.quantity * parseFloat(item.unitPrice);
+           itemDiscount = Math.floor(itemBase * (discountValue / 100));
+           return sum + Math.min(itemDiscount, maxDiscount); // Cap per item variant
+        }, 0);
+      } else {
+        switch (promo.promo_type) {
+          case 'PERCENTAGE':
+            discount = Math.floor(baseAmount * (discountValue / 100));
+            break;
+
+          case 'FIXED':
+            discount = Math.min(discountValue, baseAmount);
+            break;
+
+          case 'TIERED':
+            discount = this.applyTieredDiscount(baseAmount, promo);
+            break;
+
+          case 'BUNDLING':
+            discount = this.applyBundlingDiscount(eligibleItems, promo);
+            break;
+
+          case 'FLASH_SALE':
+            discount = this.applyFlashSaleDiscount(eligibleItems, promo);
+            break;
+        }
+
+        if (maxDiscount > 0) {
+          discount = Math.min(discount, maxDiscount);
+        }
       }
 
       if (discount > 0) {

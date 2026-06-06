@@ -294,9 +294,15 @@ export function MobileAuthQueue({ authToken, user }) {
                     <div key={idx} style={{ background: 'var(--bg-elevated)', padding: '0.75rem', borderRadius: '8px' }}>
                       <p style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold', color: 'white' }}>{item.product_name}</p>
                       {modalData.type === 'Purchase Order' ? (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                          <span>{item.qty} x Rp {parseFloat(item.price).toLocaleString('id-ID')}</span>
-                          <strong style={{ color: '#10b981' }}>Rp {parseFloat(item.subtotal).toLocaleString('id-ID')}</strong>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            <span>{item.qty} x Rp {parseFloat(item.price).toLocaleString('id-ID')}</span>
+                            <strong style={{ color: '#10b981' }}>Rp {parseFloat(item.subtotal).toLocaleString('id-ID')}</strong>
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '0.35rem 0.5rem', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Terjual (30 Hari): <strong style={{color: 'white'}}>{item.avg_sales_per_month || 0}</strong></span>
+                            <span>Sisa Stok: <strong style={{color: 'white'}}>{item.current_stock || 0}</strong></span>
+                          </div>
                         </div>
                       ) : (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>

@@ -211,6 +211,10 @@ class SyncController extends Controller
                         }
                     }
 
+                    // Panggil AccountingService untuk catat Jurnal
+                    $accountingService = new \App\Services\AccountingService();
+                    $accountingService->recordTransactionJournal($tx);
+
                     $syncedIds[] = $txData['localId'];
 
                 } catch (\Exception $e) {

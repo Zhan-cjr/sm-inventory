@@ -8,6 +8,8 @@ use App\Models\EcommerceOrder;
 use App\Models\EcommerceOrderItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Midtrans\Config;
+use Midtrans\Snap;
 
 class EcommerceController extends Controller
 {
@@ -16,13 +18,16 @@ class EcommerceController extends Controller
      */
     public function findNearestBranch(Request $request)
     {
-        $request->validate([
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-        ]);
+        $lat = $request->query('latitude');
+        $lon = $request->query('longitude');
 
-        $lat = $request->latitude;
-        $lon = $request->longitude;
+        if (!$lat || !$lon) {
+            $fallbackBranch = Branch::where('is_active', true)->first();
+            return response()->json([
+                'branch' => $fallbackBranch,
+                'distance_km' => 0
+            ]);
+        }
 
         // Haversine formula to find nearest branch in km
         $nearestBranch = Branch::select('branches.*')
@@ -85,27 +90,63 @@ class EcommerceController extends Controller
         $branchId = $request->query('branch_id'); // Optional branch filter for pricing
         $now = now();
 
-        // Cari ID produk yang sedang promo
         $promotions = \App\Models\Promotion::where('is_active', true)
-            ->where('applicable_to', 'PRODUCT')
             ->where('valid_from', '<=', $now)
             ->where('valid_until', '>=', $now)
+            ->where(function ($query) use ($branchId) {
+                $query->whereDoesntHave('branches');
+                if ($branchId) {
+                    $query->orWhereHas('branches', function ($q) use ($branchId) {
+                        $q->where('branches.id', $branchId);
+                    });
+                }
+            })
             ->get();
 
         $promoProductIds = [];
+        $promoCategoryIds = [];
+        $promoAll = null;
+        $promoDetails = [];
+
         foreach ($promotions as $promo) {
-            if (is_array($promo->target_ids)) {
-                $promoProductIds = array_merge($promoProductIds, $promo->target_ids);
+            if ($promo->applicable_to === 'ALL') {
+                if (!$promoAll) {
+                    $promoAll = $promo;
+                }
+            } elseif ($promo->applicable_to === 'CATEGORY') {
+                if (is_array($promo->target_ids)) {
+                    foreach ($promo->target_ids as $cid) {
+                        $promoCategoryIds[] = $cid;
+                        if (!isset($promoDetails['cat_'.$cid])) {
+                            $promoDetails['cat_'.$cid] = $promo;
+                        }
+                    }
+                }
+            } elseif ($promo->applicable_to === 'PRODUCT') {
+                if (is_array($promo->target_ids)) {
+                    foreach ($promo->target_ids as $pid) {
+                        $promoProductIds[] = $pid;
+                        if (!isset($promoDetails['prod_'.$pid])) {
+                            $promoDetails['prod_'.$pid] = $promo;
+                        }
+                    }
+                }
             }
         }
         $promoProductIds = array_unique($promoProductIds);
+        $promoCategoryIds = array_unique($promoCategoryIds);
 
         $query = \App\Models\Product::query()
             ->with('category')
-            ->where('is_active', true)
-            ->where(function ($q) use ($promoProductIds) {
-                $q->where('is_ecommerce_active', true)
-                  ->orWhereIn('id', $promoProductIds);
+            ->where('products.is_active', true)
+            ->where(function ($q) use ($promoProductIds, $promoCategoryIds, $promoAll) {
+                $q->where('products.is_ecommerce_active', true);
+                if (!empty($promoProductIds)) {
+                    $q->orWhereIn('products.id', $promoProductIds);
+                }
+                if (!empty($promoCategoryIds)) {
+                    $q->orWhereIn('products.category_id', $promoCategoryIds);
+                }
             });
 
         // Jika branch_id diberikan, ambil harga dan stok dari branch tersebut menggunakan leftJoin
@@ -124,11 +165,56 @@ class EcommerceController extends Controller
             $query->withSum('stocks as stock', 'quantity_on_hand');
         }
 
-        $products = $query->get()->map(function ($product) use ($promoProductIds) {
+        $products = $query->get()->map(function ($product) use ($promoProductIds, $promoCategoryIds, $promoAll, $promoDetails) {
             if (isset($product->branch_selling_price) && $product->branch_selling_price !== null) {
                 $product->selling_price = $product->branch_selling_price;
             }
-            $product->is_promo = in_array($product->id, $promoProductIds);
+            
+            $appliedPromo = null;
+            if (in_array($product->id, $promoProductIds) && isset($promoDetails['prod_'.$product->id])) {
+                $appliedPromo = $promoDetails['prod_'.$product->id];
+            } elseif (in_array($product->category_id, $promoCategoryIds) && isset($promoDetails['cat_'.$product->category_id])) {
+                $appliedPromo = $promoDetails['cat_'.$product->category_id];
+            } elseif ($promoAll) {
+                $appliedPromo = $promoAll;
+            }
+
+            if ($appliedPromo) {
+                $product->is_promo = true;
+                $promo = $appliedPromo;
+                $product->original_price = $product->selling_price;
+                
+                // Sembunyikan data internal yang tidak perlu sebelum dikirim ke frontend
+                $cleanPromo = [
+                    'name' => $promo->name,
+                    'promo_type' => $promo->promo_type,
+                    'discount_value' => $promo->discount_value,
+                    'min_purchase_amount' => $promo->min_purchase_amount,
+                    'max_discount_per_transaction' => $promo->max_discount_per_transaction,
+                    'promo_config' => is_string($promo->promo_config) ? json_decode($promo->promo_config, true) : $promo->promo_config,
+                    'valid_until' => $promo->valid_until,
+                ];
+                $product->applied_promo = $cleanPromo;
+                
+                $discount = 0;
+                if ($promo->promo_type === 'PERCENTAGE' || $promo->promo_type === 'FLASH_SALE') {
+                    $discount = ($product->selling_price * $promo->discount_value) / 100;
+                    if ($promo->max_discount_per_transaction > 0 && $discount > $promo->max_discount_per_transaction) {
+                        $discount = $promo->max_discount_per_transaction;
+                    }
+                } elseif ($promo->promo_type === 'FIXED') {
+                    $discount = $promo->discount_value;
+                }
+                
+                // Only set original price if there is an actual discount on unit price
+                if ($discount > 0) {
+                    $product->selling_price = max(0, $product->selling_price - $discount);
+                } else {
+                    $product->original_price = null; // No strikethrough if no direct unit discount (e.g. Bundling)
+                }
+            } else {
+                $product->is_promo = false;
+            }
             
             // Format image url
             $product->image_url = $product->image_path 
@@ -153,6 +239,14 @@ class EcommerceController extends Controller
         return response()->json($branches);
     }
 
+    private function _configureMidtrans()
+    {
+        Config::$serverKey = env('MIDTRANS_SERVER_KEY');
+        Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', false);
+        Config::$isSanitized = true;
+        Config::$is3ds = true;
+    }
+
     /**
      * Kirim pesanan E-Commerce baru
      */
@@ -169,6 +263,7 @@ class EcommerceController extends Controller
             'items.*.product_id' => 'required|string|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'points_to_redeem' => 'nullable|integer|min:0',
+            'payment_method' => 'nullable|string',
         ]);
 
         $organization = \App\Models\Organization::first();
@@ -194,6 +289,48 @@ class EcommerceController extends Controller
             $totalAmount = 0;
             $itemsData = [];
 
+            $now = now();
+            $promotions = \App\Models\Promotion::where('is_active', true)
+                ->where('valid_from', '<=', $now)
+                ->where('valid_until', '>=', $now)
+                ->where(function ($query) use ($request) {
+                    $branchId = $request->branch_id;
+                    $query->whereDoesntHave('branches');
+                    if ($branchId) {
+                        $query->orWhereHas('branches', function ($q) use ($branchId) {
+                            $q->where('branches.id', $branchId);
+                        });
+                    }
+                })
+                ->get();
+
+            $promoProductIds = [];
+            $promoCategoryIds = [];
+            $promoAll = null;
+            $promoDetails = [];
+
+            foreach ($promotions as $promo) {
+                if ($promo->applicable_to === 'ALL') {
+                    if (!$promoAll) $promoAll = $promo;
+                } elseif ($promo->applicable_to === 'CATEGORY') {
+                    if (is_array($promo->target_ids)) {
+                        foreach ($promo->target_ids as $cid) {
+                            $promoCategoryIds[] = $cid;
+                            if (!isset($promoDetails['cat_'.$cid])) $promoDetails['cat_'.$cid] = $promo;
+                        }
+                    }
+                } elseif ($promo->applicable_to === 'PRODUCT') {
+                    if (is_array($promo->target_ids)) {
+                        foreach ($promo->target_ids as $pid) {
+                            $promoProductIds[] = $pid;
+                            if (!isset($promoDetails['prod_'.$pid])) $promoDetails['prod_'.$pid] = $promo;
+                        }
+                    }
+                }
+            }
+
+            $accumulatedDiscounts = [];
+
             foreach ($request->items as $item) {
                 $product = \App\Models\Product::findOrFail($item['product_id']);
                 
@@ -210,6 +347,48 @@ class EcommerceController extends Controller
                 }
 
                 $subtotal = $price * $item['quantity'];
+
+                $appliedPromo = null;
+                if (in_array($product->id, $promoProductIds) && isset($promoDetails['prod_'.$product->id])) {
+                    $appliedPromo = $promoDetails['prod_'.$product->id];
+                } elseif (in_array($product->category_id, $promoCategoryIds) && isset($promoDetails['cat_'.$product->category_id])) {
+                    $appliedPromo = $promoDetails['cat_'.$product->category_id];
+                } elseif ($promoAll) {
+                    $appliedPromo = $promoAll;
+                }
+
+                if ($appliedPromo) {
+                    $promo = $appliedPromo;
+                    $limitType = $promo->promo_config['discount_limit_type'] ?? 'PER_TRANSACTION';
+                    $maxDiscount = $promo->max_discount_per_transaction;
+
+                    $unitDiscount = 0;
+                    if ($promo->promo_type === 'PERCENTAGE' || $promo->promo_type === 'FLASH_SALE') {
+                        $unitDiscount = ($price * $promo->discount_value) / 100;
+                        if ($maxDiscount > 0 && $limitType === 'PER_ITEM') {
+                            if ($unitDiscount > $maxDiscount) {
+                                $unitDiscount = $maxDiscount;
+                            }
+                        }
+                    } elseif ($promo->promo_type === 'FIXED') {
+                        $unitDiscount = $promo->discount_value;
+                    }
+                    
+                    $lineDiscount = $unitDiscount * $item['quantity'];
+                    
+                    if ($maxDiscount > 0 && $limitType === 'PER_TRANSACTION') {
+                        if (!isset($accumulatedDiscounts[$promo->id])) $accumulatedDiscounts[$promo->id] = 0;
+                        
+                        $remainingQuota = max(0, $maxDiscount - $accumulatedDiscounts[$promo->id]);
+                        if ($lineDiscount > $remainingQuota) {
+                            $lineDiscount = $remainingQuota;
+                        }
+                        $accumulatedDiscounts[$promo->id] += $lineDiscount;
+                    }
+
+                    $subtotal = max(0, $subtotal - $lineDiscount);
+                }
+
                 $totalAmount += $subtotal;
 
                 $itemsData[] = [
@@ -235,6 +414,9 @@ class EcommerceController extends Controller
 
             $finalAmount = max(0, $totalAmount - $pointsRedeemedDiscount);
 
+            $paymentMethod = $request->input('payment_method', 'CASH');
+            $paymentStatus = $paymentMethod === 'CASH' ? 'UNPAID' : 'UNPAID'; // Both start UNPAID, but non-cash will use Midtrans
+
             // Create Order
             $order = EcommerceOrder::create([
                 'organization_id' => $orgId,
@@ -247,6 +429,8 @@ class EcommerceController extends Controller
                 'total_amount' => $finalAmount,
                 'points_redeemed' => $actualPointsToRedeem,
                 'points_redeemed_discount' => $pointsRedeemedDiscount,
+                'payment_method' => $paymentMethod,
+                'payment_status' => $paymentStatus,
                 'notes' => $request->notes,
             ]);
 
@@ -313,6 +497,75 @@ class EcommerceController extends Controller
                 $earnedPoints = floor($finalAmount / $pointConversionRate);
                 if ($earnedPoints > 0) {
                     $customer->addPoints($earnedPoints, 'ECOMMERCE_ORDER', $order->id, "Belanja E-Commerce: #{$orderIdShort}");
+                }
+            }
+
+            // Generate Midtrans Snap Token if payment method is MIDTRANS or NON_CASH
+            if (in_array($paymentMethod, ['MIDTRANS', 'QRIS', 'TRANSFER']) && $finalAmount > 0) {
+                $this->_configureMidtrans();
+
+                $params = [
+                    'transaction_details' => [
+                        'order_id' => $order->id,
+                        'gross_amount' => (int)$finalAmount,
+                    ],
+                    'customer_details' => [
+                        'first_name' => $request->customer_name,
+                        'phone' => $request->customer_phone,
+                    ],
+                ];
+
+                try {
+                    $snapToken = Snap::getSnapToken($params);
+                    $order->update(['snap_token' => $snapToken]);
+                } catch (\Exception $e) {
+                    \Log::error('Midtrans Error: ' . $e->getMessage());
+                }
+            }
+
+            // Send Telegram Notification
+            $token = env('TELEGRAM_BOT_TOKEN');
+            if ($token) {
+                $supervisors = \App\Models\User::whereNotNull('telegram_chat_id')
+                    ->where(function($q) use ($order) {
+                        if ($order->branch_id) {
+                            $q->where('branch_id', $order->branch_id)
+                              ->orWhereNull('branch_id');
+                        } else {
+                            $q->whereNull('branch_id');
+                        }
+                    })
+                    ->get();
+
+                // Filter manually for roles that can manage (to avoid complex spatie queries in closure)
+                $supervisors = $supervisors->filter(function($u) {
+                    $role = strtoupper($u->role ?? 'CASHIER');
+                    if (in_array($role, ['MANAGER', 'SUPERVISOR', 'ADMIN', 'SUPER_ADMIN'])) return true;
+                    if ($u->hasRole(['superadmin', 'admin', 'manager'])) return true;
+                    return false;
+                });
+
+                if ($supervisors->count() > 0) {
+                    $branchName = $order->branch ? $order->branch->name : 'Pusat';
+                    $baseUrl = env('FRONTEND_URL', request()->getSchemeAndHttpHost());
+                    $link = rtrim($baseUrl, '/') . "/mobile/ecommerce";
+                    $totalFormatted = number_format($order->total_amount, 0, ',', '.');
+                    
+                    $message = "🛒 *Pesanan E-Commerce Baru*\n\n";
+                    $message .= "Cabang: {$branchName}\n";
+                    $message .= "Pelanggan: {$order->customer_name}\n";
+                    $message .= "Total: Rp {$totalFormatted}\n";
+                    $message .= "Metode: {$order->delivery_method}\n\n";
+                    $message .= "Silakan cek dan proses pesanan di tautan berikut:\n{$link}";
+
+                    foreach ($supervisors as $spv) {
+                        \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+                            'chat_id' => $spv->telegram_chat_id,
+                            'text' => $message,
+                            'parse_mode' => 'Markdown',
+                            'disable_web_page_preview' => true,
+                        ]);
+                    }
                 }
             }
 
@@ -460,7 +713,9 @@ class EcommerceController extends Controller
                     'delivery_address' => $order->delivery_address,
                     'branch_name' => $order->branch?->name ?? 'Pusat',
                     'cashier_name' => 'Online System',
-                    'payment_method' => 'TRANSFER',
+                    'payment_method' => $order->payment_method ?? 'TRANSFER',
+                    'payment_status' => $order->payment_status ?? 'UNPAID',
+                    'snap_token' => $order->snap_token,
                     'is_voided' => false,
                     'items' => $order->items->map(function ($item) {
                         return [
@@ -588,8 +843,20 @@ class EcommerceController extends Controller
         
         \App\Services\WhatsappService::sendMessage($customer->phone, $message);
 
+        // Backup notifikasi via Email jika ada
+        if ($customer->email) {
+            try {
+                \Mail::raw("Halo {$customer->name},\n\nKode OTP untuk mereset kata sandi member Toserba Selamat Anda adalah: {$otp}.\n\nKode ini berlaku selama 5 menit. Mohon tidak membagikan kode ini kepada siapapun demi keamanan akun Anda.", function ($mailMsg) use ($customer) {
+                    $mailMsg->to($customer->email)
+                        ->subject('Kode OTP Reset Kata Sandi');
+                });
+            } catch (\Exception $e) {
+                \Log::error('Failed to send email OTP: ' . $e->getMessage());
+            }
+        }
+
         return response()->json([
-            'message' => 'Kode OTP untuk reset kata sandi telah dikirim ke nomor WhatsApp Anda.',
+            'message' => 'Kode OTP untuk reset kata sandi telah dikirim ke nomor WhatsApp dan Email Anda.',
         ], 200);
     }
 
@@ -657,6 +924,255 @@ class EcommerceController extends Controller
         return response()->json([
             'phone' => $phone,
             'otp' => $otp,
+        ]);
+    }
+    /**
+     * Webhook notifikasi dari Midtrans
+     */
+    public function paymentNotification(Request $request)
+    {
+        \Log::info('Midtrans Webhook Received:', $request->all());
+
+        try {
+            $this->_configureMidtrans();
+            $notif = new \Midtrans\Notification();
+        } catch (\Exception $e) {
+            \Log::error('Midtrans Notification Error: ' . $e->getMessage());
+            
+            // If Midtrans test notification throws 404 (Transaction doesn't exist), accept it
+            if (strpos($e->getMessage(), '404') !== false || strpos($e->getMessage(), 'exist') !== false) {
+                return response()->json(['message' => 'Test notification accepted'], 200);
+            }
+
+            return response()->json(['message' => 'Error initializing notification'], 500);
+        }
+
+        $transaction = $notif->transaction_status;
+        $type = $notif->payment_type;
+        $orderId = $notif->order_id;
+        $fraud = $notif->fraud_status ?? null;
+
+        // Parse order_id because we might append -{timestamp} to generate new tokens
+        $rawOrderId = $notif->order_id;
+        
+        // Midtrans test webhook sends dummy data that might not be a UUID
+        if (strpos($rawOrderId, 'payment_notif_test') !== false) {
+            $orderId = $rawOrderId;
+        } else {
+            // Our Order ID is a UUID which is exactly 36 characters long
+            $orderId = substr($rawOrderId, 0, 36);
+        }
+
+        $order = EcommerceOrder::find($orderId);
+        
+        if (!$order) {
+            // Midtrans test webhook sends dummy data that won't exist in our DB
+            return response()->json(['message' => 'Order not found, but accepted for test'], 200);
+        }
+
+        if ($transaction == 'capture') {
+            if ($type == 'credit_card') {
+                if ($fraud == 'challenge') {
+                    $order->update(['payment_status' => 'CHALLENGE']);
+                } else {
+                    $order->update(['payment_status' => 'PAID']);
+                }
+            }
+        } else if ($transaction == 'settlement') {
+            $order->update(['payment_status' => 'PAID']);
+        } else if ($transaction == 'pending') {
+            if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
+                $order->update(['payment_status' => 'PENDING']);
+            }
+        } else if ($transaction == 'deny') {
+            $order->update(['payment_status' => 'FAILED']);
+        } else if ($transaction == 'expire') {
+            if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
+                $order->update(['payment_status' => 'EXPIRED']);
+            }
+        } else if ($transaction == 'cancel') {
+            if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
+                $order->update(['payment_status' => 'CANCELED']);
+            }
+        }
+
+        return response()->json(['message' => 'Notification processed']);
+    }
+
+    /**
+     * Refresh Midtrans Snap Token for an existing order (Allows user to change payment method)
+     */
+    public function refreshPaymentToken($id)
+    {
+        $order = EcommerceOrder::find($id);
+
+        if (!$order) {
+            return response()->json(['message' => 'Order not found'], 404);
+        }
+
+        if (in_array($order->payment_status, ['PAID', 'SUCCESS', 'CANCELED'])) {
+            return response()->json(['message' => 'Cannot refresh token for this order status'], 400);
+        }
+
+        if ($order->payment_method !== 'MIDTRANS' && $order->payment_method !== 'QRIS' && $order->payment_method !== 'TRANSFER') {
+            return response()->json(['message' => 'Not a Midtrans order'], 400);
+        }
+
+        $this->_configureMidtrans();
+
+        $params = [
+            'transaction_details' => [
+                'order_id' => $order->id . '-' . time(), // Append timestamp to bypass duplicate order_id rejection
+                'gross_amount' => (int)$order->total_amount,
+            ],
+            'customer_details' => [
+                'first_name' => $order->customer_name,
+                'phone' => $order->customer_phone,
+            ],
+        ];
+
+        try {
+            $snapToken = Snap::getSnapToken($params);
+            $order->update(['snap_token' => $snapToken]);
+            
+            return response()->json([
+                'message' => 'Payment token refreshed',
+                'snap_token' => $snapToken
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Midtrans Refresh Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal membuat sesi pembayaran baru.'], 500);
+        }
+    }
+
+    /**
+     * Get pending ecommerce orders for staff dashboard
+     */
+    public function getPendingOrders(Request $request)
+    {
+        $user = $request->user();
+        
+        $spatieRoles = $user->roles->pluck('name')->toArray();
+        $dbRole = $user->role;
+        $role = $dbRole ?: 'CASHIER';
+
+        if (in_array('superadmin', $spatieRoles) || in_array('SUPER_ADMIN', $spatieRoles)) {
+            $role = 'SUPER_ADMIN';
+        } elseif (in_array('admin', $spatieRoles) || in_array('ADMIN', $spatieRoles)) {
+            $role = 'ADMIN';
+        }
+
+        if (!in_array(strtoupper($role), ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SUPER_ADMIN'])) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $query = EcommerceOrder::with(['items.product', 'branch:id,name'])
+            ->whereIn('status', ['PENDING', 'PROCESSING']);
+
+        $branchId = $user->branch_id;
+        $isAdmin = in_array(strtoupper($role), ['ADMIN', 'SUPER_ADMIN']);
+        if (!$branchId || $isAdmin) {
+            $branchId = $request->query('branch_id') ?: $branchId;
+        }
+
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+
+        $orders = $query->orderBy('created_at', 'desc')->get();
+
+        return response()->json(['data' => $orders]);
+    }
+
+    /**
+     * Process an ecommerce order (Accept or Reject)
+     */
+    public function processOrder(Request $request, $id)
+    {
+        $user = $request->user();
+        $order = EcommerceOrder::find($id);
+        
+        if (!$order) {
+            return response()->json(['error' => 'Pesanan tidak ditemukan'], 404);
+        }
+
+        if ($user->branch_id !== null && $order->branch_id !== $user->branch_id) {
+            return response()->json(['error' => 'Akses ditolak: Anda tidak dapat memproses pesanan di luar cabang Anda'], 403);
+        }
+
+        $action = $request->input('action'); // 'approve' or 'reject'
+        
+        if (!in_array($order->status, ['PENDING', 'PROCESSING'])) {
+            return response()->json(['error' => 'Pesanan sudah diproses sebelumnya atau selesai'], 400);
+        }
+
+        if ($action === 'approve' && $order->status === 'PENDING') {
+            $order->update([
+                'status' => 'PROCESSING',
+                'processed_by' => $user->id
+            ]);
+            return response()->json(['message' => 'Pesanan diterima dan sedang diproses', 'data' => $order]);
+        } elseif ($action === 'reject' && in_array($order->status, ['PENDING', 'PROCESSING'])) {
+            $order->update(['status' => 'CANCELLED']); // EcommerceOrderObserver will handle stock & points rollback
+            return response()->json(['message' => 'Pesanan dibatalkan. Stok dikembalikan.', 'data' => $order]);
+        } elseif ($action === 'complete' && $order->status === 'PROCESSING') {
+            $order->update(['status' => 'COMPLETED']);
+            return response()->json(['message' => 'Pesanan telah selesai.', 'data' => $order]);
+        }
+
+        return response()->json(['error' => 'Aksi tidak valid'], 400);
+    }
+
+    /**
+     * Update member profile
+     */
+    public function updateMemberProfile(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|uuid',
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'address' => 'nullable|string'
+        ]);
+
+        $customer = \App\Models\Customer::find($request->id);
+        if (!$customer) {
+            return response()->json(['error' => 'Customer not found'], 404);
+        }
+
+        $oldPhone = $customer->phone;
+        $newPhone = $request->phone;
+
+        // Check if new phone is already taken by another customer
+        if ($oldPhone !== $newPhone) {
+            $existing = \App\Models\Customer::where('phone', $newPhone)->where('id', '!=', $customer->id)->first();
+            if ($existing) {
+                return response()->json(['error' => 'Nomor telepon sudah digunakan oleh akun lain.'], 400);
+            }
+        }
+
+        $customer->update([
+            'name' => $request->name,
+            'phone' => $newPhone,
+            'email' => $request->email,
+            'address' => $request->address
+        ]);
+
+        if ($oldPhone !== $newPhone && $customer->email) {
+            try {
+                \Mail::raw("Halo {$customer->name},\n\nNomor telepon (username) untuk login ke Toserba Selamat Anda telah berhasil diubah dari {$oldPhone} menjadi {$newPhone}.\n\nSilakan gunakan nomor baru tersebut untuk login selanjutnya.", function ($message) use ($customer) {
+                    $message->to($customer->email)
+                        ->subject('Perubahan Nomor Telepon (Username) Akun');
+                });
+            } catch (\Exception $e) {
+                \Log::error('Failed to send email profile update: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'message' => 'Profil berhasil diperbarui.',
+            'user' => $customer
         ]);
     }
 }

@@ -30,6 +30,8 @@ Route::prefix('v1/ecommerce')->group(function () {
     Route::get('nearest-branch', [EcommerceController::class, 'findNearestBranch']);
     Route::get('branches', [EcommerceController::class, 'getBranches']);
     Route::post('orders', [EcommerceController::class, 'createOrder']);
+    Route::post('orders/{id}/refresh-payment', [EcommerceController::class, 'refreshPaymentToken']);
+    Route::post('payment/notification', [EcommerceController::class, 'paymentNotification']);
     Route::post('members', [EcommerceController::class, 'registerMember']);
     Route::post('members/login', [EcommerceController::class, 'memberLogin']);
     Route::get('members/history', [EcommerceController::class, 'getMemberHistory']);
@@ -37,6 +39,7 @@ Route::prefix('v1/ecommerce')->group(function () {
     Route::post('members/forgot-password', [EcommerceController::class, 'forgotPassword']);
     Route::get('members/debug-otp', [EcommerceController::class, 'debugLastOtp']);
     Route::post('members/reset-password', [EcommerceController::class, 'resetPassword']);
+    Route::put('customer/profile', [EcommerceController::class, 'updateMemberProfile']);
 });
 
 Route::prefix('v1')->group(function () {
@@ -68,6 +71,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/document-approvals/pending', [\App\Http\Controllers\Api\V1\DocumentApprovalController::class, 'pending']);
         Route::get('/document-approvals/{id}/details', [\App\Http\Controllers\Api\V1\DocumentApprovalController::class, 'details']);
         Route::post('/document-approvals/{id}/{action}', [\App\Http\Controllers\Api\V1\DocumentApprovalController::class, 'action']);
+        
+        // E-Commerce Management for Staff/Admin
+        Route::get('/ecommerce/pending', [EcommerceController::class, 'getPendingOrders']);
+        Route::post('/ecommerce/{id}/process', [EcommerceController::class, 'processOrder']);
         
         // Transaction retrieval for POS Return
         Route::get('/transactions/latest', [\App\Http\Controllers\Api\V1\TransactionController::class, 'getLatestTransaction']);
@@ -163,10 +170,21 @@ Route::prefix('v1')->group(function () {
         // Get Active Promotions
         Route::get('/promotions', function (Request $request) {
             $now = now();
+            $user = $request->user();
+            $branchId = $user->branch_id;
+            
             return response()->json(
                 \App\Models\Promotion::where('is_active', true)
                     ->where('valid_from', '<=', $now)
                     ->where('valid_until', '>=', $now)
+                    ->where(function ($query) use ($branchId) {
+                        $query->whereDoesntHave('branches');
+                        if ($branchId) {
+                            $query->orWhereHas('branches', function ($q) use ($branchId) {
+                                $q->where('branches.id', $branchId);
+                            });
+                        }
+                    })
                     ->get()
             );
         });

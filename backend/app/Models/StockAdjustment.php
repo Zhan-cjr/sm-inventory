@@ -66,6 +66,10 @@ class StockAdjustment extends Model
         // Update status to COMPLETED after approval
         $this->update(['status' => 'COMPLETED']);
 
+        // MENCATAT JURNAL PENYESUAIAN STOK (ENTERPRISE)
+        $accountingService = new \App\Services\AccountingService();
+        $accountingService->recordStockAdjustmentJournal($this);
+
         return $result;
     }
 }

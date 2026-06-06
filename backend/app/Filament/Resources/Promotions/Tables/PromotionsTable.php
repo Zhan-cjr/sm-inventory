@@ -112,6 +112,12 @@ class PromotionsTable
                     ->label('Berlaku Sampai')
                     ->dateTime()
                     ->sortable(),
+                TextColumn::make('branches.name')
+                    ->label('Berlaku di Cabang')
+                    ->badge()
+                    ->separator(',')
+                    ->searchable()
+                    ->placeholder('Semua Cabang / Tidak Ditentukan'),
                 TextColumn::make('max_discount_per_transaction')
                     ->label('Maksimal Diskon')
                     ->money('IDR')

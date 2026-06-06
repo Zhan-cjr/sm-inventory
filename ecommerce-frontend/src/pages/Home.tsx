@@ -3,7 +3,7 @@ import PromoCarousel from '../components/PromoCarousel';
 import CategoryIcons from '../components/CategoryIcons';
 import ProductGrid from '../components/ProductGrid';
 import MemberWidget from '../components/MemberWidget';
-import { Truck, Clock, CreditCard, RotateCcw } from 'lucide-react';
+import { Truck, ShieldCheck, CreditCard, RotateCcw } from 'lucide-react';
 import { useEcom } from '../context/EcomContext';
 
 const Home = () => {
@@ -16,46 +16,46 @@ const Home = () => {
       <CategoryIcons />
       
       {/* Value Propositions / Features */}
-      <div className="bg-white border-y border-slate-100 py-6 sm:py-10 mt-2">
+      <div className="bg-white py-8 sm:py-12 mt-4 shadow-[0_4px_40px_-10px_rgba(0,0,0,0.03)] border-y border-slate-100 relative z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-blue/5 flex items-center justify-center text-brand-blue flex-shrink-0">
-                <Truck className="size-5 sm:size-6" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-3 sm:gap-4 group cursor-default">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-brand-blue/5 flex items-center justify-center text-brand-blue flex-shrink-0 transition-all duration-300 group-hover:bg-brand-blue group-hover:text-white group-hover:shadow-lg group-hover:-translate-y-1">
+                <Truck className="size-6 sm:size-7" />
               </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-xs sm:text-sm">Ambil di Cabang</h4>
-                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Praktis & bebas ongkir</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green flex-shrink-0">
-                <Clock className="size-5 sm:size-6" />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-xs sm:text-sm">Layanan 24 Jam</h4>
-                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Belanja kapan saja</p>
+              <div className="pt-1">
+                <h4 className="font-bold text-slate-800 text-sm sm:text-base">Ambil di Toko</h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">Pesan via aplikasi, ambil pesanan langsung di cabang tanpa antre panjang</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-red/10 flex items-center justify-center text-brand-red flex-shrink-0">
-                <CreditCard className="size-5 sm:size-6" />
+            <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-3 sm:gap-4 group cursor-default">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-brand-green/10 flex items-center justify-center text-brand-green flex-shrink-0 transition-all duration-300 group-hover:bg-brand-green group-hover:text-white group-hover:shadow-lg group-hover:-translate-y-1">
+                <ShieldCheck className="size-6 sm:size-7" />
               </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-xs sm:text-sm">Pembayaran Aman</h4>
-                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Beragam metode transfer</p>
+              <div className="pt-1">
+                <h4 className="font-bold text-slate-800 text-sm sm:text-base">Kualitas Terjamin</h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">Produk selalu segar dan melalui proses sortir sebelum diserahkan</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 flex-shrink-0">
-                <RotateCcw className="size-5 sm:size-6" />
+            <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-3 sm:gap-4 group cursor-default">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-brand-red/10 flex items-center justify-center text-brand-red flex-shrink-0 transition-all duration-300 group-hover:bg-brand-red group-hover:text-white group-hover:shadow-lg group-hover:-translate-y-1">
+                <CreditCard className="size-6 sm:size-7" />
               </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-xs sm:text-sm">Garansi Produk</h4>
-                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">Retur jika rusak/kadaluarsa</p>
+              <div className="pt-1">
+                <h4 className="font-bold text-slate-800 text-sm sm:text-base">Pembayaran Mudah</h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">Dukung QRIS, transfer antar bank, hingga pembayaran tunai di kasir</p>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-3 sm:gap-4 group cursor-default">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 flex-shrink-0 transition-all duration-300 group-hover:bg-amber-500 group-hover:text-white group-hover:shadow-lg group-hover:-translate-y-1">
+                <RotateCcw className="size-6 sm:size-7" />
+              </div>
+              <div className="pt-1">
+                <h4 className="font-bold text-slate-800 text-sm sm:text-base">Garansi Penukaran</h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">Proses retur cepat jika barang cacat produksi atau kadaluarsa</p>
               </div>
             </div>
           </div>

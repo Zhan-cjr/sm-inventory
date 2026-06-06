@@ -10,6 +10,10 @@ class PurchaseOrderItem extends Model
 {
     use HasUuids;
 
+    protected $attributes = [
+        'quantity_received' => 0,
+    ];
+
     protected $fillable = [
         'purchase_order_id', 'product_id', 'quantity_ordered', 
         'quantity_received', 'unit_cost', 'discount_1', 'discount_2', 'discount_3', 'subtotal'

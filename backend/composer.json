@@ -12,6 +12,7 @@
         "laravel/framework": "^13.7",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0",
+        "midtrans/midtrans-php": "^2.6",
         "picqer/php-barcode-generator": "^3.2",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-permission": "^7.4"

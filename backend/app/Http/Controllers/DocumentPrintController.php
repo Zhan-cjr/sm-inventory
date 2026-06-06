@@ -14,6 +14,9 @@ class DocumentPrintController extends Controller
     public function print(Request $request, $type)
     {
         $ids = $request->input('ids', []);
+        if ($request->has('id')) {
+            $ids[] = $request->input('id');
+        }
         
         if (empty($ids)) {
             abort(404, 'Tidak ada dokumen yang dipilih');
@@ -41,6 +44,12 @@ class DocumentPrintController extends Controller
                 $viewName = 'print.documents.goods-receipt';
                 $title = 'Nota Penerimaan Barang';
                 break;
+            case 'purchase-return':
+                $documents = \App\Models\PurchaseReturn::with(['supplier', 'branch', 'items.product', 'goodsReceipt'])
+                    ->whereIn('id', $ids)->get();
+                $viewName = 'print.documents.purchase-return';
+                $title = 'Nota Retur Pembelian';
+                break;
             case 'adjustment':
                 $documents = StockAdjustment::with(['branch', 'adjustmentReason', 'items.product', 'recorder'])
                     ->whereIn('id', $ids)->get();
@@ -52,6 +61,12 @@ class DocumentPrintController extends Controller
                     ->whereIn('id', $ids)->get();
                 $viewName = 'print.documents.stock-transfer';
                 $title = 'Nota Stok Transfer';
+                break;
+            case 'expense':
+                $documents = \App\Models\Expense::with(['branch', 'expenseAccount', 'paymentAccount', 'creator'])
+                    ->whereIn('id', $ids)->get();
+                $viewName = 'print.documents.expense';
+                $title = 'Bukti Pengeluaran Kas';
                 break;
             default:
                 abort(404, 'Tipe dokumen tidak didukung');

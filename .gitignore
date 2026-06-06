@@ -1,0 +1,6 @@
+desktop-pos/build_dist/
+*.sql
+desktop-pos/node_modules/
+ecommerce-frontend/node_modules/
+frontend/node_modules/
+backend/vendor/

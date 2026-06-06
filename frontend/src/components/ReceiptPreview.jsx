@@ -238,14 +238,20 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
   }, []);
 
   const handlePrintRawText = () => {
-    // ESC p 0 25 250 (Buka Cash Drawer 1)
-    const rawText = '\x1B\x70\x00\x19\xFA' + generateRawTextReceipt(transaction, branchSettings, 35);
-    const htmlString = '<html><head><title>Struk ESC/POS</title><style>@page { margin: 0; } body { margin: 0; padding: 0 0 0 12mm; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>';
+    // Removed ESC p 0 25 250 (Buka Cash Drawer 1) due to null bytes blocking print dialogs
+    const rawText = generateRawTextReceipt(transaction, branchSettings, 35);
     
-    if (window.electronAPI) {
-      window.electronAPI.silentPrint(htmlString, autoPrintSettings?.printerName);
-      if (onClose) onClose();
+    if (window.electronAPI && window.electronAPI.printRaw) {
+      window.electronAPI.printRaw(rawText, autoPrintSettings?.printerName).then(() => {
+        if (onClose) onClose();
+      });
     } else {
+      const htmlString = '<html><head><title>Struk ESC/POS</title><style>@page { margin: 0; } body { margin: 0; padding: 0 0 0 12mm; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>';
+      
+      if (window.electronAPI) {
+        window.electronAPI.silentPrint(htmlString, autoPrintSettings?.printerName);
+        if (onClose) onClose();
+      } else {
       const iframe = document.createElement('iframe');
       iframe.style.position = 'absolute';
       iframe.style.width = '0px';
@@ -267,6 +273,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
           if (onClose) onClose();
         }, 1000);
       }, 500);
+      }
     }
   };
 

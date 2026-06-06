@@ -10,14 +10,27 @@ class DocumentApprovalController extends Controller
 {
     public function pending(Request $request)
     {
+        $user = auth()->user();
         $branchId = $request->query('branch_id');
+
+        $allowedTypes = [];
+        if ($user->hasCustomAuthorization('APPROVE_PO')) {
+            $allowedTypes[] = \App\Models\PurchaseOrder::class;
+        }
+        if ($user->hasCustomAuthorization('APPROVE_STOCK_ADJUSTMENT')) {
+            $allowedTypes[] = \App\Models\StockAdjustment::class;
+        }
+
+        if (empty($allowedTypes)) {
+            return response()->json(['data' => []]);
+        }
 
         $query = Approval::with(['approvable', 'approvable.branch'])
             ->where('status', 'pending')
-            ->whereIn('approvable_type', [\App\Models\PurchaseOrder::class, \App\Models\StockAdjustment::class]);
+            ->whereIn('approvable_type', $allowedTypes);
 
         if ($branchId) {
-            $query->whereHasMorph('approvable', [\App\Models\PurchaseOrder::class, \App\Models\StockAdjustment::class], function ($q) use ($branchId) {
+            $query->whereHasMorph('approvable', $allowedTypes, function ($q) use ($branchId) {
                 $q->where('branch_id', $branchId);
             });
         }
@@ -120,13 +133,36 @@ class DocumentApprovalController extends Controller
                 'date' => $model->po_date?->format('d-m-Y'),
                 'total' => $model->total_amount,
                 'notes' => $model->notes,
-                'items' => $model->items->map(function ($item) {
+                'items' => $model->items->map(function ($item) use ($model) {
+                    $thirtyDaysAgo = \Carbon\Carbon::now()->subDays(30);
+                    
+                    // 1. Total penjualan 30 hari terakhir (Mengambil langsung dari Kartu Stok / Inventory Log)
+                    $soldLast30Days = \App\Models\InventoryLog::where('product_id', $item->product_id)
+                        ->where('created_at', '>=', $thirtyDaysAgo)
+                        ->where('log_type', 'SALE')
+                        ->when($model->branch_id, function($q) use ($model) {
+                            return $q->where('branch_id', $model->branch_id);
+                        })
+                        ->sum('quantity_change');
+                        
+                    // Karena penjualan mengurangi stok (minus), kita absolutkan nilainya
+                    $soldLast30Days = abs($soldLast30Days);
+
+                    // 2. Ambil Stok Fisik Saat Ini
+                    $stockQuery = \App\Models\Stock::where('product_id', $item->product_id);
+                    if ($model->branch_id) {
+                        $stockQuery->where('branch_id', $model->branch_id);
+                    }
+                    $currentStock = $stockQuery->sum('quantity_on_hand');
+
                     return [
                         'product_name' => $item->product?->name,
                         'product_sku' => $item->product?->sku,
                         'qty' => $item->quantity_ordered,
                         'price' => $item->unit_cost,
                         'subtotal' => $item->subtotal,
+                        'avg_sales_per_month' => (float) $soldLast30Days,
+                        'current_stock' => (float) $currentStock,
                     ];
                 })
             ]);
