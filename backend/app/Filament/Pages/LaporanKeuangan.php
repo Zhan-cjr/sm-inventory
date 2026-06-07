@@ -108,9 +108,8 @@ class LaporanKeuangan extends Page implements HasForms
             return ['accountBalances' => [], 'netProfit' => 0];
         }
 
-        // Ambil semua akun untuk organisasi ini
+        // Ambil semua akun untuk organisasi ini (termasuk non-aktif agar balance tidak selisih jika ada riwayat)
         $accounts = Account::where('organization_id', $this->organization_id)
-            ->where('is_active', true)
             ->orderBy('account_code')
             ->get();
 

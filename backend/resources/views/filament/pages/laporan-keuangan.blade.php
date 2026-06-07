@@ -4,7 +4,7 @@
             {{ $this->form }}
             
             <div class="flex justify-end gap-3" style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem;">
-                <x-filament::button type="button" wire:click="printReport" icon="heroicon-o-printer" color="success">
+                <x-filament::button tag="a" href="{{ route('print.report', ['type' => 'laporan_keuangan', 'start_date' => $this->start_date, 'end_date' => $this->end_date, 'branch_id' => $this->branch_id]) }}" target="_blank" icon="heroicon-o-printer" color="success">
                     Cetak Laporan
                 </x-filament::button>
                 <x-filament::button type="submit" icon="heroicon-o-funnel">
@@ -13,16 +13,6 @@
             </div>
         </form>
     </x-filament::section>
-
-    @push('scripts')
-    <script>
-        document.addEventListener('livewire:init', () => {
-            Livewire.on('open-print-url', (event) => {
-                window.open(event[0].url, '_blank');
-            });
-        });
-    </script>
-    @endpush
 
     @php
         $data = $this->getViewData();

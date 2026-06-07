@@ -1100,7 +1100,6 @@ class ReportPrintController extends Controller
         }
 
         $accounts = \App\Models\Account::where('organization_id', $organizationId)
-            ->where('is_active', true)
             ->orderBy('account_code')
             ->get();
 
