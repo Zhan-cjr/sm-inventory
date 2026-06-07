@@ -4,3 +4,9 @@ desktop-pos/node_modules/
 ecommerce-frontend/node_modules/
 frontend/node_modules/
 backend/vendor/
+
+# SECURITY: Pastikan semua file .env tidak ikut ke push!
+.env
+.env.*
+**/.env
+**/.env.*

@@ -42,7 +42,9 @@
         $totalRevenues = array_sum(array_column($revenues, 'balance'));
         $totalExpenses = array_sum(array_column($expenses, 'balance'));
         
-        $totalLiabEq = $totalLiabilities + $totalEquities + $netProfit;
+        $retainedEarnings = $data['retainedEarnings'] ?? 0;
+        
+        $totalLiabEq = $totalLiabilities + $totalEquities + $retainedEarnings + $netProfit;
         $isBalanced = round($totalAssets, 2) == round($totalLiabEq, 2);
     @endphp
 
@@ -156,7 +158,14 @@
                         <div style="color: #6b7280; font-style: italic;">Tidak ada data ekuitas.</div>
                     @endforelse
                     
-                    {{-- Tambahkan Laba Tahun Berjalan di Ekuitas agar Balance --}}
+                    {{-- Tambahkan Laba Ditahan dan Laba Tahun Berjalan di Ekuitas agar Balance --}}
+                    @if($retainedEarnings != 0)
+                    <div style="display: flex; justify-content: space-between; padding-top: 0.25rem; padding-bottom: 0.25rem; color: #4f46e5;">
+                        <span>Laba Ditahan (Periode Sebelumnya)</span>
+                        <span style="font-family: monospace;">Rp {{ number_format($retainedEarnings, 0, ',', '.') }}</span>
+                    </div>
+                    @endif
+                    
                     <div style="display: flex; justify-content: space-between; padding-top: 0.25rem; padding-bottom: 0.25rem; color: #4f46e5; font-weight: 500;">
                         <span>Laba Bersih Berjalan</span>
                         <span style="font-family: monospace;">Rp {{ number_format($netProfit, 0, ',', '.') }}</span>

@@ -39,6 +39,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->brandName('SM Inventory')
             ->brandLogo(fn () => view('filament.brand'))
+            ->favicon(asset('favicon.png'))
             ->font('Plus Jakarta Sans', 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap')
             ->topNavigation()
             ->spa()

@@ -142,6 +142,14 @@
                 <td class="amount">{{ number_format($item['balance'], 0, ',', '.') }}</td>
             </tr>
             @endforeach
+            @if(isset($retainedEarnings) && $retainedEarnings != 0)
+            <tr>
+                <td>-</td>
+                <td>Laba Ditahan (Periode Sebelumnya)</td>
+                <td class="amount">{{ number_format($retainedEarnings, 0, ',', '.') }}</td>
+            </tr>
+            @php $totalEquity += $retainedEarnings; @endphp
+            @endif
             <tr>
                 <td>-</td>
                 <td>Laba Berjalan (Net Profit)</td>

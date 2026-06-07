@@ -114,12 +114,14 @@ class LaporanKeuangan extends Page implements HasForms
             ->orderBy('account_code')
             ->get();
 
-        // Hitung Saldo per Akun berdasarkan Journal Entries di rentang waktu
+        // Hitung Saldo per Akun berdasarkan Journal Entries
         $accountBalances = [];
         $netProfit = 0;
+        $retainedEarnings = 0;
 
         foreach ($accounts as $account) {
-            $lines = JournalEntryLine::where('account_id', $account->id)
+            // 1. Current Period (untuk Laba Rugi)
+            $linesCurrent = JournalEntryLine::where('account_id', $account->id)
                 ->whereHas('journalEntry', function ($query) {
                     $query->where('status', 'posted');
                     if ($this->start_date) {
@@ -135,17 +137,62 @@ class LaporanKeuangan extends Page implements HasForms
                 ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
                 ->first();
 
-            $debit = $lines->total_debit ?? 0;
-            $credit = $lines->total_credit ?? 0;
-            $balance = 0;
+            $debitCurrent = $linesCurrent->total_debit ?? 0;
+            $creditCurrent = $linesCurrent->total_credit ?? 0;
 
-            // Saldo Normal:
-            // Asset & Expense -> Debit
-            // Liability, Equity, Revenue -> Credit
+            // 2. Prior Period (untuk Laba Ditahan dari Laba Rugi masa lalu)
+            if (in_array($account->type, ['revenue', 'expense']) && $this->start_date) {
+                $linesPrior = JournalEntryLine::where('account_id', $account->id)
+                    ->whereHas('journalEntry', function ($query) {
+                        $query->where('status', 'posted');
+                        $query->whereDate('entry_date', '<', $this->start_date);
+                        if ($this->branch_id) {
+                            $query->where('branch_id', $this->branch_id);
+                        }
+                    })
+                    ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
+                    ->first();
+                $debitPrior = $linesPrior->total_debit ?? 0;
+                $creditPrior = $linesPrior->total_credit ?? 0;
+
+                if ($account->type === 'revenue') {
+                    $retainedEarnings += ($creditPrior - $debitPrior);
+                } else { // expense
+                    $retainedEarnings -= ($debitPrior - $creditPrior);
+                }
+            }
+
+            // 3. Total Balance (untuk Neraca)
+            $linesTotal = JournalEntryLine::where('account_id', $account->id)
+                ->whereHas('journalEntry', function ($query) {
+                    $query->where('status', 'posted');
+                    if ($this->end_date) {
+                        $query->whereDate('entry_date', '<=', $this->end_date);
+                    }
+                    if ($this->branch_id) {
+                        $query->where('branch_id', $this->branch_id);
+                    }
+                })
+                ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
+                ->first();
+
+            $debitTotal = $linesTotal->total_debit ?? 0;
+            $creditTotal = $linesTotal->total_credit ?? 0;
+
+            $balance = 0;
+            // Saldo Normal: Asset & Expense -> Debit, Liability, Equity, Revenue -> Credit
             if (in_array($account->type, ['asset', 'expense'])) {
-                $balance = $debit - $credit;
+                if ($account->type === 'asset') {
+                    $balance = $debitTotal - $creditTotal; // Neraca mengambil saldo akumulasi total
+                } else {
+                    $balance = $debitCurrent - $creditCurrent; // Laba Rugi mengambil saldo periode ini
+                }
             } else {
-                $balance = $credit - $debit;
+                if (in_array($account->type, ['liability', 'equity'])) {
+                    $balance = $creditTotal - $debitTotal; // Neraca mengambil saldo akumulasi total
+                } else {
+                    $balance = $creditCurrent - $debitCurrent; // Laba Rugi mengambil saldo periode ini
+                }
             }
 
             if ($account->type === 'revenue') {
@@ -156,8 +203,8 @@ class LaporanKeuangan extends Page implements HasForms
 
             $accountBalances[$account->id] = [
                 'account' => $account,
-                'debit' => $debit,
-                'credit' => $credit,
+                'debit' => $debitCurrent, // Info debit periode ini
+                'credit' => $creditCurrent, // Info credit periode ini
                 'balance' => $balance
             ];
         }
@@ -165,6 +212,7 @@ class LaporanKeuangan extends Page implements HasForms
         return [
             'accountBalances' => $accountBalances,
             'netProfit' => $netProfit,
+            'retainedEarnings' => $retainedEarnings,
         ];
     }
 }
