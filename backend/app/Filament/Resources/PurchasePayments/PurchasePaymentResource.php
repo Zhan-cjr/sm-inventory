@@ -76,7 +76,7 @@ class PurchasePaymentResource extends Resource
                     ->hidden(fn () => \Illuminate\Support\Facades\Auth::user()->branch_id !== null),
             ])
             ->headerActions([
-                \Filament\Tables\Actions\Action::make('cetak_daftar')
+                \Filament\Actions\Action::make('cetak_daftar')
                     ->label('Cetak Daftar')
                     ->icon('heroicon-o-printer')
                     ->color('info')
