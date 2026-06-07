@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Kontrabons;
 
 use App\Filament\Resources\Kontrabons\Pages\CreateKontrabon;
-use App\Filament\Resources\Kontrabons\Pages\EditKontrabon;
 use App\Filament\Resources\Kontrabons\Pages\ListKontrabons;
 use App\Filament\Resources\Kontrabons\Schemas\KontrabonForm;
 use App\Filament\Resources\Kontrabons\Tables\KontrabonsTable;
@@ -28,7 +27,30 @@ class KontrabonResource extends Resource
     {
         return $schema
             ->schema([
-                //
+                Filament\Forms\Components\Section::make('Info Kontrabon')
+                    ->schema([
+                        Filament\Forms\Components\TextInput::make('kontrabon_number')
+                            ->label('No. Kontrabon')
+                            ->disabled(),
+                        Filament\Forms\Components\DatePicker::make('tanggal_kontrabon')
+                            ->label('Tgl Kontrabon')
+                            ->disabled(),
+                        Filament\Forms\Components\DatePicker::make('tanggal_jatuh_tempo')
+                            ->label('Jatuh Tempo')
+                            ->disabled(),
+                        Filament\Forms\Components\Select::make('supplier_id')
+                            ->relationship('supplier', 'name')
+                            ->label('Pemasok')
+                            ->disabled(),
+                        Filament\Forms\Components\TextInput::make('total_amount')
+                            ->label('Total Tagihan')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->disabled(),
+                        Filament\Forms\Components\Textarea::make('notes')
+                            ->label('Catatan')
+                            ->disabled(),
+                    ])->columns(2)
             ]);
     }
 
@@ -76,7 +98,6 @@ class KontrabonResource extends Resource
         return [
             'index' => ListKontrabons::route('/'),
             'create' => CreateKontrabon::route('/create'),
-            'edit' => EditKontrabon::route('/{record}/edit'),
         ];
     }
 }
