@@ -87,14 +87,14 @@ class AuthorizationController extends Controller
     {
         $user = $request->user();
         
-        $spatieRoles = $user->roles->pluck('name')->toArray();
+        $spatieRoles = array_map('strtolower', $user->roles->pluck('name')->toArray());
         $dbRole = $user->role;
         $role = $dbRole ?: 'CASHIER';
 
         // Override role if user has Spatie admin roles
-        if (in_array('superadmin', $spatieRoles) || in_array('SUPER_ADMIN', $spatieRoles)) {
+        if (in_array('superadmin', $spatieRoles) || in_array('super_admin', $spatieRoles) || strtolower($dbRole) === 'superadmin' || strtolower($dbRole) === 'super_admin') {
             $role = 'SUPER_ADMIN';
-        } elseif (in_array('admin', $spatieRoles) || in_array('ADMIN', $spatieRoles)) {
+        } elseif (in_array('admin', $spatieRoles) || strtolower($dbRole) === 'admin') {
             $role = 'ADMIN';
         }
 
