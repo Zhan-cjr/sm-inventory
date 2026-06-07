@@ -31,7 +31,30 @@ class PurchasePaymentResource extends Resource
     {
         return $schema
             ->schema([
-                //
+                Filament\Forms\Components\Section::make('Detail Pembayaran')
+                    ->schema([
+                        Filament\Forms\Components\TextInput::make('payment_number')
+                            ->label('No Pembayaran')
+                            ->disabled(),
+                        Filament\Forms\Components\DatePicker::make('payment_date')
+                            ->label('Tanggal Bayar')
+                            ->disabled(),
+                        Filament\Forms\Components\Select::make('supplier_id')
+                            ->relationship('supplier', 'name')
+                            ->label('Pemasok')
+                            ->disabled(),
+                        Filament\Forms\Components\TextInput::make('payment_method')
+                            ->label('Metode Bayar')
+                            ->disabled(),
+                        Filament\Forms\Components\TextInput::make('total_amount')
+                            ->label('Total Bayar')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->disabled(),
+                        Filament\Forms\Components\Textarea::make('notes')
+                            ->label('Catatan')
+                            ->disabled(),
+                    ])->columns(2)
             ]);
     }
 
@@ -44,6 +67,32 @@ class PurchasePaymentResource extends Resource
                 Tables\Columns\TextColumn::make('supplier.name')->label('Pemasok')->searchable(),
                 Tables\Columns\TextColumn::make('total_amount')->label('Total Bayar')->money('IDR'),
                 Tables\Columns\TextColumn::make('status')->badge()->color('success'),
+            ])
+            ->actions([
+                Tables\Actions\ViewAction::make()->label('Detail'),
+                Tables\Actions\DeleteAction::make()
+                    ->label('Batalkan')
+                    ->modalHeading('Batalkan Pembayaran')
+                    ->modalDescription('Apakah Anda yakin ingin membatalkan pembayaran ini? Nominal pada faktur penerimaan (GR) akan dikembalikan ke status belum lunas.')
+                    ->action(function (PurchasePayment $record) {
+                        // Restore goods receipt paid amounts
+                        foreach ($record->items as $item) {
+                            $gr = $item->goodsReceipt;
+                            if ($gr) {
+                                $gr->paid_amount -= $item->amount_paid;
+                                if ($gr->paid_amount <= 0) {
+                                    $gr->payment_status = 'UNPAID';
+                                    $gr->paid_amount = 0;
+                                } else {
+                                    $gr->payment_status = 'PARTIAL_PAID';
+                                }
+                                $gr->save();
+                            }
+                        }
+                        $record->status = 'CANCELLED';
+                        $record->save();
+                    })
+                    ->hidden(fn (PurchasePayment $record) => $record->status === 'CANCELLED'),
             ]);
     }
 
@@ -59,7 +108,6 @@ class PurchasePaymentResource extends Resource
         return [
             'index' => ListPurchasePayments::route('/'),
             'create' => CreatePurchasePayment::route('/create'),
-            'edit' => EditPurchasePayment::route('/{record}/edit'),
         ];
     }
 }
