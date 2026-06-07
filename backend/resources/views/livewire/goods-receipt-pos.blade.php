@@ -38,7 +38,7 @@
             
             <!-- Receipt Panel -->
             <div>
-                <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem; color: #111827;" class="dark:text-gray-200">Detail Penerimaan</div>
+                <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem;" class="text-gray-900 dark:text-gray-200">Detail Penerimaan</div>
                 <table style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
                     <tr>
                         <td style="width: 30%;" class="pos-label">No Terima</td>
@@ -62,7 +62,7 @@
                                         <option value="{{ $po->id }}">{{ $po->po_number }}</option>
                                     @endforeach
                                 </select>
-                                <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: #4b5563; white-space: nowrap; cursor: pointer;" class="dark:text-gray-300">
+                                <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; white-space: nowrap; cursor: pointer;" class="text-gray-600 dark:text-gray-300">
                                     <input type="checkbox" wire:model.live="only_latest_po" style="border-radius: 0.25rem; color: #2563eb;">
                                     PO Terbaru Saja
                                 </label>
@@ -89,7 +89,7 @@
 
             <!-- Supplier Panel -->
             <div>
-                <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem; color: #111827;" class="dark:text-gray-200">Detail Pemasok</div>
+                <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem;" class="text-gray-900 dark:text-gray-200">Detail Pemasok</div>
                 <table style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
                     <tr>
                         <td style="width: 30%;" class="pos-label">Pemasok</td>
