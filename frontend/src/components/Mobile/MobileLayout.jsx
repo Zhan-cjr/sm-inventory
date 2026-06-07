@@ -14,6 +14,11 @@ export function MobileLayout({ user, onLogout }) {
   const isManagerOrAdmin = ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SPV', 'EDP', 'SUPERADMIN', 'SUPER_ADMIN'].includes(user?.role?.toUpperCase());
   const isRestrictedRole = !isManagerOrAdmin;
 
+  const hasEcommerceAuth = user?.custom_authorizations?.includes('PROCESS_ECOMMERCE');
+  const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) || 
+                      user?.custom_authorizations?.includes('APPROVE_PO') || 
+                      user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
+
   return (
     <div className="mobile-layout">
       {/* Top Header */}
@@ -68,7 +73,7 @@ export function MobileLayout({ user, onLogout }) {
           <span>Cek Barang</span>
         </button>
 
-        {!isRestrictedRole && (
+        {hasAuthMenu && (
           <button
             className={`nav-item ${isActive('/mobile/auth') ? 'active' : ''}`}
             onClick={() => navigate('/mobile/auth')}
@@ -80,7 +85,7 @@ export function MobileLayout({ user, onLogout }) {
           </button>
         )}
 
-        {!isRestrictedRole && (
+        {hasEcommerceAuth && (
           <button
             className={`nav-item ${isActive('/mobile/ecommerce') ? 'active' : ''}`}
             onClick={() => navigate('/mobile/ecommerce')}

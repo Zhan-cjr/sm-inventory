@@ -65,6 +65,7 @@ class AuthController extends Controller
                 'scale_barcode_weight_length' => $user->organization?->scale_barcode_weight_length ?? 5,
                 'scale_barcode_weight_decimal_places' => $user->organization?->scale_barcode_weight_decimal_places ?? 3,
                 'pos_authorizations' => $user->pos_authorizations,
+                'custom_authorizations' => $user->custom_authorizations,
                 'can_access_pos' => $user->can('access_pos') || $user->can('AccessPos'),
             ],
             'token' => $token
@@ -118,6 +119,7 @@ class AuthController extends Controller
                 'scale_barcode_weight_length' => $user->organization?->scale_barcode_weight_length ?? 5,
                 'scale_barcode_weight_decimal_places' => $user->organization?->scale_barcode_weight_decimal_places ?? 3,
                 'pos_authorizations' => $user->pos_authorizations,
+                'custom_authorizations' => $user->custom_authorizations,
                 'can_access_pos' => $user->can('access_pos') || $user->can('AccessPos'),
             ]
         ]);
