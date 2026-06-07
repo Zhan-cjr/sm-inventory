@@ -45,88 +45,83 @@ class FixedAssetResource extends Resource
     {
         return $schema
             ->components([
-                \Filament\Schemas\Components\Grid::make(3)->schema([
-                    \Filament\Schemas\Components\Group::make()->schema([
-                        Section::make('Informasi Dasar')->schema([
-                            TextInput::make('asset_code')
-                                ->label('Kode Aset')
-                                ->default(function () {
-                                    $count = FixedAsset::count() + 1;
-                                    return 'AST-' . str_pad($count, 4, '0', STR_PAD_LEFT);
-                                })
-                                ->required()
-                                ->unique(ignoreRecord: true),
-                                
-                            TextInput::make('name')
-                                ->label('Nama Aset')
-                                ->required()
-                                ->maxLength(255),
-                                
-                            DatePicker::make('purchase_date')
-                                ->label('Tanggal Pembelian')
-                                ->default(now())
-                                ->required(),
-                                
-                            Textarea::make('description')
-                                ->label('Keterangan')
-                                ->rows(3)
-                                ->columnSpanFull(),
-                        ])->columns(2),
+                Section::make('Informasi Dasar')->schema([
+                    TextInput::make('asset_code')
+                        ->label('Kode Aset')
+                        ->default(function () {
+                            $count = FixedAsset::count() + 1;
+                            return 'AST-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+                        })
+                        ->required()
+                        ->unique(ignoreRecord: true),
                         
-                        Section::make('Pemetaan Akun (Accounting)')->schema([
-                            Select::make('asset_account_id')
-                                ->label('Akun Aset Tetap')
-                                ->options(fn () => Account::where('type', 'asset')->pluck('name', 'id'))
-                                ->searchable()
-                                ->required(),
-                                
-                            Select::make('accumulated_depreciation_account_id')
-                                ->label('Akun Akumulasi Penyusutan')
-                                ->options(fn () => Account::whereIn('type', ['asset', 'liability', 'equity'])->pluck('name', 'id'))
-                                ->searchable()
-                                ->required(),
-                                
-                            Select::make('depreciation_expense_account_id')
-                                ->label('Akun Beban Penyusutan')
-                                ->options(fn () => Account::where('type', 'expense')->pluck('name', 'id'))
-                                ->searchable()
-                                ->required(),
-                                
-                            Select::make('payment_account_id')
-                                ->label('Dibayar Melalui (Opsional)')
-                                ->helperText('Jika diisi, sistem akan otomatis membuat Jurnal Pembelian.')
-                                ->options(fn () => Account::whereIn('type', ['asset', 'liability'])->pluck('name', 'id'))
-                                ->searchable(),
-                        ])->columns(2),
-                    ])->columnSpan(2),
-
-                    \Filament\Schemas\Components\Group::make()->schema([
-                        Section::make('Nilai & Penyusutan')->schema([
-                            TextInput::make('purchase_price')
-                                ->label('Harga Perolehan')
-                                ->prefix('Rp')
-                                ->numeric()
-                                ->mask(\Filament\Support\RawJs::make('$money($input, \',\', \'.\', 0)'))
-                                ->stripCharacters('.')
-                                ->required(),
-                                
-                            TextInput::make('salvage_value')
-                                ->label('Nilai Sisa (Residu)')
-                                ->prefix('Rp')
-                                ->numeric()
-                                ->default(0)
-                                ->mask(\Filament\Support\RawJs::make('$money($input, \',\', \'.\', 0)'))
-                                ->stripCharacters('.')
-                                ->required(),
-                                
-                            TextInput::make('useful_life_years')
-                                ->label('Umur Ekonomis (Tahun)')
-                                ->numeric()
-                                ->default(4)
-                                ->required(),
-                        ])->columns(1),
-                    ])->columnSpan(1),
-                ]),
+                    TextInput::make('name')
+                        ->label('Nama Aset')
+                        ->required()
+                        ->maxLength(255),
+                        
+                    DatePicker::make('purchase_date')
+                        ->label('Tanggal Pembelian')
+                        ->default(now())
+                        ->required(),
+                        
+                    Textarea::make('description')
+                        ->label('Keterangan')
+                        ->rows(2)
+                        ->columnSpanFull(),
+                ])->columns(2),
+                
+                Section::make('Nilai & Penyusutan')->schema([
+                    TextInput::make('purchase_price')
+                        ->label('Harga Perolehan (Nilai Beli)')
+                        ->prefix('Rp')
+                        ->numeric()
+                        ->mask(\Filament\Support\RawJs::make('$money($input, \',\', \'.\', 0)'))
+                        ->stripCharacters('.')
+                        ->required(),
+                        
+                    TextInput::make('salvage_value')
+                        ->label('Nilai Sisa (Residu)')
+                        ->prefix('Rp')
+                        ->numeric()
+                        ->default(0)
+                        ->mask(\Filament\Support\RawJs::make('$money($input, \',\', \'.\', 0)'))
+                        ->stripCharacters('.')
+                        ->required(),
+                        
+                    TextInput::make('useful_life_years')
+                        ->label('Umur Ekonomis (Tahun)')
+                        ->numeric()
+                        ->default(4)
+                        ->required()
+                        ->columnSpan(2),
+                ])->columns(2),
+                
+                Section::make('Pemetaan Akun (Accounting)')->schema([
+                    Select::make('asset_account_id')
+                        ->label('Akun Aset Tetap')
+                        ->options(fn () => Account::where('type', 'asset')->pluck('name', 'id'))
+                        ->searchable()
+                        ->required(),
+                        
+                    Select::make('accumulated_depreciation_account_id')
+                        ->label('Akun Akumulasi Penyusutan')
+                        ->options(fn () => Account::whereIn('type', ['asset', 'liability', 'equity'])->pluck('name', 'id'))
+                        ->searchable()
+                        ->required(),
+                        
+                    Select::make('depreciation_expense_account_id')
+                        ->label('Akun Beban Penyusutan')
+                        ->options(fn () => Account::where('type', 'expense')->pluck('name', 'id'))
+                        ->searchable()
+                        ->required(),
+                        
+                    Select::make('payment_account_id')
+                        ->label('Dibayar Melalui (Opsional)')
+                        ->helperText('Jika diisi, sistem otomatis menjurnal Pembelian.')
+                        ->options(fn () => Account::whereIn('type', ['asset', 'liability'])->pluck('name', 'id'))
+                        ->searchable(),
+                ])->columns(2),
                 
                 Hidden::make('organization_id')->default(fn () => auth()->user()?->organization_id ?? Organization::first()?->id),
                 Hidden::make('branch_id')->default(fn () => auth()->user()?->branch_id),
