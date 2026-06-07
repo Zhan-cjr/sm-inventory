@@ -34,8 +34,19 @@
 
 <div class="document-container">
     <div class="header">
-        <h1>{{ $title }}</h1>
-        <p><strong>Cabang:</strong> {{ $branchName }}</p>
+        <h1 style="margin: 0; font-size: 24px;">{{ strtoupper($organization->name ?? 'SM INVENTORY') }}</h1>
+        @if($branchName !== 'Semua Cabang (Global)')
+            <h3 style="margin: 3px 0; font-size: 16px;">{{ strtoupper($branchName) }}</h3>
+            @php $headerAddress = \App\Models\Branch::where('name', $branchName)->first()?->address ?? ($organization->address ?? ''); @endphp
+        @else
+            @php $headerAddress = $organization->address ?? ''; @endphp
+        @endif
+        @if($headerAddress)
+            <p style="margin: 0 0 10px 0; font-size: 13px;">{{ $headerAddress }}</p>
+        @endif
+        <hr style="border: 1px solid #000; margin-bottom: 15px;">
+        
+        <h2>{{ $title }}</h2>
         <p><strong>Periode:</strong> {{ $period }}</p>
     </div>
 

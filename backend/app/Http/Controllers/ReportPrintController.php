@@ -1096,7 +1096,25 @@ class ReportPrintController extends Controller
         }
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
 
-        return view('print.reports.generic', ['title' => 'Daftar Pengeluaran (Expenses)', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+        $branchName = 'Semua Cabang (Global)';
+        if (auth()->user()->branch_id !== null) {
+            $branch = \App\Models\Branch::find(auth()->user()->branch_id);
+            if ($branch) $branchName = $branch->name;
+        } elseif ($branchId) {
+            $branch = \App\Models\Branch::find($branchId);
+            if ($branch) $branchName = $branch->name;
+        }
+        
+        $organization = \App\Models\Organization::find(auth()->user()->organization_id ?? \App\Models\Organization::first()?->id);
+
+        return view('print.reports.generic', [
+            'title' => 'Daftar Pengeluaran (Expenses)', 
+            'period' => $period, 
+            'columns' => $columns, 
+            'rows' => $rows,
+            'branchName' => $branchName,
+            'organization' => $organization
+        ]);
     }
 
     private function printLaporanKeuangan(Request $request)
@@ -1221,6 +1239,8 @@ class ReportPrintController extends Controller
             if ($branch) $branchName = $branch->name;
         }
 
+        $organization = \App\Models\Organization::find($organizationId);
+
         return view('print.reports.laporan-keuangan', [
             'assets' => $assets,
             'liabilities' => $liabilities,
@@ -1231,6 +1251,7 @@ class ReportPrintController extends Controller
             'retainedEarnings' => $retainedEarnings,
             'period' => $period,
             'branchName' => $branchName,
+            'organization' => $organization,
             'title' => 'Laporan Keuangan'
         ]);
     }
@@ -1246,6 +1267,8 @@ class ReportPrintController extends Controller
         if (!$organizationId) {
             abort(404, 'Organisasi tidak ditemukan');
         }
+        
+        $organization = \App\Models\Organization::find($organizationId);
 
         $query = \App\Models\JournalEntry::where('organization_id', $organizationId)
             ->with(['lines.account', 'creator', 'branch'])
@@ -1277,6 +1300,7 @@ class ReportPrintController extends Controller
             'journals' => $journals,
             'period' => $period,
             'branchName' => $branchName,
+            'organization' => $organization,
             'title' => 'Jurnal Umum'
         ]);
     }

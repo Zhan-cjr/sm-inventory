@@ -56,7 +56,7 @@
         $org_address = $org ? $org->address : '';
         
         $filters = request()->input('tableFilters', []);
-        $branch_id = $filters['branch_id']['value'] ?? null;
+        $branch_id = request()->input('branch_id') ?? ($filters['branch_id']['value'] ?? null);
         if (!$branch_id && auth()->check() && auth()->user()->branch_id) {
             $branch_id = auth()->user()->branch_id;
         }
