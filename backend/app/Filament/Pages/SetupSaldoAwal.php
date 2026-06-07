@@ -127,7 +127,7 @@ class SetupSaldoAwal extends Page implements HasForms
                     ->schema([
                         Select::make('account_id')
                             ->label('Akun')
-                            ->options(function (Get $get) {
+                            ->options(function ($get) {
                                 return Account::where('organization_id', $get('../../organization_id'))
                                     ->whereIn('type', ['asset', 'liability', 'equity'])
                                     ->get()
