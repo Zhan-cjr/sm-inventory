@@ -232,9 +232,9 @@ class LaporanKeuangan extends Page implements HasForms
             'accountBalances' => $accountBalances,
             'netProfit' => $netProfit,
             'retainedEarnings' => $retainedEarnings,
-            'startDate' => $startDate,
-            'endDate' => $endDate,
-            'branchId' => $branchId,
+            'startDate' => $this->start_date,
+            'endDate' => $this->end_date,
+            'branchId' => $this->branch_id,
         ];
     }
 }
