@@ -1,23 +1,12 @@
 <x-filament-panels::page>
-    <x-filament::section>
-        <form wire:submit="updateFilter" class="space-y-6">
-            {{ $this->form }}
-            
-            <div class="flex justify-end gap-3" style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem;">
-                <x-filament::button tag="a" href="{{ route('print.report', ['type' => 'laporan_keuangan', 'start_date' => $this->start_date, 'end_date' => $this->end_date, 'branch_id' => $this->branch_id]) }}" target="_blank" icon="heroicon-o-printer" color="success">
-                    Cetak Laporan
-                </x-filament::button>
-                <x-filament::button type="submit" icon="heroicon-o-funnel">
-                    Filter Laporan
-                </x-filament::button>
-            </div>
-        </form>
-    </x-filament::section>
-
     @php
         $data = $this->getViewData();
-        $accountBalances = $data['accountBalances'];
-        $netProfit = $data['netProfit'];
+        $accountBalances = $data['accountBalances'] ?? [];
+        $netProfit = $data['netProfit'] ?? 0;
+        $retainedEarnings = $data['retainedEarnings'] ?? 0;
+        $startDate = $data['startDate'] ?? '';
+        $endDate = $data['endDate'] ?? '';
+        $branchId = $data['branchId'] ?? '';
 
         // Kelompokkan berdasarkan tipe akun
         $assets = array_filter($accountBalances, fn($item) => $item['account']->type === 'asset');
@@ -32,11 +21,26 @@
         $totalRevenues = array_sum(array_column($revenues, 'balance'));
         $totalExpenses = array_sum(array_column($expenses, 'balance'));
         
-        $retainedEarnings = $data['retainedEarnings'] ?? 0;
-        
         $totalLiabEq = $totalLiabilities + $totalEquities + $retainedEarnings + $netProfit;
         $isBalanced = round($totalAssets, 2) == round($totalLiabEq, 2);
     @endphp
+
+    <x-filament::section>
+        <form wire:submit="updateFilter" class="space-y-6">
+            {{ $this->form }}
+            
+            <div class="flex justify-end gap-3" style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem;">
+                <x-filament::button tag="a" href="{{ route('print.report', ['type' => 'laporan_keuangan', 'start_date' => $startDate ?? '', 'end_date' => $endDate ?? '', 'branch_id' => $branchId ?? '']) }}" target="_blank" icon="heroicon-o-printer" color="success">
+                    Cetak Laporan
+                </x-filament::button>
+                <x-filament::button type="submit" icon="heroicon-o-funnel">
+                    Filter Laporan
+                </x-filament::button>
+            </div>
+        </form>
+    </x-filament::section>
+
+
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
         {{-- Laporan Laba Rugi (P&L) --}}
