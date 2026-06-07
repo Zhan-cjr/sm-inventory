@@ -52,6 +52,8 @@ class ReportPrintController extends Controller
                 return $this->printExpenseList($filters);
             case 'laporan_keuangan':
                 return $this->printLaporanKeuangan($request);
+            case 'jurnal_umum':
+                return $this->printJurnalUmum($request);
             default:
                 abort(404, 'Tipe laporan tidak ditemukan');
         }
@@ -1220,6 +1222,52 @@ class ReportPrintController extends Controller
             'period' => $period,
             'branchName' => $branchName,
             'title' => 'Laporan Keuangan'
+        ]);
+    }
+
+    private function printJurnalUmum(Request $request)
+    {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $branchId = $request->input('branch_id');
+        
+        $organizationId = auth()->user()->organization_id ?? \App\Models\Organization::first()?->id;
+
+        if (!$organizationId) {
+            abort(404, 'Organisasi tidak ditemukan');
+        }
+
+        $query = \App\Models\JournalEntry::where('organization_id', $organizationId)
+            ->with(['lines.account', 'creator', 'branch'])
+            ->orderBy('entry_date', 'asc')
+            ->orderBy('id', 'asc');
+
+        if ($startDate) {
+            $query->whereDate('entry_date', '>=', $startDate);
+        }
+        
+        if ($endDate) {
+            $query->whereDate('entry_date', '<=', $endDate);
+        }
+        
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+
+        $journals = $query->get();
+
+        $period = ($startDate && $endDate) ? \Carbon\Carbon::parse($startDate)->format('d M Y') . ' s/d ' . \Carbon\Carbon::parse($endDate)->format('d M Y') : 'Semua Waktu';
+        $branchName = 'Semua Cabang (Global)';
+        if ($branchId) {
+            $branch = \App\Models\Branch::find($branchId);
+            if ($branch) $branchName = $branch->name;
+        }
+
+        return view('print.reports.laporan-jurnal-umum', [
+            'journals' => $journals,
+            'period' => $period,
+            'branchName' => $branchName,
+            'title' => 'Jurnal Umum'
         ]);
     }
 }
