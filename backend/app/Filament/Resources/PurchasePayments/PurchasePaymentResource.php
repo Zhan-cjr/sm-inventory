@@ -69,8 +69,8 @@ class PurchasePaymentResource extends Resource
                 Tables\Columns\TextColumn::make('status')->badge()->color('success'),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Detail'),
-                Tables\Actions\DeleteAction::make()
+                \Filament\Actions\ViewAction::make()->label('Detail'),
+                \Filament\Actions\DeleteAction::make()
                     ->label('Batalkan')
                     ->modalHeading('Batalkan Pembayaran')
                     ->modalDescription('Apakah Anda yakin ingin membatalkan pembayaran ini? Nominal pada faktur penerimaan (GR) akan dikembalikan ke status belum lunas.')

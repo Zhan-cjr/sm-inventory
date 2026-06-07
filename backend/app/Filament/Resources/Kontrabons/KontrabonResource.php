@@ -73,8 +73,8 @@ class KontrabonResource extends Resource
                     ]),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->label('Detail'),
-                Tables\Actions\DeleteAction::make()
+                \Filament\Actions\ViewAction::make()->label('Detail'),
+                \Filament\Actions\DeleteAction::make()
                     ->label('Batalkan')
                     ->modalHeading('Batalkan Kontrabon')
                     ->action(function (Kontrabon $record) {
