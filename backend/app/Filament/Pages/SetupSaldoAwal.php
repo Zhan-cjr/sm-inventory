@@ -196,14 +196,14 @@ class SetupSaldoAwal extends Page implements HasForms
             $branchCode = $branchId ? ('-' . Branch::find($branchId)->code) : '-PUSAT';
             $refNumber = "SALDO-AWAL" . $branchCode;
 
-            // Delete ALL existing saldo awal for this organization to prevent duplicates
-            $existings = JournalEntry::where('organization_id', $orgId)
-                ->where('reference_number', 'LIKE', 'SALDO-AWAL%')
-                ->get();
+            // Delete existing saldo awal for THIS SPECIFIC BRANCH
+            $existing = JournalEntry::where('organization_id', $orgId)
+                ->where('reference_number', $refNumber)
+                ->first();
                 
-            foreach ($existings as $exist) {
-                $exist->lines()->delete();
-                $exist->delete();
+            if ($existing) {
+                $existing->lines()->delete();
+                $existing->delete();
             }
 
             // Create new journal
