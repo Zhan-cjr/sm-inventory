@@ -24,7 +24,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Filament\Tables\Actions\Action;
 use Filament\Notifications\Notification;
 use App\Services\AccountingService;
 use Illuminate\Support\Facades\DB;
@@ -144,7 +143,7 @@ class FixedAssetResource extends Resource
                     }),
             ])
             ->headerActions([
-                \Filament\Tables\Actions\Action::make('runDepreciation')
+                \Filament\Actions\Action::make('runDepreciation')
                     ->label('Jalankan Penyusutan Bulan Ini')
                     ->icon('heroicon-o-calculator')
                     ->color('warning')
