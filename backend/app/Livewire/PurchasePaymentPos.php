@@ -8,6 +8,7 @@ use App\Models\GoodsReceipt;
 use App\Models\PurchasePayment;
 use App\Models\PurchasePaymentItem;
 use App\Models\Branch;
+use App\Models\Kontrabon;
 use Illuminate\Support\Facades\DB;
 
 class PurchasePaymentPos extends Component
