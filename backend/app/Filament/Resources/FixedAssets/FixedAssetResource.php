@@ -35,7 +35,7 @@ class FixedAssetResource extends Resource
     protected static ?string $model = FixedAsset::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-building-office-2';
-    protected static ?string $navigationGroup = 'AKUNTANSI';
+    protected static \UnitEnum|string|null $navigationGroup = 'AKUNTANSI';
     protected static ?int $navigationSort = 4;
     protected static ?string $navigationLabel = 'Aset Tetap (Fixed Assets)';
     protected static ?string $pluralModelLabel = 'Aset Tetap';
