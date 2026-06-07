@@ -58,8 +58,8 @@ class SetupSaldoAwal extends Page implements HasForms
             foreach ($existing->lines as $line) {
                 $lines[] = [
                     'account_id' => $line->account_id,
-                    'debit' => $line->debit,
-                    'credit' => $line->credit,
+                    'debit' => (int) round($line->debit),
+                    'credit' => (int) round($line->credit),
                 ];
             }
         } else {
