@@ -15,13 +15,13 @@ class PerbaikanNeraca extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-wrench-screwdriver';
     protected static ?string $navigationLabel = 'Diagnosa & Perbaikan Neraca';
     protected static ?string $title = 'Diagnosa Neraca Saldo';
-    protected static ?string $navigationGroup = 'AKUNTANSI';
+    protected static string|\UnitEnum|null $navigationGroup = 'AKUNTANSI';
     protected static ?int $navigationSort = 4;
 
-    protected static string $view = 'filament.pages.perbaikan-neraca';
+    protected string $view = 'filament.pages.perbaikan-neraca';
 
     public function table(Tables\Table $table): Tables\Table
     {
