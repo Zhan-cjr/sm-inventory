@@ -33,63 +33,58 @@ class SetupSaldoAwal extends Page implements HasForms
 
     protected string $view = 'filament.pages.setup-saldo-awal';
 
-    public ?string $organization_id = null;
-    public ?string $branch_id = null;
-    public ?string $entry_date = null;
-    public array $lines = [];
+    public ?array $data = [];
     public float $total_debit = 0;
     public float $total_credit = 0;
 
     public function mount()
     {
         $user = auth()->user();
-        $this->organization_id = $user->organization_id ?? Organization::first()?->id;
-        $this->branch_id = null;
-        $this->entry_date = date('Y') . '-01-01'; // Default to start of current year
+        $organization_id = $user->organization_id ?? Organization::first()?->id;
+        $branch_id = null;
+        $entry_date = date('Y') . '-01-01'; // Default to start of current year
+        $lines = [];
         
         // Load existing Saldo Awal if any
-        $existing = JournalEntry::where('organization_id', $this->organization_id)
+        $existing = JournalEntry::where('organization_id', $organization_id)
             ->where('reference_number', 'LIKE', 'SALDO-AWAL%')
             ->with('lines')
             ->first();
 
         if ($existing) {
-            $this->entry_date = $existing->entry_date->format('Y-m-d');
-            $this->branch_id = $existing->branch_id;
+            $entry_date = $existing->entry_date->format('Y-m-d');
+            $branch_id = $existing->branch_id;
             
-            $formattedLines = [];
             foreach ($existing->lines as $line) {
-                $formattedLines[] = [
+                $lines[] = [
                     'account_id' => $line->account_id,
                     'debit' => $line->debit,
                     'credit' => $line->credit,
                 ];
             }
-            $this->lines = $formattedLines;
-            $this->calculateTotals();
         } else {
             // Default lines (Kas, Bank, Modal)
-            $accounts = Account::where('organization_id', $this->organization_id)
+            $accounts = Account::where('organization_id', $organization_id)
                 ->whereIn('type', ['asset', 'liability', 'equity'])
                 ->get();
                 
-            $defaultLines = [];
             foreach ($accounts as $acc) {
-                $defaultLines[] = [
+                $lines[] = [
                     'account_id' => $acc->id,
                     'debit' => 0,
                     'credit' => 0,
                 ];
             }
-            $this->lines = $defaultLines;
         }
         
         $this->form->fill([
-            'organization_id' => $this->organization_id,
-            'branch_id' => $this->branch_id,
-            'entry_date' => $this->entry_date,
-            'lines' => $this->lines,
+            'organization_id' => $organization_id,
+            'branch_id' => $branch_id,
+            'entry_date' => $entry_date,
+            'lines' => $lines,
         ]);
+        
+        $this->calculateTotals();
     }
 
     public function calculateTotals()
@@ -97,7 +92,8 @@ class SetupSaldoAwal extends Page implements HasForms
         $this->total_debit = 0;
         $this->total_credit = 0;
         
-        foreach ($this->lines as $line) {
+        $lines = $this->data['lines'] ?? [];
+        foreach ($lines as $line) {
             $debitStr = str_replace('.', '', (string) ($line['debit'] ?? 0));
             $creditStr = str_replace('.', '', (string) ($line['credit'] ?? 0));
             $this->total_debit += (float) $debitStr;
@@ -131,8 +127,8 @@ class SetupSaldoAwal extends Page implements HasForms
                     ->schema([
                         Select::make('account_id')
                             ->label('Akun')
-                            ->options(function () {
-                                return Account::where('organization_id', $this->organization_id)
+                            ->options(function (Get $get) {
+                                return Account::where('organization_id', $get('../../organization_id'))
                                     ->whereIn('type', ['asset', 'liability', 'equity'])
                                     ->get()
                                     ->mapWithKeys(function ($account) {
@@ -169,17 +165,15 @@ class SetupSaldoAwal extends Page implements HasForms
                     ->addActionLabel('Tambah Baris Akun')
                     ->live()
                     ->afterStateUpdated(function ($state) {
-                        $this->lines = $state;
                         $this->calculateTotals();
                     }),
             ])
-        ]);
+        ])->statePath('data');
     }
 
     public function save()
     {
         $data = $this->form->getState();
-        $this->lines = $data['lines'] ?? [];
         $this->calculateTotals();
         
         // Validation
@@ -223,7 +217,8 @@ class SetupSaldoAwal extends Page implements HasForms
                 'created_by' => auth()->id(),
             ]);
 
-            foreach ($this->lines as $line) {
+            $lines = $data['lines'] ?? [];
+            foreach ($lines as $line) {
                 $debitVal = (float) str_replace('.', '', (string) ($line['debit'] ?? 0));
                 $creditVal = (float) str_replace('.', '', (string) ($line['credit'] ?? 0));
                 
