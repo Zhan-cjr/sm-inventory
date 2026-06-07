@@ -28,7 +28,17 @@ class GoodsReceiptForm
                     ->relationship('supplier', 'name')
                     ->required()
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->live()
+                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        if ($state) {
+                            $supplier = \App\Models\Supplier::find($state);
+                            if ($supplier && $get('receipt_date')) {
+                                $receiptDate = \Carbon\Carbon::parse($get('receipt_date'));
+                                $set('due_date', $receiptDate->addDays($supplier->default_due_days)->format('Y-m-d'));
+                            }
+                        }
+                    }),
                 Select::make('branch_id')
                     ->relationship('branch', 'name')
                     ->required()
@@ -40,7 +50,20 @@ class GoodsReceiptForm
                 TextInput::make('receipt_number')
                     ->required(),
                 DateTimePicker::make('receipt_date')
-                    ->required(),
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        $supplierId = $get('supplier_id');
+                        if ($supplierId && $state) {
+                            $supplier = \App\Models\Supplier::find($supplierId);
+                            if ($supplier) {
+                                $receiptDate = \Carbon\Carbon::parse($state);
+                                $set('due_date', $receiptDate->addDays($supplier->default_due_days)->format('Y-m-d'));
+                            }
+                        }
+                    }),
+                \Filament\Forms\Components\DatePicker::make('due_date')
+                    ->label('Jatuh Tempo (Tempo Pembayaran)'),
                 TextInput::make('received_by')
                     ->required(),
                 TextInput::make('faktur_supplier'),
@@ -55,6 +78,22 @@ class GoodsReceiptForm
                     ->label('Nominal PPN')
                     ->numeric()
                     ->default(0.0),
+                Select::make('payment_status')
+                    ->label('Status Pembayaran')
+                    ->options([
+                        'unpaid' => 'Belum Lunas (Hutang)',
+                        'partial' => 'Sebagian (Cicilan)',
+                        'paid' => 'Lunas',
+                    ])
+                    ->default('unpaid')
+                    ->required(),
+                TextInput::make('paid_amount')
+                    ->label('Jumlah Sudah Dibayar')
+                    ->numeric()
+                    ->default(0.0)
+                    ->prefix('Rp')
+                    ->disabled() // Because payments should be recorded via payment system
+                    ->dehydrated(),
                 TextInput::make('status')
                     ->required()
                     ->default('RECEIVED'),

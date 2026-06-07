@@ -28,7 +28,22 @@ class SupplierForm
                     ->email(),
                 Textarea::make('address')
                     ->columnSpanFull(),
+                TextInput::make('default_due_days')
+                    ->label('Jatuh Tempo Default (Hari)')
+                    ->numeric()
+                    ->default(0)
+                    ->helperText('0 = Cash/COD. Di atas 0 = Tempo (Kredit)'),
+                Select::make('payment_method')
+                    ->label('Cara Pembayaran Default')
+                    ->options([
+                        'cash' => 'Tunai (Cash)',
+                        'transfer' => 'Transfer Bank',
+                        'giro' => 'Cek / Bilyet Giro',
+                        'other' => 'Lainnya',
+                    ])
+                    ->default('transfer'),
                 Toggle::make('is_active')
+                    ->default(true)
                     ->required(),
             ]);
     }

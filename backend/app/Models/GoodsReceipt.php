@@ -15,13 +15,16 @@ class GoodsReceipt extends Model
     protected $fillable = [
         'purchase_order_id', 'supplier_id', 'branch_id', 
         'receipt_number', 'receipt_date', 'received_by', 
-        'faktur_supplier', 'total_amount', 'include_tax', 'tax_amount', 'status', 'notes'
+        'faktur_supplier', 'total_amount', 'include_tax', 'tax_amount', 'status', 'notes',
+        'due_date', 'payment_status', 'paid_amount'
     ];
 
     protected $casts = [
         'receipt_date' => 'date',
+        'due_date' => 'date',
         'total_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',
+        'paid_amount' => 'decimal:2',
         'include_tax' => 'boolean',
     ];
 

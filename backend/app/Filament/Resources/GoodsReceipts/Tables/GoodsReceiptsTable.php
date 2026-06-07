@@ -41,6 +41,24 @@ class GoodsReceiptsTable
                     ->label('Total')
                     ->money('IDR')
                     ->sortable(),
+                TextColumn::make('payment_status')
+                    ->label('Pembayaran')
+                    ->badge()
+                    ->colors([
+                        'danger' => 'unpaid',
+                        'warning' => 'partial',
+                        'success' => 'paid',
+                    ])
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'unpaid' => 'Belum Lunas',
+                        'partial' => 'Cicilan',
+                        'paid' => 'Lunas',
+                        default => $state,
+                    }),
+                TextColumn::make('due_date')
+                    ->label('Jatuh Tempo')
+                    ->date()
+                    ->sortable(),
                 TextColumn::make('status')
                     ->badge()
                     ->color('success'),
