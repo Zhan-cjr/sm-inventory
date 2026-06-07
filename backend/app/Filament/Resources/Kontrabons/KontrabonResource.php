@@ -27,7 +27,7 @@ class KontrabonResource extends Resource
     {
         return $schema
             ->schema([
-                \Filament\Forms\Components\Section::make('Info Kontrabon')
+                \Filament\Schemas\Components\Section::make('Info Kontrabon')
                     ->schema([
                         \Filament\Forms\Components\TextInput::make('kontrabon_number')
                             ->label('No. Kontrabon')

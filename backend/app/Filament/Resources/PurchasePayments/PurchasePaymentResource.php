@@ -31,7 +31,7 @@ class PurchasePaymentResource extends Resource
     {
         return $schema
             ->schema([
-                \Filament\Forms\Components\Section::make('Detail Pembayaran')
+                \Filament\Schemas\Components\Section::make('Detail Pembayaran')
                     ->schema([
                         \Filament\Forms\Components\TextInput::make('payment_number')
                             ->label('No Pembayaran')
