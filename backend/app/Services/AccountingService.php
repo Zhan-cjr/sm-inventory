@@ -122,18 +122,23 @@ class AccountingService
 
             // PPN Kalkulasi
             if ($item->product && $item->product->is_taxable) {
-                $dpp = round($itemNet / $taxMultiplier, 2);
+                $dpp = round($itemNet / $taxMultiplier, 2); // Tax is calculated on NET amount
                 $taxAmount += ($itemNet - $dpp);
+                
+                // Revenue should be credited GROSS amount, minus the tax portion of the NET amount.
+                // Revenue (Gross) = Gross Amount - Tax Amount of this item
+                $grossDpp = $itemGross - ($itemNet - $dpp);
+                
                 if ($isService) {
-                    $revenueService += $dpp;
+                    $revenueService += $grossDpp;
                 } else {
-                    $revenueProduct += $dpp;
+                    $revenueProduct += $grossDpp;
                 }
             } else {
                 if ($isService) {
-                    $revenueService += $itemNet;
+                    $revenueService += $itemGross; // Credit gross amount
                 } else {
-                    $revenueProduct += $itemNet;
+                    $revenueProduct += $itemGross; // Credit gross amount
                 }
             }
             
@@ -503,9 +508,12 @@ class AccountingService
             if ($item->product && $item->product->is_taxable) {
                 $dpp = round($itemNet / $taxMultiplier, 2);
                 $taxAmount += ($itemNet - $dpp);
-                $revenueAmount += $dpp;
+                
+                // Credit Gross Amount
+                $grossDpp = $itemGross - ($itemNet - $dpp);
+                $revenueAmount += $grossDpp;
             } else {
-                $revenueAmount += $itemNet;
+                $revenueAmount += $itemGross; // Credit gross amount
             }
         }
 
