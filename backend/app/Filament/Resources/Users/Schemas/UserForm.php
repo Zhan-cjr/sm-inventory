@@ -72,6 +72,7 @@ class UserForm
                                         'UPDATE_SELLING_PRICE' => 'Update Harga Jual (Penerimaan Barang)',
                                         'APPROVE_PO' => 'Approval Purchase Order (PO)',
                                         'APPROVE_STOCK_ADJUSTMENT' => 'Approval Koreksi Stok (SO)',
+                                        'PROCESS_ECOMMERCE' => 'Proses Pesanan E-Commerce',
                                     ])
                                     ->columns(2)
                                     ->helperText('Centang izin khusus untuk backend, berlaku spesifik untuk user ini (termasuk Admin/Superadmin wajib dicentang).'),

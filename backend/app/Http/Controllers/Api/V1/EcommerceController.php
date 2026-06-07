@@ -1063,8 +1063,13 @@ class EcommerceController extends Controller
             $role = 'ADMIN';
         }
 
-        if (!in_array(strtoupper($role), ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SUPER_ADMIN'])) {
+        if (!in_array(strtoupper($role), ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']) && !$user->hasCustomAuthorization('PROCESS_ECOMMERCE')) {
             return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Require explicit per-user authorization just like PO/SO
+        if (!$user->hasCustomAuthorization('PROCESS_ECOMMERCE')) {
+            return response()->json(['data' => []]);
         }
 
         $query = EcommerceOrder::with(['items.product', 'branch:id,name'])
@@ -1095,6 +1100,10 @@ class EcommerceController extends Controller
         
         if (!$order) {
             return response()->json(['error' => 'Pesanan tidak ditemukan'], 404);
+        }
+
+        if (!$user->hasCustomAuthorization('PROCESS_ECOMMERCE')) {
+            return response()->json(['error' => 'Akses ditolak: Anda tidak memiliki izin untuk memproses pesanan E-Commerce'], 403);
         }
 
         if ($user->branch_id !== null && $order->branch_id !== $user->branch_id) {
