@@ -30,14 +30,14 @@ class ListJournalEntries extends ListRecords
                         ->label('Cabang (Opsional)')
                         ->options(\App\Models\Branch::pluck('name', 'id')),
                 ])
-                ->action(function (array $data, \Filament\Actions\Action $action) {
+                ->action(function (array $data, \Livewire\Component $livewire) {
                     $url = route('print.report', [
                         'type' => 'jurnal_umum',
                         'start_date' => $data['start_date'],
                         'end_date' => $data['end_date'],
                         'branch_id' => $data['branch_id'],
                     ]);
-                    $action->livewire->js("window.open('{$url}', '_blank');");
+                    $livewire->js("window.open('{$url}', '_blank');");
                 }),
             CreateAction::make(),
         ];
