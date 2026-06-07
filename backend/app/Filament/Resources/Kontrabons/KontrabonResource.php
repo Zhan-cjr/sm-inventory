@@ -27,27 +27,27 @@ class KontrabonResource extends Resource
     {
         return $schema
             ->schema([
-                Filament\Forms\Components\Section::make('Info Kontrabon')
+                \Filament\Forms\Components\Section::make('Info Kontrabon')
                     ->schema([
-                        Filament\Forms\Components\TextInput::make('kontrabon_number')
+                        \Filament\Forms\Components\TextInput::make('kontrabon_number')
                             ->label('No. Kontrabon')
                             ->disabled(),
-                        Filament\Forms\Components\DatePicker::make('tanggal_kontrabon')
+                        \Filament\Forms\Components\DatePicker::make('tanggal_kontrabon')
                             ->label('Tgl Kontrabon')
                             ->disabled(),
-                        Filament\Forms\Components\DatePicker::make('tanggal_jatuh_tempo')
+                        \Filament\Forms\Components\DatePicker::make('tanggal_jatuh_tempo')
                             ->label('Jatuh Tempo')
                             ->disabled(),
-                        Filament\Forms\Components\Select::make('supplier_id')
+                        \Filament\Forms\Components\Select::make('supplier_id')
                             ->relationship('supplier', 'name')
                             ->label('Pemasok')
                             ->disabled(),
-                        Filament\Forms\Components\TextInput::make('total_amount')
+                        \Filament\Forms\Components\TextInput::make('total_amount')
                             ->label('Total Tagihan')
                             ->numeric()
                             ->prefix('Rp')
                             ->disabled(),
-                        Filament\Forms\Components\Textarea::make('notes')
+                        \Filament\Forms\Components\Textarea::make('notes')
                             ->label('Catatan')
                             ->disabled(),
                     ])->columns(2)
@@ -62,8 +62,8 @@ class KontrabonResource extends Resource
                 Tables\Columns\TextColumn::make('tanggal_kontrabon')->label('Tgl Kontrabon')->date()->sortable(),
                 Tables\Columns\TextColumn::make('tanggal_jatuh_tempo')->label('Jatuh Tempo')->date()->sortable(),
                 Tables\Columns\TextColumn::make('supplier.name')->label('Pemasok')->searchable(),
-                Tables\Columns\TextColumn::make('total_amount')->label('Total Tagihan')->money('IDR'),
-                Tables\Columns\TextColumn::make('paid_amount')->label('Sudah Dibayar')->money('IDR'),
+                Tables\Columns\TextColumn::make('total_amount')->label('Total Tagihan')->money('IDR')->sortable(),
+                Tables\Columns\TextColumn::make('paid_amount')->label('Sudah Dibayar')->money('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('status')->badge()
                     ->colors([
                         'danger' => 'UNPAID',
@@ -71,6 +71,23 @@ class KontrabonResource extends Resource
                         'success' => 'PAID',
                         'gray' => 'CANCELLED',
                     ]),
+            ])
+            ->filters([
+                \App\Filament\Filters\DateFilterHelper::make('tanggal_kontrabon')->label('Tanggal Kontrabon'),
+                Tables\Filters\SelectFilter::make('branch_id')
+                    ->label('Cabang')
+                    ->relationship('branch', 'name')
+                    ->hidden(fn () => \Illuminate\Support\Facades\Auth::user()->branch_id !== null),
+            ])
+            ->headerActions([
+                \Filament\Tables\Actions\Action::make('cetak_daftar')
+                    ->label('Cetak Daftar')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'kontrabon',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
             ])
             ->actions([
                 \Filament\Actions\ViewAction::make()->label('Detail'),

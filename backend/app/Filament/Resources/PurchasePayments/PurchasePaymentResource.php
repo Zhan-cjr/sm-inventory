@@ -31,27 +31,27 @@ class PurchasePaymentResource extends Resource
     {
         return $schema
             ->schema([
-                Filament\Forms\Components\Section::make('Detail Pembayaran')
+                \Filament\Forms\Components\Section::make('Detail Pembayaran')
                     ->schema([
-                        Filament\Forms\Components\TextInput::make('payment_number')
+                        \Filament\Forms\Components\TextInput::make('payment_number')
                             ->label('No Pembayaran')
                             ->disabled(),
-                        Filament\Forms\Components\DatePicker::make('payment_date')
+                        \Filament\Forms\Components\DatePicker::make('payment_date')
                             ->label('Tanggal Bayar')
                             ->disabled(),
-                        Filament\Forms\Components\Select::make('supplier_id')
+                        \Filament\Forms\Components\Select::make('supplier_id')
                             ->relationship('supplier', 'name')
                             ->label('Pemasok')
                             ->disabled(),
-                        Filament\Forms\Components\TextInput::make('payment_method')
+                        \Filament\Forms\Components\TextInput::make('payment_method')
                             ->label('Metode Bayar')
                             ->disabled(),
-                        Filament\Forms\Components\TextInput::make('total_amount')
+                        \Filament\Forms\Components\TextInput::make('total_amount')
                             ->label('Total Bayar')
                             ->numeric()
                             ->prefix('Rp')
                             ->disabled(),
-                        Filament\Forms\Components\Textarea::make('notes')
+                        \Filament\Forms\Components\Textarea::make('notes')
                             ->label('Catatan')
                             ->disabled(),
                     ])->columns(2)
@@ -65,8 +65,25 @@ class PurchasePaymentResource extends Resource
                 Tables\Columns\TextColumn::make('payment_number')->label('No. Pembayaran')->searchable(),
                 Tables\Columns\TextColumn::make('payment_date')->label('Tanggal')->date()->sortable(),
                 Tables\Columns\TextColumn::make('supplier.name')->label('Pemasok')->searchable(),
-                Tables\Columns\TextColumn::make('total_amount')->label('Total Bayar')->money('IDR'),
+                Tables\Columns\TextColumn::make('total_amount')->label('Total Bayar')->money('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('status')->badge()->color('success'),
+            ])
+            ->filters([
+                \App\Filament\Filters\DateFilterHelper::make('payment_date')->label('Tanggal Bayar'),
+                Tables\Filters\SelectFilter::make('branch_id')
+                    ->label('Cabang')
+                    ->relationship('branch', 'name')
+                    ->hidden(fn () => \Illuminate\Support\Facades\Auth::user()->branch_id !== null),
+            ])
+            ->headerActions([
+                \Filament\Tables\Actions\Action::make('cetak_daftar')
+                    ->label('Cetak Daftar')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'pembayaran-hutang',
+                        'tableFilters' => $livewire->tableFilters
+                    ]), true),
             ])
             ->actions([
                 \Filament\Actions\ViewAction::make()->label('Detail'),

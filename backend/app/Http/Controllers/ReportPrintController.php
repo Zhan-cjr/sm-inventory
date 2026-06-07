@@ -54,6 +54,10 @@ class ReportPrintController extends Controller
                 return $this->printLaporanKeuangan($request);
             case 'jurnal_umum':
                 return $this->printJurnalUmum($request);
+            case 'kontrabon':
+                return $this->printKontrabon($filters);
+            case 'pembayaran-hutang':
+                return $this->printPembayaranHutang($filters);
             default:
                 abort(404, 'Tipe laporan tidak ditemukan');
         }
@@ -1303,5 +1307,77 @@ class ReportPrintController extends Controller
             'organization' => $organization,
             'title' => 'Jurnal Umum'
         ]);
+    }
+
+    private function printKontrabon($filters)
+    {
+        $query = \App\Models\Kontrabon::query()->with(['supplier', 'branch']);
+        $query = $this->applyDateFilters($query, $filters, 'tanggal_kontrabon', 'tanggal_kontrabon');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+
+        $records = $query->orderBy('tanggal_kontrabon', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'tanggal_kontrabon');
+
+        $columns = ['Tgl Kontrabon', 'No. Kontrabon', 'Pemasok', 'Cabang', 'Jatuh Tempo', 'Total Tagihan', 'Sudah Dibayar', 'Status'];
+        $rows = [];
+        $t_tagihan = 0; $t_dibayar = 0;
+        
+        foreach ($records as $r) {
+            $t_tagihan += $r->total_amount;
+            $t_dibayar += $r->paid_amount;
+            $rows[] = [
+                \Carbon\Carbon::parse($r->tanggal_kontrabon)->format('d-m-Y'),
+                $r->kontrabon_number,
+                $r->supplier ? $r->supplier->name : '-',
+                $r->branch ? $r->branch->name : 'Pusat / Global',
+                \Carbon\Carbon::parse($r->tanggal_jatuh_tempo)->format('d-m-Y'),
+                number_format($r->total_amount, 0, ',', '.'),
+                number_format($r->paid_amount, 0, ',', '.'),
+                $r->status
+            ];
+        }
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>'.number_format($t_tagihan, 0, ',', '.').'</strong>', '<strong>'.number_format($t_dibayar, 0, ',', '.').'</strong>', ''];
+
+        return view('print.reports.generic', ['title' => 'Daftar Tukar Faktur (Kontrabon)', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printPembayaranHutang($filters)
+    {
+        $query = \App\Models\PurchasePayment::query()->with(['supplier', 'branch']);
+        $query = $this->applyDateFilters($query, $filters, 'payment_date', 'payment_date');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+
+        $records = $query->orderBy('payment_date', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'payment_date');
+
+        $columns = ['Tgl Bayar', 'No. Pembayaran', 'Pemasok', 'Cabang', 'Metode Bayar', 'Nominal Bayar', 'Status'];
+        $rows = [];
+        $t_bayar = 0;
+        
+        foreach ($records as $r) {
+            $t_bayar += $r->total_amount;
+            $rows[] = [
+                \Carbon\Carbon::parse($r->payment_date)->format('d-m-Y'),
+                $r->payment_number,
+                $r->supplier ? $r->supplier->name : '-',
+                $r->branch ? $r->branch->name : 'Pusat / Global',
+                $r->payment_method,
+                number_format($r->total_amount, 0, ',', '.'),
+                $r->status
+            ];
+        }
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>'.number_format($t_bayar, 0, ',', '.').'</strong>', ''];
+
+        return view('print.reports.generic', ['title' => 'Daftar Pembayaran Hutang', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
 }
