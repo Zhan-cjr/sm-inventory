@@ -19,6 +19,7 @@ class GoodsReceiptPos extends Component
 {
     public $receipt_number;
     public $receipt_date;
+    public $due_date;
     public $faktur_supplier;
     public $branch_id;
     public $notes;
@@ -50,7 +51,8 @@ class GoodsReceiptPos extends Component
         if ($goodsReceipt) {
             $this->goodsReceipt = $goodsReceipt;
             $this->receipt_number = $goodsReceipt->receipt_number;
-            $this->receipt_date = $goodsReceipt->receipt_date;
+            $this->receipt_date = $goodsReceipt->receipt_date ? $goodsReceipt->receipt_date->format('Y-m-d') : null;
+            $this->due_date = $goodsReceipt->due_date ? $goodsReceipt->due_date->format('Y-m-d') : null;
             $this->faktur_supplier = $goodsReceipt->faktur_supplier;
             $this->branch_id = $goodsReceipt->branch_id;
             $this->notes = $goodsReceipt->notes;
@@ -88,6 +90,7 @@ class GoodsReceiptPos extends Component
         } else {
             $this->receipt_number = 'GR-' . date('YmdHis');
             $this->receipt_date = date('Y-m-d');
+            $this->due_date = date('Y-m-d');
             $this->branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
         }
 
@@ -96,12 +99,34 @@ class GoodsReceiptPos extends Component
 
     public $only_latest_po = false;
 
+    public function updatedSupplierId($value)
+    {
+        $this->recalculateDueDate();
+    }
+
+    public function updatedReceiptDate($value)
+    {
+        $this->recalculateDueDate();
+    }
+
+    private function recalculateDueDate()
+    {
+        if ($this->supplier_id && $this->receipt_date) {
+            $supplier = Supplier::find($this->supplier_id);
+            if ($supplier) {
+                $this->due_date = \Carbon\Carbon::parse($this->receipt_date)->addDays($supplier->default_due_days)->format('Y-m-d');
+            }
+        }
+    }
+
     public function updatedPurchaseOrderId($value)
     {
         if ($value) {
             $po = PurchaseOrder::with('items.product')->find($value);
             if ($po) {
                 $this->supplier_id = $po->supplier_id;
+                $this->recalculateDueDate();
+                
                 $this->cart = [];
                 foreach ($po->items as $item) {
                     $remainingQty = $item->quantity_ordered - $item->quantity_received;
@@ -386,6 +411,7 @@ class GoodsReceiptPos extends Component
                 'branch_id' => $this->branch_id,
                 'receipt_number' => $this->receipt_number,
                 'receipt_date' => $this->receipt_date,
+                'due_date' => $this->due_date,
                 'received_by' => auth()->user()->name,
                 'faktur_supplier' => $this->faktur_supplier,
                 'total_amount' => $this->grandTotal,

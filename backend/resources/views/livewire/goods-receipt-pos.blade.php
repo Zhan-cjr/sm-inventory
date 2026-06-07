@@ -46,7 +46,11 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Tgl Terima</td>
-                        <td><input type="date" class="pos-input" wire:model="receipt_date"></td>
+                        <td><input type="date" class="pos-input" wire:model.live="receipt_date"></td>
+                    </tr>
+                    <tr>
+                        <td class="pos-label">Jatuh Tempo</td>
+                        <td><input type="date" class="pos-input" wire:model="due_date" placeholder="Otomatis dari Pemasok"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Pilih PO (Opsional)</td>
@@ -58,7 +62,7 @@
                                         <option value="{{ $po->id }}">{{ $po->po_number }}</option>
                                     @endforeach
                                 </select>
-                                <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: #4b5563; white-space: nowrap; cursor: pointer;" class="dark:text-gray-400">
+                                <label style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: #4b5563; white-space: nowrap; cursor: pointer;" class="dark:text-gray-300">
                                     <input type="checkbox" wire:model.live="only_latest_po" style="border-radius: 0.25rem; color: #2563eb;">
                                     PO Terbaru Saja
                                 </label>
@@ -110,8 +114,8 @@
                                 }
                             }" style="position: relative;">
                                 <button type="button" @click="!disabled && (open = !open)" 
-                                        class="pos-input flex-between"
-                                        :class="disabled ? 'bg-gray-100 cursor-not-allowed opacity-75' : 'bg-white dark:bg-gray-800 cursor-pointer'"
+                                        class="pos-input flex-between dark:text-gray-200"
+                                        :class="disabled ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed opacity-75' : 'bg-white dark:bg-gray-800 cursor-pointer'"
                                         style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                                     <span>{{ $supplier_id ? (collect($suppliers)->firstWhere('id', $supplier_id)['code'] . ' - ' . collect($suppliers)->firstWhere('id', $supplier_id)['name']) : 'Pilih Supplier...' }}</span>
                                     <svg style="width: 1rem; height: 1rem; color: #9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -144,11 +148,11 @@
                     @endphp
                     <tr>
                         <td class="pos-label">Nama Kontak</td>
-                        <td><div class="pos-input" style="background-color: transparent; border-color: transparent; padding-left: 0;">{{ $selectedSupplier ? $selectedSupplier->name : '-' }}</div></td>
+                        <td><div class="pos-input dark:text-gray-200" style="background-color: transparent; border-color: transparent; padding-left: 0;">{{ $selectedSupplier ? $selectedSupplier->name : '-' }}</div></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Alamat</td>
-                        <td><div class="pos-input" style="background-color: transparent; border-color: transparent; padding-left: 0; line-height: 1.2;">{{ $selectedSupplier ? $selectedSupplier->address : '-' }}</div></td>
+                        <td><div class="pos-input dark:text-gray-200" style="background-color: transparent; border-color: transparent; padding-left: 0; line-height: 1.2;">{{ $selectedSupplier ? $selectedSupplier->address : '-' }}</div></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Catatan</td>
@@ -239,7 +243,7 @@
             @endif
         </div>
         <div x-data="{ open: false }" style="position: relative;">
-            <button @click="open = !open" class="pos-input" style="display: flex; align-items: center; gap: 0.5rem; background: white; cursor: pointer;">
+            <button @click="open = !open" class="pos-input dark:text-gray-200" style="display: flex; align-items: center; gap: 0.5rem; background: white; cursor: pointer;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M1 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zM1 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V7zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V7zM1 12a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-2z"/></svg>
                 Pilih Kolom
             </button>
@@ -247,7 +251,7 @@
                 @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga Satuan', 'harga_jual_1' => 'Harga Jual', 'margin_gol_1' => 'Margin', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
                     <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                         <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
-                        <span class="text-xs">{{ $label }}</span>
+                        <span class="text-xs dark:text-gray-200">{{ $label }}</span>
                     </label>
                 @endforeach
             </div>
@@ -283,7 +287,7 @@
                         @if(in_array('sku', $visibleColumns)) <td class="pos-grid-td">{{ $item['sku'] }}</td> @endif
                         @if(in_array('barcode', $visibleColumns)) <td class="pos-grid-td">{{ $item['barcode'] }}</td> @endif
                         @if(in_array('name', $visibleColumns)) <td class="pos-grid-td" style="font-weight: 500;">{{ $item['name'] }}</td> @endif
-                        @if(in_array('qty_ordered', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #6b7280;">{{ $item['qty_ordered'] > 0 ? number_format($item['qty_ordered'], 0) : '-' }}</td> @endif
+                        @if(in_array('qty_ordered', $visibleColumns)) <td class="pos-grid-td dark:text-gray-400" style="text-align: right; color: #6b7280;">{{ $item['qty_ordered'] > 0 ? number_format($item['qty_ordered'], 0) : '-' }}</td> @endif
                         @if(in_array('qty_received', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
                             <input type="number" step="any" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
@@ -308,12 +312,12 @@
                                        wire:model.lazy="cart.{{ $index }}.harga_jual_1"
                                        wire:change="recalculateRow({{ $index }})">
                             @else
-                                <div style="text-align: right; padding: 0.375rem 0.5rem; color: #6b7280;">{{ number_format($item['harga_jual_1'], 2) }}</div>
+                                <div style="text-align: right; padding: 0.375rem 0.5rem; color: #6b7280;" class="dark:text-gray-400">{{ number_format($item['harga_jual_1'], 2) }}</div>
                             @endif
                         </td>
                         @endif
                         @if(in_array('margin_gol_1', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem; background-color: #f9fafb;">
+                        <td class="pos-grid-td dark:bg-gray-800" style="padding: 0.25rem; background-color: #f9fafb;">
                             @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
                                 <input type="number" step="any" class="pos-input {{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
                                        wire:model.lazy="cart.{{ $index }}.margin_gol_1"
@@ -358,7 +362,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" style="text-align: center; padding: 3rem; color: #6b7280; font-style: italic;">
+                        <td colspan="10" style="text-align: center; padding: 3rem; color: #6b7280; font-style: italic;" class="dark:text-gray-400">
                             Belum ada barang. Silakan pilih PO atau scan produk untuk penerimaan langsung.
                         </td>
                     </tr>
