@@ -143,20 +143,24 @@ class SetupSaldoAwal extends Page implements HasForms
                             
                         TextInput::make('debit')
                             ->label('Debit (Harta bertambah)')
-                            ->numeric()
                             ->default(0)
+                            ->prefix('Rp')
+                            ->mask(\Filament\Support\RawJs::make("String(\$input).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')"))
+                            ->stripCharacters('.')
                             ->live(debounce: 500)
                             ->afterStateUpdated(function ($state, callable $set) {
-                                if ($state > 0) $set('credit', 0);
+                                if ((float) $state > 0) $set('credit', 0);
                             }),
                             
                         TextInput::make('credit')
                             ->label('Kredit (Hutang/Modal bertambah)')
-                            ->numeric()
                             ->default(0)
+                            ->prefix('Rp')
+                            ->mask(\Filament\Support\RawJs::make("String(\$input).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')"))
+                            ->stripCharacters('.')
                             ->live(debounce: 500)
                             ->afterStateUpdated(function ($state, callable $set) {
-                                if ($state > 0) $set('debit', 0);
+                                if ((float) $state > 0) $set('debit', 0);
                             }),
                     ])
                     ->columns(3)
