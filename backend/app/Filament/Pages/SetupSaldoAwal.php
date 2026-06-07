@@ -98,8 +98,10 @@ class SetupSaldoAwal extends Page implements HasForms
         $this->total_credit = 0;
         
         foreach ($this->lines as $line) {
-            $this->total_debit += (float) ($line['debit'] ?? 0);
-            $this->total_credit += (float) ($line['credit'] ?? 0);
+            $debitStr = str_replace('.', '', (string) ($line['debit'] ?? 0));
+            $creditStr = str_replace('.', '', (string) ($line['credit'] ?? 0));
+            $this->total_debit += (float) $debitStr;
+            $this->total_credit += (float) $creditStr;
         }
     }
 
@@ -222,14 +224,17 @@ class SetupSaldoAwal extends Page implements HasForms
             ]);
 
             foreach ($this->lines as $line) {
-                if ($line['debit'] == 0 && $line['credit'] == 0) continue;
+                $debitVal = (float) str_replace('.', '', (string) ($line['debit'] ?? 0));
+                $creditVal = (float) str_replace('.', '', (string) ($line['credit'] ?? 0));
+                
+                if ($debitVal == 0 && $creditVal == 0) continue;
                 
                 JournalEntryLine::create([
                     'journal_entry_id' => $journal->id,
                     'account_id' => $line['account_id'],
                     'description' => 'Saldo Awal',
-                    'debit' => $line['debit'],
-                    'credit' => $line['credit'],
+                    'debit' => $debitVal,
+                    'credit' => $creditVal,
                 ]);
             }
             
