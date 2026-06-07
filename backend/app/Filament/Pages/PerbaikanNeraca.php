@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Filament\Tables;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Actions\Action;
 use Filament\Notifications\Notification;
 use App\Services\AccountingService;
 
@@ -64,7 +65,7 @@ class PerbaikanNeraca extends Page implements HasTable
                     }),
             ])
             ->actions([
-                Tables\Actions\Action::make('perbaiki')
+                Action::make('perbaiki')
                     ->label('Proses Perbaikan')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
