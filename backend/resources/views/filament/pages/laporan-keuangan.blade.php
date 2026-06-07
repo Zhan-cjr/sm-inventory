@@ -29,10 +29,7 @@
         <form wire:submit="updateFilter" class="space-y-6">
             {{ $this->form }}
             
-            <div class="flex justify-end gap-3" style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem;">
-                <x-filament::button tag="a" href="{{ route('print.report', ['type' => 'laporan_keuangan', 'start_date' => $startDate ?? '', 'end_date' => $endDate ?? '', 'branch_id' => $branchId ?? '']) }}" target="_blank" icon="heroicon-o-printer" color="success">
-                    Cetak Laporan
-                </x-filament::button>
+            <div class="flex justify-end mt-4">
                 <x-filament::button type="submit" icon="heroicon-o-funnel">
                     Filter Laporan
                 </x-filament::button>

@@ -24,6 +24,26 @@ class LaporanKeuangan extends Page implements HasForms
     protected static string|\UnitEnum|null $navigationGroup = 'AKUNTANSI';
     protected static ?int $navigationSort = 3;
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\Action::make('print')
+                ->label('Cetak Laporan')
+                ->icon('heroicon-o-printer')
+                ->color('success')
+                ->action(function () {
+                    $data = $this->form->getState();
+                    $url = route('print.report', [
+                        'type' => 'laporan_keuangan',
+                        'start_date' => $data['start_date'] ?? $this->start_date,
+                        'end_date' => $data['end_date'] ?? $this->end_date,
+                        'branch_id' => $data['branch_id'] ?? $this->branch_id,
+                    ]);
+                    $this->js("window.open('{$url}', '_blank');");
+                })
+        ];
+    }
+
     protected string $view = 'filament.pages.laporan-keuangan';
 
     public ?string $start_date = null;
@@ -212,6 +232,9 @@ class LaporanKeuangan extends Page implements HasForms
             'accountBalances' => $accountBalances,
             'netProfit' => $netProfit,
             'retainedEarnings' => $retainedEarnings,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'branchId' => $branchId,
         ];
     }
 }

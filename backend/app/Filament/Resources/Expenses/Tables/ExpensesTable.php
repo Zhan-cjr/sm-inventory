@@ -45,11 +45,29 @@ class ExpensesTable
                     ->label('Cetak Laporan')
                     ->icon('heroicon-o-printer')
                     ->color('success')
-                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
-                        'type' => 'expense_list',
-                        'tableFilters' => $livewire->tableFilters
-                    ]))
-                    ->openUrlInNewTab(),
+                    ->form([
+                        \Filament\Forms\Components\DatePicker::make('start_date')
+                            ->label('Dari Tanggal')
+                            ->required()
+                            ->default(now()->startOfMonth()),
+                        \Filament\Forms\Components\DatePicker::make('end_date')
+                            ->label('Sampai Tanggal')
+                            ->required()
+                            ->default(now()->endOfMonth()),
+                        \Filament\Forms\Components\Select::make('branch_id')
+                            ->label('Cabang (Opsional)')
+                            ->options(\App\Models\Branch::pluck('name', 'id'))
+                            ->visible(fn () => auth()->user()?->branch_id === null),
+                    ])
+                    ->action(function (array $data, \Livewire\Component $livewire) {
+                        $url = route('print.report', [
+                            'type' => 'expense_list',
+                            'start_date' => $data['start_date'],
+                            'end_date' => $data['end_date'],
+                            'branch_id' => $data['branch_id'] ?? null,
+                        ]);
+                        $livewire->js("window.open('{$url}', '_blank');");
+                    }),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

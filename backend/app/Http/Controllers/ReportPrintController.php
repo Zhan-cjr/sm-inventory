@@ -49,7 +49,7 @@ class ReportPrintController extends Controller
             case 'stock-transfer':
                 return $this->printStockTransfer($filters);
             case 'expense_list':
-                return $this->printExpenseList($filters);
+                return $this->printExpenseList($request);
             case 'laporan_keuangan':
                 return $this->printLaporanKeuangan($request);
             case 'jurnal_umum':
@@ -1055,19 +1055,29 @@ class ReportPrintController extends Controller
         return view('print.reports.generic', ['title' => 'Daftar Stock Transfer', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
 
-    private function printExpenseList($filters)
+    private function printExpenseList(Request $request)
     {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        $branchId = $request->input('branch_id');
+        
         $query = \App\Models\Expense::query()->with(['branch', 'expenseAccount', 'paymentAccount', 'creator']);
-        $query = $this->applyDateFilters($query, $filters, 'expense_date', 'expense_date');
+        
+        if ($startDate) {
+            $query->whereDate('expense_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->whereDate('expense_date', '<=', $endDate);
+        }
         
         if (auth()->user()->branch_id !== null) {
             $query->where('branch_id', auth()->user()->branch_id);
-        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
-            $query->where('branch_id', $filters['branch_id']['value']);
+        } elseif ($branchId) {
+            $query->where('branch_id', $branchId);
         }
         
         $expenses = $query->orderBy('expense_date', 'desc')->orderBy('created_at', 'desc')->get();
-        $period = $this->getPeriodString($filters, 'expense_date');
+        $period = ($startDate && $endDate) ? \Carbon\Carbon::parse($startDate)->format('d M Y') . ' s/d ' . \Carbon\Carbon::parse($endDate)->format('d M Y') : 'Semua Waktu';
 
         $columns = ['Tgl', 'No. Ref', 'Cabang', 'Akun Pengeluaran (Debit)', 'Sumber Dana (Kredit)', 'Nominal', 'Keterangan'];
         $rows = [];
