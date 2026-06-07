@@ -47,20 +47,20 @@ class PurchasePaymentPos extends Component
             return;
         }
         
-        $invoices = GoodsReceipt::where('supplier_id', $this->supplier_id)
-            ->whereIn('payment_status', ['UNPAID', 'PARTIAL_PAID'])
+        $kontrabons = Kontrabon::where('supplier_id', $this->supplier_id)
+            ->whereIn('status', ['UNPAID', 'PARTIAL'])
             ->get();
             
         $this->unpaid_invoices = [];
-        foreach($invoices as $inv) {
-            $remaining = $inv->total_amount - $inv->paid_amount;
+        foreach($kontrabons as $kb) {
+            $remaining = $kb->total_amount - $kb->paid_amount;
             $this->unpaid_invoices[] = [
-                'id' => $inv->id,
-                'receipt_number' => $inv->receipt_number,
-                'receipt_date' => $inv->receipt_date,
-                'due_date' => $inv->due_date,
-                'total_amount' => $inv->total_amount,
-                'paid_amount' => $inv->paid_amount,
+                'id' => $kb->id,
+                'receipt_number' => $kb->kontrabon_number,
+                'receipt_date' => $kb->tanggal_kontrabon,
+                'due_date' => $kb->tanggal_jatuh_tempo,
+                'total_amount' => $kb->total_amount,
+                'paid_amount' => $kb->paid_amount,
                 'remaining_amount' => $remaining,
                 'pay_amount' => 0,
                 'is_selected' => false
@@ -109,7 +109,7 @@ class PurchasePaymentPos extends Component
         });
         
         if ($selectedInvoices->isEmpty()) {
-            session()->flash('error', 'Pilih minimal 1 faktur untuk dibayar.');
+            session()->flash('error', 'Pilih minimal 1 faktur/kontrabon untuk dibayar.');
             return;
         }
         
@@ -129,21 +129,44 @@ class PurchasePaymentPos extends Component
             ]);
             
             foreach ($selectedInvoices as $invData) {
-                PurchasePaymentItem::create([
-                    'purchase_payment_id' => $payment->id,
-                    'goods_receipt_id' => $invData['id'],
-                    'amount_paid' => floatval($invData['pay_amount']),
-                ]);
-                
-                $gr = GoodsReceipt::find($invData['id']);
-                $gr->paid_amount += floatval($invData['pay_amount']);
-                
-                if ($gr->paid_amount >= ($gr->total_amount - 0.01)) {
-                    $gr->payment_status = 'PAID';
-                } else {
-                    $gr->payment_status = 'PARTIAL_PAID';
+                // Determine if we are paying a Kontrabon
+                $kb = Kontrabon::find($invData['id']);
+                if ($kb) {
+                    $kb->paid_amount += floatval($invData['pay_amount']);
+                    if ($kb->paid_amount >= ($kb->total_amount - 0.01)) {
+                        $kb->status = 'PAID';
+                    } else {
+                        $kb->status = 'PARTIAL';
+                    }
+                    $kb->save();
+                    
+                    // Distribute payment to GRs inside Kontrabon
+                    $remainingPayment = floatval($invData['pay_amount']);
+                    foreach ($kb->items as $kbItem) {
+                        if ($remainingPayment <= 0) break;
+                        $gr = $kbItem->goodsReceipt;
+                        $grUnpaid = $gr->total_amount - $gr->paid_amount;
+                        if ($grUnpaid > 0) {
+                            $payToGr = min($grUnpaid, $remainingPayment);
+                            $gr->paid_amount += $payToGr;
+                            $remainingPayment -= $payToGr;
+                            
+                            if ($gr->paid_amount >= ($gr->total_amount - 0.01)) {
+                                $gr->payment_status = 'PAID';
+                            } else {
+                                $gr->payment_status = 'PARTIAL_PAID';
+                            }
+                            $gr->save();
+                            
+                            // Create Payment Item for the GR
+                            PurchasePaymentItem::create([
+                                'purchase_payment_id' => $payment->id,
+                                'goods_receipt_id' => $gr->id,
+                                'amount_paid' => $payToGr,
+                            ]);
+                        }
+                    }
                 }
-                $gr->save();
             }
             
             DB::commit();
