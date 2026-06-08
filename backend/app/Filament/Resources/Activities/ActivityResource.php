@@ -23,6 +23,24 @@ class ActivityResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     protected static ?string $recordTitleAttribute = 'description';
+    protected static \UnitEnum|string|null $navigationGroup = 'UTILITY';
+    protected static ?string $modelLabel = 'Log Aktivitas';
+    protected static ?string $pluralModelLabel = 'Riwayat Aktivitas';
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return false;
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -50,9 +68,7 @@ class ActivityResource extends Resource
     {
         return [
             'index' => ListActivities::route('/'),
-            'create' => CreateActivity::route('/create'),
             'view' => ViewActivity::route('/{record}'),
-            'edit' => EditActivity::route('/{record}/edit'),
         ];
     }
 }

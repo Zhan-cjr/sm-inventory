@@ -14,43 +14,65 @@ class ActivitiesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
-                TextColumn::make('log_name')
-                    ->searchable(),
+                TextColumn::make('created_at')
+                    ->label('Waktu Kejadian')
+                    ->dateTime('d M Y, H:i:s')
+                    ->sortable(),
+                TextColumn::make('causer.name')
+                    ->label('Pelaku (User)')
+                    ->searchable()
+                    ->badge()
+                    ->color('info')
+                    ->default('Sistem / Otomatis'),
                 TextColumn::make('subject_type')
+                    ->label('Modul (Area)')
+                    ->formatStateUsing(function (string $state): string {
+                        return match ($state) {
+                            'App\Models\PurchaseOrder' => 'Pesanan Pembelian',
+                            'App\Models\GoodsReceipt' => 'Penerimaan Barang',
+                            'App\Models\PurchasePayment' => 'Pembayaran Hutang',
+                            'App\Models\Kontrabon' => 'Tukar Faktur (Kontrabon)',
+                            'App\Models\User' => 'Data Pengguna',
+                            'App\Models\Product' => 'Master Produk',
+                            'App\Models\Supplier' => 'Data Supplier',
+                            'App\Models\Branch' => 'Data Cabang',
+                            'App\Models\Transaction' => 'Transaksi Penjualan',
+                            default => class_basename($state),
+                        };
+                    })
                     ->searchable(),
                 TextColumn::make('event')
+                    ->label('Aksi')
+                    ->formatStateUsing(function (string $state): string {
+                        return match ($state) {
+                            'created' => 'Data Baru (Dibuat)',
+                            'updated' => 'Perubahan (Diedit)',
+                            'deleted' => 'Dihapus',
+                            default => ucfirst($state),
+                        };
+                    })
+                    ->badge()
+                    ->colors([
+                        'success' => fn ($state) => strtolower($state) === 'created',
+                        'warning' => fn ($state) => strtolower($state) === 'updated',
+                        'danger' => fn ($state) => strtolower($state) === 'deleted',
+                    ])
                     ->searchable(),
-                TextColumn::make('subject_id')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('causer_type')
+                TextColumn::make('description')
+                    ->label('Keterangan Singkat')
+                    ->limit(50)
                     ->searchable(),
-                TextColumn::make('causer.name')
-                    ->label('Causer')
-                    ->searchable(),
-                TextColumn::make('batch_uuid')
-                    ->searchable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //
             ])
             ->recordActions([
-                ViewAction::make(),
-                EditAction::make(),
+                ViewAction::make()->label('Lihat Detail'),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+                // No bulk actions allowed for logs
             ]);
     }
 }
