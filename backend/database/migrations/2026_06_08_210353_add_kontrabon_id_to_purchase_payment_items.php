@@ -17,11 +17,9 @@ return new class extends Migration
             }
         });
         
+        // This makes the column nullable and matches the UUID char(36) of goods_receipts
+        // Without dropping the existing foreign key since it is still compatible
         \Illuminate\Support\Facades\DB::statement('ALTER TABLE purchase_payment_items MODIFY goods_receipt_id CHAR(36) NULL DEFAULT NULL;');
-        
-        Schema::table('purchase_payment_items', function (Blueprint $table) {
-            $table->foreign('goods_receipt_id')->references('id')->on('goods_receipts')->onDelete('cascade');
-        });
     }
 
     /**
@@ -29,15 +27,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('purchase_payment_items', function (Blueprint $table) {
-            $table->dropForeign(['goods_receipt_id']);
-        });
-        
         \Illuminate\Support\Facades\DB::statement('ALTER TABLE purchase_payment_items MODIFY goods_receipt_id CHAR(36) NOT NULL;');
         
         Schema::table('purchase_payment_items', function (Blueprint $table) {
-            $table->foreign('goods_receipt_id')->references('id')->on('goods_receipts')->onDelete('cascade');
-            $table->dropColumn('kontrabon_id');
+            if (Schema::hasColumn('purchase_payment_items', 'kontrabon_id')) {
+                $table->dropColumn('kontrabon_id');
+            }
         });
     }
 };
