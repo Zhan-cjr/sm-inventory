@@ -261,7 +261,7 @@
                 Pilih Kolom
             </button>
             <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 12rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="bg-white dark:bg-gray-800 dark:border-gray-700">
-                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'avg_bln' => 'Rata Jual/Bln', 'avg_minggu' => 'Rata Jual/Mgg', 'stock' => 'Stok', 'min_qty' => 'Min Qty', 'max_qty' => 'Max Qty', 'qty' => 'Qty Pesan', 'unit_cost' => 'Harga Satuan', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
+                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'avg_bln' => 'Rata Jual/Bln', 'avg_minggu' => 'Rata Jual/Mgg', 'stock' => 'Stok', 'min_qty' => 'Min Qty', 'max_qty' => 'Max Qty', 'qty_saran' => 'Qty Saran', 'qty' => 'Qty Pesan', 'unit_cost' => 'Harga Satuan', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
                     <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                         <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
                         <span class="text-xs">{{ $label }}</span>
@@ -285,6 +285,7 @@
                     @if(in_array('stock', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Stok</th> @endif
                     @if(in_array('min_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Min</th> @endif
                     @if(in_array('max_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Max</th> @endif
+                    @if(in_array('qty_saran', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right; background-color: #e0f2fe; color: #0369a1;">Qty Saran</th> @endif
                     @if(in_array('qty', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right;">Qty Pesan</th> @endif
                     @if(in_array('unit_cost', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Satuan</th> @endif
                     @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis1 (%)</th> @endif
@@ -306,6 +307,7 @@
                         @if(in_array('stock', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #6b7280;">{{ $item['stock'] }}</td> @endif
                         @if(in_array('min_qty', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #ef4444;">{{ $item['min_qty'] }}</td> @endif
                         @if(in_array('max_qty', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #10b981;">{{ $item['max_qty'] }}</td> @endif
+                        @if(in_array('qty_saran', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; font-weight: bold; color: #0284c7; background-color: #f0f9ff;">{{ $item['qty_saran'] }}</td> @endif
                         @if(in_array('qty', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
                             <input onfocus="this.select()" type="number" id="qty-{{ $index }}" class="pos-input" style="text-align: right;" 

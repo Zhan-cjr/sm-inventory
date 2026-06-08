@@ -22,7 +22,7 @@ class PurchaseOrderPos extends Component
     public $tax_amount = 0;
     public $cetak_nota = false;
 
-    public $visibleColumns = ['barcode', 'name', 'stock', 'min_qty', 'max_qty', 'qty', 'unit_cost', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
+    public $visibleColumns = ['barcode', 'name', 'avg_bln', 'avg_minggu', 'stock', 'qty_saran', 'qty', 'unit_cost', 'discount_1', 'subtotal'];
 
     public $searchQuery = '';
     public $cart = [];
@@ -78,6 +78,7 @@ class PurchaseOrderPos extends Component
                     'stock' => $stock,
                     'min_qty' => $stockModel->min_qty ?? 0,
                     'max_qty' => $stockModel->max_qty ?? 0,
+                    'qty_saran' => (float)($item->quantity_suggested ?? 0),
                     'qty' => (float)$item->quantity_ordered,
                     'unit_cost' => (float)$item->unit_cost,
                     'discount_1' => (float)$item->discount_1,
@@ -106,6 +107,12 @@ class PurchaseOrderPos extends Component
         } else {
             $this->searchResults = [];
         }
+    }
+
+    public function updatedSupplierId()
+    {
+        $this->cart = [];
+        $this->calculateTotals();
     }
 
     public function selectProduct($productId)
@@ -177,6 +184,7 @@ class PurchaseOrderPos extends Component
                 'stock' => $stock ? $stock->quantity_on_hand : 0,
                 'min_qty' => $stock ? $stock->min_qty : 0,
                 'max_qty' => $stock ? $stock->max_qty : 0,
+                'qty_saran' => 0,
                 'qty' => 1,
                 'unit_cost' => $finalCost,
                 'discount_1' => 0,
@@ -242,6 +250,9 @@ class PurchaseOrderPos extends Component
             return;
         }
 
+        // Kosongkan keranjang terlebih dahulu agar saran sebelumnya tidak bertumpuk
+        $this->cart = [];
+
         $addedCount = 0;
 
         if ($method === 'sales') {
@@ -251,7 +262,7 @@ class PurchaseOrderPos extends Component
             foreach ($suggestions as $suggestion) {
                 if ($suggestion['suggested_qty'] > 0) {
                     $product = Product::find($suggestion['product_id']);
-                    $this->addItemWithQty($product, $suggestion['suggested_qty']);
+                    $this->addItemWithQty($product, $suggestion['suggested_qty'], null, $suggestion['suggested_qty']);
                     $addedCount++;
                 }
             }
@@ -278,7 +289,7 @@ class PurchaseOrderPos extends Component
                 }
 
                 if ($suggestedQty > 0) {
-                    $this->addItemWithQty($product, $suggestedQty, $stockRec);
+                    $this->addItemWithQty($product, $suggestedQty, $stockRec, $suggestedQty);
                     $addedCount++;
                 }
             }
@@ -291,11 +302,12 @@ class PurchaseOrderPos extends Component
         }
     }
 
-    public function addItemWithQty($product, $qty, $stockRec = null)
+    public function addItemWithQty($product, $qty, $stockRec = null, $qtySaran = 0)
     {
         $existingIndex = collect($this->cart)->search(fn($item) => $item['product_id'] == $product->id);
 
         if ($existingIndex !== false) {
+            $this->cart[$existingIndex]['qty_saran'] = $qtySaran;
             $this->cart[$existingIndex]['qty'] = $qty;
             $this->recalculateRow($existingIndex);
         } else {
@@ -325,6 +337,7 @@ class PurchaseOrderPos extends Component
                 'stock' => $stockRec->quantity_on_hand ?? 0,
                 'min_qty' => $stockRec->min_qty ?? 0,
                 'max_qty' => $stockRec->max_qty ?? 0,
+                'qty_saran' => $qtySaran,
                 'qty' => $qty,
                 'unit_cost' => $finalCost,
                 'discount_1' => 0,
@@ -386,14 +399,11 @@ class PurchaseOrderPos extends Component
 
             if ($organization->po_approval_max_qty_enabled) {
                 foreach ($this->cart as $item) {
-                    $maxQty = $item['max_qty'];
-                    $stock = $item['stock'];
-                    $saran = $maxQty - $stock;
-                    if ($saran < 0) $saran = 0;
+                    $qtySaran = $item['qty_saran'] ?? 0;
 
-                    if ($item['qty'] > $saran) {
+                    if ($item['qty'] > $qtySaran) {
                         $needsApproval = true;
-                        $approvalReason[] = "Kuantitas {$item['name']} melebihi saran order ($saran).";
+                        $approvalReason[] = "Kuantitas {$item['name']} ({$item['qty']}) melebihi saran order sistem ({$qtySaran}).";
                         break;
                     }
                 }
@@ -429,6 +439,7 @@ class PurchaseOrderPos extends Component
             PurchaseOrderItem::create([
                 'purchase_order_id' => $po->id,
                 'product_id' => $item['product_id'],
+                'quantity_suggested' => $item['qty_saran'] ?? 0,
                 'quantity_ordered' => $item['qty'],
                 'unit_cost' => $item['unit_cost'],
                 'discount_1' => $item['discount_1'],
