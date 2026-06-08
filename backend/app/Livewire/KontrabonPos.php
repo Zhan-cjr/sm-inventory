@@ -24,6 +24,11 @@ class KontrabonPos extends Component
     public $unbilled_invoices = [];
     
     public $total_amount = 0;
+    public $total_deduction = 0;
+    public $manual_deduction_amount = 0;
+    public $manual_deduction_notes = '';
+    public $grand_total = 0;
+    public $available_deductions = [];
 
     public function mount()
     {
@@ -32,7 +37,7 @@ class KontrabonPos extends Component
         // Default jatuh tempo 14 hari dari sekarang jika belum ada supplier
         $this->tanggal_jatuh_tempo = date('Y-m-d', strtotime('+14 days'));
         
-        $this->branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
+        $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
         $this->suppliers = Supplier::where('is_active', true)->select('id', 'name', 'code', 'address', 'default_due_days')->get()->toArray();
         $this->branches = Branch::all();
     }
@@ -46,6 +51,49 @@ class KontrabonPos extends Component
             }
         }
         $this->loadUnbilledInvoices();
+        $this->loadDeductions();
+    }
+    
+    public function updatedBranchId()
+    {
+        $this->loadUnbilledInvoices();
+        $this->loadDeductions();
+    }
+    
+    public function loadDeductions()
+    {
+        if (!$this->supplier_id) {
+            $this->available_deductions = [];
+            $this->total_deduction = 0;
+            return;
+        }
+
+        $deductions = \App\Models\SupplierDeduction::where('supplier_id', $this->supplier_id)
+            ->whereIn('status', ['OPEN', 'PARTIAL'])
+            ->where(function($query) {
+                $query->whereNull('branch_id')->orWhere('branch_id', $this->branch_id);
+            })
+            ->get();
+
+        $this->available_deductions = [];
+        $total = 0;
+        foreach($deductions as $d) {
+            $sisa = floatval($d->amount) - floatval($d->claimed_amount);
+            $this->available_deductions[] = [
+                'id' => $d->id,
+                'type' => $d->deduction_type,
+                'branch_id' => $d->branch_id,
+                'sisa' => $sisa,
+                'notes' => $d->notes,
+                'is_selected' => false
+            ];
+        }
+        $this->calculateTotal();
+    }
+    
+    public function toggleDeduction($index)
+    {
+        $this->calculateTotal();
     }
     
     public function loadUnbilledInvoices()
@@ -57,15 +105,22 @@ class KontrabonPos extends Component
         
         // Find GRs that are not yet billed in any active Kontrabon
         // Or we can just add a column `is_billed` to GoodsReceipt, but querying relationships is safer.
-        $invoices = GoodsReceipt::where('supplier_id', $this->supplier_id)
+        $query = GoodsReceipt::where('supplier_id', $this->supplier_id)
             ->whereIn('payment_status', ['UNPAID', 'PARTIAL_PAID'])
             ->whereDoesntHave('kontrabonItems', function ($query) {
                 // exclude invoices that are already in a NON-CANCELLED kontrabon
                 $query->whereHas('kontrabon', function ($q) {
                     $q->where('status', '!=', 'CANCELLED');
                 });
-            })
-            ->get();
+            });
+            
+        if (empty($this->branch_id)) {
+            $query->whereNull('branch_id');
+        } else {
+            $query->where('branch_id', $this->branch_id);
+        }
+            
+        $invoices = $query->get();
             
         $this->unbilled_invoices = [];
         foreach($invoices as $inv) {
@@ -89,6 +144,11 @@ class KontrabonPos extends Component
         $this->calculateTotal();
     }
     
+    public function updatedManualDeductionAmount()
+    {
+        $this->calculateTotal();
+    }
+    
     public function calculateTotal()
     {
         $total = 0;
@@ -98,6 +158,16 @@ class KontrabonPos extends Component
             }
         }
         $this->total_amount = $total;
+        
+        $totalDeduction = 0;
+        foreach($this->available_deductions as $d) {
+            if ($d['is_selected']) {
+                $totalDeduction += floatval($d['sisa']);
+            }
+        }
+        $this->total_deduction = $totalDeduction + floatval($this->manual_deduction_amount);
+        
+        $this->grand_total = max(0, $this->total_amount - $this->total_deduction);
     }
     
     public function save()
@@ -126,7 +196,7 @@ class KontrabonPos extends Component
                 'tanggal_jatuh_tempo' => $this->tanggal_jatuh_tempo,
                 'supplier_id' => $this->supplier_id,
                 'branch_id' => $this->branch_id,
-                'total_amount' => $this->total_amount,
+                'total_amount' => $this->grand_total,
                 'paid_amount' => 0,
                 'notes' => $this->notes,
                 'status' => 'UNPAID',
@@ -138,6 +208,48 @@ class KontrabonPos extends Component
                     'kontrabon_id' => $kontrabon->id,
                     'goods_receipt_id' => $invData['id'],
                     'amount' => floatval($invData['remaining_amount']),
+                ]);
+            }
+            
+            // Apply selected deductions
+            $selectedDeductions = collect($this->available_deductions)->filter(function($d) {
+                return $d['is_selected'];
+            });
+            
+            if ($selectedDeductions->isNotEmpty() && $this->total_amount > 0) {
+                $amountToDeduct = $this->total_amount;
+                
+                foreach ($selectedDeductions as $deduction) {
+                    if ($amountToDeduct <= 0) break;
+                    
+                    $applied = min($amountToDeduct, $deduction['sisa']);
+                    
+                    \App\Models\KontrabonDeduction::create([
+                        'kontrabon_id' => $kontrabon->id,
+                        'supplier_deduction_id' => $deduction['id'],
+                        'amount_applied' => $applied,
+                    ]);
+                    
+                    $dbDeduction = \App\Models\SupplierDeduction::find($deduction['id']);
+                    $newClaimed = floatval($dbDeduction->claimed_amount) + $applied;
+                    $status = ($newClaimed >= floatval($dbDeduction->amount) - 0.01) ? 'COMPLETED' : 'PARTIAL';
+                    
+                    $dbDeduction->update([
+                        'claimed_amount' => $newClaimed,
+                        'status' => $status
+                    ]);
+                    
+                    $amountToDeduct -= $applied;
+                }
+            }
+
+            // Simpan potongan manual jika ada
+            if (floatval($this->manual_deduction_amount) > 0) {
+                \App\Models\KontrabonDeduction::create([
+                    'kontrabon_id' => $kontrabon->id,
+                    'supplier_deduction_id' => null,
+                    'amount_applied' => floatval($this->manual_deduction_amount),
+                    'notes' => $this->manual_deduction_notes ?: 'Potongan Lainnya',
                 ]);
             }
             
@@ -155,3 +267,5 @@ class KontrabonPos extends Component
         return view('livewire.kontrabon-pos');
     }
 }
+
+

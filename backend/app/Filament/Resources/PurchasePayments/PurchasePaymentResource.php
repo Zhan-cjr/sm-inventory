@@ -22,7 +22,7 @@ class PurchasePaymentResource extends Resource
     protected static ?string $model = PurchasePayment::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
-    protected static \UnitEnum|string|null $navigationGroup = 'Keuangan';
+    protected static \UnitEnum|string|null $navigationGroup = 'KEUANGAN';
     protected static ?string $modelLabel = 'Pembayaran Hutang';
     protected static ?string $pluralModelLabel = 'Pembayaran Hutang';
     protected static ?int $navigationSort = 3;
@@ -48,8 +48,7 @@ class PurchasePaymentResource extends Resource
                             ->disabled(),
                         \Filament\Forms\Components\TextInput::make('total_amount')
                             ->label('Total Bayar')
-                            ->numeric()
-                            ->prefix('Rp')
+                            ->rupiah()
                             ->disabled(),
                         \Filament\Forms\Components\Textarea::make('notes')
                             ->label('Catatan')

@@ -26,8 +26,8 @@ class ManageVouchers extends ManageRecords
                         ->label('Nama Voucher (Opsional)')
                         ->placeholder('Contoh: Voucher Belanja Lebaran'),
                     \Filament\Forms\Components\TextInput::make('nominal_value')
-                        ->label('Nilai Nominal (Rp)')
-                        ->numeric()
+                        ->label('Nilai Nominal')
+                        ->rupiah()
                         ->required(),
                     \Filament\Forms\Components\TextInput::make('amount')
                         ->label('Jumlah Voucher yang dibuat')
@@ -45,7 +45,7 @@ class ManageVouchers extends ManageRecords
                         $vouchers[] = [
                             'code' => $code,
                             'name' => $data['name'] ?? null,
-                            'nominal_value' => $data['nominal_value'],
+                            'nominal_value' => (float) str_replace('.', '', $data['nominal_value']),
                             'valid_until' => $data['valid_until'],
                             'is_used' => false,
                             'created_at' => now(),

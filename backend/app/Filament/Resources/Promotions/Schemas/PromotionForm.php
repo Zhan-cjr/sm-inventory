@@ -208,14 +208,6 @@ class PromotionForm
                             ->helperText('Promo hanya berlaku jika menggunakan metode pembayaran tertentu. Biarkan kosong jika berlaku untuk semua metode.'),
                         Grid::make(2)
                             ->schema([
-                                TextInput::make('promo_config.start_time')
-                                    ->label('Jam Mulai Berlaku')
-                                    ->placeholder('Contoh: 14:00')
-                                    ->helperText('Format HH:MM (24 jam)'),
-                                TextInput::make('promo_config.end_time')
-                                    ->label('Jam Selesai Berlaku')
-                                    ->placeholder('Contoh: 17:00')
-                                    ->helperText('Format HH:MM (24 jam)'),
                                 TextInput::make('promo_config.max_usage_limit')
                                     ->label('Batas Kuota Penggunaan')
                                     ->numeric()
@@ -228,6 +220,30 @@ class PromotionForm
                                     ->helperText('Maksimal promo digunakan oleh satu member yang sama. Kosongkan jika tanpa batas.'),
                             ]),
                     ]),
+
+                Section::make('Tanggungan Supplier (Promo Rafaksi / Klaim)')
+                    ->schema([
+                        Select::make('supplier_id')
+                            ->label('Pemasok / Supplier')
+                            ->relationship('supplier', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Pilih supplier jika promo ini ditanggung oleh supplier (Rafaksi).'),
+                        TextInput::make('supplier_sponsorship_percent')
+                            ->label('Persentase Tanggungan Supplier')
+                            ->numeric()
+                            ->suffix('%')
+                            ->default(0)
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->helperText('Berapa persen dari total diskon yang akan ditagihkan ke supplier? (Ketik 100 jika ditanggung penuh)'),
+                        Toggle::make('is_settled')
+                            ->label('Sudah Di-settle (Ditutup)')
+                            ->default(false)
+                            ->disabled()
+                            ->helperText('Akan dicentang otomatis saat proses settlement dilakukan.'),
+                    ])
+                    ->columns(2),
 
                 Section::make('Periode Validitas')
                     ->schema([

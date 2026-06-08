@@ -43,6 +43,51 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
+        \Filament\Forms\Components\TextInput::macro('rupiah', function () {
+            /** @var \Filament\Forms\Components\TextInput $this */
+            return $this
+                ->prefix('Rp')
+                ->extraAlpineAttributes(['x-mask:dynamic' => "\$money(\$input, ',', '.')"])
+                ->formatStateUsing(function ($state) {
+                    if ($state === null || $state === '') return '';
+                    $floatState = (float) $state;
+                    $decimals = (floor($floatState) == $floatState) ? 0 : 2;
+                    return number_format($floatState, $decimals, ',', '.');
+                })
+                ->dehydrateStateUsing(function ($state) {
+                    if ($state === null || $state === '') return null;
+                    $clean = str_replace('.', '', $state);
+                    $clean = str_replace(',', '.', $clean);
+                    return (float) $clean;
+                });
+        });
+
+        \Filament\Forms\Components\TextInput::macro('ribuan', function () {
+            /** @var \Filament\Forms\Components\TextInput $this */
+            return $this
+                ->extraAlpineAttributes(['x-mask:dynamic' => "\$money(\$input, ',', '.')"])
+                ->formatStateUsing(fn ($state) => $state !== null ? number_format((float)$state, 0, ',', '.') : '')
+                ->dehydrateStateUsing(fn ($state) => $state !== null ? (float) str_replace('.', '', $state) : null);
+        });
+
+        \Filament\Forms\Components\TextInput::macro('ribuan_desimal', function () {
+            /** @var \Filament\Forms\Components\TextInput $this */
+            return $this
+                ->extraAlpineAttributes(['x-mask:dynamic' => "\$money(\$input, ',', '.')"])
+                ->formatStateUsing(function ($state) {
+                    if ($state === null || $state === '') return '';
+                    $floatState = (float) $state;
+                    $decimals = (floor($floatState) == $floatState) ? 0 : 2;
+                    return number_format($floatState, $decimals, ',', '.');
+                })
+                ->dehydrateStateUsing(function ($state) {
+                    if ($state === null || $state === '') return null;
+                    $clean = str_replace('.', '', $state);
+                    $clean = str_replace(',', '.', $clean);
+                    return (float) $clean;
+                });
+        });
+
         Stock::observe(StockObserver::class);
         Transaction::observe(TransactionObserver::class);
         TransactionItem::observe(TransactionItemObserver::class);

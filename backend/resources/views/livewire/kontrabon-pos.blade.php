@@ -31,16 +31,16 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Tgl Kontrabon</td>
-                        <td><input type="date" class="pos-input" wire:model="tanggal_kontrabon"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="tanggal_kontrabon"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Jatuh Tempo</td>
-                        <td><input type="date" class="pos-input" wire:model="tanggal_jatuh_tempo"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="tanggal_jatuh_tempo"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Cabang</td>
                         <td>
-                            <select class="pos-input" wire:model="branch_id" @if(auth()->user()->branch_id) disabled @endif>
+                            <select class="pos-input" wire:model.live="branch_id" @if(auth()->user()->branch_id) disabled @endif>
                                 <option value="">Pusat</option>
                                 @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
@@ -86,7 +86,7 @@
                                      style="position: absolute; left: 0; z-index: 50; margin-top: 0.25rem; background: white; border: 1px solid #e5e7eb; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-height: 15rem; overflow-y: auto; width: 100%;" 
                                      class="dark:bg-gray-800 dark:border-gray-700">
                                     <div style="position: sticky; top: 0; padding: 0.5rem; background: white; border-bottom: 1px solid #f3f4f6;" class="dark:bg-gray-800 dark:border-gray-700">
-                                        <input type="text" x-model="search" class="pos-input" placeholder="Cari supplier..." autofocus @keydown.escape="open = false">
+                                        <input onfocus="this.select()" type="text" x-model="search" class="pos-input" placeholder="Cari supplier..." autofocus @keydown.escape="open = false">
                                     </div>
                                     <template x-for="s in filteredSuppliers" :key="s.id">
                                         <div @click="selectSupplier(s.id)" 
@@ -103,7 +103,7 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Keterangan</td>
-                        <td><input type="text" class="pos-input" wire:model="notes" placeholder="Catatan kontrabon..."></td>
+                        <td><input onfocus="this.select()" type="text" class="pos-input" wire:model="notes" placeholder="Catatan kontrabon..."></td>
                     </tr>
                 </table>
             </div>
@@ -162,6 +162,59 @@
         </table>
     </div>
 
+    <!-- Data Grid: Available Deductions -->
+    <div style="flex: 1; overflow-y: auto; border-top: 1px solid #e5e7eb;" class="bg-gray-50 dark:bg-gray-800/50 dark:border-gray-700">
+        <div style="padding: 0.75rem 1rem; font-weight: 600; font-size: 0.875rem;" class="text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800">
+            Klaim & Potongan Supplier (Opsional)
+        </div>
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead style="position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);">
+                <tr>
+                    <th class="pos-grid-th" style="width: 3rem; text-align: center;">Pilih</th>
+                    <th class="pos-grid-th">Tipe Potongan</th>
+                    <th class="pos-grid-th">Keterangan / Ref</th>
+                    <th class="pos-grid-th" style="text-align: right;">Sisa Saldo Potongan</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($available_deductions as $index => $d)
+                    <tr class="{{ $d['is_selected'] ? 'bg-red-50 dark:bg-red-900/20' : '' }}">
+                        <td class="pos-grid-td" style="text-align: center;">
+                            <input type="checkbox" wire:model.live="available_deductions.{{ $index }}.is_selected" wire:change="toggleDeduction({{ $index }})" style="width: 1.25rem; height: 1.25rem; cursor: pointer; accent-color: #ef4444;">
+                        </td>
+                        <td class="pos-grid-td font-medium text-red-600 dark:text-red-400">{{ str_replace('_', ' ', $d['type']) }}</td>
+                        <td class="pos-grid-td">{{ $d['notes'] ?? '-' }}</td>
+                        <td class="pos-grid-td font-bold text-red-600 dark:text-red-400" style="text-align: right;">-{{ number_format($d['sisa'], 0) }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 2rem; color: #6b7280; font-style: italic;" class="dark:text-gray-400">
+                            Tidak ada saldo klaim, retur, atau potongan yang terbuka untuk pemasok ini.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+        </table>
+    </div>
+
+    <!-- Manual Deduction (Potongan Lainnya) -->
+    <div style="flex: none; border-top: 1px solid #e5e7eb; padding: 1rem;" class="bg-white dark:bg-gray-800 dark:border-gray-700">
+        <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.5rem;" class="text-gray-700 dark:text-gray-200">
+            Potongan Lainnya (Manual)
+        </div>
+        <div style="display: flex; gap: 1rem; align-items: flex-end;">
+            <div style="flex: 1;">
+                <label class="pos-label">Nominal Potongan</label>
+                <input onfocus="this.select()" type="number" class="pos-input" wire:model.live="manual_deduction_amount" placeholder="0" min="0">
+            </div>
+            <div style="flex: 2;">
+                <label class="pos-label">Keterangan / Alasan Potongan (Misal: Listing fee, sewa rak)</label>
+                <input onfocus="this.select()" type="text" class="pos-input" wire:model="manual_deduction_notes" placeholder="Catatan potongan...">
+            </div>
+        </div>
+    </div>
+
     <!-- Bottom Action Bar -->
     <div style="background-color: white; border-top: 1px solid #e5e7eb; padding: 1rem; position: sticky; bottom: 0; z-index: 20;" class="dark:bg-gray-800 dark:border-gray-700">
         <div class="flex-between">
@@ -171,8 +224,18 @@
             
             <div style="display: flex; gap: 1.5rem; align-items: center;">
                 <div style="text-align: right;">
-                    <div style="font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase;" class="dark:text-gray-400">Total Kontrabon</div>
-                    <div style="font-size: 1.5rem; font-weight: 800; color: #2563eb; line-height: 1;">Rp {{ number_format($total_amount, 0) }}</div>
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase;" class="dark:text-gray-400">Total Tagihan</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: #374151; line-height: 1;">Rp {{ number_format($total_amount, 0) }}</div>
+                </div>
+                
+                <div style="text-align: right;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #ef4444; text-transform: uppercase;" class="dark:text-red-400">Potongan (Promo/Retur)</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: #ef4444; line-height: 1;">- Rp {{ number_format($total_deduction, 0) }}</div>
+                </div>
+                
+                <div style="text-align: right;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase;" class="dark:text-gray-400">Grand Total Kontrabon</div>
+                    <div style="font-size: 1.5rem; font-weight: 800; color: #2563eb; line-height: 1;">Rp {{ number_format($grand_total, 0) }}</div>
                 </div>
                 
                 <button wire:click="save" wire:loading.attr="disabled"
@@ -185,3 +248,6 @@
         </div>
     </div>
 </div>
+
+
+

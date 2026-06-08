@@ -11,7 +11,7 @@ class TransactionItem extends Model
 
     protected $fillable = [
         'transaction_id', 'product_id', 'service_id', 'quantity', 
-        'unit_price', 'discount_per_item'
+        'unit_price', 'discount_per_item', 'promotion_id'
     ];
 
     protected $casts = [
@@ -32,5 +32,10 @@ class TransactionItem extends Model
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function promotion()
+    {
+        return $this->belongsTo(Promotion::class);
     }
 }

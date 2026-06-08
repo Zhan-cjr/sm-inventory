@@ -85,7 +85,7 @@ class PurchaseReturnPos extends Component
         } else {
             $this->return_number = 'PRT-' . strtoupper(substr(uniqid(), -6));
             $this->return_date = date('Y-m-d');
-            $this->branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
+            $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
         }
 
         $this->calculateTotals();
@@ -245,8 +245,32 @@ class PurchaseReturnPos extends Component
                 
                 // Update PR header
                 $pr->update($data);
+                
+                \App\Models\SupplierDeduction::updateOrCreate(
+                    [
+                        'deduction_type' => 'PURCHASE_RETURN',
+                        'reference_id' => $pr->id,
+                    ],
+                    [
+                        'supplier_id' => $this->supplier_id,
+                        'branch_id' => $this->branch_id,
+                        'amount' => $this->grandTotal,
+                        'notes' => 'Otomatis dari Retur Pembelian ' . $pr->return_number,
+                    ]
+                );
             } else {
                 $pr = PurchaseReturn::create($data);
+                
+                \App\Models\SupplierDeduction::create([
+                    'supplier_id' => $this->supplier_id,
+                    'branch_id' => $this->branch_id,
+                    'deduction_type' => 'PURCHASE_RETURN',
+                    'reference_id' => $pr->id,
+                    'amount' => $this->grandTotal,
+                    'claimed_amount' => 0,
+                    'status' => 'OPEN',
+                    'notes' => 'Otomatis dari Retur Pembelian ' . $pr->return_number,
+                ]);
             }
 
             foreach ($validCart as $item) {
@@ -319,3 +343,5 @@ class PurchaseReturnPos extends Component
         ]);
     }
 }
+
+

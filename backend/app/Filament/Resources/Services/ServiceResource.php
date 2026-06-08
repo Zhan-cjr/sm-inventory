@@ -60,8 +60,7 @@ class ServiceResource extends Resource
                 TextInput::make('price')
                     ->label('Harga')
                     ->required()
-                    ->numeric()
-                    ->prefix('Rp')
+                    ->rupiah()
                     ->minValue(0),
 
                 Textarea::make('description')

@@ -57,6 +57,7 @@ class TransactionController extends Controller
             'items.*.unit_price' => 'required|numeric',
             'items.*.discount_per_item' => 'nullable|numeric',
             'items.*.customer_no' => 'nullable|string',
+            'items.*.promotionId' => 'nullable|uuid',
         ]);
 
         $user = $this->getUser();
@@ -137,7 +138,8 @@ class TransactionController extends Controller
                         'product_id' => $item['product_id'],
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unit_price'],
-                        'discount_per_item' => $item['discount_per_item'] ?? 0,
+                        'discount_per_item' => ($item['discount_per_item'] ?? 0) + ($item['discountPerItem'] ?? 0),
+                        'promotion_id' => $item['promotionId'] ?? $item['promotion_id'] ?? null,
                     ]);
 
                     $product = \App\Models\Product::find($item['product_id']);

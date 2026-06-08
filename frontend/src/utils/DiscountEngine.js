@@ -56,9 +56,10 @@ export class DiscountEngine {
         // Calculate discount per item line and cap it
         discount = eligibleItems.reduce((sum, item) => {
            let itemDiscount = 0;
-           const itemBase = item.quantity * parseFloat(item.unitPrice);
-           itemDiscount = Math.floor(itemBase * (discountValue / 100));
-           return sum + Math.min(itemDiscount, maxDiscount); // Cap per item variant
+           const appliedItemDiscount = Math.min(itemDiscount, maxDiscount);
+           item.discountPerItem = (item.discountPerItem || 0) + (appliedItemDiscount / item.quantity);
+           item.promotionId = promo.id;
+           return sum + appliedItemDiscount; 
         }, 0);
       } else {
         switch (promo.promo_type) {
@@ -85,6 +86,19 @@ export class DiscountEngine {
 
         if (maxDiscount > 0) {
           discount = Math.min(discount, maxDiscount);
+        }
+        
+        // Distribute discount to items so backend can record promotion_id
+        if (discount > 0 && eligibleItems.length > 0) {
+            let remainingDiscount = discount;
+            eligibleItems.forEach((item, index) => {
+                const itemBase = item.quantity * parseFloat(item.unitPrice);
+                const portion = Math.floor((itemBase / baseAmount) * discount);
+                const applied = (index === eligibleItems.length - 1) ? remainingDiscount : portion;
+                item.discountPerItem = (item.discountPerItem || 0) + (applied / item.quantity);
+                item.promotionId = promo.id;
+                remainingDiscount -= applied;
+            });
         }
       }
 
@@ -166,13 +180,7 @@ export class DiscountEngine {
       }
     }
 
-    // Check applicable hours if specified (e.g. start_time: "14:00", end_time: "17:00")
-    if (promo.promo_config?.start_time && promo.promo_config?.end_time) {
-      const currentHourMin = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      if (currentHourMin < promo.promo_config.start_time || currentHourMin > promo.promo_config.end_time) {
-        return false;
-      }
-    }
+                        
 
     return true;
   }

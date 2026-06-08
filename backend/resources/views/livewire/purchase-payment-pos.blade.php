@@ -31,7 +31,7 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Tanggal</td>
-                        <td><input type="date" class="pos-input" wire:model="payment_date"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="payment_date"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Cabang</td>
@@ -82,7 +82,7 @@
                                      style="position: absolute; left: 0; z-index: 50; margin-top: 0.25rem; background: white; border: 1px solid #e5e7eb; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-height: 15rem; overflow-y: auto; width: 100%;" 
                                      class="dark:bg-gray-800 dark:border-gray-700">
                                     <div style="position: sticky; top: 0; padding: 0.5rem; background: white; border-bottom: 1px solid #f3f4f6;" class="dark:bg-gray-800 dark:border-gray-700">
-                                        <input type="text" x-model="search" class="pos-input" placeholder="Cari supplier..." autofocus @keydown.escape="open = false">
+                                        <input onfocus="this.select()" type="text" x-model="search" class="pos-input" placeholder="Cari supplier..." autofocus @keydown.escape="open = false">
                                     </div>
                                     <template x-for="s in filteredSuppliers" :key="s.id">
                                         <div @click="selectSupplier(s.id)" 
@@ -110,11 +110,11 @@
                     </tr>
                     <tr>
                         <td class="pos-label">No Ref / Giro</td>
-                        <td><input type="text" class="pos-input" wire:model="reference_number" placeholder="Boleh dikosongkan..."></td>
+                        <td><input onfocus="this.select()" type="text" class="pos-input" wire:model="reference_number" placeholder="Boleh dikosongkan..."></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Keterangan</td>
-                        <td><input type="text" class="pos-input" wire:model="notes" placeholder="Catatan pembayaran..."></td>
+                        <td><input onfocus="this.select()" type="text" class="pos-input" wire:model="notes" placeholder="Catatan pembayaran..."></td>
                     </tr>
                 </table>
             </div>
@@ -159,7 +159,7 @@
                         <td class="pos-grid-td text-green-600 dark:text-green-400" style="text-align: right;">{{ number_format($inv['paid_amount'], 0) }}</td>
                         <td class="pos-grid-td font-bold" style="text-align: right;">{{ number_format($inv['remaining_amount'], 0) }}</td>
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" step="any" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb; background: {{ $inv['is_selected'] ? 'white' : '#f3f4f6' }};" 
+                            <input onfocus="this.select()" type="number" step="any" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb; background: {{ $inv['is_selected'] ? 'white' : '#f3f4f6' }};" 
                                    wire:model.live.debounce.300ms="unpaid_invoices.{{ $index }}.pay_amount"
                                    @if(!$inv['is_selected']) disabled @endif>
                         </td>
@@ -202,3 +202,6 @@
         </div>
     </div>
 </div>
+
+
+

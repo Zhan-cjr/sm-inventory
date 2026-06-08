@@ -70,7 +70,7 @@ class StockTransferPos extends Component
         } else {
             $this->reference_number = 'TRF-' . strtoupper(uniqid());
             $this->transfer_date = date('Y-m-d');
-            $this->from_branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
+            $this->from_branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
             $this->to_branch_id = null;
             $this->status = 'pending';
         }
@@ -174,8 +174,8 @@ class StockTransferPos extends Component
                 'name' => $product->name,
                 'stock_available' => $availableStock,
                 'qty_transfer' => 1,
-                'unit_price' => $product->cost_price ?? 0,
-                'subtotal' => $product->cost_price ?? 0,
+                'unit_price' => $stock->cost_price ?: ($product->cost_price ?? 0),
+                'subtotal' => $stock->cost_price ?: ($product->cost_price ?? 0),
                 'notes' => ''
             ];
         }
@@ -309,3 +309,5 @@ class StockTransferPos extends Component
         ]);
     }
 }
+
+

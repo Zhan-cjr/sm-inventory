@@ -88,6 +88,12 @@ export const POSTransaction = ({
     }
   })();
 
+  const formatThousandSeparator = (valStr) => {
+    if (valStr === null || valStr === undefined) return '';
+    const clean = valStr.toString().replace(/[^0-9]/g, '');
+    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
+
   const [items, setItems] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('pos_active_cart') || '[]');
@@ -1231,7 +1237,7 @@ export const POSTransaction = ({
     selectedCustomer ? { memberTier: selectedCustomer.member_tier, tierDiscountPercent: selectedCustomer.tier_discount_percent } : { memberTier: 'REGULAR', tierDiscountPercent: 0 },
     subtotal
   );
-  const finalAmount = subtotal - totalDiscount - manualTotalDiscount;
+  const finalAmount = Math.round(subtotal - totalDiscount - manualTotalDiscount);
   const totalPaid = payments.length > 0
     ? payments.reduce((sum, p) => sum + p.amount, 0)
     : (receivedAmount ? parseFloat(receivedAmount) : 0);
@@ -1248,7 +1254,8 @@ export const POSTransaction = ({
   };
 
   const applyEnteredDiscount = () => {
-    const val = parseFloat(discountInputVal);
+    const rawVal = (discountModal && discountModal.type === 'RUPIAH') ? discountInputVal.replace(/\./g, '') : discountInputVal;
+    const val = parseFloat(rawVal);
     if (isNaN(val) || val <= 0) {
       setAlertMsg({ text: 'Nilai diskon harus berupa angka lebih besar dari 0!', type: 'error' });
       setTimeout(() => setAlertMsg(null), 2000);
@@ -1379,7 +1386,7 @@ export const POSTransaction = ({
       setIsBankSelectOpen(true);
     } else if (method === 'CASH') {
       const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-      setDirectCashInput(sisa > 0 ? sisa.toString() : '');
+      setDirectCashInput(sisa > 0 ? formatThousandSeparator(sisa) : '');
       setIsDirectCashModalOpen(true);
     } else {
       processTransaction(method);
@@ -1948,12 +1955,12 @@ export const POSTransaction = ({
             <div className="form-group" style={{ marginBottom: '1.5rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Modal Awal (Cash)</label>
               <input
-                type="number"
+                type="text"
                 className="modern-barcode-input"
                 style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem' }}
                 placeholder="0"
-                value={startingCash}
-                onChange={(e) => setStartingCash(e.target.value)}
+                value={startingCash ? formatThousandSeparator(startingCash) : ''}
+                onChange={(e) => setStartingCash(e.target.value.replace(/[^0-9]/g, ''))}
               />
             </div>
 
@@ -1987,12 +1994,12 @@ export const POSTransaction = ({
             <div className="form-group" style={{ marginBottom: '1.5rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Uang Fisik di Laci (Cash)</label>
               <input
-                type="number"
+                type="text"
                 className="modern-barcode-input"
                 style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem' }}
-                placeholder="Masukkan jumlah uang fisik..."
-                value={actualCash}
-                onChange={(e) => setActualCash(e.target.value)}
+                placeholder="0"
+                value={actualCash ? formatThousandSeparator(actualCash) : ''}
+                onChange={(e) => setActualCash(e.target.value.replace(/[^0-9]/g, ''))}
                 autoFocus
               />
             </div>
@@ -2340,7 +2347,7 @@ export const POSTransaction = ({
                 <button key={bank.id} className="bank-item-btn" onClick={() => {
                   setSelectedBank(bank);
                   const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-                  setDirectCardInput(sisa > 0 ? sisa.toString() : '');
+                  setDirectCardInput(sisa > 0 ? formatThousandSeparator(sisa) : '');
                   setIsBankSelectOpen(false);
                   setIsDirectCardAmountModalOpen(true);
                 }}>
@@ -2484,7 +2491,13 @@ export const POSTransaction = ({
               style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
               placeholder="0"
               value={discountInputVal}
-              onChange={(e) => setDiscountInputVal(e.target.value.replace(/[^0-9.]/g, ''))}
+              onChange={(e) => {
+                if (discountModal?.type === 'RUPIAH') {
+                  setDiscountInputVal(formatThousandSeparator(e.target.value));
+                } else {
+                  setDiscountInputVal(e.target.value.replace(/[^0-9.]/g, ''));
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   applyEnteredDiscount();
@@ -2658,14 +2671,14 @@ export const POSTransaction = ({
               <button className="btn-secondary" style={{ flex: 1, padding: '0.75rem', fontSize: '0.9rem' }} onClick={() => { setVoucherSource('MULTI'); setIsVoucherModalOpen(true); setIsMultiPaymentModalOpen(false); }}>+ Voucher</button>
               <button className="btn-secondary" style={{ flex: 1, padding: '0.75rem', fontSize: '0.9rem' }} onClick={() => {
                 const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-                setMultiCashInput(sisa > 0 ? sisa.toString() : '');
+                setMultiCashInput(sisa > 0 ? formatThousandSeparator(sisa) : '');
                 setIsMultiCashModalOpen(true);
                 setIsMultiPaymentModalOpen(false);
               }}>+ Tunai</button>
               <button className="btn-secondary" style={{ flex: 1, padding: '0.75rem', fontSize: '0.9rem' }} onClick={() => {
                 const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
                 if (sisa > 0) {
-                  setMultiCardInput(sisa.toString());
+                  setMultiCardInput(formatThousandSeparator(sisa));
                   setIsMultiCardAmountModalOpen(true);
                   setIsMultiPaymentModalOpen(false);
                 }
@@ -2694,11 +2707,11 @@ export const POSTransaction = ({
               style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
               value={directCashInput}
               onChange={(e) => {
-                if (/^\d*$/.test(e.target.value)) setDirectCashInput(e.target.value);
+                setDirectCashInput(formatThousandSeparator(e.target.value));
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  const val = parseFloat(directCashInput);
+                  const val = parseFloat(directCashInput.replace(/\./g, ''));
                   if (!isNaN(val) && val > 0) {
                     setIsDirectCashModalOpen(false);
                     processTransaction('CASH', null, val);
@@ -2709,11 +2722,12 @@ export const POSTransaction = ({
                 }
               }}
               autoFocus
+              onFocus={(e) => e.target.select()}
             />
             <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsDirectCashModalOpen(false); setDirectCashInput(''); }}>BATAL (Esc)</button>
               <button className="btn-success" style={{ flex: 1 }} onClick={() => {
-                const val = parseFloat(directCashInput);
+                const val = parseFloat(directCashInput.replace(/\./g, ''));
                 if (!isNaN(val) && val > 0) {
                   setIsDirectCashModalOpen(false);
                   processTransaction('CASH', null, val);
@@ -2738,11 +2752,11 @@ export const POSTransaction = ({
               style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
               value={directCardInput}
               onChange={(e) => {
-                if (/^\d*$/.test(e.target.value)) setDirectCardInput(e.target.value);
+                setDirectCardInput(formatThousandSeparator(e.target.value));
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  const val = parseFloat(directCardInput);
+                  const val = parseFloat(directCardInput.replace(/\./g, ''));
                   if (!isNaN(val) && val > 0) {
                     setIsDirectCardAmountModalOpen(false);
                     processTransaction('CARD', selectedBank?.id, val);
@@ -2753,11 +2767,12 @@ export const POSTransaction = ({
                 }
               }}
               autoFocus
+              onFocus={(e) => e.target.select()}
             />
             <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsDirectCardAmountModalOpen(false); setDirectCardInput(''); }}>BATAL (Esc)</button>
               <button className="btn-success" style={{ flex: 1 }} onClick={() => {
-                const val = parseFloat(directCardInput);
+                const val = parseFloat(directCardInput.replace(/\./g, ''));
                 if (!isNaN(val) && val > 0) {
                   setIsDirectCardAmountModalOpen(false);
                   processTransaction('CARD', selectedBank?.id, val);
@@ -2781,10 +2796,10 @@ export const POSTransaction = ({
               style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
               placeholder="0"
               value={multiCashInput}
-              onChange={(e) => setMultiCashInput(e.target.value.replace(/[^0-9]/g, ''))}
+              onChange={(e) => setMultiCashInput(formatThousandSeparator(e.target.value))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  const val = parseFloat(multiCashInput);
+                  const val = parseFloat(multiCashInput.replace(/\./g, ''));
                   if (!isNaN(val) && val > 0) {
                     setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
                     setIsMultiCashModalOpen(false);
@@ -2798,11 +2813,12 @@ export const POSTransaction = ({
                 }
               }}
               autoFocus
+              onFocus={(e) => e.target.select()}
             />
             <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsMultiCashModalOpen(false); setMultiCashInput(''); setIsMultiPaymentModalOpen(true); }}>BATAL (Esc)</button>
               <button className="btn-success" style={{ flex: 1 }} onClick={() => {
-                const val = parseFloat(multiCashInput);
+                const val = parseFloat(multiCashInput.replace(/\./g, ''));
                 if (!isNaN(val) && val > 0) {
                   setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
                   setIsMultiCashModalOpen(false);
@@ -2828,10 +2844,10 @@ export const POSTransaction = ({
               style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
               placeholder="0"
               value={multiCardInput}
-              onChange={(e) => setMultiCardInput(e.target.value.replace(/[^0-9]/g, ''))}
+              onChange={(e) => setMultiCardInput(formatThousandSeparator(e.target.value))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  const val = parseFloat(multiCardInput);
+                  const val = parseFloat(multiCardInput.replace(/\./g, ''));
                   if (!isNaN(val) && val > 0) {
                     setPendingCardAmount(val);
                     setIsMultiCardAmountModalOpen(false);
@@ -2845,11 +2861,12 @@ export const POSTransaction = ({
                 }
               }}
               autoFocus
+              onFocus={(e) => e.target.select()}
             />
             <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsMultiCardAmountModalOpen(false); setMultiCardInput(''); setIsMultiPaymentModalOpen(true); }}>BATAL (Esc)</button>
               <button className="btn-success" style={{ flex: 1 }} onClick={() => {
-                const val = parseFloat(multiCardInput);
+                const val = parseFloat(multiCardInput.replace(/\./g, ''));
                 if (!isNaN(val) && val > 0) {
                   setPendingCardAmount(val);
                   setIsMultiCardAmountModalOpen(false);
@@ -2887,6 +2904,7 @@ export const POSTransaction = ({
                 }
               }}
               autoFocus
+              onFocus={(e) => e.target.select()}
             />
             <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setNextItemQty(''); setIsQtyModalOpen(false); barcodeInput.current?.focus(); }}>BATAL (Esc)</button>

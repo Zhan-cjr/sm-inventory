@@ -43,7 +43,7 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Tanggal Mutasi</td>
-                        <td><input type="date" class="pos-input" wire:model="transfer_date"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="transfer_date"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Cabang Asal</td>
@@ -136,7 +136,7 @@
                     this.highlightedIndex = -1;
                 }
              }">
-            <input type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
+            <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
                    placeholder="Scan barcode atau ketik nama produk yang ada di cabang asal... tekan Enter"
                    wire:model.live.debounce.250ms="searchQuery"
                    @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
@@ -205,7 +205,7 @@
                         @if(in_array('stock_available', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #10b981; font-weight: 600;">{{ number_format($item['stock_available'], 0) }}</td> @endif
                         @if(in_array('qty_transfer', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
+                            <input onfocus="this.select()" type="number" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
                                    wire:model.lazy="cart.{{ $index }}.qty_transfer"
                                    wire:change="checkQty({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('price-{{ $index }}') ? document.getElementById('price-{{ $index }}').focus() : (document.getElementById('notes-{{ $index }}') ? document.getElementById('notes-{{ $index }}').focus() : document.getElementById('search-input').focus())">
@@ -213,7 +213,7 @@
                         @endif
                         @if(in_array('unit_price', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" id="price-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" id="price-{{ $index }}" class="pos-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.unit_price"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('notes-{{ $index }}') ? document.getElementById('notes-{{ $index }}').focus() : document.getElementById('search-input').focus()">
@@ -226,7 +226,7 @@
                         @endif
                         @if(in_array('notes', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="text" id="notes-{{ $index }}" class="pos-input" placeholder="Keterangan..."
+                            <input onfocus="this.select()" type="text" id="notes-{{ $index }}" class="pos-input" placeholder="Keterangan..."
                                    wire:model.lazy="cart.{{ $index }}.notes"
                                    x-on:keydown.enter.prevent="document.getElementById('search-input').focus()">
                         </td>
@@ -286,3 +286,6 @@
     </div>
 </div>
 </div>
+
+
+

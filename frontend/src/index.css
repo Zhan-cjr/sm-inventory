@@ -1147,6 +1147,16 @@ body {
   transition: all 0.2s;
 }
 
+.login-input option {
+  color: #f8fafc;
+  background-color: #1e293b;
+}
+
+[data-theme="light"] .login-input option {
+  color: #1f2937;
+  background-color: #ffffff;
+}
+
 .login-input:focus {
   outline: none;
   border-color: var(--primary);

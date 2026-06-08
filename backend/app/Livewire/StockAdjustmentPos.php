@@ -68,7 +68,7 @@ class StockAdjustmentPos extends Component
         } else {
             $this->adjustment_number = 'ADJ-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(2)));
             $this->adjustment_date = date('Y-m-d');
-            $this->branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
+            $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
             
             $firstReason = AdjustmentReason::first();
             if ($firstReason) {
@@ -303,3 +303,5 @@ class StockAdjustmentPos extends Component
         ]);
     }
 }
+
+

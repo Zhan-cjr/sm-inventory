@@ -40,7 +40,7 @@ class VoucherResource extends Resource
                 TextInput::make('name'),
                 TextInput::make('nominal_value')
                     ->required()
-                    ->numeric(),
+                    ->rupiah(),
                 DateTimePicker::make('valid_until'),
                 Toggle::make('is_used')
                     ->required(),

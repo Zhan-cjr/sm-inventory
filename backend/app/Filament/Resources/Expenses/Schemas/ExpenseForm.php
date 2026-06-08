@@ -35,8 +35,7 @@ class ExpenseForm
 
                         \Filament\Forms\Components\TextInput::make('amount')
                             ->label('Nominal')
-                            ->numeric()
-                            ->prefix('Rp')
+                            ->rupiah()
                             ->required(),
 
                         \Filament\Forms\Components\Textarea::make('description')

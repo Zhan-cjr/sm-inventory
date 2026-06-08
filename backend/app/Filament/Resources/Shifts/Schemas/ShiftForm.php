@@ -31,21 +31,21 @@ class ShiftForm
                 DateTimePicker::make('end_time'),
                 TextInput::make('starting_cash')
                     ->required()
-                    ->numeric(),
+                    ->rupiah(),
                 TextInput::make('total_cash_sales')
                     ->required()
-                    ->numeric()
-                    ->default(0.0),
+                    ->rupiah()
+                    ->default(0),
                 TextInput::make('total_card_sales')
                     ->required()
-                    ->numeric()
-                    ->default(0.0),
+                    ->rupiah()
+                    ->default(0),
                 TextInput::make('actual_cash')
-                    ->numeric(),
+                    ->rupiah(),
                 TextInput::make('difference')
                     ->required()
-                    ->numeric()
-                    ->default(0.0),
+                    ->rupiah()
+                    ->default(0),
                 TextInput::make('status')
                     ->required()
                     ->default('OPEN'),

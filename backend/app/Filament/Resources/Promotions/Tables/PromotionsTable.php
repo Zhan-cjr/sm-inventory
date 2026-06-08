@@ -95,9 +95,7 @@ class PromotionsTable
                             $translatedDays = array_map(fn ($d) => $daysMap[$d] ?? $d, (array) $state['applicable_days']);
                             $lines[] = 'Hari: ' . implode(', ', $translatedDays);
                         }
-                        if (!empty($state['start_time']) && !empty($state['end_time'])) {
-                            $lines[] = 'Jam: ' . $state['start_time'] . ' - ' . $state['end_time'];
-                        }
+                        
                         
                         return count($lines) > 0 ? implode(' | ', $lines) : '-';
                     })
@@ -127,6 +125,19 @@ class PromotionsTable
                 IconColumn::make('is_active')
                     ->label('Status Aktif')
                     ->boolean(),
+                TextColumn::make('supplier.name')
+                    ->label('Tanggungan Supplier')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('-'),
+                IconColumn::make('is_settled')
+                    ->label('Settled')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-clock')
+                    ->trueColor('success')
+                    ->falseColor('warning')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

@@ -18,7 +18,7 @@ class KontrabonResource extends Resource
     protected static ?string $model = Kontrabon::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-duplicate';
-    protected static \UnitEnum|string|null $navigationGroup = 'Keuangan';
+    protected static \UnitEnum|string|null $navigationGroup = 'KEUANGAN';
     protected static ?string $modelLabel = 'Tukar Faktur (Kontrabon)';
     protected static ?string $pluralModelLabel = 'Tukar Faktur (Kontrabon)';
     protected static ?int $navigationSort = 2;
@@ -42,15 +42,36 @@ class KontrabonResource extends Resource
                             ->relationship('supplier', 'name')
                             ->label('Pemasok')
                             ->disabled(),
-                        \Filament\Forms\Components\TextInput::make('total_amount')
+                         \Filament\Forms\Components\TextInput::make('total_amount')
                             ->label('Total Tagihan')
-                            ->numeric()
-                            ->prefix('Rp')
+                            ->rupiah()
                             ->disabled(),
                         \Filament\Forms\Components\Textarea::make('notes')
                             ->label('Catatan')
                             ->disabled(),
-                    ])->columns(2)
+                    ])->columns(2),
+
+                \Filament\Schemas\Components\Section::make('Potongan Supplier (Promo/Klaim)')
+                    ->schema([
+                        \Filament\Forms\Components\Repeater::make('kontrabonDeductions')
+                            ->relationship()
+                            ->schema([
+                                \Filament\Forms\Components\Select::make('supplier_deduction_id')
+                                    ->relationship('supplierDeduction', 'notes')
+                                    ->label('Keterangan / ID Promo')
+                                    ->disabled(),
+                                \Filament\Forms\Components\TextInput::make('amount_applied')
+                                    ->label('Nominal Terpotong')
+                                    ->rupiah()
+                                    ->disabled(),
+                            ])
+                            ->columns(2)
+                            ->disableItemCreation()
+                            ->disableItemDeletion()
+                            ->disableItemMovement()
+                            ->label('')
+                    ])
+                    ->visible(fn ($record) => $record && $record->kontrabonDeductions()->count() > 0),
             ]);
     }
 
@@ -90,6 +111,12 @@ class KontrabonResource extends Resource
                     ]), true),
             ])
             ->actions([
+                \Filament\Actions\Action::make('cetak_nota')
+                    ->label('Cetak')
+                    ->icon('heroicon-o-printer')
+                    ->color('info')
+                    ->url(fn (Kontrabon $record) => route('print.report', ['type' => 'kontrabon-nota', 'id' => $record->id]))
+                    ->openUrlInNewTab(),
                 \Filament\Actions\ViewAction::make()->label('Detail'),
                 \Filament\Actions\DeleteAction::make()
                     ->label('Batalkan')

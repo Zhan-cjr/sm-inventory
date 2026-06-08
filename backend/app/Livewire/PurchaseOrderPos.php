@@ -89,7 +89,7 @@ class PurchaseOrderPos extends Component
         } else {
             $this->po_number = 'PO-' . date('YmdHis');
             $this->po_date = date('Y-m-d');
-            $this->branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
+            $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
         }
 
         $this->calculateTotals();
@@ -464,3 +464,5 @@ class PurchaseOrderPos extends Component
         ]);
     }
 }
+
+

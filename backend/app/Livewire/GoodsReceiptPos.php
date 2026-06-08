@@ -91,7 +91,7 @@ class GoodsReceiptPos extends Component
             $this->receipt_number = 'GR-' . date('YmdHis');
             $this->receipt_date = date('Y-m-d');
             $this->due_date = date('Y-m-d');
-            $this->branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
+            $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
         }
 
         $this->calculateTotals();
@@ -454,23 +454,27 @@ class GoodsReceiptPos extends Component
 
                 $costPriceTax = $this->include_tax ? round($item['unit_price'] * $taxMultiplier, 2) : $item['unit_price'];
 
-                if (empty($this->branch_id)) {
-                    // Update Global Product
-                    $product = Product::find($item['product_id']);
-                    if ($product) {
-                        $updateData = [
-                            'cost_price' => $item['unit_price'],
-                            'cost_price_tax' => $costPriceTax,
-                        ];
-                        if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
-                            $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
-                            $updateData['margin_gol_1'] = $item['margin_gol_1'] ?? $product->margin_gol_1;
-                            $updateData['selling_price'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
-                        }
-                        $product->update($updateData);
+                // 1. Selalu update Produk Global (Master Data) agar harga global tetap up-to-date
+                $product = Product::find($item['product_id']);
+                if ($product) {
+                    $updateData = [
+                        'cost_price' => $item['unit_price'],
+                        'cost_price_tax' => $costPriceTax,
+                    ];
+                    if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
+                        $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
+                        $updateData['margin_gol_1'] = $item['margin_gol_1'] ?? $product->margin_gol_1;
+                        $updateData['harga_jual_2'] = $item['harga_jual_2'] ?? $product->harga_jual_2;
+                        $updateData['margin_gol_2'] = $item['margin_gol_2'] ?? $product->margin_gol_2;
+                        $updateData['harga_jual_3'] = $item['harga_jual_3'] ?? $product->harga_jual_3;
+                        $updateData['margin_gol_3'] = $item['margin_gol_3'] ?? $product->margin_gol_3;
+                        $updateData['selling_price'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
                     }
-                } else {
-                    // Update Branch Stock
+                    $product->update($updateData);
+                }
+
+                // 2. Jika cabang dipilih, update juga harga spesifik cabang tersebut
+                if (!empty($this->branch_id)) {
                     $stock = Stock::where('product_id', $item['product_id'])->where('branch_id', $this->branch_id)->first();
                     if ($stock) {
                         $updateData = [
@@ -480,6 +484,10 @@ class GoodsReceiptPos extends Component
                         if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
                             $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $stock->harga_jual_1;
                             $updateData['margin_gol_1'] = $item['margin_gol_1'] ?? $stock->margin_gol_1;
+                            $updateData['harga_jual_2'] = $item['harga_jual_2'] ?? $stock->harga_jual_2;
+                            $updateData['margin_gol_2'] = $item['margin_gol_2'] ?? $stock->margin_gol_2;
+                            $updateData['harga_jual_3'] = $item['harga_jual_3'] ?? $stock->harga_jual_3;
+                            $updateData['margin_gol_3'] = $item['margin_gol_3'] ?? $stock->margin_gol_3;
                             $updateData['selling_price'] = $item['harga_jual_1'] ?? $stock->harga_jual_1;
                         }
                         $stock->update($updateData);
@@ -552,3 +560,5 @@ class GoodsReceiptPos extends Component
         ]);
     }
 }
+
+

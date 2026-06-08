@@ -46,7 +46,7 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Tgl Transaksi</td>
-                        <td><input type="date" class="pos-input" wire:model="adjustment_date"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="adjustment_date"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Lokasi Cabang</td>
@@ -77,7 +77,7 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Catatan Tambahan</td>
-                        <td><input type="text" class="pos-input" wire:model="notes" placeholder="Tulis catatan..."></td>
+                        <td><input onfocus="this.select()" type="text" class="pos-input" wire:model="notes" placeholder="Tulis catatan..."></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Tipe Perhitungan</td>
@@ -145,7 +145,7 @@
                     this.highlightedIndex = -1;
                 }
              }">
-            <input type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
+            <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
                    placeholder="Mulai ketik nama produk, SKU, atau scan barcode... lalu tekan Enter"
                    wire:model.live.debounce.250ms="searchQuery"
                    @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
@@ -214,7 +214,7 @@
                         @if(in_array('stock', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #6b7280;">{{ $item['stock'] }}</td> @endif
                         @if(in_array('qty', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" step="any" id="qty-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.qty"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('cost-{{ $index }}') ? document.getElementById('cost-{{ $index }}').focus() : document.getElementById('search-input').focus()">
@@ -225,7 +225,7 @@
                         @endif
                         @if(in_array('unit_cost', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" step="any" id="cost-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" step="any" id="cost-{{ $index }}" class="pos-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.unit_cost"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('search-input').focus()">
@@ -283,3 +283,6 @@
         </div>
     </div>
 </div>
+
+
+

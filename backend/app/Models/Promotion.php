@@ -13,18 +13,21 @@ class Promotion extends Model
         'organization_id', 'name', 'promo_type', 'discount_value',
         'min_purchase_amount', 'applicable_to', 'target_ids',
         'valid_from', 'valid_until', 'max_discount_per_transaction',
-        'is_active', 'promo_config'
+        'is_active', 'promo_config',
+        'supplier_id', 'supplier_sponsorship_percent', 'is_settled'
     ];
 
     protected $casts = [
         'target_ids' => 'array',
         'promo_config' => 'array',
         'is_active' => 'boolean',
+        'is_settled' => 'boolean',
         'valid_from' => 'datetime',
         'valid_until' => 'datetime',
         'discount_value' => 'decimal:2',
         'min_purchase_amount' => 'decimal:2',
         'max_discount_per_transaction' => 'decimal:2',
+        'supplier_sponsorship_percent' => 'decimal:2',
     ];
 
     protected static function booted()
@@ -47,5 +50,10 @@ class Promotion extends Model
     public function branches(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Branch::class, 'branch_promotion');
+    }
+
+    public function supplier(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
     }
 }

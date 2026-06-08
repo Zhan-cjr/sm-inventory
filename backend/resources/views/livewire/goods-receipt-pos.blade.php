@@ -46,11 +46,11 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Tgl Terima</td>
-                        <td><input type="date" class="pos-input" wire:model.live="receipt_date"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model.live="receipt_date"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Jatuh Tempo</td>
-                        <td><input type="date" class="pos-input" wire:model="due_date" placeholder="Otomatis dari Pemasok"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="due_date" placeholder="Otomatis dari Pemasok"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Pilih PO (Opsional)</td>
@@ -71,7 +71,7 @@
                     </tr>
                     <tr>
                         <td class="pos-label">No Faktur Supplier</td>
-                        <td><input type="text" class="pos-input" wire:model="faktur_supplier" placeholder="Masukkan No Surat Jalan / Faktur..."></td>
+                        <td><input onfocus="this.select()" type="text" class="pos-input" wire:model="faktur_supplier" placeholder="Masukkan No Surat Jalan / Faktur..."></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Lokasi Cabang</td>
@@ -125,7 +125,7 @@
                                      style="position: absolute; left: 0; z-index: 50; margin-top: 0.25rem; background: white; border: 1px solid #e5e7eb; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-height: 15rem; overflow-y: auto; width: 100%; min-width: 300px; max-width: 500px;" 
                                      class="dark:bg-gray-800 dark:border-gray-700">
                                     <div style="position: sticky; top: 0; padding: 0.5rem; background: white; border-bottom: 1px solid #f3f4f6;" class="dark:bg-gray-800 dark:border-gray-700">
-                                        <input type="text" x-model="search" class="pos-input" placeholder="Cari supplier..." autofocus @keydown.escape="open = false">
+                                        <input onfocus="this.select()" type="text" x-model="search" class="pos-input" placeholder="Cari supplier..." autofocus @keydown.escape="open = false">
                                     </div>
                                     <template x-for="s in filteredSuppliers" :key="s.id">
                                         <div @click="selectSupplier(s.id)" 
@@ -156,7 +156,7 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Catatan</td>
-                        <td><input type="text" class="pos-input" wire:model="notes" placeholder="Catatan tambahan..."></td>
+                        <td><input onfocus="this.select()" type="text" class="pos-input" wire:model="notes" placeholder="Catatan tambahan..."></td>
                     </tr>
                 </table>
             </div>
@@ -216,7 +216,7 @@
                     this.highlightedIndex = -1;
                 }
              }">
-            <input type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
+            <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
                    placeholder="Scan barcode atau ketik nama produk... tekan Enter"
                    wire:model.live.debounce.250ms="searchQuery"
                    @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
@@ -290,7 +290,7 @@
                         @if(in_array('qty_ordered', $visibleColumns)) <td class="pos-grid-td dark:text-gray-400" style="text-align: right; color: #6b7280;">{{ $item['qty_ordered'] > 0 ? number_format($item['qty_ordered'], 0) : '-' }}</td> @endif
                         @if(in_array('qty_received', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" step="any" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
+                            <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
                                    wire:model.lazy="cart.{{ $index }}.qty_received"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('price-{{ $index }}').focus()">
@@ -298,7 +298,7 @@
                         @endif
                         @if(in_array('unit_price', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" step="any" id="price-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" step="any" id="price-{{ $index }}" class="pos-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.unit_price"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('dis1-{{ $index }}').focus()">
@@ -308,7 +308,7 @@
                         @if(in_array('harga_jual_1', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
                             @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
-                                <input type="number" step="any" class="pos-input" style="text-align: right;" 
+                                <input onfocus="this.select()" type="number" step="any" class="pos-input" style="text-align: right;" 
                                        wire:model.lazy="cart.{{ $index }}.harga_jual_1"
                                        wire:change="recalculateRow({{ $index }})">
                             @else
@@ -329,7 +329,7 @@
                         @endif
                         @if(in_array('discount_1', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" id="dis1-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" id="dis1-{{ $index }}" class="pos-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.discount_1"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('dis2-{{ $index }}').focus()">
@@ -337,7 +337,7 @@
                         @endif
                         @if(in_array('discount_2', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" id="dis2-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" id="dis2-{{ $index }}" class="pos-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.discount_2"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('dis3-{{ $index }}').focus()">
@@ -345,7 +345,7 @@
                         @endif
                         @if(in_array('discount_3', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" step="any" id="dis3-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" step="any" id="dis3-{{ $index }}" class="pos-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.discount_3"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.enter.prevent="document.getElementById('search-input').focus()">
@@ -415,7 +415,7 @@
                         <option value="nominal">Rp</option>
                         <option value="percent">%</option>
                     </select>
-                    <input type="number" wire:model.live="discount_subtotal" class="pos-input" style="width: 6rem; padding: 0.125rem 0.25rem; text-align: right;">
+                    <input onfocus="this.select()" type="number" wire:model.live="discount_subtotal" class="pos-input" style="width: 6rem; padding: 0.125rem 0.25rem; text-align: right;">
                 </div>
             </div>
 
@@ -423,7 +423,7 @@
                 <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN ({{ (float)(\App\Models\Organization::first()->tax_rate ?? 11) }}%)</div>
                 <div class="flex items-center justify-end gap-1">
                     <span style="font-size: 0.75rem; color: #6b7280;">Rp</span>
-                    <input type="number" wire:model.live="tax_amount" class="pos-input" style="width: 7rem; padding: 0.125rem 0.25rem; text-align: right; border-style: dashed; background: transparent;">
+                    <input onfocus="this.select()" type="number" wire:model.live="tax_amount" class="pos-input" style="width: 7rem; padding: 0.125rem 0.25rem; text-align: right; border-style: dashed; background: transparent;">
                 </div>
             </div>
 
@@ -434,3 +434,6 @@
         </div>
     </div>
 </div>
+
+
+

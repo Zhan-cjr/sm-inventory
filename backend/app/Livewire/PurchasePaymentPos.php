@@ -31,7 +31,7 @@ class PurchasePaymentPos extends Component
     {
         $this->payment_number = 'PAY-' . date('YmdHis');
         $this->payment_date = date('Y-m-d');
-        $this->branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
+        $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
         $this->suppliers = Supplier::where('is_active', true)->select('id', 'name', 'code', 'address')->get()->toArray();
         $this->branches = Branch::all();
     }
@@ -184,3 +184,5 @@ class PurchasePaymentPos extends Component
         return view('livewire.purchase-payment-pos');
     }
 }
+
+

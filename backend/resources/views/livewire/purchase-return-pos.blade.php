@@ -42,7 +42,7 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Tgl Retur</td>
-                        <td><input type="date" class="pos-input" wire:model="return_date"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="return_date"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Supplier</td>
@@ -78,7 +78,7 @@
                                      style="position: absolute; left: 0; z-index: 50; margin-top: 0.25rem; background: white; border: 1px solid #e5e7eb; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-height: 15rem; overflow-y: auto; width: 100%; min-width: 300px; max-width: 500px;" 
                                      class="dark:bg-gray-800 dark:border-gray-700">
                                     <div style="position: sticky; top: 0; padding: 0.5rem; background: white; border-bottom: 1px solid #f3f4f6;" class="dark:bg-gray-800 dark:border-gray-700">
-                                        <input type="text" x-model="search" class="pos-input" placeholder="Cari kode/nama supplier..." autofocus @keydown.escape="open = false">
+                                        <input onfocus="this.select()" type="text" x-model="search" class="pos-input" placeholder="Cari kode/nama supplier..." autofocus @keydown.escape="open = false">
                                     </div>
                                     <template x-for="s in filteredSuppliers" :key="s.id">
                                         <div @click="selectSupplier(s.id)" 
@@ -159,7 +159,7 @@
                         <td class="pos-grid-td" style="font-weight: 500;">{{ $item['name'] }}</td>
                         <td class="pos-grid-td" style="text-align: right; color: #6b7280;">{{ number_format($item['max_qty'], 0) }}</td>
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="number" step="any" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #dc2626;" 
+                            <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #dc2626;" 
                                    wire:model.lazy="cart.{{ $index }}.qty_returned"
                                    wire:change="recalculateRow({{ $index }})"
                                    placeholder="0">
@@ -171,7 +171,7 @@
                             {{ number_format($item['subtotal'], 2) }}
                         </td>
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input type="text" class="pos-input" wire:model.lazy="cart.{{ $index }}.reason" placeholder="Ketik alasan...">
+                            <input onfocus="this.select()" type="text" class="pos-input" wire:model.lazy="cart.{{ $index }}.reason" placeholder="Ketik alasan...">
                         </td>
                         <td class="pos-grid-td" style="text-align: center;">
                             <button wire:click="removeItem({{ $index }})" class="text-red-500 hover:text-red-700 transition-colors" title="Hapus Barang">
@@ -222,3 +222,6 @@
         </div>
     </div>
 </div>
+
+
+

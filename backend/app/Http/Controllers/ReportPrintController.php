@@ -58,6 +58,12 @@ class ReportPrintController extends Controller
                 return $this->printKontrabon($filters);
             case 'pembayaran-hutang':
                 return $this->printPembayaranHutang($filters);
+            case 'kontrabon-nota':
+                return $this->printKontrabonNota($request);
+            case 'promo-sellout':
+                return $this->printPromoSellout($request);
+            case 'supplier-deductions':
+                return $this->printSupplierDeductions($filters);
             default:
                 abort(404, 'Tipe laporan tidak ditemukan');
         }
@@ -1312,16 +1318,16 @@ class ReportPrintController extends Controller
     private function printKontrabon($filters)
     {
         $query = \App\Models\Kontrabon::query()->with(['supplier', 'branch']);
-        $query = $this->applyDateFilters($query, $filters, 'tanggal_kontrabon', 'tanggal_kontrabon');
+        $query = $this->applyDateFilters($query, $filters, 'tanggal_kontrabon', 'date_filter');
         
-        if (auth()->user()->branch_id !== null) {
+        if (auth()->user() && auth()->user()->branch_id !== null) {
             $query->where('branch_id', auth()->user()->branch_id);
         } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
             $query->where('branch_id', $filters['branch_id']['value']);
         }
 
         $records = $query->orderBy('tanggal_kontrabon', 'desc')->get();
-        $period = $this->getPeriodString($filters, 'tanggal_kontrabon');
+        $period = $this->getPeriodString($filters, 'date_filter');
 
         $columns = ['Tgl Kontrabon', 'No. Kontrabon', 'Pemasok', 'Cabang', 'Jatuh Tempo', 'Total Tagihan', 'Sudah Dibayar', 'Status'];
         $rows = [];
@@ -1349,16 +1355,16 @@ class ReportPrintController extends Controller
     private function printPembayaranHutang($filters)
     {
         $query = \App\Models\PurchasePayment::query()->with(['supplier', 'branch']);
-        $query = $this->applyDateFilters($query, $filters, 'payment_date', 'payment_date');
+        $query = $this->applyDateFilters($query, $filters, 'payment_date', 'date_filter');
         
-        if (auth()->user()->branch_id !== null) {
+        if (auth()->user() && auth()->user()->branch_id !== null) {
             $query->where('branch_id', auth()->user()->branch_id);
         } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
             $query->where('branch_id', $filters['branch_id']['value']);
         }
 
         $records = $query->orderBy('payment_date', 'desc')->get();
-        $period = $this->getPeriodString($filters, 'payment_date');
+        $period = $this->getPeriodString($filters, 'date_filter');
 
         $columns = ['Tgl Bayar', 'No. Pembayaran', 'Pemasok', 'Cabang', 'Metode Bayar', 'Nominal Bayar', 'Status'];
         $rows = [];
@@ -1379,5 +1385,102 @@ class ReportPrintController extends Controller
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>'.number_format($t_bayar, 0, ',', '.').'</strong>', ''];
 
         return view('print.reports.generic', ['title' => 'Daftar Pembayaran Hutang', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printKontrabonNota(Request $request)
+    {
+        $id = $request->query('id');
+        $kontrabon = \App\Models\Kontrabon::with(['supplier', 'branch', 'goodsReceipts', 'kontrabonDeductions.supplierDeduction'])->findOrFail($id);
+        
+        $organizationId = auth()->user()?->organization_id ?? \App\Models\Organization::first()?->id;
+        $organization = \App\Models\Organization::find($organizationId);
+        
+        return view('print.documents.kontrabon-nota', [
+            'kontrabon' => $kontrabon,
+            'organization' => $organization,
+            'title' => 'Nota Kontrabon'
+        ]);
+    }
+
+    private function printPromoSellout(Request $request)
+    {
+        $promoId = $request->query('id');
+        $promo = \App\Models\Promotion::with('supplier')->findOrFail($promoId);
+        
+        $items = \App\Models\TransactionItem::where('promotion_id', $promoId)
+                    ->with(['transaction.branch', 'product'])
+                    ->get();
+
+        if ($items->isEmpty()) {
+            $query = \App\Models\TransactionItem::whereHas('transaction', function ($q) use ($promo) {
+                $q->whereBetween('transaction_date', [$promo->valid_from, $promo->valid_until])
+                  ->where('is_voided', false);
+            });
+
+            if ($promo->applicable_to === 'PRODUCT') {
+                $query->whereIn('product_id', $promo->target_ids ?? []);
+            } elseif ($promo->applicable_to === 'CATEGORY') {
+                $query->whereHas('product', function ($q) use ($promo) {
+                    $q->whereIn('category_id', $promo->target_ids ?? []);
+                });
+            }
+
+            $itemsWithDiscount = (clone $query)->where('discount_per_item', '>', 0)
+                ->with(['transaction.branch', 'product'])
+                ->get();
+
+            if ($itemsWithDiscount->isNotEmpty()) {
+                $items = $itemsWithDiscount;
+            } else {
+                $items = $query->with(['transaction.branch', 'product'])->get();
+            }
+        }
+                    
+        $organizationId = auth()->user()?->organization_id ?? \App\Models\Organization::first()?->id;
+        $organization = \App\Models\Organization::find($organizationId);
+        
+        return view('print.reports.promo-sellout', [
+            'promo' => $promo,
+            'items' => $items,
+            'organization' => $organization,
+            'title' => 'Laporan Sellout Promo'
+        ]);
+    }
+
+    private function printSupplierDeductions($filters)
+    {
+        $query = \App\Models\SupplierDeduction::query()->with(['supplier', 'branch']);
+        $query = $this->applyDateFilters($query, $filters, 'created_at', 'date_filter');
+        
+        if (auth()->user() && auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+
+        $records = $query->orderBy('created_at', 'desc')->get();
+        $period = $this->getPeriodString($filters, 'date_filter');
+
+        $columns = ['Tanggal', 'Jenis', 'Pemasok', 'Cabang', 'Nominal', 'Terpakai', 'Status', 'Catatan'];
+        $rows = [];
+        $t_nominal = 0; $t_terpakai = 0;
+        
+        foreach ($records as $r) {
+            $t_nominal += $r->amount;
+            $t_terpakai += $r->claimed_amount;
+            $rows[] = [
+                \Carbon\Carbon::parse($r->created_at)->format('d-m-Y'),
+                $r->deduction_type,
+                $r->supplier ? $r->supplier->name : '-',
+                $r->branch ? $r->branch->name : 'Pusat / Global',
+                number_format($r->amount, 0, ',', '.'),
+                number_format($r->claimed_amount, 0, ',', '.'),
+                $r->status,
+                $r->notes
+            ];
+        }
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>'.number_format($t_nominal, 0, ',', '.').'</strong>', '<strong>'.number_format($t_terpakai, 0, ',', '.').'</strong>', '', ''];
+
+        return view('print.reports.generic', ['title' => 'Daftar Klaim & Potongan Pemasok', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
 }

@@ -69,15 +69,15 @@ class GoodsReceiptForm
                 TextInput::make('faktur_supplier'),
                 TextInput::make('total_amount')
                     ->required()
-                    ->numeric(),
+                    ->rupiah(),
                 Toggle::make('include_tax')
                     ->label('Include PPN')
                     ->default(true)
                     ->required(),
                 TextInput::make('tax_amount')
                     ->label('Nominal PPN')
-                    ->numeric()
-                    ->default(0.0),
+                    ->rupiah()
+                    ->default(0),
                 Select::make('payment_status')
                     ->label('Status Pembayaran')
                     ->options([
@@ -89,9 +89,8 @@ class GoodsReceiptForm
                     ->required(),
                 TextInput::make('paid_amount')
                     ->label('Jumlah Sudah Dibayar')
-                    ->numeric()
-                    ->default(0.0)
-                    ->prefix('Rp')
+                    ->rupiah()
+                    ->default(0)
                     ->disabled() // Because payments should be recorded via payment system
                     ->dehydrated(),
                 TextInput::make('status')
