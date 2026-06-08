@@ -14,6 +14,7 @@ class PurchasePaymentItem extends Model
     protected $fillable = [
         'purchase_payment_id',
         'goods_receipt_id',
+        'kontrabon_id',
         'amount_paid',
     ];
 

@@ -45,6 +45,10 @@ class SupplierForm
                 Toggle::make('is_active')
                     ->default(true)
                     ->required(),
+                Toggle::make('is_consignment')
+                    ->label('Supplier Konsinyasi / Titip Jual')
+                    ->helperText('Jika aktif, seluruh barang dari supplier ini tidak diakui sebagai Hutang/Aset saat diterima.')
+                    ->default(false),
             ]);
     }
 }

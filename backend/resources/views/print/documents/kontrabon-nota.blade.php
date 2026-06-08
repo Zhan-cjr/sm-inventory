@@ -34,7 +34,8 @@
             </tr>
         </table>
 
-        <h3>Faktur Tagihan</h3>
+        @if($kontrabon->goodsReceipts->count() > 0)
+        <h3>Faktur Tagihan (Penerimaan Barang)</h3>
         <table class="items-table">
             <thead>
                 <tr>
@@ -55,6 +56,31 @@
                 @endforeach
             </tbody>
         </table>
+        @elseif(isset($selloutItems) && $selloutItems->count() > 0)
+        <h3>Rincian Barang Terjual (Sellout Konsinyasi)</h3>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 25px;" class="text-center">No</th>
+                    <th>SKU / Nama Produk</th>
+                    <th class="text-right" style="width: 100px;">HPP</th>
+                    <th class="text-center" style="width: 80px;">Qty Terjual</th>
+                    <th class="text-right" style="width: 150px;">Subtotal Tagihan</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($selloutItems as $index => $item)
+                <tr>
+                    <td class="text-center">{{ $index + 1 }}</td>
+                    <td><strong>{{ $item['sku'] }}</strong><br>{{ $item['name'] }}</td>
+                    <td class="text-right">Rp {{ number_format($item['cost_price'], 0, ',', '.') }}</td>
+                    <td class="text-center">{{ number_format($item['qty']) }}</td>
+                    <td class="text-right">Rp {{ number_format($item['subtotal'], 0, ',', '.') }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        @endif
 
         @if($kontrabon->kontrabonDeductions->count() > 0)
         <h3 style="margin-top: 15px;">Potongan & Klaim</h3>

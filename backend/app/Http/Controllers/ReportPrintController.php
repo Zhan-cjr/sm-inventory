@@ -1395,9 +1395,26 @@ class ReportPrintController extends Controller
         $organizationId = auth()->user()?->organization_id ?? \App\Models\Organization::first()?->id;
         $organization = \App\Models\Organization::find($organizationId);
         
+        // Aggregate Consignment Sellout if applicable
+        $selloutItems = \App\Models\TransactionItem::with('product')
+            ->where('kontrabon_id', $kontrabon->id)
+            ->get()
+            ->groupBy('product_id')
+            ->map(function ($items) {
+                $first = $items->first();
+                return [
+                    'sku' => $first->product->sku ?? '-',
+                    'name' => $first->product->name ?? '-',
+                    'qty' => $items->sum('quantity'),
+                    'cost_price' => $first->product->cost_price ?? 0,
+                    'subtotal' => $items->sum('quantity') * ($first->product->cost_price ?? 0),
+                ];
+            })->values();
+
         return view('print.documents.kontrabon-nota', [
             'kontrabon' => $kontrabon,
             'organization' => $organization,
+            'selloutItems' => $selloutItems,
             'title' => 'Nota Kontrabon'
         ]);
     }

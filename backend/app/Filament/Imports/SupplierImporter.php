@@ -67,6 +67,17 @@ class SupplierImporter extends Importer
                 ->example('Jl. Sudirman No 1 Jakarta')
                 ->rules(['nullable', 'string']),
 
+            ImportColumn::make('default_due_days')
+                ->label('Jatuh Tempo Default (Hari)')
+                ->numeric()
+                ->example('14')
+                ->rules(['nullable', 'integer']),
+
+            ImportColumn::make('payment_method')
+                ->label('Cara Pembayaran Default')
+                ->example('transfer')
+                ->rules(['nullable', 'string']),
+
             ImportColumn::make('is_active')
                 ->label('Aktif (1/0)')
                 ->boolean()

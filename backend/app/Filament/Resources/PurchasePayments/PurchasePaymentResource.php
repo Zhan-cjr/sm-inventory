@@ -91,8 +91,11 @@ class PurchasePaymentResource extends Resource
                     ->modalHeading('Batalkan Pembayaran')
                     ->modalDescription('Apakah Anda yakin ingin membatalkan pembayaran ini? Nominal pada faktur penerimaan (GR) akan dikembalikan ke status belum lunas.')
                     ->action(function (PurchasePayment $record) {
-                        // Restore goods receipt paid amounts
+                        // Track which kontrabons we've updated to avoid double-deducting if multiple items share the same kontrabon
+                        $processedKontrabons = [];
+                        
                         foreach ($record->items as $item) {
+                            // 1. Restore goods receipt paid amounts (if applicable)
                             $gr = $item->goodsReceipt;
                             if ($gr) {
                                 $gr->paid_amount -= $item->amount_paid;
@@ -104,7 +107,27 @@ class PurchasePaymentResource extends Resource
                                 }
                                 $gr->save();
                             }
+                            
+                            // 2. Restore Kontrabon paid amounts
+                            if (!empty($item->kontrabon_id)) {
+                                $kb = \App\Models\Kontrabon::find($item->kontrabon_id);
+                                // If the Kontrabon wasn't already processed for this specific item payment chunk (which can happen if a kontrabon has multiple GR items)
+                                // Actually, amount_paid in item is specifically what was paid in that chunk.
+                                // Wait, the payment distributed the amount to the GRs. The sum of all item->amount_paid for a Kontrabon equals the total paid to the Kontrabon.
+                                // So we CAN deduct it safely per item.
+                                if ($kb) {
+                                    $kb->paid_amount -= $item->amount_paid;
+                                    if ($kb->paid_amount <= 0) {
+                                        $kb->status = 'UNPAID';
+                                        $kb->paid_amount = 0;
+                                    } else {
+                                        $kb->status = 'PARTIAL';
+                                    }
+                                    $kb->save();
+                                }
+                            }
                         }
+                        
                         $record->status = 'CANCELLED';
                         $record->save();
                     })

@@ -49,6 +49,16 @@
                         <td><input onfocus="this.select()" type="date" class="pos-input" wire:model.live="receipt_date"></td>
                     </tr>
                     <tr>
+                        <td class="pos-label">Metode Bayar</td>
+                        <td>
+                            <select class="pos-input font-semibold text-blue-600 dark:bg-gray-800" wire:model.live="payment_method">
+                                <option value="tempo">Kontrabon (Hutang / Tempo)</option>
+                                <option value="cash">Lunas Tunai (Cash Toko)</option>
+                                <option value="transfer">Lunas Transfer (Bank)</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr x-show="$wire.payment_method === 'tempo'">
                         <td class="pos-label">Jatuh Tempo</td>
                         <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="due_date" placeholder="Otomatis dari Pemasok"></td>
                     </tr>

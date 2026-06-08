@@ -45,11 +45,11 @@ class GoodsReceiptsTable
                     ->label('Pembayaran')
                     ->badge()
                     ->colors([
-                        'danger' => 'unpaid',
-                        'warning' => 'partial',
-                        'success' => 'paid',
+                        'danger' => fn ($state) => strtolower($state) === 'unpaid',
+                        'warning' => fn ($state) => strtolower($state) === 'partial',
+                        'success' => fn ($state) => strtolower($state) === 'paid',
                     ])
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn (string $state): string => match (strtolower($state)) {
                         'unpaid' => 'Belum Lunas',
                         'partial' => 'Cicilan',
                         'paid' => 'Lunas',

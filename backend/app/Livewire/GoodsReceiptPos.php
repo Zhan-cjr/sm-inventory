@@ -24,6 +24,7 @@ class GoodsReceiptPos extends Component
     public $branch_id;
     public $notes;
     public $supplier_id;
+    public $payment_method = 'tempo';
     public $purchase_order_id;
     public $include_tax = true;
     public $tax_amount = 0;
@@ -57,6 +58,7 @@ class GoodsReceiptPos extends Component
             $this->branch_id = $goodsReceipt->branch_id;
             $this->notes = $goodsReceipt->notes;
             $this->supplier_id = $goodsReceipt->supplier_id;
+            $this->payment_method = $goodsReceipt->payment_method ?? 'tempo';
             $this->purchase_order_id = $goodsReceipt->purchase_order_id;
             $this->include_tax = $goodsReceipt->include_tax;
             $this->tax_amount = $goodsReceipt->tax_amount;
@@ -418,6 +420,9 @@ class GoodsReceiptPos extends Component
                 'include_tax' => $this->include_tax,
                 'tax_amount' => $this->tax_amount,
                 'status' => 'RECEIVED',
+                'payment_method' => $this->payment_method,
+                'payment_status' => $this->payment_method === 'tempo' ? 'UNPAID' : 'PAID',
+                'paid_amount' => $this->payment_method === 'tempo' ? 0 : $this->grandTotal,
                 'notes' => $this->notes,
             ];
 

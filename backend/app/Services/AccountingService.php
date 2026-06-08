@@ -255,11 +255,25 @@ class AccountingService
             ->where('account_code', '1140')->first();
         $hutangAccount = Account::where('organization_id', $organizationId)
             ->where('account_code', '2110')->first();
+            
+        // Akun khusus untuk Konsinyasi
+        $hutangKonsinyasiAccount = Account::firstOrCreate([
+            'organization_id' => $organizationId,
+            'account_code' => '2130' // Asumsi 2130 untuk Hutang Konsinyasi
+        ], [
+            'name' => 'Hutang Konsinyasi (Titipan)',
+            'type' => 'liability',
+            'description' => 'Nilai barang titipan supplier yang belum laku terjual',
+            'is_active' => true,
+        ]);
+
         $pajakAccount = Account::where('organization_id', $organizationId)
             ->where('account_code', '2120')->first();
+        $kasAccount = Account::where('organization_id', $organizationId)
+            ->where('account_code', '1110')->first();
 
         // Jika akun penting tidak ada, lewati
-        if (!$persediaanAccount || !$hutangAccount) {
+        if (!$persediaanAccount || (!$hutangAccount && !$hutangKonsinyasiAccount) || !$kasAccount) {
             return false;
         }
 
@@ -317,11 +331,25 @@ class AccountingService
             $line->save();
         }
 
-        // KREDIT: Hutang Usaha
+        // KREDIT: Hutang Usaha ATAU Kas/Bank ATAU Hutang Konsinyasi
+        $isCash = in_array($receipt->payment_method ?? 'tempo', ['cash', 'transfer']);
+        $isConsignment = $receipt->supplier && $receipt->supplier->is_consignment;
+        
+        $creditAccount = $hutangAccount;
+        $description = 'Hutang pembelian barang';
+        
+        if ($isCash && !$isConsignment) {
+            $creditAccount = $kasAccount;
+            $description = 'Pembayaran langsung (Cash/Bank) pembelian barang';
+        } elseif ($isConsignment) {
+            $creditAccount = $hutangKonsinyasiAccount;
+            $description = 'Penerimaan barang konsinyasi (titipan)';
+        }
+
         JournalEntryLine::create([
             'journal_entry_id' => $journal->id,
-            'account_id' => $hutangAccount->id,
-            'description' => 'Hutang pembelian barang',
+            'account_id' => $creditAccount->id,
+            'description' => $description,
             'debit' => 0,
             'credit' => $receipt->total_amount ?? 0,
         ]);

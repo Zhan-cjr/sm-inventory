@@ -143,28 +143,39 @@ class PurchasePaymentPos extends Component
                     
                     // Distribute payment to GRs inside Kontrabon
                     $remainingPayment = floatval($invData['pay_amount']);
-                    foreach ($kb->items as $kbItem) {
-                        if ($remainingPayment <= 0) break;
-                        $gr = $kbItem->goodsReceipt;
-                        $grUnpaid = $gr->total_amount - $gr->paid_amount;
-                        if ($grUnpaid > 0) {
-                            $payToGr = min($grUnpaid, $remainingPayment);
-                            $gr->paid_amount += $payToGr;
-                            $remainingPayment -= $payToGr;
-                            
-                            if ($gr->paid_amount >= ($gr->total_amount - 0.01)) {
-                                $gr->payment_status = 'PAID';
-                            } else {
-                                $gr->payment_status = 'PARTIAL_PAID';
+                    
+                    if ($kb->items->count() === 0) {
+                        // Consignment Kontrabon (no GRs attached)
+                        PurchasePaymentItem::create([
+                            'purchase_payment_id' => $payment->id,
+                            'kontrabon_id' => $kb->id,
+                            'amount_paid' => $remainingPayment,
+                        ]);
+                    } else {
+                        foreach ($kb->items as $kbItem) {
+                            if ($remainingPayment <= 0) break;
+                            $gr = $kbItem->goodsReceipt;
+                            $grUnpaid = $gr->total_amount - $gr->paid_amount;
+                            if ($grUnpaid > 0) {
+                                $payToGr = min($grUnpaid, $remainingPayment);
+                                $gr->paid_amount += $payToGr;
+                                $remainingPayment -= $payToGr;
+                                
+                                if ($gr->paid_amount >= ($gr->total_amount - 0.01)) {
+                                    $gr->payment_status = 'PAID';
+                                } else {
+                                    $gr->payment_status = 'PARTIAL_PAID';
+                                }
+                                $gr->save();
+                                
+                                // Create Payment Item for the GR
+                                PurchasePaymentItem::create([
+                                    'purchase_payment_id' => $payment->id,
+                                    'goods_receipt_id' => $gr->id,
+                                    'kontrabon_id' => $kb->id,
+                                    'amount_paid' => $payToGr,
+                                ]);
                             }
-                            $gr->save();
-                            
-                            // Create Payment Item for the GR
-                            PurchasePaymentItem::create([
-                                'purchase_payment_id' => $payment->id,
-                                'goods_receipt_id' => $gr->id,
-                                'amount_paid' => $payToGr,
-                            ]);
                         }
                     }
                 }

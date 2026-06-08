@@ -87,11 +87,18 @@ class KontrabonResource extends Resource
                 Tables\Columns\TextColumn::make('paid_amount')->label('Sudah Dibayar')->money('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('status')->badge()
                     ->colors([
-                        'danger' => 'UNPAID',
-                        'warning' => 'PARTIAL',
-                        'success' => 'PAID',
-                        'gray' => 'CANCELLED',
-                    ]),
+                        'danger' => fn ($state) => strtolower($state) === 'unpaid' || strtolower($state) === 'pending',
+                        'warning' => fn ($state) => strtolower($state) === 'partial',
+                        'success' => fn ($state) => strtolower($state) === 'paid',
+                        'gray' => fn ($state) => strtolower($state) === 'cancelled',
+                    ])
+                    ->formatStateUsing(fn (string $state): string => match (strtolower($state)) {
+                        'unpaid', 'pending' => 'Belum Lunas',
+                        'partial' => 'Cicilan',
+                        'paid' => 'Lunas',
+                        'cancelled' => 'Dibatalkan',
+                        default => $state,
+                    }),
             ])
             ->filters([
                 \App\Filament\Filters\DateFilterHelper::make('tanggal_kontrabon')->label('Tanggal Kontrabon'),

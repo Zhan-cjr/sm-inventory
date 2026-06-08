@@ -16,7 +16,7 @@ class GoodsReceipt extends Model
         'purchase_order_id', 'supplier_id', 'branch_id', 
         'receipt_number', 'receipt_date', 'received_by', 
         'faktur_supplier', 'total_amount', 'include_tax', 'tax_amount', 'status', 'notes',
-        'due_date', 'payment_status', 'paid_amount'
+        'due_date', 'payment_status', 'paid_amount', 'payment_method'
     ];
 
     protected $casts = [

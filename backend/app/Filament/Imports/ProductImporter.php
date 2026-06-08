@@ -82,14 +82,74 @@ class ProductImporter extends Importer
                 }),
 
             ImportColumn::make('cost_price')
-                ->label('Harga Beli')
+                ->label('Harga Modal (HPP)')
                 ->requiredMapping()
                 ->numeric()
                 ->example('2500')
                 ->rules(['required', 'numeric', 'min:0']),
 
+            ImportColumn::make('cost_price_tax')
+                ->label('Harga Beli + PPN')
+                ->numeric()
+                ->example('2775')
+                ->rules(['nullable', 'numeric', 'min:0']),
+
+            ImportColumn::make('qty_min_gol_1')
+                ->label('Min Qty Gol 1')
+                ->numeric()
+                ->example('1')
+                ->rules(['nullable', 'integer', 'min:1']),
+
+            ImportColumn::make('margin_gol_1')
+                ->label('Margin Gol 1 (%)')
+                ->numeric()
+                ->example('20')
+                ->rules(['nullable', 'numeric']),
+
+            ImportColumn::make('harga_jual_1')
+                ->label('Harga Jual Gol 1')
+                ->numeric()
+                ->example('3330')
+                ->rules(['nullable', 'numeric', 'min:0']),
+
+            ImportColumn::make('qty_min_gol_2')
+                ->label('Min Qty Gol 2')
+                ->numeric()
+                ->example('12')
+                ->rules(['nullable', 'integer', 'min:1']),
+
+            ImportColumn::make('margin_gol_2')
+                ->label('Margin Gol 2 (%)')
+                ->numeric()
+                ->example('15')
+                ->rules(['nullable', 'numeric']),
+
+            ImportColumn::make('harga_jual_2')
+                ->label('Harga Jual Gol 2')
+                ->numeric()
+                ->example('3191')
+                ->rules(['nullable', 'numeric', 'min:0']),
+
+            ImportColumn::make('qty_min_gol_3')
+                ->label('Min Qty Gol 3')
+                ->numeric()
+                ->example('50')
+                ->rules(['nullable', 'integer', 'min:1']),
+
+            ImportColumn::make('margin_gol_3')
+                ->label('Margin Gol 3 (%)')
+                ->numeric()
+                ->example('10')
+                ->rules(['nullable', 'numeric']),
+
+            ImportColumn::make('harga_jual_3')
+                ->label('Harga Jual Gol 3')
+                ->numeric()
+                ->example('3052')
+                ->rules(['nullable', 'numeric', 'min:0']),
+
             ImportColumn::make('selling_price')
-                ->label('Harga Jual')
+                ->label('Harga Jual (Default)')
                 ->requiredMapping()
                 ->numeric()
                 ->example('3000')
