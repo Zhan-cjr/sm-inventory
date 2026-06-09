@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, ShoppingCart, Star, PackageOpen, Sparkles, Plus, Minus, Check } from 'lucide-react';
+import { X, ShoppingCart, Star, Sparkles, Plus, Minus, Check } from 'lucide-react';
+import { ProductImage } from './ProductImage';
 import { useEcom } from '../context/EcomContext';
 
 const ProductDetailModal = () => {
@@ -108,18 +109,12 @@ const ProductDetailModal = () => {
 
         {/* Image Section */}
         <div className="w-full sm:w-2/5 aspect-square sm:aspect-auto sm:h-auto bg-slate-50 relative flex items-center justify-center overflow-hidden flex-shrink-0">
-          {product.image_url ? (
-            <img 
-              src={product.image_url} 
-              alt={product.name} 
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center text-slate-300">
-              <PackageOpen size={64} className="mb-4" />
-              <span className="text-sm font-medium">Tidak ada gambar</span>
-            </div>
-          )}
+          <ProductImage 
+            src={product.image_url} 
+            alt={product.name} 
+            className="w-full h-full object-cover bg-white"
+            fallbackIconSize={64}
+          />
           
           {product.is_promo && (
             <div className="absolute top-4 left-4 bg-brand-red text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5">

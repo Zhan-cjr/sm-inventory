@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\V1\StockOpnameApiController;
 Route::prefix('v1/ecommerce')->group(function () {
     Route::get('settings', [EcommerceController::class, 'getSettings']);
     Route::get('products', [EcommerceController::class, 'getProducts']);
+    Route::get('check-price', [EcommerceController::class, 'checkPrice']);
     Route::get('nearest-branch', [EcommerceController::class, 'findNearestBranch']);
     Route::get('branches', [EcommerceController::class, 'getBranches']);
     Route::post('orders', [EcommerceController::class, 'createOrder']);

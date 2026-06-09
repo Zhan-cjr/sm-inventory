@@ -1185,4 +1185,152 @@ class EcommerceController extends Controller
             'user' => $customer
         ]);
     }
+
+    /**
+     * Check product price by barcode (for Cek Harga Kiosk)
+     */
+    public function checkPrice(Request $request)
+    {
+        $request->validate([
+            'barcode' => 'required|string'
+        ]);
+
+        $barcode = $request->input('barcode');
+        $branchId = $request->query('branch_id'); // Optional branch filter for pricing
+        $now = now();
+
+        $promotions = \App\Models\Promotion::where('is_active', true)
+            ->where('valid_from', '<=', $now)
+            ->where('valid_until', '>=', $now)
+            ->where(function ($query) use ($branchId) {
+                $query->whereDoesntHave('branches');
+                if ($branchId) {
+                    $query->orWhereHas('branches', function ($q) use ($branchId) {
+                        $q->where('branches.id', $branchId);
+                    });
+                }
+            })
+            ->get();
+
+        $promoProductIds = [];
+        $promoCategoryIds = [];
+        $promoAll = null;
+        $promoDetails = [];
+
+        foreach ($promotions as $promo) {
+            if ($promo->applicable_to === 'ALL') {
+                if (!$promoAll) {
+                    $promoAll = $promo;
+                }
+            } elseif ($promo->applicable_to === 'CATEGORY') {
+                if (is_array($promo->target_ids)) {
+                    foreach ($promo->target_ids as $cid) {
+                        $promoCategoryIds[] = $cid;
+                        if (!isset($promoDetails['cat_'.$cid])) {
+                            $promoDetails['cat_'.$cid] = $promo;
+                        }
+                    }
+                }
+            } elseif ($promo->applicable_to === 'PRODUCT') {
+                if (is_array($promo->target_ids)) {
+                    foreach ($promo->target_ids as $pid) {
+                        $promoProductIds[] = $pid;
+                        if (!isset($promoDetails['prod_'.$pid])) {
+                            $promoDetails['prod_'.$pid] = $promo;
+                        }
+                    }
+                }
+            }
+        }
+        $promoProductIds = array_unique($promoProductIds);
+        $promoCategoryIds = array_unique($promoCategoryIds);
+
+        $query = \App\Models\Product::query()
+            ->with('category')
+            ->where('products.is_active', true)
+            ->where(function($q) use ($barcode) {
+                $q->where('products.barcode', $barcode)
+                  ->orWhere('products.sku', $barcode);
+            });
+
+        if ($branchId) {
+            $query->leftJoin('stocks', function($join) use ($branchId) {
+                $join->on('products.id', '=', 'stocks.product_id')
+                     ->where('stocks.branch_id', '=', $branchId);
+            })
+            ->select([
+                'products.*',
+                'stocks.selling_price as branch_selling_price',
+                'stocks.quantity_on_hand as stock'
+            ]);
+        } else {
+            $query->withSum('stocks as stock', 'quantity_on_hand');
+        }
+
+        $product = $query->first();
+
+        if (!$product) {
+            return response()->json(['error' => 'Produk tidak ditemukan.'], 404);
+        }
+
+        if (isset($product->branch_selling_price) && $product->branch_selling_price !== null) {
+            $product->selling_price = $product->branch_selling_price;
+        }
+
+        $appliedPromo = null;
+        if (in_array($product->id, $promoProductIds) && isset($promoDetails['prod_'.$product->id])) {
+            $appliedPromo = $promoDetails['prod_'.$product->id];
+        } elseif (in_array($product->category_id, $promoCategoryIds) && isset($promoDetails['cat_'.$product->category_id])) {
+            $appliedPromo = $promoDetails['cat_'.$product->category_id];
+        } elseif ($promoAll) {
+            $appliedPromo = $promoAll;
+        }
+
+        if ($appliedPromo) {
+            $product->is_promo = true;
+            $product->applied_promo = $appliedPromo;
+            $product->original_price = $product->selling_price;
+            $promo = $appliedPromo;
+            
+            $discount = 0;
+            if ($promo->promo_type === 'PERCENTAGE' || $promo->promo_type === 'FLASH_SALE') {
+                $discount = ($product->selling_price * $promo->discount_value) / 100;
+                if ($promo->max_discount_per_transaction > 0 && $promo->discount_limit_type === 'PER_ITEM') {
+                    if ($discount > $promo->max_discount_per_transaction) {
+                        $discount = $promo->max_discount_per_transaction;
+                    }
+                }
+            } elseif ($promo->promo_type === 'FIXED_DISCOUNT') {
+                $discount = $promo->discount_value;
+            }
+
+            if ($discount > 0) {
+                $product->selling_price = max(0, $product->selling_price - $discount);
+            } else {
+                $product->original_price = null; 
+            }
+        } else {
+            $product->is_promo = false;
+        }
+
+        // Format
+        $product->stock = (int)($product->stock ?? 0);
+        $product->selling_price = number_format((float)$product->selling_price, 2, '.', '');
+        if ($product->original_price) {
+            $product->original_price = number_format((float)$product->original_price, 2, '.', '');
+        }
+
+        // Format image url
+        $product->image_url = $product->image_path 
+            ? asset('storage/' . $product->image_path)
+            : null;
+
+        // Add formatted strings for UI
+        $product->formatted_price = 'Rp ' . number_format((float)$product->selling_price, 0, ',', '.');
+        if ($product->original_price) {
+            $product->formatted_original_price = 'Rp ' . number_format((float)$product->original_price, 0, ',', '.');
+        }
+
+        return response()->json($product);
+    }
 }

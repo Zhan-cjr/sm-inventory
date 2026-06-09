@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Star, PackageOpen, Sparkles, Check, Plus } from 'lucide-react';
+import { ProductImage } from './ProductImage';
 import { useEcom, Product } from '../context/EcomContext';
 import axios from 'axios';
 import { getImageUrl } from '../utils/api';
@@ -122,18 +123,12 @@ const ProductCard = ({ product }: { product: Product }) => {
         className="relative aspect-square overflow-hidden bg-slate-50 flex items-center justify-center cursor-pointer"
         onClick={handleCardClick}
       >
-        {product.image_url ? (
-          <img 
-            src={product.image_url} 
-            alt={product.name} 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center text-slate-300">
-            <PackageOpen size={48} className="mb-2" />
-            <span className="text-xs font-medium">No Image</span>
-          </div>
-        )}
+        <ProductImage 
+          src={product.image_url} 
+          alt={product.name} 
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 bg-white"
+          fallbackIconSize={48}
+        />
         
         {product.is_promo && (
           <div className="absolute top-3 left-3 bg-brand-red text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-1">

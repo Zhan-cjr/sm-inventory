@@ -1,6 +1,7 @@
 import React from 'react';
 import { useEcom } from '../context/EcomContext';
 import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight } from 'lucide-react';
+import { ProductImage } from './ProductImage';
 
 export const CartDrawer: React.FC = () => {
   const {
@@ -76,15 +77,12 @@ export const CartDrawer: React.FC = () => {
                   >
                     {/* Thumbnail */}
                     <div className="w-20 h-20 bg-slate-50 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center border border-slate-100">
-                      {product.image_url ? (
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="text-slate-300 font-bold text-lg">S</div>
-                      )}
+                      <ProductImage 
+                        src={product.image_url} 
+                        alt={product.name} 
+                        className="w-full h-full object-cover bg-white"
+                        fallbackIconSize={24}
+                      />
                     </div>
 
                     {/* Details */}
