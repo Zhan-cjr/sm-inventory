@@ -70,8 +70,6 @@
                 <td class="right">{{ number_format($row['jual_netto'], 0, ',', '.') }}</td>
             </tr>
         @endforeach
-    </tbody>
-    <tfoot>
         <tr class="total-row">
             <td colspan="3">Total</td>
             <td class="right">{{ number_format($t_jml, 0, ',', '.') }}</td>
@@ -85,6 +83,6 @@
             <td class="right">{{ number_format($t_retur, 0, ',', '.') }}</td>
             <td class="right">{{ number_format($t_netto, 0, ',', '.') }}</td>
         </tr>
-    </tfoot>
+    </tbody>
 </table>
 @endsection

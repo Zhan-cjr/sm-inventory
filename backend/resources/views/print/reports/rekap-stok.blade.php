@@ -94,15 +94,13 @@
                     $grandTotalValuation += $subTotalValuation;
                 @endphp
             @endforeach
-        </tbody>
-        <tfoot>
             <tr class="font-bold bg-dark-gray">
                 <td class="text-right">GRAND TOTAL</td>
                 <td class="text-right">{{ number_format($grandTotalQty, 2, ',', '.') }}</td>
                 <td class="text-right">-</td>
                 <td class="text-right">{{ number_format($grandTotalValuation, 2, ',', '.') }}</td>
             </tr>
-        </tfoot>
+        </tbody>
     </table>
 </body>
 </html>

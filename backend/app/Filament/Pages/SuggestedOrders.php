@@ -99,6 +99,7 @@ class SuggestedOrders extends Page implements HasTable
                         \App\Models\PurchaseOrderItem::create([
                             'purchase_order_id' => $po->id,
                             'product_id' => $record->product_id,
+                            'quantity_suggested' => $suggestion['suggested_qty'],
                             'quantity_ordered' => $suggestion['suggested_qty'],
                             'unit_cost' => $costPrice,
                             'subtotal' => $suggestion['suggested_qty'] * $costPrice,
@@ -143,6 +144,7 @@ class SuggestedOrders extends Page implements HasTable
                             \App\Models\PurchaseOrderItem::create([
                                 'purchase_order_id' => $po->id,
                                 'product_id' => $record->product_id,
+                                'quantity_suggested' => $suggestion['suggested_qty'],
                                 'quantity_ordered' => $suggestion['suggested_qty'],
                                 'unit_cost' => $costPrice,
                                 'subtotal' => $subtotal,

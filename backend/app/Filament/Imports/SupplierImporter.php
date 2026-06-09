@@ -83,6 +83,12 @@ class SupplierImporter extends Importer
                 ->boolean()
                 ->example('1')
                 ->rules(['nullable', 'boolean']),
+
+            ImportColumn::make('is_consignment')
+                ->label('Konsinyasi (1/0)')
+                ->boolean()
+                ->example('0')
+                ->rules(['nullable', 'boolean']),
         ];
     }
 

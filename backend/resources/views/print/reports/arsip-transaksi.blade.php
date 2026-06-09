@@ -35,12 +35,10 @@
                 <td class="right">{{ number_format($t->final_amount, 0, ',', '.') }}</td>
             </tr>
         @endforeach
-    </tbody>
-    <tfoot>
         <tr class="total-row">
             <td colspan="7" class="right"><strong>Total Keseluruhan</strong></td>
             <td class="right"><strong>{{ number_format($total_bersih, 0, ',', '.') }}</strong></td>
         </tr>
-    </tfoot>
+    </tbody>
 </table>
 @endsection
