@@ -63,7 +63,8 @@ class ArsipTransaksiResource extends Resource
                 Section::make('Informasi Transaksi')
                     ->schema([
                         Grid::make(3)->schema([
-                            TextEntry::make('local_transaction_id')->label('No Nota'),
+                            TextEntry::make('short_id')->label('No Transaksi')->badge()->color('gray')->copyable(),
+                            TextEntry::make('local_transaction_id')->label('No Nota Lokal')->default('-'),
                             TextEntry::make('transaction_date')->label('Tanggal & Jam')->dateTime('d M Y H:i:s'),
                             TextEntry::make('customer.name')->label('Customer')->default('Tunai'),
                             TextEntry::make('cashier.name')->label('Kasir'),
@@ -109,10 +110,17 @@ class ArsipTransaksiResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('local_transaction_id')
-                    ->label('No Nota')
-                    ->searchable()
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('short_id')
+                    ->label('No Transaksi')
+                    ->searchable(query: function ($query, $search) {
+                        $query->where('receipt_number', 'like', "%{$search}%")
+                              ->orWhere('local_transaction_id', 'like', "%{$search}%");
+                    })
+                    ->sortable(query: fn ($query, $direction) => $query->orderBy('receipt_number', $direction))
+                    ->badge()
+                    ->color('gray')
+                    ->copyable()
+                    ->copyMessage('No transaksi disalin!'),
                 Tables\Columns\TextColumn::make('transaction_date')
                     ->label('Jam')
                     ->dateTime('H:i:s')

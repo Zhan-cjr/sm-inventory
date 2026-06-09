@@ -77,166 +77,176 @@ class AccountingService
             'journalable_type' => Transaction::class,
         ]);
 
-        // 3. Catat Jurnal Kas & Diskon
-        // DEBIT: Kas (senilai uang yang sebenarnya dibayarkan / final_amount)
+        // ── 3. DEBIT Kas ──────────────────────────────────────────────────────
         JournalEntryLine::create([
             'journal_entry_id' => $journal->id,
-            'account_id' => $kasAccount->id,
-            'description' => 'Kas masuk dari penjualan',
-            'debit' => $transaction->final_amount,
-            'credit' => 0,
+            'account_id'       => $kasAccount->id,
+            'description'      => 'Kas masuk dari penjualan POS',
+            'debit'            => $transaction->final_amount,
+            'credit'           => 0,
         ]);
 
-        // DEBIT: Diskon (Jika Ada)
-        $totalDiscount = max(0, $transaction->total_amount - $transaction->final_amount);
-        
-        if ($totalDiscount > 0 && $diskonAccount) {
-            JournalEntryLine::create([
-                'journal_entry_id' => $journal->id,
-                'account_id' => $diskonAccount->id,
-                'description' => 'Diskon penjualan',
-                'debit' => $totalDiscount,
-                'credit' => 0,
-            ]);
-        }
+        // ── 4. Kalkulasi Revenue & HPP (dua pass) ────────────────────────────
+        // STRATEGI BULLETPROOF:
+        // 1. Pass 1: hitung sumGross per kategori (setelah item-discount, sebelum global discount)
+        // 2. Pass 2: alokasikan final_amount proporsional → dijamin sum(kredit) = final_amount
+        // 3. Koreksi rounding pada item terakhir & koreksi akhir PPN
 
-        // Kalkulasi Pendapatan dan HPP Terpisah (Produk vs Layanan)
-        $taxRate = \App\Models\Organization::find($transaction->organization_id)->tax_rate ?? 11;
+        $org           = \App\Models\Organization::find($transaction->organization_id);
+        $taxRate       = $org->tax_rate ?? 11;
         $taxMultiplier = 1 + ($taxRate / 100);
-        
-        $taxAmount = 0;
-        $revenueProduct = 0;
-        $revenueService = 0;
-        $cogsProduct = 0;
-        $cogsService = 0;
+        $totalDiscount = max(0, (float)$transaction->total_amount - (float)$transaction->final_amount);
+
+        $transaction->loadMissing(['items.product', 'items.service']);
+
+        // PASS 1: kumpulkan data item
+        $itemsData   = [];
+        $sumGross    = 0.0;
+        $cogsProduct = 0.0;
+        $cogsService = 0.0;
 
         foreach ($transaction->items as $item) {
-            $itemGross = ($item->unit_price - $item->discount_per_item) * $item->quantity;
-            
-            // Terapkan proporsi global discount
-            $itemProportion = $transaction->total_amount > 0 ? ($itemGross / $transaction->total_amount) : 0;
-            $itemFinalDiscount = $totalDiscount * $itemProportion;
-            $itemNet = $itemGross - $itemFinalDiscount;
+            if ($item->is_assembly_component) continue;
 
-            $isService = $item->service_id !== null || ($item->product && !empty($item->product->ppob_sku));
+            $itemGross = ((float)$item->unit_price - (float)($item->discount_per_item ?? 0))
+                       * (float)$item->quantity;
 
-            // PPN Kalkulasi
-            if ($item->product && $item->product->is_taxable) {
-                $dpp = round($itemNet / $taxMultiplier, 2); // Tax is calculated on NET amount
-                $taxAmount += ($itemNet - $dpp);
-                
-                // Revenue should be credited GROSS amount, minus the tax portion of the NET amount.
-                // Revenue (Gross) = Gross Amount - Tax Amount of this item
-                $grossDpp = $itemGross - ($itemNet - $dpp);
-                
-                if ($isService) {
-                    $revenueService += $grossDpp;
-                } else {
-                    $revenueProduct += $grossDpp;
-                }
-            } else {
-                if ($isService) {
-                    $revenueService += $itemGross; // Credit gross amount
-                } else {
-                    $revenueProduct += $itemGross; // Credit gross amount
-                }
+            $isService = ($item->service_id !== null)
+                      || ($item->product && !empty($item->product->ppob_sku));
+            $isTaxable = $item->product && $item->product->is_taxable;
+
+            $sumGross += $itemGross;
+
+            if ($isService && $item->product) {
+                $cogsService += (float)$item->product->cost_price * (float)$item->quantity;
+            } elseif (!$isService && $item->product) {
+                $cogsProduct += (float)$item->product->cost_price * (float)$item->quantity;
             }
-            
-            // COGS Kalkulasi
-            if ($isService) {
-                if ($item->product) {
-                    // PPOB cost is based on Digiflazz price or product cost price
-                    // We assume product->cost_price is kept relatively updated, or we use transaction's PPobTransaction
-                    $cogsService += ($item->product->cost_price * $item->quantity);
-                }
+
+            $itemsData[] = compact('itemGross', 'isService', 'isTaxable');
+        }
+
+        if ($sumGross <= 0) {
+            return true; // Tidak ada item → Kas sudah terdebit, selesai
+        }
+
+        // PASS 2: alokasikan final_amount proporsional ke setiap item
+        $revenueProduct = 0.0;
+        $revenueService = 0.0;
+        $taxAmount      = 0.0;
+        $allocated      = 0.0;
+        $lastIdx        = count($itemsData) - 1;
+        $finalAmount    = (float)$transaction->final_amount;
+
+        foreach ($itemsData as $i => $d) {
+            // Koreksi rounding: item terakhir mengambil sisa agar sum = final_amount persis
+            $share = ($i === $lastIdx)
+                ? round($finalAmount - $allocated, 2)
+                : round($finalAmount * ($d['itemGross'] / $sumGross), 2);
+
+            $allocated += $share;
+
+            if ($d['isTaxable']) {
+                $dpp     = round($share / $taxMultiplier, 2);
+                $itemTax = $share - $dpp; // selisih pasti, tidak perlu double-round
+                $taxAmount += $itemTax;
+                $d['isService'] ? $revenueService += $dpp : $revenueProduct += $dpp;
             } else {
-                if ($item->product) {
-                    $cogsProduct += ($item->product->cost_price * $item->quantity);
-                }
+                $d['isService'] ? $revenueService += $share : $revenueProduct += $share;
             }
         }
 
-        // KREDIT: Pendapatan Penjualan (Produk Fisik)
+        // Koreksi akhir: selisih pembulatan DPP bisa geser 1 sen, tambahkan ke produk/jasa
+        $creditTotal = round($revenueProduct + $revenueService + $taxAmount, 2);
+        $rounding    = round($finalAmount - $creditTotal, 2);
+        if ($rounding != 0.0) {
+            if ($revenueProduct > 0)     $revenueProduct = round($revenueProduct + $rounding, 2);
+            elseif ($revenueService > 0) $revenueService = round($revenueService + $rounding, 2);
+            else                         $taxAmount      = round($taxAmount + $rounding, 2);
+        }
+
+        // ── 5. KREDIT Pendapatan Produk ──────────────────────────────────────
         if ($revenueProduct > 0 && $pendapatanAccount) {
             JournalEntryLine::create([
                 'journal_entry_id' => $journal->id,
-                'account_id' => $pendapatanAccount->id,
-                'description' => 'Pendapatan atas penjualan produk fisik',
-                'debit' => 0,
-                'credit' => $revenueProduct,
+                'account_id'       => $pendapatanAccount->id,
+                'description'      => 'Pendapatan produk fisik',
+                'debit'            => 0,
+                'credit'           => $revenueProduct,
             ]);
         }
 
-        // KREDIT: Pendapatan Layanan/PPOB
+        // ── 6. KREDIT Pendapatan Jasa / PPOB ────────────────────────────────
         if ($revenueService > 0 && $pendapatanLayananAccount) {
             JournalEntryLine::create([
                 'journal_entry_id' => $journal->id,
-                'account_id' => $pendapatanLayananAccount->id,
-                'description' => 'Pendapatan atas layanan / PPOB',
-                'debit' => 0,
-                'credit' => $revenueService,
+                'account_id'       => $pendapatanLayananAccount->id,
+                'description'      => 'Pendapatan jasa / layanan',
+                'debit'            => 0,
+                'credit'           => $revenueService,
             ]);
         }
 
-        // KREDIT: Hutang Pajak / PPN Keluaran
-        if ($taxAmount > 0 && $pajakAccount) {
-            JournalEntryLine::create([
-                'journal_entry_id' => $journal->id,
-                'account_id' => $pajakAccount->id,
-                'description' => 'PPN Keluaran atas penjualan',
-                'debit' => 0,
-                'credit' => $taxAmount,
-            ]);
-        } elseif ($taxAmount > 0) {
-            // Jika akun pajak tidak ada, masukkan semua ke pendapatan produk
-            $line = JournalEntryLine::where('journal_entry_id', $journal->id)
-                ->where('account_id', $pendapatanAccount->id)
-                ->first();
-            if ($line) {
-                $line->credit += $taxAmount;
-                $line->save();
+        // ── 7. KREDIT PPN Keluaran ───────────────────────────────────────────
+        if ($taxAmount > 0) {
+            // Jika akun PPN tidak ada, gabungkan ke pendapatan produk
+            $taxAccount = $pajakAccount ?? $pendapatanAccount;
+            if ($taxAccount) {
+                JournalEntryLine::create([
+                    'journal_entry_id' => $journal->id,
+                    'account_id'       => $taxAccount->id,
+                    'description'      => 'PPN Keluaran atas penjualan',
+                    'debit'            => 0,
+                    'credit'           => $taxAmount,
+                ]);
             }
         }
 
-        // 4. Catat Harga Pokok Penjualan (HPP) & Persediaan (Produk Fisik)
-        if ($cogsProduct > 0 && $hppAccount && $persediaanAccount) {
-            // DEBIT: HPP Produk
+        // ── 8. Diskon (self-balancing memo, tidak ganggu balance) ────────────
+        // Dicatat hanya jika akun Diskon tersedia. Debit = Kredit → netting = 0.
+        if ($totalDiscount > 0 && $diskonAccount) {
             JournalEntryLine::create([
                 'journal_entry_id' => $journal->id,
-                'account_id' => $hppAccount->id,
-                'description' => 'HPP barang fisik terjual',
-                'debit' => $cogsProduct,
-                'credit' => 0,
-            ]);
-
-            // KREDIT: Persediaan Barang Dagang
-            JournalEntryLine::create([
-                'journal_entry_id' => $journal->id,
-                'account_id' => $persediaanAccount->id,
-                'description' => 'Pengurangan persediaan barang fisik',
-                'debit' => 0,
-                'credit' => $cogsProduct,
+                'account_id'       => $diskonAccount->id,
+                'description'      => 'Diskon penjualan',
+                'debit'            => $totalDiscount,
+                'credit'           => $totalDiscount,
             ]);
         }
 
-        // 5. Catat Harga Pokok Penjualan (HPP) & Pengurangan Saldo (PPOB/Layanan)
-        if ($cogsService > 0 && $hppLayananAccount && $saldoPpobAccount) {
-            // DEBIT: HPP Layanan
+        // ── 9. HPP & Persediaan (Produk Fisik) ──────────────────────────────
+        if ($cogsProduct > 0 && $hppAccount && $persediaanAccount) {
             JournalEntryLine::create([
                 'journal_entry_id' => $journal->id,
-                'account_id' => $hppLayananAccount->id,
-                'description' => 'HPP Layanan/PPOB terjual',
-                'debit' => $cogsService,
-                'credit' => 0,
+                'account_id'       => $hppAccount->id,
+                'description'      => 'HPP barang fisik terjual',
+                'debit'            => round($cogsProduct, 2),
+                'credit'           => 0,
             ]);
-
-            // KREDIT: Saldo Deposit PPOB
             JournalEntryLine::create([
                 'journal_entry_id' => $journal->id,
-                'account_id' => $saldoPpobAccount->id,
-                'description' => 'Pengurangan saldo deposit PPOB',
-                'debit' => 0,
-                'credit' => $cogsService,
+                'account_id'       => $persediaanAccount->id,
+                'description'      => 'Pengurangan persediaan barang fisik',
+                'debit'            => 0,
+                'credit'           => round($cogsProduct, 2),
+            ]);
+        }
+
+        // ── 10. HPP & Deposit PPOB (Layanan Digital) ─────────────────────────
+        if ($cogsService > 0 && $hppLayananAccount && $saldoPpobAccount) {
+            JournalEntryLine::create([
+                'journal_entry_id' => $journal->id,
+                'account_id'       => $hppLayananAccount->id,
+                'description'      => 'HPP Layanan/PPOB terjual',
+                'debit'            => round($cogsService, 2),
+                'credit'           => 0,
+            ]);
+            JournalEntryLine::create([
+                'journal_entry_id' => $journal->id,
+                'account_id'       => $saldoPpobAccount->id,
+                'description'      => 'Pengurangan saldo deposit PPOB',
+                'debit'            => 0,
+                'credit'           => round($cogsService, 2),
             ]);
         }
 

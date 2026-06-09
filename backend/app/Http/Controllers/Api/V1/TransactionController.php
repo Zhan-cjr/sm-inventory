@@ -133,6 +133,57 @@ class TransactionController extends Controller
                 }
 
                 foreach ($validated['items'] as $item) {
+                    $product = \App\Models\Product::with(['assemblies', 'conversions'])->find($item['product_id']);
+
+                    // Check Auto-Conversion if stock is not enough (only for physical products)
+                    if ($product && $product->product_type === 'physical') {
+                        $stock = \App\Models\Stock::where('product_id', $product->id)
+                            ->where('branch_id', $transaction->branch_id)
+                            ->first();
+
+                        $currentQty = $stock ? $stock->quantity_on_hand : 0;
+                        if ($currentQty < $item['quantity']) {
+                            // Find conversion rule where this product is the target
+                            $conversion = \App\Models\ProductConversion::where('target_product_id', $product->id)
+                                ->where('auto_convert', true)
+                                ->first();
+
+                            if ($conversion) {
+                                $neededDeficit = $item['quantity'] - $currentQty;
+                                // How many source items needed?
+                                $sourceQtyToUnpack = ceil($neededDeficit / $conversion->conversion_qty);
+                                
+                                // Deduct from source
+                                $sourceStock = \App\Models\Stock::firstOrCreate([
+                                    'branch_id' => $transaction->branch_id,
+                                    'product_id' => $conversion->source_product_id,
+                                ], ['quantity_on_hand' => 0]);
+
+                                $sourceStock->log_type = 'UNPACKING';
+                                $sourceStock->reason_code = 'AUTO_CONVERSION';
+                                $sourceStock->reference_doc_type = 'TRANSACTION';
+                                $sourceStock->reference_doc_id = $transaction->id;
+                                $sourceStock->quantity_on_hand -= $sourceQtyToUnpack;
+                                $sourceStock->save();
+
+                                // Add to target
+                                if (!$stock) {
+                                    $stock = \App\Models\Stock::create([
+                                        'branch_id' => $transaction->branch_id,
+                                        'product_id' => $product->id,
+                                        'quantity_on_hand' => 0
+                                    ]);
+                                }
+                                $stock->log_type = 'UNPACKING';
+                                $stock->reason_code = 'AUTO_CONVERSION';
+                                $stock->reference_doc_type = 'TRANSACTION';
+                                $stock->reference_doc_id = $transaction->id;
+                                $stock->quantity_on_hand += ($sourceQtyToUnpack * $conversion->conversion_qty);
+                                $stock->save();
+                            }
+                        }
+                    }
+
                     $txItem = TransactionItem::create([
                         'transaction_id' => $transaction->id,
                         'product_id' => $item['product_id'],
@@ -141,6 +192,21 @@ class TransactionController extends Controller
                         'discount_per_item' => ($item['discount_per_item'] ?? 0) + ($item['discountPerItem'] ?? 0),
                         'promotion_id' => $item['promotionId'] ?? $item['promotion_id'] ?? null,
                     ]);
+
+                    // Check Assembly
+                    if ($product && $product->assemblies()->exists()) {
+                        foreach ($product->assemblies as $assembly) {
+                            TransactionItem::create([
+                                'transaction_id' => $transaction->id,
+                                'product_id' => $assembly->child_product_id,
+                                'quantity' => $assembly->quantity * $item['quantity'],
+                                'unit_price' => 0,
+                                'discount_per_item' => 0,
+                                'is_assembly_component' => true,
+                                'assembly_parent_id' => $product->id,
+                            ]);
+                        }
+                    }
 
                     $product = \App\Models\Product::find($item['product_id']);
                     if ($product && $product->product_type === 'digital' && !empty($product->ppob_sku)) {

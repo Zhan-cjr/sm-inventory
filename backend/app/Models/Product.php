@@ -85,4 +85,14 @@ class Product extends Model
     {
         return $this->belongsTo(Supplier::class);
     }
+
+    public function assemblies()
+    {
+        return $this->hasMany(ProductAssembly::class, 'parent_product_id');
+    }
+
+    public function conversions()
+    {
+        return $this->hasMany(ProductConversion::class, 'source_product_id');
+    }
 }

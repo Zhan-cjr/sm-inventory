@@ -195,6 +195,30 @@ class ProductForm
                     ->placeholder('Pilih Kategori E-Commerce')
                     ->searchable()
                     ->preload(),
+                \Filament\Schemas\Components\Section::make('Auto-Unpacking (Konversi Pecah Barang)')
+                    ->description('Isi jika barang ini bisa "dipecah" menjadi barang satuan lain saat stok satuan tersebut habis. (Contoh: Produk ini "Beras Karung 15kg" dipecah menjadi "Beras Curah 1kg").')
+                    ->schema([
+                        \Filament\Forms\Components\Repeater::make('conversions')
+                            ->relationship()
+                            ->schema([
+                                Select::make('target_product_id')
+                                    ->label('Produk Pecahan (Satuan Kecil)')
+                                    ->options(fn () => \App\Models\Product::pluck('name', 'id'))
+                                    ->required()
+                                    ->searchable(),
+                                TextInput::make('conversion_qty')
+                                    ->label('Hasil Pecahan (Qty)')
+                                    ->helperText('Contoh: 1 Karung = 15 Curah, maka isi 15.')
+                                    ->numeric()
+                                    ->required()
+                                    ->default(1),
+                                Toggle::make('auto_convert')
+                                    ->label('Auto-Unpack di POS')
+                                    ->default(true),
+                            ])
+                            ->columns(3)
+                            ->defaultItems(0)
+                    ])->collapsed(),
                 TextInput::make('metadata'),
             ]);
     }

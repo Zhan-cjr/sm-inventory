@@ -45,9 +45,23 @@ class LaporanJasaTerjual extends Page implements HasTable
                     ->label('Tanggal')
                     ->dateTime('d M Y H:i')
                     ->sortable(),
-                TextColumn::make('transaction.local_transaction_id')
+                TextColumn::make('transaction_no')
                     ->label('No Transaksi')
-                    ->searchable(),
+                    ->state(fn (TransactionItem $record): string =>
+                        !empty($record->transaction?->receipt_number)
+                            ? $record->transaction->receipt_number
+                            : (!empty($record->transaction?->local_transaction_id)
+                                ? $record->transaction->local_transaction_id
+                                : strtoupper(substr($record->transaction_id ?? '', 0, 8)))
+                    )
+                    ->badge()
+                    ->color('gray')
+                    ->searchable(query: fn ($query, $search) =>
+                        $query->whereHas('transaction', fn ($q) =>
+                            $q->where('receipt_number', 'like', "%{$search}%")
+                              ->orWhere('local_transaction_id', 'like', "%{$search}%")
+                        )
+                    ),
                 TextColumn::make('transaction.branch.name')
                     ->label('Cabang')
                     ->hidden(fn () => Auth::user()->branch_id !== null),

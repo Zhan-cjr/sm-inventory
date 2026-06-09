@@ -13,7 +13,13 @@ return new class extends Migration
     {
         Schema::create('product_assemblies', function (Blueprint $table) {
             $table->id();
+            $table->uuid('parent_product_id');
+            $table->uuid('child_product_id');
+            $table->decimal('quantity', 10, 2)->default(1);
             $table->timestamps();
+
+            $table->foreign('parent_product_id')->references('id')->on('products')->onDelete('cascade');
+            $table->foreign('child_product_id')->references('id')->on('products')->onDelete('cascade');
         });
     }
 

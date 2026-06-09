@@ -92,6 +92,21 @@ class Transaction extends Model
         return $this->final_amount - $this->cogs;
     }
 
+    /**
+     * No transaksi versi pendek untuk tampilan di tabel.
+     * Prioritas: receipt_number > local_transaction_id > 8 karakter UUID
+     */
+    public function getShortIdAttribute(): string
+    {
+        if (!empty($this->receipt_number)) {
+            return $this->receipt_number;
+        }
+        if (!empty($this->local_transaction_id)) {
+            return $this->local_transaction_id;
+        }
+        return strtoupper(substr($this->id, 0, 8));
+    }
+
     public function ppobTransactions()
     {
         return $this->hasMany(PpobTransaction::class);
