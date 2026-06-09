@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useEcom, Branch } from '../context/EcomContext';
 import { useSearchParams } from 'react-router-dom';
-import { ScanBarcode, AlertCircle, Loader2, Info, Building2, Tag, ChevronDown, MapPin, X, Keyboard, CreditCard, Package } from 'lucide-react';
+import { ScanBarcode, AlertCircle, Loader2, Info, Building2, Tag, ChevronDown, MapPin, X, Keyboard, CreditCard, Package, Maximize, Minimize } from 'lucide-react';
 import { ProductImage } from '../components/ProductImage';
 import { VirtualKeyboard } from '../components/kiosk/VirtualKeyboard';
 import { VirtualNumpad } from '../components/kiosk/VirtualNumpad';
@@ -29,6 +29,7 @@ const PriceChecker: React.FC = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [bgImageIndex, setBgImageIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -139,6 +140,26 @@ const PriceChecker: React.FC = () => {
     }
   };
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   const handleSearchManual = async (keyword: string) => {
     setShowSearchModal(false);
     if (!keyword.trim()) return;
@@ -245,14 +266,24 @@ const PriceChecker: React.FC = () => {
 
       {/* Top Bar for Branch Info & Clock */}
       <div className="absolute top-0 left-0 right-0 p-6 z-20 flex justify-between items-start text-white/50">
-        <button 
-          onClick={() => setShowBranchModal(true)}
-          className="flex items-center gap-3 bg-white/10 hover:bg-white/20 transition-colors px-4 py-2 rounded-xl backdrop-blur-md border border-white/10 cursor-pointer shadow-lg"
-        >
-          <Building2 size={24} className="text-white" />
-          <span className="text-xl font-bold tracking-wide uppercase text-white">{activeBranchName}</span>
-          <ChevronDown size={20} className="text-white/70" />
-        </button>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setShowBranchModal(true)}
+            className="flex items-center gap-3 bg-white/10 hover:bg-white/20 transition-colors px-4 py-2 rounded-xl backdrop-blur-md border border-white/10 cursor-pointer shadow-lg"
+          >
+            <Building2 size={24} className="text-white" />
+            <span className="text-xl font-bold tracking-wide uppercase text-white">{activeBranchName}</span>
+            <ChevronDown size={20} className="text-white/70" />
+          </button>
+          
+          <button 
+            onClick={toggleFullscreen}
+            className="bg-white/10 hover:bg-white/20 transition-colors p-3 rounded-xl backdrop-blur-md border border-white/10 cursor-pointer shadow-lg text-white"
+            title="Toggle Fullscreen"
+          >
+            {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+          </button>
+        </div>
         
         <div className="flex flex-col items-end gap-2">
           <div className="text-sm font-mono tracking-widest uppercase bg-black/30 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/5">
