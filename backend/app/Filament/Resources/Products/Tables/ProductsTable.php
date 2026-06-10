@@ -81,7 +81,8 @@ class ProductsTable
                     ->label('Status')
                     ->boolean(),
                 \Filament\Tables\Columns\ToggleColumn::make('is_ecommerce_active')
-                    ->label('Tampil E-Commerce'),
+                    ->label('Tampil E-Commerce')
+                    ->disabled(fn () => auth()->user()->branch_id !== null),
             ])
             ->filters([
                 \Filament\Tables\Filters\SelectFilter::make('branch')
@@ -181,7 +182,8 @@ class ProductsTable
                             ]);
                         })
                         ->deselectRecordsAfterCompletion(),
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn () => auth()->user()->branch_id === null),
                 ]),
             ]);
     }

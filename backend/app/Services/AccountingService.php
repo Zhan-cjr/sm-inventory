@@ -77,14 +77,39 @@ class AccountingService
             'journalable_type' => Transaction::class,
         ]);
 
-        // ── 3. DEBIT Kas ──────────────────────────────────────────────────────
-        JournalEntryLine::create([
-            'journal_entry_id' => $journal->id,
-            'account_id'       => $kasAccount->id,
-            'description'      => 'Kas masuk dari penjualan POS',
-            'debit'            => $transaction->final_amount,
-            'credit'           => 0,
-        ]);
+        // ── 3. DEBIT Kas & Diskon Poin ───────────────────────────────────────
+        $pointPayment = 0.0;
+        if (!empty($transaction->payment_details)) {
+            $details = $transaction->payment_details;
+            if (is_string($details)) $details = json_decode($details, true);
+            if (is_array($details)) {
+                $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+            }
+        } elseif (strtoupper($transaction->payment_method) === 'POINT') {
+            $pointPayment = (float) $transaction->final_amount;
+        }
+
+        $cashReceived = (float) $transaction->final_amount - $pointPayment;
+
+        if ($cashReceived > 0) {
+            JournalEntryLine::create([
+                'journal_entry_id' => $journal->id,
+                'account_id'       => $kasAccount->id,
+                'description'      => 'Kas masuk dari penjualan POS',
+                'debit'            => $cashReceived,
+                'credit'           => 0,
+            ]);
+        }
+
+        if ($pointPayment > 0 && $diskonAccount) {
+            JournalEntryLine::create([
+                'journal_entry_id' => $journal->id,
+                'account_id'       => $diskonAccount->id,
+                'description'      => 'Diskon penukaran poin belanja POS',
+                'debit'            => $pointPayment,
+                'credit'           => 0,
+            ]);
+        }
 
         // ── 4. Kalkulasi Revenue & HPP (dua pass) ────────────────────────────
         // STRATEGI BULLETPROOF:

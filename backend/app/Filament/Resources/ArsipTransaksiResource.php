@@ -101,6 +101,136 @@ class ArsipTransaksiResource extends Resource
                             TextEntry::make('discount_amount')->label('Total Diskon')->money('IDR', true),
                             TextEntry::make('final_amount')->label('Total Bersih (Trans)')->money('IDR', true)->size(\Filament\Support\Enums\TextSize::Large)->weight(\Filament\Support\Enums\FontWeight::Bold),
                             TextEntry::make('received_amount')->label('Nominal Diterima')->money('IDR', true),
+                            
+                            TextEntry::make('change_amount')
+                                ->label('Kembalian')
+                                ->money('IDR', true)
+                                ->visible(fn ($record) => $record && $record->change_amount > 0),
+                            
+                            // Payment Breakdown
+                            TextEntry::make('tunai_paid')
+                                ->label('Bayar Tunai')
+                                ->state(function ($record) {
+                                    if (!$record) return 0;
+                                    if (strtoupper($record->payment_method) === 'CASH') return $record->received_amount;
+                                    if (strtoupper($record->payment_method) === 'MULTI') {
+                                        $details = $record->payment_details;
+                                        if (is_string($details)) $details = json_decode($details, true);
+                                        if (is_array($details)) {
+                                            $cashAmount = collect($details)->where('method', 'CASH')->sum('amount');
+                                            if ($cashAmount > 0) {
+                                                return $cashAmount;
+                                            }
+                                        }
+                                    }
+                                    return 0;
+                                })
+                                ->money('IDR', true)
+                                ->visible(function ($record) {
+                                    if (!$record) return false;
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return strtoupper($record->payment_method) === 'CASH' ||
+                                        (strtoupper($record->payment_method) === 'MULTI' && 
+                                         is_array($details) && 
+                                         collect($details)->where('method', 'CASH')->sum('amount') > 0);
+                                }),
+                            TextEntry::make('card_paid')
+                                ->label('Bayar Card')
+                                ->state(function ($record) {
+                                    if (!$record) return 0;
+                                    if (strtoupper($record->payment_method) === 'CARD') return $record->final_amount;
+                                    if (strtoupper($record->payment_method) === 'MULTI') {
+                                        $details = $record->payment_details;
+                                        if (is_string($details)) $details = json_decode($details, true);
+                                        if (is_array($details)) {
+                                            return collect($details)->where('method', 'CARD')->sum('amount');
+                                        }
+                                    }
+                                    return 0;
+                                })
+                                ->money('IDR', true)
+                                ->visible(function ($record) {
+                                    if (!$record) return false;
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return strtoupper($record->payment_method) === 'CARD' ||
+                                        (strtoupper($record->payment_method) === 'MULTI' && 
+                                         is_array($details) && 
+                                         collect($details)->where('method', 'CARD')->sum('amount') > 0);
+                                }),
+                            TextEntry::make('point_paid')
+                                ->label('Bayar Point')
+                                ->state(function ($record) {
+                                    if (!$record) return 0;
+                                    if (strtoupper($record->payment_method) === 'POINT') return $record->final_amount;
+                                    if (strtoupper($record->payment_method) === 'MULTI') {
+                                        $details = $record->payment_details;
+                                        if (is_string($details)) $details = json_decode($details, true);
+                                        if (is_array($details)) {
+                                            return collect($details)->where('method', 'POINT')->sum('amount');
+                                        }
+                                    }
+                                    return 0;
+                                })
+                                ->money('IDR', true)
+                                ->visible(function ($record) {
+                                    if (!$record) return false;
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return strtoupper($record->payment_method) === 'POINT' ||
+                                        (strtoupper($record->payment_method) === 'MULTI' && 
+                                         is_array($details) && 
+                                         collect($details)->where('method', 'POINT')->sum('amount') > 0);
+                                }),
+                            TextEntry::make('voucher_paid')
+                                ->label('Bayar Voucher')
+                                ->state(function ($record) {
+                                    if (!$record) return 0;
+                                    if (strtoupper($record->payment_method) === 'VOUCHER') return $record->final_amount;
+                                    if (strtoupper($record->payment_method) === 'MULTI') {
+                                        $details = $record->payment_details;
+                                        if (is_string($details)) $details = json_decode($details, true);
+                                        if (is_array($details)) {
+                                            return collect($details)->where('method', 'VOUCHER')->sum('amount');
+                                        }
+                                    }
+                                    return 0;
+                                })
+                                ->money('IDR', true)
+                                ->visible(function ($record) {
+                                    if (!$record) return false;
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return strtoupper($record->payment_method) === 'VOUCHER' ||
+                                        (strtoupper($record->payment_method) === 'MULTI' && 
+                                         is_array($details) && 
+                                         collect($details)->where('method', 'VOUCHER')->sum('amount') > 0);
+                                }),
+                            TextEntry::make('transfer_paid')
+                                ->label('Bayar Transfer')
+                                ->state(function ($record) {
+                                    if (!$record) return 0;
+                                    if (strtoupper($record->payment_method) === 'TRANSFER') return $record->final_amount;
+                                    if (strtoupper($record->payment_method) === 'MULTI') {
+                                        $details = $record->payment_details;
+                                        if (is_string($details)) $details = json_decode($details, true);
+                                        if (is_array($details)) {
+                                            return collect($details)->where('method', 'TRANSFER')->sum('amount');
+                                        }
+                                    }
+                                    return 0;
+                                })
+                                ->money('IDR', true)
+                                ->visible(function ($record) {
+                                    if (!$record) return false;
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return strtoupper($record->payment_method) === 'TRANSFER' ||
+                                        (strtoupper($record->payment_method) === 'MULTI' && 
+                                         is_array($details) && 
+                                         collect($details)->where('method', 'TRANSFER')->sum('amount') > 0);
+                                }),
                         ])
                     ])
             ]);
@@ -273,13 +403,55 @@ class ArsipTransaksiResource extends Resource
                     ),
                 Tables\Columns\TextColumn::make('point')
                     ->label('Pembayaran Point')
-                    ->state(fn () => 0)
+                    ->state(function (Transaction $record) {
+                        if (strtoupper($record->payment_method) === 'POINT') return $record->final_amount;
+                        if (strtoupper($record->payment_method) === 'MULTI') {
+                            $details = $record->payment_details;
+                            if (is_string($details)) $details = json_decode($details, true);
+                            if (is_array($details)) {
+                                return collect($details)->where('method', 'POINT')->sum('amount');
+                            }
+                        }
+                        return 0;
+                    })
                     ->money('IDR', true)
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn () => 0)
+                            ->using(function ($query) {
+                                $pointOnly = (clone $query)->whereIn('payment_method', ['POINT', 'point'])->sum('final_amount');
+                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details']);
+                                $multiPoint = $multiRecords->sum(function ($record) {
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return is_array($details) ? collect($details)->where('method', 'POINT')->sum('amount') : 0;
+                                });
+                                return $pointOnly + $multiPoint;
+                            })
                             ->money('IDR')
+                    ),
+                Tables\Columns\TextColumn::make('points_deducted')
+                    ->label('Poin Ditukar')
+                    ->state(function (Transaction $record) {
+                        $details = $record->payment_details;
+                        if (is_string($details)) $details = json_decode($details, true);
+                        if (is_array($details)) {
+                            return collect($details)->where('method', 'POINT')->sum('points_deducted');
+                        }
+                        return 0;
+                    })
+                    ->numeric()
+                    ->summarize(
+                        Summarizer::make()
+                            ->label('Total')
+                            ->using(function ($query) {
+                                $records = $query->get(['payment_details']);
+                                return $records->sum(function ($record) {
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return is_array($details) ? collect($details)->where('method', 'POINT')->sum('points_deducted') : 0;
+                                });
+                            })
                     ),
                 Tables\Columns\TextColumn::make('transfer')
                     ->label('Transfer')

@@ -79,6 +79,7 @@ class EcommerceController extends Controller
             'ecommerce_announcement' => $organization?->ecommerce_announcement ?? 'Selamat datang di toko online resmi kami! Nikmati promo menarik dan poin di setiap transaksi.',
             'point_redemption_value' => (float)($organization?->point_redemption_value ?? 1.00),
             'minimum_points_to_redeem' => (int)($organization?->minimum_points_to_redeem ?? 100),
+            'point_redemption_enabled' => (bool)($organization?->point_redemption_enabled ?? true),
         ]);
     }
 
@@ -272,6 +273,9 @@ class EcommerceController extends Controller
         $pointsToRedeem = (int)$request->input('points_to_redeem', 0);
         $customer = null;
         if ($pointsToRedeem > 0) {
+            if ($organization && !$organization->point_redemption_enabled) {
+                return response()->json(['message' => 'Penukaran poin saat ini dinonaktifkan oleh Perusahaan.'], 422);
+            }
             $customer = \App\Models\Customer::where('phone', $request->customer_phone)->first();
             if (!$customer) {
                 return response()->json(['message' => 'Member tidak ditemukan untuk penukaran poin.'], 422);

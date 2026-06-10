@@ -22,7 +22,18 @@
         @endphp
         @foreach($transactions as $t)
             @php
-                $total_bersih += $t->final_amount;
+                $pointPayment = 0.0;
+                if (!empty($t->payment_details)) {
+                    $details = $t->payment_details;
+                    if (is_string($details)) $details = json_decode($details, true);
+                    if (is_array($details)) {
+                        $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+                    }
+                } elseif (strtoupper($t->payment_method) === 'POINT') {
+                    $pointPayment = (float) $t->final_amount;
+                }
+                $netRevenue = $t->final_amount - $pointPayment;
+                $total_bersih += $netRevenue;
             @endphp
             <tr>
                 <td class="center">{{ $t->local_transaction_id }}</td>
@@ -32,7 +43,7 @@
                 <td>{{ $t->customer ? $t->customer->name : 'Tunai' }}</td>
                 <td>{{ strtoupper($t->payment_method) }}</td>
                 <td>{{ $t->is_voided ? 'Batal' : 'Berhasil' }}</td>
-                <td class="right">{{ number_format($t->final_amount, 0, ',', '.') }}</td>
+                <td class="right">{{ number_format($netRevenue, 0, ',', '.') }}</td>
             </tr>
         @endforeach
         <tr class="total-row">

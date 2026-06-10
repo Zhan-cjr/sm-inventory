@@ -88,6 +88,15 @@ export const POSTransaction = ({
     }
   })();
 
+  const pointRedemptionEnabled = (() => {
+    try {
+      const userObj = JSON.parse(localStorage.getItem('pos_user'));
+      return userObj?.point_redemption_enabled !== false;
+    } catch (e) {
+      return true;
+    }
+  })();
+
   const formatThousandSeparator = (valStr) => {
     if (valStr === null || valStr === undefined) return '';
     const clean = valStr.toString().replace(/[^0-9]/g, '');
@@ -1283,6 +1292,12 @@ export const POSTransaction = ({
   };
 
   const handleApplyPoints = () => {
+    if (!pointRedemptionEnabled) {
+      setAlertMsg({ text: 'Penukaran poin saat ini dinonaktifkan oleh Perusahaan.', type: 'error' });
+      setTimeout(() => setAlertMsg(null), 3000);
+      return;
+    }
+
     const pointsToUse = parseInt(pointsToRedeemInput, 10);
 
     if (isNaN(pointsToUse) || pointsToUse <= 0) {
@@ -2257,6 +2272,11 @@ export const POSTransaction = ({
               <Wallet size={40} />
             </div>
             <h2 style={{ textAlign: 'center' }}>Penukaran Poin</h2>
+            {!pointRedemptionEnabled && (
+              <div className="device-auth-error-card" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center', fontSize: '0.85rem' }}>
+                <strong>Penukaran poin saat ini dinonaktifkan oleh Perusahaan.</strong>
+              </div>
+            )}
             <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
               1 Poin = {formatCurrency(pointRedemptionValue)}<br />
               Minimal Tukar = {minimumPointsToRedeem} Poin
@@ -2278,10 +2298,11 @@ export const POSTransaction = ({
               <input
                 type="number"
                 className="modern-barcode-input"
-                style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem' }}
+                style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem', opacity: pointRedemptionEnabled ? 1 : 0.5 }}
                 placeholder="0"
                 value={pointsToRedeemInput}
                 onChange={(e) => setPointsToRedeemInput(e.target.value)}
+                disabled={!pointRedemptionEnabled}
                 autoFocus
               />
               {pointsToRedeemInput && !isNaN(parseInt(pointsToRedeemInput, 10)) && (
@@ -2295,8 +2316,9 @@ export const POSTransaction = ({
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsRedeemPointModalOpen(false)}>BATAL</button>
               <button
                 className="btn-primary"
-                style={{ flex: 2 }}
+                style={{ flex: 2, opacity: pointRedemptionEnabled ? 1 : 0.5 }}
                 onClick={handleApplyPoints}
+                disabled={!pointRedemptionEnabled}
               >
                 TERAPKAN POIN
               </button>
@@ -3121,6 +3143,31 @@ export const POSTransaction = ({
                   <span style={{ background: 'var(--primary)', color: 'white', padding: '2px 4px', borderRadius: '4px', fontWeight: 'bold' }}>{selectedCustomer.member_tier}</span>
                   <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{selectedCustomer.name}</span>
                   <span style={{ color: 'var(--text-muted)' }}>(Pts: {selectedCustomer.points})</span>
+                  {pointRedemptionEnabled && selectedCustomer.points >= minimumPointsToRedeem && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPointsToRedeemInput('');
+                        setIsRedeemPointModalOpen(true);
+                      }}
+                      style={{
+                        marginLeft: '0.25rem',
+                        padding: '2px 8px',
+                        fontSize: '0.75rem',
+                        borderRadius: '4px',
+                        background: 'var(--primary)',
+                        color: 'white',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        transition: 'opacity 0.2s'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
+                      onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+                    >
+                      Tukar Poin
+                    </button>
+                  )}
                 </div>
               )}
             </div>

@@ -157,14 +157,43 @@
                 <td class="bold">TOTAL TRANSAKSI</td>
                 <td class="right bold">Rp {{ number_format($transaction->final_amount, 0, ',', '.') }}</td>
             </tr>
-            <tr>
-                <td>Pembayaran ({{ strtoupper($transaction->payment_method) }})</td>
-                <td class="right">{{ number_format($transaction->received_amount, 0, ',', '.') }}</td>
-            </tr>
+            @if(strtoupper($transaction->payment_method) === 'MULTI' && !empty($transaction->payment_details))
+                @php
+                    $details = $transaction->payment_details;
+                    if (is_string($details)) {
+                        $details = json_decode($details, true);
+                    }
+                @endphp
+                @if(is_array($details))
+                    @foreach($details as $payment)
+                        @php
+                            $label = $payment['label'] ?? (strtoupper($payment['method'] ?? ''));
+                            if (strtoupper($payment['method'] ?? '') === 'CASH') {
+                                $label = 'Tunai';
+                            }
+                        @endphp
+                        <tr>
+                            <td>{{ $label }}</td>
+                            <td class="right">{{ number_format($payment['amount'] ?? 0, 0, ',', '.') }}</td>
+                        </tr>
+                    @endforeach
+                @endif
+            @else
+                @php
+                    $methodLabel = strtoupper($transaction->payment_method);
+                    if ($methodLabel === 'CASH') $methodLabel = 'TUNAI';
+                @endphp
+                <tr>
+                    <td>Pembayaran ({{ $methodLabel }})</td>
+                    <td class="right">{{ number_format($transaction->received_amount, 0, ',', '.') }}</td>
+                </tr>
+            @endif
+            @if(($transaction->change_amount ?? 0) > 0 || ($transaction->received_amount - $transaction->final_amount) > 0)
             <tr>
                 <td>Kembalian</td>
-                <td class="right">{{ number_format(max(0, $transaction->received_amount - $transaction->final_amount), 0, ',', '.') }}</td>
+                <td class="right">{{ number_format($transaction->change_amount ?? max(0, $transaction->received_amount - $transaction->final_amount), 0, ',', '.') }}</td>
             </tr>
+            @endif
         </table>
 
         <div class="footer">

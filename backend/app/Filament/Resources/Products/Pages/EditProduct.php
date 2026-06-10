@@ -13,7 +13,17 @@ class EditProduct extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->visible(fn () => auth()->user()->branch_id === null),
         ];
+    }
+
+    protected function getFormActions(): array
+    {
+        if (auth()->user()->branch_id !== null) {
+            return [];
+        }
+
+        return parent::getFormActions();
     }
 }

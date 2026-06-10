@@ -12,6 +12,8 @@ class ProductForm
 {
     public static function configure(Schema $schema): Schema
     {
+        $isBranchUser = \Illuminate\Support\Facades\Auth::user()?->branch_id !== null;
+
         return $schema
             ->components([
                 FileUpload::make('image_path')
@@ -19,12 +21,13 @@ class ProductForm
                     ->image()
                     ->disk('public')
                     ->directory('products')
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->disabled($isBranchUser),
                 Select::make('organization_id')
                     ->relationship('organization', 'name')
                     ->required()
                     ->default(fn() => \Illuminate\Support\Facades\Auth::user()->organization_id)
-                    ->disabled(fn() => \Illuminate\Support\Facades\Auth::user()->organization_id !== null)
+                    ->disabled(fn() => \Illuminate\Support\Facades\Auth::user()->organization_id !== null || $isBranchUser)
                     ->dehydrated(),
                 TextInput::make('sku')
                     ->label('SKU')
@@ -32,20 +35,25 @@ class ProductForm
                     ->unique(ignoreRecord: true)
                     ->validationMessages([
                         'unique' => 'SKU ini sudah digunakan oleh produk lain.',
-                    ]),
+                    ])
+                    ->disabled($isBranchUser),
                 TextInput::make('barcode')
                     ->unique(ignoreRecord: true)
                     ->validationMessages([
                         'unique' => 'Barcode ini sudah digunakan oleh produk lain.',
-                    ]),
+                    ])
+                    ->disabled($isBranchUser),
                 TextInput::make('name')
-                    ->required(),
+                    ->required()
+                    ->disabled($isBranchUser),
                 Select::make('category_id')
                     ->relationship('category', 'name')
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->disabled($isBranchUser),
                 TextInput::make('sub_category')
-                    ->label('Sub Kategori'),
+                    ->label('Sub Kategori')
+                    ->disabled($isBranchUser),
                 Select::make('product_type')
                     ->label('Tipe Produk')
                     ->options([
@@ -54,15 +62,18 @@ class ProductForm
                     ])
                     ->default('physical')
                     ->required()
-                    ->live(),
+                    ->live()
+                    ->disabled($isBranchUser),
                 TextInput::make('ppob_sku')
                     ->label('Kode SKU Digiflazz (PPOB SKU)')
                     ->visible(fn ($get) => $get('product_type') === 'digital')
-                    ->helperText('Contoh: xld10 (Lihat daftar harga di Digiflazz)'),
+                    ->helperText('Contoh: xld10 (Lihat daftar harga di Digiflazz)')
+                    ->disabled($isBranchUser),
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->disabled($isBranchUser),
                 \Filament\Schemas\Components\Section::make('Harga Bertingkat & Margin')
                     ->columns(1)
                     ->columnSpanFull()
@@ -151,32 +162,40 @@ class ProductForm
                                 }),
                         ])->columns(3)->columnSpanFull(),
                         \Filament\Forms\Components\Hidden::make('selling_price')->default(0)
-                    ]),
+                    ])
+                    ->disabled($isBranchUser),
                 Toggle::make('is_taxable')
                     ->label('Kena PPN')
                     ->default(true)
-                    ->required(),
+                    ->required()
+                    ->disabled($isBranchUser),
                 TextInput::make('unit_of_measure')
                     ->required()
-                    ->default('pcs'),
+                    ->default('pcs')
+                    ->disabled($isBranchUser),
                 TextInput::make('reorder_point')
                     ->required()
                     ->numeric()
-                    ->default(10),
+                    ->default(10)
+                    ->disabled($isBranchUser),
                 TextInput::make('reorder_qty')
                     ->required()
                     ->numeric()
-                    ->default(50),
+                    ->default(50)
+                    ->disabled($isBranchUser),
                 TextInput::make('lead_time_days')
                     ->required()
                     ->numeric()
-                    ->default(5),
+                    ->default(5)
+                    ->disabled($isBranchUser),
                 Toggle::make('is_active')
-                    ->required(),
+                    ->required()
+                    ->disabled($isBranchUser),
                 Toggle::make('is_ecommerce_active')
                     ->label('Tampilkan di E-Commerce')
                     ->default(false)
-                    ->reactive(),
+                    ->reactive()
+                    ->disabled($isBranchUser),
                 Select::make('ecommerce_category')
                     ->label('Kategori E-Commerce')
                     ->options(function () {
@@ -194,7 +213,8 @@ class ProductForm
                     ->visible(fn ($get) => $get('is_ecommerce_active'))
                     ->placeholder('Pilih Kategori E-Commerce')
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->disabled($isBranchUser),
                 \Filament\Schemas\Components\Section::make('Auto-Unpacking (Konversi Pecah Barang)')
                     ->description('Isi jika barang ini bisa "dipecah" menjadi barang satuan lain saat stok satuan tersebut habis. (Contoh: Produk ini "Beras Karung 15kg" dipecah menjadi "Beras Curah 1kg").')
                     ->schema([
@@ -218,8 +238,10 @@ class ProductForm
                             ])
                             ->columns(3)
                             ->defaultItems(0)
-                    ])->collapsed(),
-                TextInput::make('metadata'),
+                    ])->collapsed()
+                    ->disabled($isBranchUser),
+                TextInput::make('metadata')
+                    ->disabled($isBranchUser),
             ]);
     }
 }

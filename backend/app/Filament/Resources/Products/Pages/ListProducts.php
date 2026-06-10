@@ -14,17 +14,22 @@ class ListProducts extends ListRecords
 
     protected function getHeaderActions(): array
     {
+        $isBranchUser = auth()->user()->branch_id !== null;
+
         return [
             ImportAction::make('import_products')
                 ->label('Import Produk')
                 ->importer(ProductImporter::class)
-                ->icon('heroicon-o-shopping-bag'),
+                ->icon('heroicon-o-shopping-bag')
+                ->visible(!$isBranchUser),
             ImportAction::make('import_stocks')
                 ->label('Import Stok Cabang')
                 ->importer(\App\Filament\Imports\StockImporter::class)
                 ->icon('heroicon-o-building-storefront')
-                ->color('info'),
-            CreateAction::make(),
+                ->color('info')
+                ->visible(!$isBranchUser),
+            CreateAction::make()
+                ->visible(!$isBranchUser),
         ];
     }
 }

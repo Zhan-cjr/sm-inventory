@@ -71,10 +71,10 @@ class TransactionController extends Controller
 
                 if (is_array($requestPayments) && count($requestPayments) > 1) {
                     $paymentMethod = 'MULTI';
-                    $paymentDetails = json_encode($requestPayments);
+                    $paymentDetails = $requestPayments;
                 } else if (is_array($requestPayments) && count($requestPayments) === 1) {
                     $paymentMethod = $requestPayments[0]['method'];
-                    $paymentDetails = json_encode($requestPayments);
+                    $paymentDetails = $requestPayments;
                 }
 
                 $transaction = Transaction::create([
@@ -107,6 +107,16 @@ class TransactionController extends Controller
                         
                         // Handle Point Redemption
                         if ($payment['method'] === 'POINT' && isset($payment['points_deducted'])) {
+                            $org = \App\Models\Organization::find($user->organization_id);
+                            if (!$org || !$org->point_redemption_enabled) {
+                                throw new \Exception('Penukaran poin saat ini dinonaktifkan oleh Perusahaan.');
+                            }
+
+                            $minPoints = $org->minimum_points_to_redeem ?? 100;
+                            if ($payment['points_deducted'] < $minPoints) {
+                                throw new \Exception("Minimal penukaran poin adalah {$minPoints} poin.");
+                            }
+
                             $customer = \App\Models\Customer::find($transaction->customer_id);
                             if ($customer) {
                                 $customer->deductPoints(

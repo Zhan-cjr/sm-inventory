@@ -185,6 +185,7 @@ class ReportPrintController extends Controller
                     'penjualan' => 0,
                     'tunai' => 0,
                     'voucher' => 0,
+                    'point' => 0,
                     'diskon' => 0,
                     'retur' => 0,
                     'jual_netto' => 0,
@@ -210,8 +211,15 @@ class ReportPrintController extends Controller
             }
 
             // Memproses Pembayaran (mendukung multi payment dan single payment fallback)
-            if (!empty($t->payment_details) && is_array($t->payment_details)) {
-                foreach ($t->payment_details as $p) {
+            $details = $t->payment_details;
+            if (is_string($details)) {
+                $details = json_decode($details, true);
+            }
+
+            if (!empty($details) && is_array($details)) {
+                $cashAmt = 0.0;
+                $hasCash = false;
+                foreach ($details as $p) {
                     $pMethod = strtoupper($p['method'] ?? 'CASH');
                     $pAmt = floatval($p['amount'] ?? 0);
                     
@@ -220,19 +228,32 @@ class ReportPrintController extends Controller
                     }
 
                     if ($pMethod === 'CASH') {
-                        $data[$key]['tunai'] += $pAmt;
+                        $cashAmt += $pAmt;
+                        $hasCash = true;
                     } elseif ($pMethod === 'VOUCHER') {
                         $data[$key]['voucher'] += $pAmt;
+                    } elseif ($pMethod === 'POINT') {
+                        $data[$key]['point'] += $pAmt;
                     } elseif ($pMethod === 'CARD') {
                         $bId = $p['bankId'] ?? null;
                         if ($bId && isset($data[$key]['bank_'.$bId])) {
                             $data[$key]['bank_'.$bId] += $pAmt;
                         } else {
-                            $data[$key]['tunai'] += $pAmt; // Fallback jika bank tak dikenal / tak aktif
+                            $cashAmt += $pAmt; // Fallback jika bank tak dikenal / tak aktif
+                            $hasCash = true;
                         }
                     } else {
-                        $data[$key]['tunai'] += $pAmt;
+                        $cashAmt += $pAmt;
+                        $hasCash = true;
                     }
+                }
+                if ($hasCash) {
+                    $change = floatval($t->change_amount ?? 0);
+                    if ($isReturn) {
+                        $change = -$change;
+                    }
+                    $netCash = $cashAmt - $change;
+                    $data[$key]['tunai'] += ($isReturn ? $netCash : max(0.0, $netCash));
                 }
             } else {
                 $method = strtoupper($t->payment_method);
@@ -242,6 +263,8 @@ class ReportPrintController extends Controller
                     $data[$key]['tunai'] += $amt;
                 } elseif ($method === 'VOUCHER') {
                     $data[$key]['voucher'] += $amt;
+                } elseif ($method === 'POINT') {
+                    $data[$key]['point'] += $amt;
                 } elseif (in_array($method, ['CARD', 'DEBIT', 'CREDIT', 'TRANSFER', 'QRIS'])) {
                     $bId = $t->bank_id;
                     if ($bId && isset($data[$key]['bank_'.$bId])) {
@@ -310,6 +333,18 @@ class ReportPrintController extends Controller
         $columns = ['Tanggal', 'No Transaksi', 'Kasir', 'Metode', 'Total', 'Diskon', 'Pendapatan'];
         $rows = [];
         foreach ($transactions as $t) {
+            $pointPayment = 0.0;
+            if (!empty($t->payment_details)) {
+                $details = $t->payment_details;
+                if (is_string($details)) $details = json_decode($details, true);
+                if (is_array($details)) {
+                    $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+                }
+            } elseif (strtoupper($t->payment_method) === 'POINT') {
+                $pointPayment = (float) $t->final_amount;
+            }
+            $netRevenue = (float) $t->final_amount - $pointPayment;
+
             $rows[] = [
                 \Carbon\Carbon::parse($t->transaction_date)->format('d M Y H:i'),
                 $t->local_transaction_id,
@@ -317,7 +352,7 @@ class ReportPrintController extends Controller
                 strtoupper($t->payment_method),
                 number_format($t->total_amount, 0, ',', '.'),
                 number_format($t->discount_amount, 0, ',', '.'),
-                number_format($t->final_amount, 0, ',', '.')
+                number_format($netRevenue, 0, ',', '.')
             ];
         }
 
@@ -488,8 +523,18 @@ class ReportPrintController extends Controller
         $t_omset = 0; $t_hpp = 0; $t_laba = 0;
 
         foreach ($transactions as $t) {
-            $omset = $t->final_amount;
-            $hpp = $t->total_amount * 0.7; // Fallback
+            $pointPayment = 0.0;
+            if (!empty($t->payment_details)) {
+                $details = $t->payment_details;
+                if (is_string($details)) $details = json_decode($details, true);
+                if (is_array($details)) {
+                    $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+                }
+            } elseif (strtoupper($t->payment_method) === 'POINT') {
+                $pointPayment = (float) $t->final_amount;
+            }
+            $omset = (float) $t->final_amount - $pointPayment;
+            $hpp = $t->cogs > 0 ? (float) $t->cogs : (float) $t->total_amount * 0.7;
             $laba = $omset - $hpp;
 
             $t_omset += $omset; $t_hpp += $hpp; $t_laba += $laba;

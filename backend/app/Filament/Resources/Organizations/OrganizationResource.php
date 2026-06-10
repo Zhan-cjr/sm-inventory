@@ -24,9 +24,9 @@ class OrganizationResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-    protected static ?string $modelLabel = 'Organisasi';
+    protected static ?string $modelLabel = 'Perusahaan';
 
-    protected static ?string $pluralModelLabel = 'Organisasi';
+    protected static ?string $pluralModelLabel = 'Perusahaan';
 
     protected static ?string $recordTitleAttribute = 'name';
 

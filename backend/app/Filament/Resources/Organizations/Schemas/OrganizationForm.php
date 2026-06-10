@@ -49,6 +49,11 @@ class OrganizationForm
                                 ->numeric()
                                 ->default(1.00)
                                 ->helperText('Contoh: jika diisi 10, maka setiap 1 poin yang ditukarkan bernilai diskon Rp 10.'),
+                            \Filament\Forms\Components\Toggle::make('point_redemption_enabled')
+                                ->label('Aktifkan Penukaran Poin')
+                                ->default(true)
+                                ->helperText('Jika dinonaktifkan, pelanggan tidak dapat menukarkan poin mereka sama sekali di POS Kasir maupun E-Commerce.')
+                                ->columnSpanFull(),
                             TextInput::make('minimum_points_to_redeem')
                                 ->label('Batas Minimal Poin untuk Ditukarkan')
                                 ->required()

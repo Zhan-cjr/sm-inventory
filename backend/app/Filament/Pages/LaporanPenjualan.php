@@ -64,6 +64,19 @@ class LaporanPenjualan extends Page implements HasTable
                     ->money('IDR', true),
                 TextColumn::make('final_amount')
                     ->label('Pendapatan Bersih')
+                    ->state(function (Transaction $record) {
+                        $pointPayment = 0.0;
+                        if (!empty($record->payment_details)) {
+                            $details = $record->payment_details;
+                            if (is_string($details)) $details = json_decode($details, true);
+                            if (is_array($details)) {
+                                $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+                            }
+                        } elseif (strtoupper($record->payment_method) === 'POINT') {
+                            $pointPayment = (float) $record->final_amount;
+                        }
+                        return $record->final_amount - $pointPayment;
+                    })
                     ->money('IDR', true)
                     ->sortable(),
             ])

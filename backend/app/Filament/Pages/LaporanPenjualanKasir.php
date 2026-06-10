@@ -10,6 +10,7 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\Summarizers\Sum;
+use Filament\Tables\Columns\Summarizers\Summarizer;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Forms\Components\DatePicker;
@@ -76,8 +77,37 @@ class LaporanPenjualanKasir extends Page implements HasTable
                     ->sortable(),
                 TextColumn::make('final_amount')
                     ->label('Pendapatan Bersih')
+                    ->state(function (Transaction $record) {
+                        $pointPayment = 0.0;
+                        if (!empty($record->payment_details)) {
+                            $details = $record->payment_details;
+                            if (is_string($details)) $details = json_decode($details, true);
+                            if (is_array($details)) {
+                                $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+                            }
+                        } elseif (strtoupper($record->payment_method) === 'POINT') {
+                            $pointPayment = (float) $record->final_amount;
+                        }
+                        return $record->final_amount - $pointPayment;
+                    })
                     ->money('IDR', true)
-                    ->summarize(Sum::make()->money('IDR', true)->label('Total'))
+                    ->summarize(
+                        Summarizer::make()
+                            ->label('Total')
+                            ->using(function ($query) {
+                                $totalFinalAmount = (clone $query)->sum('final_amount');
+                                
+                                $pointOnly = (clone $query)->whereIn('payment_method', ['POINT', 'point'])->sum('final_amount');
+                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details']);
+                                $multiPoint = $multiRecords->sum(function ($record) {
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return is_array($details) ? collect($details)->where('method', 'POINT')->sum('amount') : 0;
+                                });
+                                return $totalFinalAmount - ($pointOnly + $multiPoint);
+                            })
+                            ->money('IDR')
+                    )
                     ->sortable(),
             ])
             ->filters([

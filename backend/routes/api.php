@@ -98,7 +98,15 @@ Route::prefix('v1')->group(function () {
                     'organization_id' => $user->organization_id,
                     'organization_name' => $user->organization?->name,
                     'point_conversion_rate' => $user->organization?->point_conversion_rate ?? 1000,
+                    'point_redemption_value' => $user->organization?->point_redemption_value ?? 1,
+                    'minimum_points_to_redeem' => $user->organization?->minimum_points_to_redeem ?? 100,
+                    'point_redemption_enabled' => (bool) ($user->organization?->point_redemption_enabled ?? true),
                     'allow_minus_stock' => (bool) ($user->organization?->allow_minus_stock ?? true),
+                    'scale_barcode_enabled' => (bool) ($user->organization?->scale_barcode_enabled ?? false),
+                    'scale_barcode_prefix' => $user->organization?->scale_barcode_prefix ?? '20',
+                    'scale_barcode_item_code_length' => $user->organization?->scale_barcode_item_code_length ?? 5,
+                    'scale_barcode_weight_length' => $user->organization?->scale_barcode_weight_length ?? 5,
+                    'scale_barcode_weight_decimal_places' => $user->organization?->scale_barcode_weight_decimal_places ?? 3,
                     'pos_authorizations' => $user->pos_authorizations,
                 ]
             ]);

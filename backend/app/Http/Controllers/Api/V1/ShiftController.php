@@ -335,7 +335,19 @@ class ShiftController extends Controller
                 
             $totalManualDiscount = $shiftTransactions->sum('manual_discount');
             $totalPromoDiscount = $shiftTransactions->sum('promo_discount');
-            $totalPointDeduction = $shiftTransactions->sum('points_redeemed_discount');
+            $totalPointDeduction = $shiftTransactions->sum(function ($tx) {
+                $pointPayment = 0.0;
+                if (!empty($tx->payment_details)) {
+                    $details = $tx->payment_details;
+                    if (is_string($details)) $details = json_decode($details, true);
+                    if (is_array($details)) {
+                        $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+                    }
+                } elseif (strtoupper($tx->payment_method) === 'POINT') {
+                    $pointPayment = (float) $tx->final_amount;
+                }
+                return $pointPayment;
+            });
 
             $discountDetails = [
                 'manual_discount' => $totalManualDiscount,
@@ -448,7 +460,19 @@ class ShiftController extends Controller
 
         $totalManualDiscount = $transactions->sum('manual_discount');
         $totalPromoDiscount = $transactions->sum('promo_discount');
-        $totalPointDeduction = $transactions->sum('points_redeemed_discount');
+        $totalPointDeduction = $transactions->sum(function ($tx) {
+            $pointPayment = 0.0;
+            if (!empty($tx->payment_details)) {
+                $details = $tx->payment_details;
+                if (is_string($details)) $details = json_decode($details, true);
+                if (is_array($details)) {
+                    $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+                }
+            } elseif (strtoupper($tx->payment_method) === 'POINT') {
+                $pointPayment = (float) $tx->final_amount;
+            }
+            return $pointPayment;
+        });
 
         $discountDetails = [
             'manual_discount' => $totalManualDiscount,

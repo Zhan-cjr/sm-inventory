@@ -173,6 +173,13 @@ class StocksRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function (\Illuminate\Database\Eloquent\Builder $query) {
+                $user = auth()->user();
+                if ($user && $user->branch_id) {
+                    $query->where('branch_id', $user->branch_id);
+                }
+                return $query;
+            })
             ->recordTitleAttribute('branch.name')
             ->columns([
                 TextColumn::make('branch.name')
@@ -224,16 +231,19 @@ class StocksRelationManager extends RelationManager
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->label('Tambah Stok Cabang'),
+                    ->label('Tambah Stok Cabang')
+                    ->visible(fn () => auth()->user()->branch_id === null),
             ])
             ->actions([
                 EditAction::make(),
                 DeleteAction::make()
-                    ->label('Hapus dari Cabang'),
+                    ->label('Hapus dari Cabang')
+                    ->visible(fn () => auth()->user()->branch_id === null),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn () => auth()->user()->branch_id === null),
                 ]),
             ]);
     }

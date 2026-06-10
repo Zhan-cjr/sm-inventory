@@ -16,6 +16,7 @@
                 <th class="center" colspan="{{ count($banks) }}">Card Bank</th>
             @endif
             <th class="right" rowspan="2">Voucher</th>
+            <th class="right" rowspan="2">Point</th>
             <th class="right" rowspan="2">Diskon</th>
             <th class="right" rowspan="2">Retur</th>
             <th class="right" rowspan="2">Jual Netto</th>
@@ -32,6 +33,7 @@
             $t_penjualan = 0;
             $t_tunai = 0;
             $t_voucher = 0;
+            $t_point = 0;
             $t_diskon = 0;
             $t_retur = 0;
             $t_netto = 0;
@@ -47,6 +49,7 @@
                 $t_penjualan += $row['penjualan'];
                 $t_tunai += $row['tunai'];
                 $t_voucher += $row['voucher'];
+                $t_point += $row['point'] ?? 0;
                 $t_diskon += $row['diskon'];
                 $t_retur += $row['retur'];
                 $t_netto += $row['jual_netto'];
@@ -65,6 +68,7 @@
                     <td class="right">{{ number_format($row['bank_'.$bank->id] ?? 0, 0, ',', '.') }}</td>
                 @endforeach
                 <td class="right">{{ number_format($row['voucher'], 0, ',', '.') }}</td>
+                <td class="right">{{ number_format($row['point'] ?? 0, 0, ',', '.') }}</td>
                 <td class="right">{{ number_format($row['diskon'], 0, ',', '.') }}</td>
                 <td class="right">{{ number_format($row['retur'], 0, ',', '.') }}</td>
                 <td class="right">{{ number_format($row['jual_netto'], 0, ',', '.') }}</td>
@@ -79,6 +83,7 @@
                 <td class="right">{{ number_format($t_banks['bank_'.$bank->id], 0, ',', '.') }}</td>
             @endforeach
             <td class="right">{{ number_format($t_voucher, 0, ',', '.') }}</td>
+            <td class="right">{{ number_format($t_point, 0, ',', '.') }}</td>
             <td class="right">{{ number_format($t_diskon, 0, ',', '.') }}</td>
             <td class="right">{{ number_format($t_retur, 0, ',', '.') }}</td>
             <td class="right">{{ number_format($t_netto, 0, ',', '.') }}</td>
