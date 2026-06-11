@@ -1,0 +1,34 @@
+server {
+    # Port HTTP standar
+    listen 80;
+    
+    # Nama domain lokal yang Anda inginkan (misal: cp-sminventory.test)
+    server_name cp-sminventory.test;
+
+    # Arahkan Document Root BUKAN ke folder project, melainkan ke folder 'out'
+    root "d:/APLIKASI PROJECT/sminventory/company-profile/out";
+    
+    index index.html;
+
+    # Pengaturan pembacaan file Next.js Static Export
+    location / {
+        # Pertama coba file mentah, lalu file dengan .html, lalu folder, terakhir kembalikan ke index.html (untuk SPA fallback jika ada)
+        try_files $uri $uri.html $uri/ =404;
+    }
+
+    # (Opsional) Nonaktifkan log untuk favicon yang hilang
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    # Optimasi Cache untuk aset statis (gambar, css, js)
+    location ~* \.(?:ico|css|js|gif|jpe?g|png|woff2?|eot|ttf|svg)$ {
+        expires 6M;
+        access_log off;
+        add_header Cache-Control "public, max-age=15552000, immutable";
+    }
+
+    # Block akses ke file tersembunyi
+    location ~ /\.ht {
+        deny all;
+    }
+}

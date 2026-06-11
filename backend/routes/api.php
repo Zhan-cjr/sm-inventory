@@ -316,3 +316,12 @@ Route::prefix('v1')->group(function () {
         Route::post('/purchase-orders/create-bulk-from-suggestions', [\App\Http\Controllers\Api\V1\PurchaseOrderController::class, 'createBulkFromSuggestions']);
     });
 });
+
+
+use App\Http\Controllers\API\CompanyProfileController;
+
+Route::prefix('company-profile')->group(function () {
+    Route::get('/settings', [CompanyProfileController::class, 'settings']);
+    Route::get('/branches', [CompanyProfileController::class, 'branches']);
+    Route::get('/facilities', [CompanyProfileController::class, 'facilities']);
+});
