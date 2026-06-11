@@ -564,7 +564,15 @@ class ReportPrintController extends Controller
             }
 
             $q = $this->applyDateFilters($q, $filters, 'transaction_date', 'transaction_date');
-        })->whereNotNull('product_id')->with(['product', 'transaction']);
+        })->whereNotNull('product_id');
+        
+        if (isset($filters['supplier_id']['value']) && !empty($filters['supplier_id']['value'])) {
+            $query->whereHas('product', function($q) use ($filters) {
+                $q->where('supplier_id', $filters['supplier_id']['value']);
+            });
+        }
+        
+        $query->with(['product', 'transaction']);
         
         $items = $query->get();
         $period = $this->getPeriodString($filters);

@@ -108,6 +108,11 @@ class LaporanBarangDijual extends Page implements HasTable
                     ->label('Cabang')
                     ->relationship('transaction.branch', 'name')
                     ->hidden(fn () => Auth::user()->branch_id !== null),
+                SelectFilter::make('supplier_id')
+                    ->label('Supplier')
+                    ->relationship('product.supplier', 'name')
+                    ->searchable()
+                    ->preload(),
             ])
             ->headerActions([
                 \Filament\Actions\Action::make('cetak')

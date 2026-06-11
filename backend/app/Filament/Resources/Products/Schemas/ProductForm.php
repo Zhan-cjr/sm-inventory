@@ -36,6 +36,7 @@ class ProductForm
                     ->validationMessages([
                         'unique' => 'SKU ini sudah digunakan oleh produk lain.',
                     ])
+                    ->readOnly(fn (string $operation): bool => $operation === 'edit')
                     ->disabled($isBranchUser),
                 TextInput::make('barcode')
                     ->unique(ignoreRecord: true)
