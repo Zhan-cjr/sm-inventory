@@ -65,12 +65,12 @@ export default function FacilitiesPage() {
               <Sparkles size={16} /> Layanan Premium
             </motion.div>
             
-            <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-8 leading-[1.1] tracking-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white mb-6 sm:mb-8 leading-[1.1] tracking-tight">
               Fasilitas & Layanan <br className="hidden md:block"/> 
               <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-600 text-gradient drop-shadow-sm">Terbaik untuk Anda</span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-slate-400 leading-relaxed max-w-3xl mx-auto">
+            <p className="text-base sm:text-xl md:text-2xl text-slate-400 leading-relaxed max-w-3xl mx-auto px-4 sm:px-0">
               Eksplorasi ekosistem fasilitas kami yang dirancang khusus untuk memenuhi gaya hidup, kebutuhan harian, hiburan, hingga relaksasi keluarga Anda.
             </p>
           </motion.div>
@@ -86,7 +86,7 @@ export default function FacilitiesPage() {
           return (
             <section 
               key={facility.id}
-              className={`py-24 lg:py-32 relative overflow-hidden border-b border-white/5`}
+              className={`py-16 sm:py-24 lg:py-32 relative overflow-hidden border-b border-white/5`}
             >
               <div className="container mx-auto px-4 relative z-10">
                 <div className={`flex flex-col lg:flex-row items-center gap-12 lg:gap-24`}>
@@ -99,23 +99,23 @@ export default function FacilitiesPage() {
                       viewport={{ once: true, margin: "-100px" }}
                       transition={{ duration: 0.8 }}
                     >
-                      <div className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center mb-8 glass-panel-dark border border-emerald-500/30 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-                        <Icon size={40} />
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-[1.5rem] flex items-center justify-center mb-6 sm:mb-8 glass-panel-dark border border-emerald-500/30 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                        <Icon size={32} className="sm:w-10 sm:h-10" />
                       </div>
                       
-                      <h2 className="text-4xl lg:text-5xl font-bold mb-6 text-white tracking-tight">{facility.name}</h2>
-                      <p className="text-xl leading-relaxed mb-10 text-slate-400">
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 text-white tracking-tight">{facility.name}</h2>
+                      <p className="text-base sm:text-xl leading-relaxed mb-8 sm:mb-10 text-slate-400">
                         {facility.description}
                       </p>
                       
                       <div className="p-6 rounded-2xl glass-panel-dark border border-white/5 relative overflow-hidden group">
                         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/5 to-emerald-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                         <ul className="space-y-4 relative z-10">
-                          <li className="flex items-start gap-4 text-lg text-slate-300">
+                          <li className="flex items-start gap-4 text-base sm:text-lg text-slate-300">
                             <div className="mt-1.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                             <span>Tersedia secara eksklusif di cabang-cabang pilihan kami dengan standar kualitas tertinggi.</span>
                           </li>
-                          <li className="flex items-start gap-4 text-lg text-slate-300">
+                          <li className="flex items-start gap-4 text-base sm:text-lg text-slate-300">
                             <div className="mt-1.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                             <span>Pelayanan profesional, ramah keluarga, dan <span className="font-bold text-emerald-400">berprinsip islami</span>.</span>
                           </li>
@@ -125,7 +125,7 @@ export default function FacilitiesPage() {
                   </div>
                   
                   {/* Image/Visual Parallax */}
-                  <div className={`w-full lg:w-1/2 aspect-square md:aspect-[4/3] lg:aspect-square ${isEven ? 'lg:order-2' : 'lg:order-1'} p-4 lg:p-8`}>
+                  <div className={`w-full lg:w-1/2 aspect-square md:aspect-[4/3] lg:aspect-square ${isEven ? 'lg:order-2' : 'lg:order-1'} p-2 sm:p-4 lg:p-8 mt-4 lg:mt-0`}>
                     <ParallaxImage 
                       src={facility.image_url 
                         ? (facility.image_url.startsWith('http') ? facility.image_url : `/storage/${facility.image_url}`)

@@ -51,13 +51,13 @@ export default function AboutPage() {
           }}
           className="text-center mb-24"
         >
-          <motion.div variants={fadeIn} className="inline-block px-4 py-1.5 rounded-full glass-panel border-white/10 text-emerald-400 text-sm font-semibold tracking-widest uppercase mb-6">
+          <motion.div variants={fadeIn} className="inline-block px-4 py-1.5 rounded-full glass-panel border-white/10 text-emerald-400 text-xs sm:text-sm font-semibold tracking-widest uppercase mb-6">
             Mengenal Lebih Dekat
           </motion.div>
-          <motion.h1 variants={fadeIn} className="text-5xl md:text-7xl font-extrabold text-white mb-8 tracking-tight">
+          <motion.h1 variants={fadeIn} className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white mb-6 sm:mb-8 tracking-tight">
             Tentang <span className="bg-gradient-to-r from-emerald-400 to-teal-500 text-gradient">Toserba Selamat</span>
           </motion.h1>
-          <motion.p variants={fadeIn} className="text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed">
+          <motion.p variants={fadeIn} className="text-base sm:text-lg md:text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed px-2">
             Lebih dari sekadar pusat perbelanjaan, kami adalah destinasi gaya hidup terpadu yang memadukan kebutuhan modern dengan nilai-nilai luhur dan keramahan keluarga.
           </motion.p>
         </motion.div>
@@ -66,7 +66,7 @@ export default function AboutPage() {
         <div className="mb-32 relative">
           <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-emerald-500/0 via-emerald-500/50 to-emerald-500/0 hidden lg:block" />
           
-          <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center relative">
+          <div className="grid lg:grid-cols-2 gap-10 sm:gap-16 lg:gap-24 items-center relative">
             <motion.div 
               initial={{ opacity: 0, x: -50 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -74,17 +74,17 @@ export default function AboutPage() {
               transition={{ duration: 0.8 }}
               className="relative lg:text-right lg:pr-12"
             >
-              <h2 className="text-4xl font-bold text-white mb-6">Perjalanan Kami</h2>
-              <p className="text-slate-400 mb-6 leading-relaxed text-lg">
+              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 sm:mb-6">Perjalanan Kami</h2>
+              <p className="text-slate-400 mb-4 sm:mb-6 leading-relaxed text-base sm:text-lg">
                 Berawal dari sebuah toko sederhana, Toserba Selamat telah berkembang pesat menjadi jaringan ritel dan hospitality terkemuka.
               </p>
-              <p className="text-slate-400 leading-relaxed text-lg mb-8">
+              <p className="text-slate-400 leading-relaxed text-base sm:text-lg mb-6 sm:mb-8">
                 Komitmen kami tidak pernah berubah: menyajikan produk berkualitas tinggi dengan harga terjangkau dalam balutan pelayanan yang sepenuh hati dan fasilitas terintegrasi yang lengkap.
               </p>
-              <div className="inline-flex flex-col items-start lg:items-end p-6 glass-panel-dark rounded-2xl border border-white/5 shadow-2xl relative overflow-hidden group">
+              <div className="inline-flex flex-col items-start lg:items-end p-5 sm:p-6 glass-panel-dark rounded-2xl border border-white/5 shadow-2xl relative overflow-hidden group">
                 <div className="absolute inset-0 bg-emerald-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
-                <div className="text-5xl font-black text-emerald-400 mb-2 relative z-10">26+</div>
-                <div className="text-slate-300 font-medium relative z-10">Cabang Tersebar untuk melayani Anda lebih dekat.</div>
+                <div className="text-4xl sm:text-5xl font-black text-emerald-400 mb-2 relative z-10">26+</div>
+                <div className="text-sm sm:text-base text-slate-300 font-medium relative z-10">Cabang Tersebar untuk melayani Anda lebih dekat.</div>
               </div>
             </motion.div>
             
@@ -116,27 +116,27 @@ export default function AboutPage() {
           transition={{ duration: 0.8 }}
           className="pt-10"
         >
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 text-white">Nilai Inti <span className="text-emerald-500">Perusahaan</span></h2>
-            <p className="text-slate-400 text-xl">Prinsip yang membimbing setiap langkah dan pelayanan kami.</p>
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-white">Nilai Inti <span className="text-emerald-500">Perusahaan</span></h2>
+            <p className="text-slate-400 text-base sm:text-lg md:text-xl">Prinsip yang membimbing setiap langkah dan pelayanan kami.</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
             {values.map((val, idx) => {
               const Icon = val.icon;
               return (
                 <div 
                   key={idx} 
-                  className={`glass-panel-dark p-10 rounded-[2rem] border border-white/5 hover:border-white/10 transition-colors group relative overflow-hidden ${val.span}`}
+                  className={`glass-panel-dark p-6 sm:p-8 md:p-10 rounded-3xl sm:rounded-[2rem] border border-white/5 hover:border-white/10 transition-colors group relative overflow-hidden ${val.span}`}
                 >
                   <div className={`absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl ${val.color} opacity-0 group-hover:opacity-10 transition-opacity duration-700 rounded-full blur-[80px] -mr-20 -mt-20`} />
                   
-                  <div className={`w-16 h-16 rounded-2xl mb-8 flex items-center justify-center bg-gradient-to-br ${val.color} shadow-lg shadow-black/20 group-hover:scale-110 transition-transform duration-500`}>
-                    <Icon className="text-white" size={32} />
+                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl mb-6 sm:mb-8 flex items-center justify-center bg-gradient-to-br ${val.color} shadow-lg shadow-black/20 group-hover:scale-110 transition-transform duration-500`}>
+                    <Icon className="text-white sm:w-8 sm:h-8" size={28} />
                   </div>
                   
-                  <h3 className="text-2xl font-bold mb-4 text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-slate-400 transition-all">{val.title}</h3>
-                  <p className="text-slate-400 leading-relaxed text-lg">{val.desc}</p>
+                  <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-slate-400 transition-all">{val.title}</h3>
+                  <p className="text-slate-400 leading-relaxed text-sm sm:text-base md:text-lg">{val.desc}</p>
                 </div>
               );
             })}

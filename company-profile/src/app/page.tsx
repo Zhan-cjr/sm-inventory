@@ -87,28 +87,28 @@ export default function Home() {
               <span>Standar Baru Berbelanja Keluarga</span>
             </motion.div>
 
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold leading-[1.1] mb-8 tracking-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-extrabold leading-[1.1] mb-6 sm:mb-8 tracking-tight">
               Lengkap, Nyaman, <br className="hidden md:block"/>
               <span className="bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-400 text-gradient pb-2 drop-shadow-lg">
                 Penuh Berkah.
               </span>
             </h1>
             
-            <p className="text-lg md:text-2xl text-slate-400 mb-12 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-lg md:text-2xl text-slate-400 mb-8 sm:mb-12 max-w-2xl mx-auto leading-relaxed px-2">
               Toserba Selamat menghadirkan pengalaman belanja premium dan fasilitas terintegrasi dengan nilai-nilai syariah yang menenangkan.
             </p>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 px-4 sm:px-0">
               <Link 
                 href="/locations" 
-                className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1 hover:shadow-[0_0_40px_-10px_rgba(16,185,129,0.5)]"
+                className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl font-bold text-base sm:text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1 hover:shadow-[0_0_40px_-10px_rgba(16,185,129,0.5)]"
               >
                 <MapPin size={22} />
                 Cari Cabang Terdekat
               </Link>
               <Link 
                 href="/facilities" 
-                className="w-full sm:w-auto glass-panel hover:bg-white/10 text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1"
+                className="w-full sm:w-auto glass-panel hover:bg-white/10 text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl font-semibold text-base sm:text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1"
               >
                 Jelajahi Fasilitas
                 <ArrowRight size={22} className="text-emerald-400" />
@@ -130,9 +130,9 @@ export default function Home() {
       </section>
 
       {/* Stats Section */}
-      <section className="py-20 relative z-30 border-y border-white/5 bg-slate-900/50 backdrop-blur-3xl">
+      <section className="py-12 sm:py-20 relative z-30 border-y border-white/5 bg-slate-900/50 backdrop-blur-3xl">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 divide-x divide-white/5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-4 md:gap-8 divide-x divide-white/5">
             {companyStats.map((stat, index) => (
                <AnimatedCounter key={index} value={stat.value} label={stat.label} />
             ))}
@@ -141,14 +141,14 @@ export default function Home() {
       </section>
 
       {/* Facilities Grid with 3D Hover */}
-      <section className="py-32 relative">
+      <section className="py-20 sm:py-32 relative">
         <div className="container mx-auto px-4">
-          <div className="text-center max-w-3xl mx-auto mb-20">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Layanan & <span className="text-emerald-500">Unit Bisnis</span></h2>
-            <p className="text-slate-400 text-lg md:text-xl leading-relaxed">Ekosistem fasilitas lengkap yang dirancang khusus untuk memenuhi gaya hidup sehat, modern, dan islami bagi seluruh anggota keluarga Anda.</p>
+          <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-20">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">Layanan & <span className="text-emerald-500">Unit Bisnis</span></h2>
+            <p className="text-slate-400 text-base sm:text-lg md:text-xl leading-relaxed">Ekosistem fasilitas lengkap yang dirancang khusus untuk memenuhi gaya hidup sehat, modern, dan islami bagi seluruh anggota keluarga Anda.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
             {facilities.slice(0, 6).map((facility: any, index: number) => {
               const Icon = IconMapper[facility.icon] || ShoppingCart;
               return (
@@ -161,15 +161,15 @@ export default function Home() {
                   className="group relative"
                 >
                   <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500 rounded-3xl" />
-                  <div className="relative glass-panel-dark rounded-3xl p-8 h-full border border-white/10 hover:border-emerald-500/50 transition-all duration-500 hover:-translate-y-2 overflow-hidden">
+                  <div className="relative glass-panel-dark rounded-3xl p-6 sm:p-8 h-full border border-white/10 hover:border-emerald-500/50 transition-all duration-500 hover:-translate-y-2 overflow-hidden">
                     <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-colors duration-500" />
                     
-                    <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-white/5 flex items-center justify-center text-emerald-400 mb-8 shadow-[0_8px_16px_rgb(0_0_0/0.4)] group-hover:scale-110 transition-transform duration-500">
-                      <Icon size={32} />
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-800/80 border border-white/5 flex items-center justify-center text-emerald-400 mb-6 sm:mb-8 shadow-[0_8px_16px_rgb(0_0_0/0.4)] group-hover:scale-110 transition-transform duration-500">
+                      <Icon size={28} className="sm:w-8 sm:h-8" />
                     </div>
                     
-                    <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-emerald-300 transition-colors">{facility.name}</h3>
-                    <p className="text-slate-400 leading-relaxed group-hover:text-slate-300 transition-colors">{facility.description}</p>
+                    <h3 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4 group-hover:text-emerald-300 transition-colors">{facility.name}</h3>
+                    <p className="text-sm sm:text-base text-slate-400 leading-relaxed group-hover:text-slate-300 transition-colors">{facility.description}</p>
                   </div>
                 </motion.div>
               );
@@ -191,7 +191,7 @@ export default function Home() {
       </section>
 
       {/* Premium CTA Section */}
-      <section className="py-24 relative overflow-hidden">
+      <section className="py-16 sm:py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-emerald-950/40" />
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-fixed bg-center opacity-10 mix-blend-luminosity" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950" />
@@ -202,23 +202,23 @@ export default function Home() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="glass-panel-dark rounded-[3rem] p-10 md:p-20 text-center max-w-5xl mx-auto border border-emerald-500/20 shadow-[0_0_80px_rgba(16,185,129,0.15)] relative overflow-hidden"
+            className="glass-panel-dark rounded-[2rem] sm:rounded-[3rem] p-8 sm:p-10 md:p-20 text-center max-w-5xl mx-auto border border-emerald-500/20 shadow-[0_0_80px_rgba(16,185,129,0.15)] relative overflow-hidden"
           >
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1/2 bg-emerald-500/20 blur-[100px] rounded-full pointer-events-none" />
             
-            <Building2 size={48} className="mx-auto text-emerald-500 mb-8" />
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-              Hadir Lebih Dekat di <br className="hidden md:block"/>
+            <Building2 size={40} className="mx-auto text-emerald-500 mb-6 sm:mb-8 sm:w-12 sm:h-12" />
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
+              Hadir Lebih Dekat di <br className="hidden sm:block"/>
               <span className="text-emerald-400">26 Titik Lokasi</span>
             </h2>
-            <p className="text-slate-300 text-lg md:text-xl mb-12 leading-relaxed max-w-2xl mx-auto">
+            <p className="text-slate-300 text-base sm:text-lg md:text-xl mb-8 sm:mb-12 leading-relaxed max-w-2xl mx-auto">
               Ekspansi kami berfokus pada kemudahan akses bagi keluarga Anda. Temukan Toserba Selamat terdekat dan nikmati fasilitas modern di kota Anda.
             </p>
             <Link 
               href="/locations" 
-              className="inline-flex items-center gap-3 bg-white text-slate-900 hover:bg-emerald-50 px-10 py-5 rounded-2xl font-bold text-lg w-max transition-all hover:scale-105 shadow-xl"
+              className="inline-flex items-center justify-center gap-3 bg-white text-slate-900 hover:bg-emerald-50 px-6 sm:px-10 py-4 sm:py-5 rounded-xl sm:rounded-2xl font-bold text-base sm:text-lg w-full sm:w-max transition-all hover:scale-105 shadow-xl"
             >
-              Lihat Peta Cabang <MapPin size={22} className="text-emerald-600" />
+              Lihat Peta Cabang <MapPin size={20} className="text-emerald-600 sm:w-6 sm:h-6" />
             </Link>
           </motion.div>
         </div>
