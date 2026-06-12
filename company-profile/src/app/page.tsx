@@ -34,8 +34,8 @@ function AnimatedCounter({ value, label }: { value: string, label: string }) {
 
   return (
     <div ref={ref} className="text-center px-4 relative z-10 group">
-      <div className="absolute inset-0 bg-emerald-500/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      <h3 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-emerald-400 to-emerald-600 text-gradient mb-3 drop-shadow-sm">
+      <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <h3 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 text-gradient mb-3 drop-shadow-sm">
         {count}{suffix}
       </h3>
       <p className="text-slate-400 font-medium tracking-wide uppercase text-sm">{label}</p>
@@ -50,22 +50,22 @@ export default function Home() {
     return (
       <div className="h-screen flex justify-center items-center bg-slate-950">
         <div className="relative">
-          <div className="absolute inset-0 bg-emerald-500 blur-xl opacity-20 rounded-full animate-pulse" />
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-emerald-500 relative z-10"></div>
+          <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 rounded-full animate-pulse" />
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 relative z-10"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-950 min-h-screen text-slate-50 selection:bg-emerald-500/30">
+    <div className="bg-slate-950 min-h-screen text-slate-50 selection:bg-blue-500/30">
       
       {/* Premium Hero Section */}
       <section className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden">
         {/* Animated Background Blobs */}
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-emerald-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob" />
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-emerald-700 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-emerald-900 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-4000" />
+        <div className="absolute top-0 -left-4 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob" />
+        <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-700 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-blue-900 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-4000" />
         
         {/* Subtle Grid Pattern Overlay */}
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] z-0" />
@@ -81,15 +81,14 @@ export default function Home() {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.8 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel-dark border-emerald-500/30 text-emerald-300 text-sm font-medium mb-8"
+              className="inline-block px-4 py-1.5 rounded-full glass-panel border-white/10 text-lime-400 text-xs sm:text-sm font-semibold tracking-widest uppercase mb-6 bg-lime-500/10 border-lime-500/20"
             >
-              <Sparkles size={16} className="text-emerald-400" />
-              <span>Standar Baru Berbelanja Keluarga</span>
+              THE MOSLEM FAMILY
             </motion.div>
 
             <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-extrabold leading-[1.1] mb-6 sm:mb-8 tracking-tight">
               Lengkap, Nyaman, <br className="hidden md:block"/>
-              <span className="bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-400 text-gradient pb-2 drop-shadow-lg">
+              <span className="bg-gradient-to-r from-blue-400 via-blue-500 to-red-400 text-gradient pb-2 drop-shadow-lg">
                 Penuh Berkah.
               </span>
             </h1>
@@ -101,7 +100,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 px-4 sm:px-0">
               <Link 
                 href="/locations" 
-                className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl font-bold text-base sm:text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1 hover:shadow-[0_0_40px_-10px_rgba(16,185,129,0.5)]"
+                className="w-full sm:w-auto bg-blue-500 hover:bg-blue-400 text-slate-950 px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl font-bold text-base sm:text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1 hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.5)]"
               >
                 <MapPin size={22} />
                 Cari Cabang Terdekat
@@ -111,7 +110,7 @@ export default function Home() {
                 className="w-full sm:w-auto glass-panel hover:bg-white/10 text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl font-semibold text-base sm:text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1"
               >
                 Jelajahi Fasilitas
-                <ArrowRight size={22} className="text-emerald-400" />
+                <ArrowRight size={22} className="text-blue-400" />
               </Link>
             </div>
           </motion.div>
@@ -144,7 +143,7 @@ export default function Home() {
       <section className="py-20 sm:py-32 relative">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-20">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">Layanan & <span className="text-emerald-500">Unit Bisnis</span></h2>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">Layanan & <span className="text-blue-500">Unit Bisnis</span></h2>
             <p className="text-slate-400 text-base sm:text-lg md:text-xl leading-relaxed">Ekosistem fasilitas lengkap yang dirancang khusus untuk memenuhi gaya hidup sehat, modern, dan islami bagi seluruh anggota keluarga Anda.</p>
           </div>
 
@@ -160,15 +159,15 @@ export default function Home() {
                   transition={{ duration: 0.6, delay: index * 0.1 }}
                   className="group relative"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500 rounded-3xl" />
-                  <div className="relative glass-panel-dark rounded-3xl p-6 sm:p-8 h-full border border-white/10 hover:border-emerald-500/50 transition-all duration-500 hover:-translate-y-2 overflow-hidden">
-                    <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-colors duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-blue-500/20 to-transparent opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500 rounded-3xl" />
+                  <div className="relative glass-panel-dark rounded-3xl p-6 sm:p-8 h-full border border-white/10 hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-2 overflow-hidden">
+                    <div className="absolute -right-10 -top-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-colors duration-500" />
                     
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-800/80 border border-white/5 flex items-center justify-center text-emerald-400 mb-6 sm:mb-8 shadow-[0_8px_16px_rgb(0_0_0/0.4)] group-hover:scale-110 transition-transform duration-500">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-800/80 border border-white/5 flex items-center justify-center text-blue-400 mb-6 sm:mb-8 shadow-[0_8px_16px_rgb(0_0_0/0.4)] group-hover:scale-110 transition-transform duration-500">
                       <Icon size={28} className="sm:w-8 sm:h-8" />
                     </div>
                     
-                    <h3 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4 group-hover:text-emerald-300 transition-colors">{facility.name}</h3>
+                    <h3 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4 group-hover:text-blue-300 transition-colors">{facility.name}</h3>
                     <p className="text-sm sm:text-base text-slate-400 leading-relaxed group-hover:text-slate-300 transition-colors">{facility.description}</p>
                   </div>
                 </motion.div>
@@ -179,10 +178,10 @@ export default function Home() {
           <div className="mt-20 text-center">
             <Link 
               href="/facilities" 
-              className="inline-flex items-center gap-3 text-emerald-400 font-bold hover:text-emerald-300 transition-colors text-lg group"
+              className="inline-flex items-center gap-3 text-blue-400 font-bold hover:text-blue-300 transition-colors text-lg group"
             >
               Lihat Detail Seluruh Fasilitas 
-              <span className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/40 transition-colors">
+              <span className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center group-hover:bg-blue-500/40 transition-colors">
                 <ArrowRight size={20} />
               </span>
             </Link>
@@ -192,7 +191,7 @@ export default function Home() {
 
       {/* Premium CTA Section */}
       <section className="py-16 sm:py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-emerald-950/40" />
+        <div className="absolute inset-0 bg-blue-950/40" />
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-fixed bg-center opacity-10 mix-blend-luminosity" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950" />
         
@@ -202,23 +201,23 @@ export default function Home() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="glass-panel-dark rounded-[2rem] sm:rounded-[3rem] p-8 sm:p-10 md:p-20 text-center max-w-5xl mx-auto border border-emerald-500/20 shadow-[0_0_80px_rgba(16,185,129,0.15)] relative overflow-hidden"
+            className="glass-panel-dark rounded-[2rem] sm:rounded-[3rem] p-8 sm:p-10 md:p-20 text-center max-w-5xl mx-auto border border-blue-500/20 shadow-[0_0_80px_rgba(59,130,246,0.15)] relative overflow-hidden"
           >
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1/2 bg-emerald-500/20 blur-[100px] rounded-full pointer-events-none" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1/2 bg-blue-500/20 blur-[100px] rounded-full pointer-events-none" />
             
-            <Building2 size={40} className="mx-auto text-emerald-500 mb-6 sm:mb-8 sm:w-12 sm:h-12" />
+            <Building2 size={40} className="mx-auto text-blue-500 mb-6 sm:mb-8 sm:w-12 sm:h-12" />
             <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
               Hadir Lebih Dekat di <br className="hidden sm:block"/>
-              <span className="text-emerald-400">26 Titik Lokasi</span>
+              <span className="text-blue-400">26 Titik Lokasi</span>
             </h2>
             <p className="text-slate-300 text-base sm:text-lg md:text-xl mb-8 sm:mb-12 leading-relaxed max-w-2xl mx-auto">
               Ekspansi kami berfokus pada kemudahan akses bagi keluarga Anda. Temukan Toserba Selamat terdekat dan nikmati fasilitas modern di kota Anda.
             </p>
             <Link 
               href="/locations" 
-              className="inline-flex items-center justify-center gap-3 bg-white text-slate-900 hover:bg-emerald-50 px-6 sm:px-10 py-4 sm:py-5 rounded-xl sm:rounded-2xl font-bold text-base sm:text-lg w-full sm:w-max transition-all hover:scale-105 shadow-xl"
+              className="inline-flex items-center justify-center gap-3 bg-white text-slate-900 hover:bg-blue-50 px-6 sm:px-10 py-4 sm:py-5 rounded-xl sm:rounded-2xl font-bold text-base sm:text-lg w-full sm:w-max transition-all hover:scale-105 shadow-xl"
             >
-              Lihat Peta Cabang <MapPin size={20} className="text-emerald-600 sm:w-6 sm:h-6" />
+              Lihat Peta Cabang <MapPin size={20} className="text-blue-600 sm:w-6 sm:h-6" />
             </Link>
           </motion.div>
         </div>

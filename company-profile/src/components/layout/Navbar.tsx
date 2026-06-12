@@ -50,7 +50,7 @@ export function Navbar() {
                 className="h-10 w-auto object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] group-hover:scale-105 transition-transform"
               />
             ) : (
-              <div className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 p-2 rounded-xl group-hover:bg-emerald-500/30 transition-colors shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+              <div className="bg-blue-500/20 text-blue-400 border border-blue-500/30 p-2 rounded-xl group-hover:bg-blue-500/30 transition-colors shadow-[0_0_15px_rgba(59,130,246,0.3)]">
                 <ShoppingBag size={24} />
               </div>
             )}
@@ -63,16 +63,16 @@ export function Navbar() {
                 key={link.name}
                 href={link.href}
                 className={cn(
-                  "text-sm font-semibold transition-all hover:text-emerald-400 drop-shadow-sm",
+                  "text-sm font-semibold transition-all hover:text-blue-400 drop-shadow-sm",
                   pathname === link.href
-                    ? "text-emerald-400"
+                    ? "text-blue-400"
                     : "text-slate-300"
                 )}
               >
                 {link.name}
               </Link>
             ))}
-            <a href="http://shopping.toserbaselamat.id" className="hidden md:flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:-translate-y-0.5">
+            <a href="http://shopping.toserbaselamat.id" className="hidden md:flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-slate-950 px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] hover:-translate-y-0.5">
               <ShoppingBag size={18} />
               Belanja Online
             </a>
@@ -82,7 +82,7 @@ export function Navbar() {
           <button
             className={cn(
               "md:hidden p-2 rounded-md transition-colors",
-              scrolled || isOpen ? "text-white hover:text-emerald-400" : "text-white hover:text-emerald-400"
+              scrolled || isOpen ? "text-white hover:text-blue-400" : "text-white hover:text-blue-400"
             )}
             onClick={() => setIsOpen(!isOpen)}
           >
@@ -108,7 +108,7 @@ export function Navbar() {
                   className={cn(
                     "block px-4 py-3 rounded-xl text-base font-medium transition-all",
                     pathname === link.href
-                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
                       : "text-slate-300 hover:bg-white/5 hover:text-white"
                   )}
                   onClick={() => setIsOpen(false)}
@@ -118,7 +118,7 @@ export function Navbar() {
               ))}
               <a
                 href="http://shopping.toserbaselamat.id"
-                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-5 py-4 rounded-xl font-bold transition-all mt-4 justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                className="flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-slate-950 px-5 py-4 rounded-xl font-bold transition-all mt-4 justify-center shadow-[0_0_20px_rgba(59,130,246,0.2)]"
               >
                 <ShoppingBag size={18} />
                 Belanja Online Sekarang
