@@ -1,113 +1,151 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useAnimation, useInView } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, MapPin, ShoppingCart } from "lucide-react";
+import { ArrowRight, MapPin, ShoppingCart, Sparkles, Building2, Users } from "lucide-react";
 import { companyStats } from "@/lib/data";
 import { useCompanyProfile } from "@/lib/hooks";
 import { IconMapper } from "@/lib/icon-mapper";
+import { useEffect, useRef, useState } from "react";
 
-const fadeIn = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
-};
+// Counter animation component
+function AnimatedCounter({ value, label }: { value: string, label: string }) {
+  const numericValue = parseInt(value.replace(/[^0-9]/g, ''));
+  const suffix = value.replace(/[0-9]/g, '');
+  const [count, setCount] = useState(0);
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
 
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
+  useEffect(() => {
+    if (isInView) {
+      let start = 0;
+      const duration = 2000;
+      const stepTime = Math.abs(Math.floor(duration / numericValue));
+      
+      const timer = setInterval(() => {
+        start += 1;
+        setCount(start);
+        if (start === numericValue) clearInterval(timer);
+      }, stepTime > 0 ? stepTime : 10);
+      
+      return () => clearInterval(timer);
     }
-  }
-};
+  }, [isInView, numericValue]);
+
+  return (
+    <div ref={ref} className="text-center px-4 relative z-10 group">
+      <div className="absolute inset-0 bg-emerald-500/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <h3 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-emerald-400 to-emerald-600 text-gradient mb-3 drop-shadow-sm">
+        {count}{suffix}
+      </h3>
+      <p className="text-slate-400 font-medium tracking-wide uppercase text-sm">{label}</p>
+    </div>
+  );
+}
 
 export default function Home() {
   const { facilities, settings, isLoading } = useCompanyProfile();
 
   if (isLoading) {
     return (
-      <div className="h-screen flex justify-center items-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-600"></div>
+      <div className="h-screen flex justify-center items-center bg-slate-950">
+        <div className="relative">
+          <div className="absolute inset-0 bg-emerald-500 blur-xl opacity-20 rounded-full animate-pulse" />
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-emerald-500 relative z-10"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <>
-      {/* Hero Section */}
-      <section className="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden">
-        {/* Placeholder for Video/Image Background */}
-        <div className="absolute inset-0 z-0 bg-slate-900">
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/40 z-10" />
-          <img 
-            src="https://images.unsplash.com/photo-1604719312566-8912e9227c6a?q=80&w=2574&auto=format&fit=crop" 
-            alt="Toserba Selamat Hero" 
-            className="w-full h-full object-cover opacity-60"
-          />
-        </div>
+    <div className="bg-slate-950 min-h-screen text-slate-50 selection:bg-emerald-500/30">
+      
+      {/* Premium Hero Section */}
+      <section className="relative h-screen min-h-[700px] flex items-center justify-center overflow-hidden">
+        {/* Animated Background Blobs */}
+        <div className="absolute top-0 -left-4 w-72 h-72 bg-emerald-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob" />
+        <div className="absolute top-0 -right-4 w-72 h-72 bg-emerald-700 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-emerald-900 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-4000" />
+        
+        {/* Subtle Grid Pattern Overlay */}
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] z-0" />
 
-        <div className="container mx-auto px-4 relative z-20 pt-20">
+        <div className="container mx-auto px-4 relative z-20 pt-24">
           <motion.div 
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainer}
-            className="max-w-3xl text-white"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            className="max-w-4xl mx-auto text-center"
           >
-            <motion.h1 variants={fadeIn} className="text-5xl md:text-7xl font-bold leading-tight mb-6 text-balance">
-              Lengkap, Nyaman, dan Penuh Berkah.
-            </motion.h1>
-            <motion.p variants={fadeIn} className="text-lg md:text-xl text-slate-200 mb-10 text-balance max-w-2xl">
-              Toserba Selamat menghadirkan pengalaman belanja dan fasilitas premium untuk seluruh keluarga dengan nilai-nilai syariah yang menenangkan.
-            </motion.p>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2, duration: 0.8 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel-dark border-emerald-500/30 text-emerald-300 text-sm font-medium mb-8"
+            >
+              <Sparkles size={16} className="text-emerald-400" />
+              <span>Standar Baru Berbelanja Keluarga</span>
+            </motion.div>
+
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold leading-[1.1] mb-8 tracking-tight">
+              Lengkap, Nyaman, <br className="hidden md:block"/>
+              <span className="bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-400 text-gradient pb-2 drop-shadow-lg">
+                Penuh Berkah.
+              </span>
+            </h1>
             
-            <motion.div variants={fadeIn} className="flex flex-wrap gap-4">
+            <p className="text-lg md:text-2xl text-slate-400 mb-12 max-w-2xl mx-auto leading-relaxed">
+              Toserba Selamat menghadirkan pengalaman belanja premium dan fasilitas terintegrasi dengan nilai-nilai syariah yang menenangkan.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
               <Link 
                 href="/locations" 
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-full font-semibold text-lg transition-all flex items-center gap-2 hover:-translate-y-1 hover:shadow-lg hover:shadow-emerald-500/30"
+                className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1 hover:shadow-[0_0_40px_-10px_rgba(16,185,129,0.5)]"
               >
-                <MapPin size={20} />
+                <MapPin size={22} />
                 Cari Cabang Terdekat
               </Link>
               <Link 
                 href="/facilities" 
-                className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/30 text-white px-8 py-4 rounded-full font-semibold text-lg transition-all flex items-center gap-2"
+                className="w-full sm:w-auto glass-panel hover:bg-white/10 text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1"
               >
                 Jelajahi Fasilitas
-                <ArrowRight size={20} />
+                <ArrowRight size={22} className="text-emerald-400" />
               </Link>
-            </motion.div>
+            </div>
           </motion.div>
         </div>
+
+        {/* Scroll Indicator */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5, duration: 1 }}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-slate-500"
+        >
+          <span className="text-xs uppercase tracking-widest font-medium">Scroll ke bawah</span>
+          <div className="w-[1px] h-12 bg-gradient-to-b from-slate-500 to-transparent" />
+        </motion.div>
       </section>
 
       {/* Stats Section */}
-      <section className="py-16 bg-white relative -mt-10 z-30 rounded-t-[3rem] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+      <section className="py-20 relative z-30 border-y border-white/5 bg-slate-900/50 backdrop-blur-3xl">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 divide-x divide-slate-100">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 divide-x divide-white/5">
             {companyStats.map((stat, index) => (
-               <motion.div 
-                 key={index}
-                 initial={{ opacity: 0, y: 20 }}
-                 whileInView={{ opacity: 1, y: 0 }}
-                 viewport={{ once: true }}
-                 transition={{ delay: index * 0.1, duration: 0.5 }}
-                 className="text-center px-4"
-               >
-                 <h3 className="text-4xl md:text-5xl font-bold text-emerald-600 mb-2">{stat.value}</h3>
-                 <p className="text-slate-500 font-medium">{stat.label}</p>
-               </motion.div>
+               <AnimatedCounter key={index} value={stat.value} label={stat.label} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* Facilities Grid */}
-      <section className="py-24 bg-slate-50">
+      {/* Facilities Grid with 3D Hover */}
+      <section className="py-32 relative">
         <div className="container mx-auto px-4">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Layanan & Unit Bisnis</h2>
-            <p className="text-slate-600 text-lg">Lebih dari sekadar tempat belanja, kami menawarkan ekosistem fasilitas lengkap untuk gaya hidup sehat dan modern.</p>
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">Layanan & <span className="text-emerald-500">Unit Bisnis</span></h2>
+            <p className="text-slate-400 text-lg md:text-xl leading-relaxed">Ekosistem fasilitas lengkap yang dirancang khusus untuk memenuhi gaya hidup sehat, modern, dan islami bagi seluruh anggota keluarga Anda.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -116,67 +154,75 @@ export default function Home() {
               return (
                 <motion.div
                   key={facility.id}
-                  initial={{ opacity: 0, y: 30 }}
+                  initial={{ opacity: 0, y: 40 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
-                  transition={{ duration: 0.5, delay: index * 0.05 }}
-                  className="group bg-white rounded-2xl p-8 border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden relative"
+                  viewport={{ once: true, margin: "-100px" }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  className="group relative"
                 >
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-600/5 rounded-bl-full -z-0 transition-transform duration-500 group-hover:scale-150" />
-                  <div className="relative z-10">
-                    <div className="w-14 h-14 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-300">
-                      <Icon size={28} />
+                  <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500 rounded-3xl" />
+                  <div className="relative glass-panel-dark rounded-3xl p-8 h-full border border-white/10 hover:border-emerald-500/50 transition-all duration-500 hover:-translate-y-2 overflow-hidden">
+                    <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-colors duration-500" />
+                    
+                    <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-white/5 flex items-center justify-center text-emerald-400 mb-8 shadow-[0_8px_16px_rgb(0_0_0/0.4)] group-hover:scale-110 transition-transform duration-500">
+                      <Icon size={32} />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-3">{facility.name}</h3>
-                    <p className="text-slate-600 leading-relaxed">{facility.description}</p>
+                    
+                    <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-emerald-300 transition-colors">{facility.name}</h3>
+                    <p className="text-slate-400 leading-relaxed group-hover:text-slate-300 transition-colors">{facility.description}</p>
                   </div>
                 </motion.div>
               );
             })}
           </div>
           
-          <div className="mt-16 text-center">
+          <div className="mt-20 text-center">
             <Link 
               href="/facilities" 
-              className="inline-flex items-center gap-2 text-emerald-600 font-semibold hover:text-emerald-700 transition-colors"
+              className="inline-flex items-center gap-3 text-emerald-400 font-bold hover:text-emerald-300 transition-colors text-lg group"
             >
-              Lihat Detail Fasilitas <ArrowRight size={18} />
+              Lihat Detail Seluruh Fasilitas 
+              <span className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/40 transition-colors">
+                <ArrowRight size={20} />
+              </span>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Highlights & Branches CTA */}
-      <section className="py-24 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="bg-slate-900 rounded-3xl overflow-hidden flex flex-col lg:flex-row shadow-2xl relative">
-            <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none" />
-            <div className="lg:w-1/2 p-10 lg:p-16 flex flex-col justify-center relative z-10">
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 leading-tight">
-                Hadir Lebih Dekat di <span className="text-amber-500">26 Titik Lokasi</span>
-              </h2>
-              <p className="text-slate-300 text-lg mb-8 leading-relaxed max-w-md">
-                Ekspansi kami berfokus pada kemudahan akses bagi keluarga Anda. Temukan Toserba Selamat terdekat dan nikmati fasilitas modern di kota Anda.
-              </p>
-              <Link 
-                href="/locations" 
-                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-400 text-white px-6 py-3 rounded-xl font-semibold w-max transition-all"
-              >
-                Lihat Peta Cabang <MapPin size={18} />
-              </Link>
-            </div>
-            <div className="lg:w-1/2 min-h-[300px] lg:min-h-full relative">
-              <img 
-                src="https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop" 
-                alt="Cabang Toserba Selamat" 
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent lg:hidden" />
-              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-slate-900 hidden lg:block" />
-            </div>
-          </div>
+      {/* Premium CTA Section */}
+      <section className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-emerald-950/40" />
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-fixed bg-center opacity-10 mix-blend-luminosity" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950" />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="glass-panel-dark rounded-[3rem] p-10 md:p-20 text-center max-w-5xl mx-auto border border-emerald-500/20 shadow-[0_0_80px_rgba(16,185,129,0.15)] relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1/2 bg-emerald-500/20 blur-[100px] rounded-full pointer-events-none" />
+            
+            <Building2 size={48} className="mx-auto text-emerald-500 mb-8" />
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+              Hadir Lebih Dekat di <br className="hidden md:block"/>
+              <span className="text-emerald-400">26 Titik Lokasi</span>
+            </h2>
+            <p className="text-slate-300 text-lg md:text-xl mb-12 leading-relaxed max-w-2xl mx-auto">
+              Ekspansi kami berfokus pada kemudahan akses bagi keluarga Anda. Temukan Toserba Selamat terdekat dan nikmati fasilitas modern di kota Anda.
+            </p>
+            <Link 
+              href="/locations" 
+              className="inline-flex items-center gap-3 bg-white text-slate-900 hover:bg-emerald-50 px-10 py-5 rounded-2xl font-bold text-lg w-max transition-all hover:scale-105 shadow-xl"
+            >
+              Lihat Peta Cabang <MapPin size={22} className="text-emerald-600" />
+            </Link>
+          </motion.div>
         </div>
       </section>
-    </>
+    </div>
   );
 }

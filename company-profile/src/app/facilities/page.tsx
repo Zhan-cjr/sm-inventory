@@ -1,134 +1,144 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { useCompanyProfile } from "@/lib/hooks";
 import { IconMapper } from "@/lib/icon-mapper";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Sparkles } from "lucide-react";
+import { useRef } from "react";
+
+// Parallax Image Component
+function ParallaxImage({ src, alt }: { src: string, alt: string }) {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"]
+  });
+  
+  const y = useTransform(scrollYProgress, [0, 1], ["-15%", "15%"]);
+
+  return (
+    <div ref={ref} className="relative w-full h-full overflow-hidden rounded-[2rem] shadow-2xl shadow-black/40 group">
+      <div className="absolute inset-0 bg-emerald-500/20 mix-blend-overlay z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <motion.img 
+        style={{ y, scale: 1.15 }}
+        src={src} 
+        alt={alt} 
+        className="w-full h-full object-cover origin-center"
+      />
+    </div>
+  );
+}
 
 export default function FacilitiesPage() {
   const { facilities, isLoading } = useCompanyProfile();
 
   if (isLoading) {
     return (
-      <div className="pt-40 pb-0 min-h-screen flex justify-center items-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-600"></div>
+      <div className="pt-40 pb-0 min-h-screen flex justify-center items-center bg-slate-950">
+        <div className="relative">
+          <div className="absolute inset-0 bg-emerald-500 blur-xl opacity-20 rounded-full animate-pulse" />
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-emerald-500 relative z-10"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="pt-28 pb-0 min-h-screen">
-      {/* Hero Section */}
-      <div className="container mx-auto px-4 mb-20">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center max-w-4xl mx-auto"
-        >
-          <h1 className="text-4xl md:text-6xl font-bold text-slate-900 mb-6 leading-tight">Fasilitas & Layanan <br className="hidden md:block"/> <span className="text-emerald-600">Terbaik untuk Anda</span></h1>
-          <p className="text-xl text-slate-600 leading-relaxed max-w-2xl mx-auto">
-            Eksplorasi 11 pilar layanan utama kami yang dirancang khusus untuk memenuhi gaya hidup, kebutuhan harian, hiburan, hingga relaksasi keluarga Anda.
-          </p>
-        </motion.div>
+    <div className="bg-slate-950 min-h-screen text-slate-50 relative overflow-hidden">
+      {/* Premium Hero Section */}
+      <div className="relative pt-40 pb-20 lg:pt-48 lg:pb-32 overflow-hidden border-b border-white/5">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[500px] bg-emerald-600/20 rounded-full blur-[150px] pointer-events-none" />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="text-center max-w-4xl mx-auto"
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel border-white/10 text-emerald-400 text-sm font-semibold tracking-widest uppercase mb-6"
+            >
+              <Sparkles size={16} /> Layanan Premium
+            </motion.div>
+            
+            <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-8 leading-[1.1] tracking-tight">
+              Fasilitas & Layanan <br className="hidden md:block"/> 
+              <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-600 text-gradient drop-shadow-sm">Terbaik untuk Anda</span>
+            </h1>
+            
+            <p className="text-xl md:text-2xl text-slate-400 leading-relaxed max-w-3xl mx-auto">
+              Eksplorasi ekosistem fasilitas kami yang dirancang khusus untuk memenuhi gaya hidup, kebutuhan harian, hiburan, hingga relaksasi keluarga Anda.
+            </p>
+          </motion.div>
+        </div>
       </div>
 
       {/* Facilities Sections */}
-      <div className="flex flex-col">
+      <div className="flex flex-col relative z-20">
         {facilities.map((facility: any, idx: number) => {
           const Icon = IconMapper[facility.icon] || ShoppingCart;
           const isEven = idx % 2 === 0;
           
-          // Determine theme classes based on index
-          const sectionClass = isEven ? "bg-slate-900 text-white" : "bg-white text-slate-900";
-          const titleClass = isEven ? "text-white" : "text-slate-900";
-          const descClass = isEven ? "text-slate-300" : "text-slate-600";
-          const iconBg = isEven ? "bg-white/10" : "bg-emerald-50";
-          const iconColor = isEven ? "text-emerald-400" : "text-emerald-600";
-          const borderColor = isEven ? "border-slate-800" : "border-slate-100";
-          const highlightText = isEven ? "text-emerald-400" : "text-emerald-600";
-          const dotColor = isEven ? "bg-emerald-500" : "bg-emerald-600";
-          const subtleText = isEven ? "text-slate-400" : "text-slate-500";
-
           return (
-            <motion.section 
+            <section 
               key={facility.id}
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.7 }}
-              className={`py-24 relative overflow-hidden ${sectionClass} ${!isEven && 'border-y border-slate-100'}`}
+              className={`py-24 lg:py-32 relative overflow-hidden border-b border-white/5`}
             >
-              {/* Optional background pattern for even sections */}
-              {isEven && (
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none" />
-              )}
-              
               <div className="container mx-auto px-4 relative z-10">
-                <div className={`flex flex-col md:flex-row items-center gap-12 lg:gap-24`}>
+                <div className={`flex flex-col lg:flex-row items-center gap-12 lg:gap-24`}>
                   
                   {/* Content */}
-                  <div className={`w-full md:w-1/2 ${isEven ? 'md:order-1' : 'md:order-2'}`}>
+                  <div className={`w-full lg:w-1/2 ${isEven ? 'lg:order-1' : 'lg:order-2'}`}>
                     <motion.div
                       initial={{ opacity: 0, x: isEven ? -50 : 50 }}
                       whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5, delay: 0.2 }}
+                      viewport={{ once: true, margin: "-100px" }}
+                      transition={{ duration: 0.8 }}
                     >
-                      <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-8 ${iconBg} ${iconColor} shadow-lg`}>
+                      <div className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center mb-8 glass-panel-dark border border-emerald-500/30 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
                         <Icon size={40} />
                       </div>
-                      <h2 className={`text-4xl lg:text-5xl font-bold mb-6 ${titleClass}`}>{facility.name}</h2>
-                      <p className={`text-xl leading-relaxed mb-8 ${descClass}`}>
+                      
+                      <h2 className="text-4xl lg:text-5xl font-bold mb-6 text-white tracking-tight">{facility.name}</h2>
+                      <p className="text-xl leading-relaxed mb-10 text-slate-400">
                         {facility.description}
                       </p>
                       
-                      <div className={`pt-6 border-t ${borderColor}`}>
-                        <ul className="space-y-4">
-                          <li className={`flex items-center gap-3 text-lg font-medium ${subtleText}`}>
-                            <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-                            Tersedia secara eksklusif di cabang-cabang pilihan kami.
+                      <div className="p-6 rounded-2xl glass-panel-dark border border-white/5 relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/5 to-emerald-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                        <ul className="space-y-4 relative z-10">
+                          <li className="flex items-start gap-4 text-lg text-slate-300">
+                            <div className="mt-1.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                            <span>Tersedia secara eksklusif di cabang-cabang pilihan kami dengan standar kualitas tertinggi.</span>
                           </li>
-                          <li className={`flex items-center gap-3 text-lg font-medium ${subtleText}`}>
-                            <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-                            Pelayanan profesional dan <span className={`font-bold ${highlightText}`}>berstandar tinggi</span>.
+                          <li className="flex items-start gap-4 text-lg text-slate-300">
+                            <div className="mt-1.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                            <span>Pelayanan profesional, ramah keluarga, dan <span className="font-bold text-emerald-400">berprinsip islami</span>.</span>
                           </li>
                         </ul>
                       </div>
                     </motion.div>
                   </div>
                   
-                  {/* Image/Visual */}
-                  <div className={`w-full md:w-1/2 ${isEven ? 'md:order-2' : 'md:order-1'}`}>
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      whileInView={{ opacity: 1, scale: 1 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5 }}
-                      className={`relative aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl ${isEven ? 'shadow-black/50' : 'shadow-slate-200/50'}`}
-                    >
-                      <img 
-                        src={facility.image_url 
-                          ? (facility.image_url.startsWith('http') ? facility.image_url : `/storage/${facility.image_url}`)
-                          : (isEven 
-                            ? "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=2574&auto=format&fit=crop" 
-                            : "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop")} 
-                        alt={facility.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                      />
-                      <div className={`absolute inset-0 bg-gradient-to-t ${isEven ? 'from-slate-900/80' : 'from-slate-900/40'} to-transparent`} />
-                      <div className="absolute bottom-6 left-6 right-6">
-                        <div className="bg-white/20 backdrop-blur-md border border-white/30 text-white p-4 rounded-xl">
-                          <p className="font-semibold text-lg flex items-center gap-2">
-                            <Icon size={20} /> Preview Ruang {facility.name}
-                          </p>
-                        </div>
-                      </div>
-                    </motion.div>
+                  {/* Image/Visual Parallax */}
+                  <div className={`w-full lg:w-1/2 aspect-square md:aspect-[4/3] lg:aspect-square ${isEven ? 'lg:order-2' : 'lg:order-1'} p-4 lg:p-8`}>
+                    <ParallaxImage 
+                      src={facility.image_url 
+                        ? (facility.image_url.startsWith('http') ? facility.image_url : `/storage/${facility.image_url}`)
+                        : (isEven 
+                          ? "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=2574&auto=format&fit=crop" 
+                          : "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop")}
+                      alt={facility.name}
+                    />
                   </div>
 
                 </div>
               </div>
-            </motion.section>
+            </section>
           );
         })}
       </div>
