@@ -49,10 +49,23 @@ export default function Home() {
   const [testimonials, setTestimonials] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://admin.toserbaselamat.id/api/v1'}/testimonials`)
-      .then(res => res.json())
-      .then(data => setTestimonials(data))
-      .catch(err => console.error(err));
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://admin.toserbaselamat.id/api/company-profile'}/testimonials`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch testimonials");
+        return res.json();
+      })
+      .then(data => {
+        if (Array.isArray(data)) {
+          setTestimonials(data);
+        } else {
+          console.error("Testimonials API did not return an array", data);
+          setTestimonials([]);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        setTestimonials([]);
+      });
   }, []);
 
   if (isLoading) {

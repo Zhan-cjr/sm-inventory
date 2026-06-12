@@ -26,14 +26,23 @@ export default function NewsPage() {
   const [filter, setFilter] = useState("Semua");
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://admin.toserbaselamat.id/api/v1'}/articles`)
-      .then(res => res.json())
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://admin.toserbaselamat.id/api/company-profile'}/articles`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch articles");
+        return res.json();
+      })
       .then(data => {
-        setArticles(data);
+        if (Array.isArray(data)) {
+          setArticles(data);
+        } else {
+          console.error("API did not return an array", data);
+          setArticles([]);
+        }
         setLoading(false);
       })
       .catch(err => {
         console.error(err);
+        setArticles([]);
         setLoading(false);
       });
   }, []);
