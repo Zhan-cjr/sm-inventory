@@ -35,4 +35,40 @@ class CompanyProfileController extends Controller
         $facilities = CPFacility::all();
         return response()->json($facilities);
     }
+
+    public function articles(Request $request)
+    {
+        $query = \App\Models\CPArticle::where('is_published', true);
+        
+        if ($request->has('type')) {
+            $query->where('type', $request->type);
+        }
+
+        $articles = $query->orderBy('published_at', 'desc')->get();
+        return response()->json($articles);
+    }
+
+    public function testimonials()
+    {
+        $testimonials = \App\Models\CPTestimonial::where('is_published', true)
+                            ->orderBy('created_at', 'desc')
+                            ->get();
+        return response()->json($testimonials);
+    }
+
+    public function storePartnership(Request $request)
+    {
+        $validated = $request->validate([
+            'business_name' => 'required|string|max:255',
+            'owner_name' => 'required|string|max:255',
+            'phone' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'category' => 'required|string|max:255',
+            'description' => 'required|string',
+        ]);
+
+        $partnership = \App\Models\CPPartnership::create($validated);
+
+        return response()->json(['message' => 'Partnership request submitted successfully', 'data' => $partnership], 201);
+    }
 }

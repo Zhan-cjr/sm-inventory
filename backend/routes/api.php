@@ -324,4 +324,7 @@ Route::prefix('company-profile')->group(function () {
     Route::get('/settings', [CompanyProfileController::class, 'settings']);
     Route::get('/branches', [CompanyProfileController::class, 'branches']);
     Route::get('/facilities', [CompanyProfileController::class, 'facilities']);
+    Route::get('/articles', [CompanyProfileController::class, 'articles']);
+    Route::get('/testimonials', [CompanyProfileController::class, 'testimonials']);
+    Route::post('/partnership', [CompanyProfileController::class, 'storePartnership']);
 });
