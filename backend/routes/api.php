@@ -318,7 +318,7 @@ Route::prefix('v1')->group(function () {
 });
 
 
-use App\Http\Controllers\API\CompanyProfileController;
+use App\Http\Controllers\Api\CompanyProfileController;
 
 Route::prefix('company-profile')->group(function () {
     Route::get('/settings', [CompanyProfileController::class, 'settings']);
