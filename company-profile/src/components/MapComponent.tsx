@@ -20,7 +20,14 @@ const icon = L.icon({
 function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(center, zoom, { duration: 1.5 });
+    // Only animate if the map container is visible (has size)
+    // This prevents "Invalid LatLng (NaN, NaN)" error when flyTo is called on a display:none container
+    const size = map.getSize();
+    if (size.x > 0 && size.y > 0) {
+      map.flyTo(center, zoom, { duration: 1.5 });
+    } else {
+      map.setView(center, zoom);
+    }
   }, [center, zoom, map]);
   return null;
 }
