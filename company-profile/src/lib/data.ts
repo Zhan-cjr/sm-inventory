@@ -1,15 +1,15 @@
-import { 
-  ShoppingCart, 
-  Shirt, 
-  Heart, 
-  Hotel, 
-  Coffee, 
-  Dumbbell, 
-  Activity, 
-  Gamepad2, 
-  Store, 
-  Scissors, 
-  Car 
+import {
+  ShoppingCart,
+  Shirt,
+  Heart,
+  Hotel,
+  Coffee,
+  Dumbbell,
+  Activity,
+  Gamepad2,
+  Store,
+  Scissors,
+  Car
 } from "lucide-react";
 
 export const facilities = [
@@ -115,6 +115,6 @@ export const branches = [
 export const companyStats = [
   { label: "Cabang Tersebar", value: "26+" },
   { label: "Unit Bisnis Utama", value: "11+" },
-  { label: "Karyawan", value: "2000+" },
-  { label: "Pelanggan Setia", value: "1 Juta+" },
+  { label: "Karyawan", value: "1000+" },
+  { label: "Pelanggan Setia", value: "5000+" },
 ];
