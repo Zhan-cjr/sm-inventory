@@ -17,7 +17,7 @@ server {
     }
 
     # Proxy untuk backend API
-    location /api {
+    location ^~ /api/ {
         # Sesuaikan URL dan port di bawah dengan port backend Laravel Anda (misalnya 8000 atau port lain)
         proxy_pass http://127.0.0.1:80;
         
@@ -29,7 +29,7 @@ server {
     }
 
     # Proxy Storage ke Laravel (untuk memuat gambar/icon dari backend)
-    location /storage {
+    location ^~ /storage/ {
         proxy_pass http://127.0.0.1:80;
         proxy_set_header Host admin.toserbaselamat.id;
         proxy_set_header X-Real-IP $remote_addr;

@@ -21,7 +21,9 @@ class CPFacilityForm
                     ->columnSpanFull(),
                 TextInput::make('icon'),
                 FileUpload::make('image_url')
-                    ->image(),
+                    ->image()
+                    ->disk('public')
+                    ->directory('facilities'),
             ]);
     }
 }
