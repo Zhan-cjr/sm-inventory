@@ -32,6 +32,8 @@ class CPArticleForm
                     ->required(),
                 RichEditor::make('content')
                     ->required()
+                    ->fileAttachmentsDisk('public')
+                    ->fileAttachmentsDirectory('articles')
                     ->columnSpanFull(),
                 FileUpload::make('image_url')
                     ->image()
