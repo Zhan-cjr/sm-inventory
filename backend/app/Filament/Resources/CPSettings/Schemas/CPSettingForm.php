@@ -26,20 +26,20 @@ class CPSettingForm
                     ->required(),
                 TextInput::make('value_string')
                     ->label('Nilai Setting')
-                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'string')
-                    ->required(fn (\Filament\Forms\Get $get) => $get('type') === 'string'),
+                    ->visible(fn ($get) => $get('type') === 'string')
+                    ->required(fn ($get) => $get('type') === 'string'),
                 Textarea::make('value_text')
                     ->label('Nilai Setting')
                     ->columnSpanFull()
-                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'text')
-                    ->required(fn (\Filament\Forms\Get $get) => $get('type') === 'text'),
+                    ->visible(fn ($get) => $get('type') === 'text')
+                    ->required(fn ($get) => $get('type') === 'text'),
                 \Filament\Forms\Components\FileUpload::make('value_image')
                     ->label('Upload Gambar')
                     ->image()
                     ->disk('public')
                     ->directory('settings')
-                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'image')
-                    ->required(fn (\Filament\Forms\Get $get) => $get('type') === 'image'),
+                    ->visible(fn ($get) => $get('type') === 'image')
+                    ->required(fn ($get) => $get('type') === 'image'),
             ]);
     }
 }
