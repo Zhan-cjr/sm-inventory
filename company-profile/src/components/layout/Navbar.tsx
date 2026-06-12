@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useCompanyProfile } from "@/lib/hooks";
 
 const navLinks = [
   { name: "Beranda", href: "/" },
@@ -18,6 +19,8 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+  const { settings } = useCompanyProfile();
+  const logoPath = settings?.['logo'];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -40,15 +43,17 @@ export function Navbar() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="bg-emerald-600 text-white p-2 rounded-lg group-hover:bg-emerald-700 transition-colors">
-              <ShoppingBag size={24} />
-            </div>
-            <span className={cn(
-              "font-bold text-xl tracking-tight transition-colors",
-              scrolled || isOpen ? "text-slate-900" : "text-slate-900 md:text-white"
-            )}>
-              Toserba <span className="text-emerald-600 md:text-inherit">Selamat</span>
-            </span>
+            {logoPath ? (
+              <img 
+                src={`/storage/${logoPath}`} 
+                alt="Logo" 
+                className="h-10 w-auto object-contain"
+              />
+            ) : (
+              <div className="bg-emerald-600 text-white p-2 rounded-lg group-hover:bg-emerald-700 transition-colors">
+                <ShoppingBag size={24} />
+              </div>
+            )}
           </Link>
 
           {/* Desktop Nav */}
@@ -59,8 +64,8 @@ export function Navbar() {
                 href={link.href}
                 className={cn(
                   "text-sm font-medium transition-colors hover:text-emerald-600",
-                  pathname === link.href 
-                    ? "text-emerald-600" 
+                  pathname === link.href
+                    ? "text-emerald-600"
                     : (scrolled ? "text-slate-600" : "text-white/90")
                 )}
               >
@@ -111,7 +116,7 @@ export function Navbar() {
                   {link.name}
                 </Link>
               ))}
-              <a 
+              <a
                 href="http://shopping.toserbaselamat.id"
                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-medium transition-colors mt-4 justify-center"
               >

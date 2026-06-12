@@ -14,12 +14,29 @@ class CPSettingForm
             ->components([
                 TextInput::make('key')
                     ->required(),
-                Textarea::make('value')
-                    ->columnSpanFull(),
-                TextInput::make('type')
-                    ->required()
-                    ->default('string'),
                 TextInput::make('label'),
+                \Filament\Forms\Components\Select::make('type')
+                    ->options([
+                        'string' => 'Teks Pendek',
+                        'text' => 'Teks Panjang / Paragraf',
+                        'image' => 'Gambar / Logo',
+                    ])
+                    ->default('string')
+                    ->live()
+                    ->required(),
+                TextInput::make('value')
+                    ->label('Nilai Setting')
+                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'string'),
+                Textarea::make('value')
+                    ->label('Nilai Setting')
+                    ->columnSpanFull()
+                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'text'),
+                \Filament\Forms\Components\FileUpload::make('value')
+                    ->label('Upload Gambar')
+                    ->image()
+                    ->disk('public')
+                    ->directory('settings')
+                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'image'),
             ]);
     }
 }
