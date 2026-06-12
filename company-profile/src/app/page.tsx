@@ -7,6 +7,7 @@ import { companyStats } from "@/lib/data";
 import { useCompanyProfile } from "@/lib/hooks";
 import { IconMapper } from "@/lib/icon-mapper";
 import { useEffect, useRef, useState } from "react";
+import { Star, Quote } from "lucide-react";
 
 // Counter animation component
 function AnimatedCounter({ value, label }: { value: string, label: string }) {
@@ -45,6 +46,14 @@ function AnimatedCounter({ value, label }: { value: string, label: string }) {
 
 export default function Home() {
   const { facilities, settings, isLoading } = useCompanyProfile();
+  const [testimonials, setTestimonials] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://admin.toserbaselamat.id/api/v1'}/testimonials`)
+      .then(res => res.json())
+      .then(data => setTestimonials(data))
+      .catch(err => console.error(err));
+  }, []);
 
   if (isLoading) {
     return (
@@ -188,6 +197,56 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Testimonials Section */}
+      {testimonials.length > 0 && (
+        <section className="py-24 bg-slate-950 relative overflow-hidden">
+          <div className="absolute top-1/2 left-0 w-96 h-96 bg-lime-500/10 rounded-full blur-[100px] pointer-events-none" />
+          <div className="container mx-auto px-4 max-w-7xl relative z-10">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
+                Apa Kata <span className="text-blue-500">Mereka</span>
+              </h2>
+              <p className="text-slate-400 text-base sm:text-lg">Pengalaman nyata dari pelanggan setia dan mitra kami.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {testimonials.slice(0, 3).map((testi, i) => (
+                <motion.div 
+                  key={testi.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  className="glass-panel-dark p-8 rounded-3xl border border-white/5 relative group hover:border-blue-500/30 transition-all"
+                >
+                  <Quote size={40} className="text-blue-500/20 absolute top-6 right-6" />
+                  <div className="flex gap-1 mb-6">
+                    {[...Array(5)].map((_, j) => (
+                      <Star key={j} size={18} className={j < testi.rating ? "text-yellow-400 fill-yellow-400" : "text-slate-600"} />
+                    ))}
+                  </div>
+                  <p className="text-slate-300 italic mb-8 relative z-10 leading-relaxed">&quot;{testi.content}&quot;</p>
+                  
+                  <div className="flex items-center gap-4 mt-auto">
+                    {testi.avatar_url ? (
+                      <img src={`https://admin.toserbaselamat.id/storage/${testi.avatar_url}`} alt={testi.customer_name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-bold text-white">
+                        {testi.customer_name.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="text-white font-bold text-sm">{testi.customer_name}</h4>
+                      {testi.role && <p className="text-slate-500 text-xs">{testi.role}</p>}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Premium CTA Section */}
       <section className="py-16 sm:py-24 relative overflow-hidden">

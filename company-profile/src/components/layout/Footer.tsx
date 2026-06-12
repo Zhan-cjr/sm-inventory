@@ -54,6 +54,15 @@ export function Footer() {
               <li>
                 <Link href="/careers" className="hover:text-blue-600 transition-colors text-sm">Karir</Link>
               </li>
+              <li>
+                <Link href="/news" className="hover:text-blue-600 transition-colors text-sm">Berita & Promo</Link>
+              </li>
+              <li>
+                <Link href="/partnership" className="hover:text-blue-600 transition-colors text-sm">Peluang Kemitraan</Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-blue-600 transition-colors text-sm">Hubungi Kami</Link>
+              </li>
             </ul>
           </div>
 

@@ -13,6 +13,10 @@ const navLinks = [
   { name: "Tentang Kami", href: "/about" },
   { name: "Fasilitas", href: "/facilities" },
   { name: "Lokasi Cabang", href: "/locations" },
+  { name: "Berita", href: "/news" },
+  { name: "Kemitraan", href: "/partnership" },
+  { name: "Karir", href: "/careers" },
+  { name: "Hubungi Kami", href: "/contact" },
 ];
 
 export function Navbar() {
