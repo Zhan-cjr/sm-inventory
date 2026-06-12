@@ -106,11 +106,12 @@ export default function FacilitiesPage() {
                       transition={{ duration: 0.5 }}
                       className={`relative aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl ${isEven ? 'shadow-black/50' : 'shadow-slate-200/50'}`}
                     >
-                      {/* Image Placeholder depending on theme */}
                       <img 
-                        src={isEven 
-                          ? "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=2574&auto=format&fit=crop" 
-                          : "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop"} 
+                        src={facility.image_url 
+                          ? (facility.image_url.startsWith('http') ? facility.image_url : `/storage/${facility.image_url}`)
+                          : (isEven 
+                            ? "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=2574&auto=format&fit=crop" 
+                            : "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=2574&auto=format&fit=crop")} 
                         alt={facility.name} 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                       />
