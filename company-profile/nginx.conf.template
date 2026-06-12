@@ -16,6 +16,16 @@ server {
         try_files $uri $uri.html $uri/ =404;
     }
 
+    # Proxy untuk backend API
+    location /api {
+        # Sesuaikan URL dan port di bawah dengan port backend Laravel Anda (misalnya 8000 atau port lain)
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
     # (Opsional) Nonaktifkan log untuk favicon yang hilang
     location = /favicon.ico { access_log off; log_not_found off; }
     location = /robots.txt  { access_log off; log_not_found off; }

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const API_BASE_URL = 'http://api-sminventory/api/company-profile';
-
+const API_BASE_URL = '/api/company-profile';
 export function useCompanyProfile() {
   const [settings, setSettings] = useState<any>(null);
   const [facilities, setFacilities] = useState<any[]>([]);
