@@ -24,19 +24,22 @@ class CPSettingForm
                     ->default('string')
                     ->live()
                     ->required(),
-                TextInput::make('value')
+                TextInput::make('value_string')
                     ->label('Nilai Setting')
-                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'string'),
-                Textarea::make('value')
+                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'string')
+                    ->required(fn (\Filament\Forms\Get $get) => $get('type') === 'string'),
+                Textarea::make('value_text')
                     ->label('Nilai Setting')
                     ->columnSpanFull()
-                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'text'),
-                \Filament\Forms\Components\FileUpload::make('value')
+                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'text')
+                    ->required(fn (\Filament\Forms\Get $get) => $get('type') === 'text'),
+                \Filament\Forms\Components\FileUpload::make('value_image')
                     ->label('Upload Gambar')
                     ->image()
                     ->disk('public')
                     ->directory('settings')
-                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'image'),
+                    ->visible(fn (\Filament\Forms\Get $get) => $get('type') === 'image')
+                    ->required(fn (\Filament\Forms\Get $get) => $get('type') === 'image'),
             ]);
     }
 }
