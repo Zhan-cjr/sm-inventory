@@ -17,6 +17,10 @@ class CPPartnershipForm
                     ->required(),
                 TextInput::make('owner_name')
                     ->required(),
+                FileUpload::make('image_url')
+                    ->image()
+                    ->disk('public')
+                    ->directory('partnerships'),
                 TextInput::make('phone')
                     ->tel()
                     ->required(),

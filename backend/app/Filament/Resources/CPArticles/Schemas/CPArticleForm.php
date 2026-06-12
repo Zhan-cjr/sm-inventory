@@ -35,7 +35,9 @@ class CPArticleForm
                     ->columnSpanFull(),
                 FileUpload::make('image_url')
                     ->image()
-                    ->directory('articles'),
+                    ->disk('public')
+                    ->directory('articles')
+                    ->columnSpanFull(),
                 Toggle::make('is_published')
                     ->required(),
                 DateTimePicker::make('published_at'),

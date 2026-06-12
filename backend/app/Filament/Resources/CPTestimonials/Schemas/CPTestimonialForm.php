@@ -22,6 +22,7 @@ class CPTestimonialForm
                     ->columnSpanFull(),
                 FileUpload::make('avatar_url')
                     ->image()
+                    ->disk('public')
                     ->avatar()
                     ->directory('testimonials'),
                 TextInput::make('rating')
