@@ -161,9 +161,10 @@ export default function NewsPage() {
                   <div className="text-slate-400 text-sm leading-relaxed mb-6 line-clamp-3" dangerouslySetInnerHTML={{ __html: article.content }}></div>
                   
                   <div className="mt-auto pt-4 border-t border-white/10">
-                    <button className="text-blue-400 font-medium text-sm flex items-center gap-2 group-hover:text-blue-300 transition-colors">
-                      Baca Selengkapnya <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                    </button>
+                    <Link href={`/news/${article.slug}`} className="text-red-400 font-semibold hover:text-red-300 flex items-center gap-2 group/link text-sm mt-auto">
+                    Baca Selengkapnya 
+                    <ArrowRight size={16} className="group-hover/link:translate-x-1 transition-transform" />
+                  </Link>
                   </div>
                 </div>
               </motion.div>
