@@ -117,7 +117,7 @@ export default function NewsPage() {
                 <div className="relative h-56 overflow-hidden bg-slate-800">
                   {article.image_url ? (
                     <img 
-                      src={`https://admin.toserbaselamat.id/storage/${article.image_url}`} 
+                      src={`${new URL(process.env.NEXT_PUBLIC_API_URL || 'https://admin.toserbaselamat.id').origin}/storage/${article.image_url}`} 
                       alt={article.title} 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />

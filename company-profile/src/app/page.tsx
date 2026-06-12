@@ -230,7 +230,7 @@ export default function Home() {
                   
                   <div className="flex items-center gap-4 mt-auto">
                     {testi.avatar_url ? (
-                      <img src={`https://admin.toserbaselamat.id/storage/${testi.avatar_url}`} alt={testi.customer_name} className="w-12 h-12 rounded-full object-cover" />
+                      <img src={`${new URL(process.env.NEXT_PUBLIC_API_URL || 'https://admin.toserbaselamat.id').origin}/storage/${testi.avatar_url}`} alt={testi.customer_name} className="w-12 h-12 rounded-full object-cover" />
                     ) : (
                       <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-bold text-white">
                         {testi.customer_name.charAt(0)}
