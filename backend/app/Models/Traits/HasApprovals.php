@@ -86,6 +86,10 @@ trait HasApprovals
         ]);
         
         $this->update(['status' => 'approved']);
+
+        if (method_exists($this, 'onApproved')) {
+            $this->onApproved();
+        }
     }
 
     public function reject($userId, $notes = null)

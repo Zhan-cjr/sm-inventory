@@ -13,7 +13,7 @@ class Supplier extends Model
 
     protected $fillable = [
         'organization_id', 'code', 'name', 'contact_person', 
-        'phone', 'email', 'address', 'is_active', 'default_due_days', 'payment_method', 'is_consignment'
+        'phone', 'email', 'address', 'is_active', 'default_due_days', 'default_po_expired_days', 'payment_method', 'is_consignment'
     ];
 
     protected $casts = [

@@ -543,19 +543,27 @@ class GoodsReceiptPos extends Component
 
     public function render()
     {
-        $purchaseOrdersQuery = PurchaseOrder::whereIn('status', ['DRAFT', 'SENT', 'APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
-            ->whereHas('items', function ($query) {
-                $query->whereColumn('quantity_received', '<', 'quantity_ordered');
-            });
-        
-        if ($this->supplier_id) {
-            $purchaseOrdersQuery->where('supplier_id', $this->supplier_id);
+        $purchaseOrdersQuery = PurchaseOrder::where(function ($q) {
+            $q->whereIn('status', ['DRAFT', 'SENT', 'APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
+              ->whereHas('items', function ($query) {
+                  $query->whereColumn('quantity_received', '<', 'quantity_ordered');
+              })
+              ->where(function ($sub) {
+                  $sub->whereNull('expired_date')
+                      ->orWhere('expired_date', '>=', now()->toDateString());
+              });
             
-            if ($this->only_latest_po) {
-                $purchaseOrdersQuery->latest('created_at')->limit(1);
+            if ($this->supplier_id) {
+                $q->where('supplier_id', $this->supplier_id);
+            } else {
+                $q->where('id', null);
             }
-        } else {
-            $purchaseOrdersQuery->where('id', null); // Don't show any PO if no supplier is selected
+        });
+
+        if ($this->purchase_order_id) {
+            $purchaseOrdersQuery->orWhere('id', $this->purchase_order_id);
+        } else if ($this->supplier_id && $this->only_latest_po) {
+            $purchaseOrdersQuery->latest('created_at')->limit(1);
         }
 
         return view('livewire.goods-receipt-pos', [

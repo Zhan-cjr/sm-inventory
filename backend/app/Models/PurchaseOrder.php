@@ -24,16 +24,38 @@ class PurchaseOrder extends Model
     protected $fillable = [
         'organization_id', 'branch_id', 'supplier_id', 'po_number', 
         'po_date', 'faktur', 'expected_delivery_date', 'status', 
-        'total_amount', 'include_tax', 'tax_amount', 'notes', 'created_by'
+        'total_amount', 'include_tax', 'tax_amount', 'notes', 'created_by',
+        'po_expired_days', 'expired_date'
     ];
 
     protected $casts = [
         'po_date' => 'date',
         'expected_delivery_date' => 'date',
+        'expired_date' => 'date',
         'total_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'include_tax' => 'boolean',
     ];
+
+    protected static function booted()
+    {
+        static::saving(function ($po) {
+            if ($po->isDirty('expired_date') || $po->isDirty('po_date')) {
+                if ($po->expired_date && $po->po_date) {
+                    $po->po_expired_days = $po->po_date->diffInDays($po->expired_date, false);
+                }
+            }
+        });
+    }
+
+    public function onApproved()
+    {
+        if ($this->po_expired_days > 0) {
+            $this->update([
+                'expired_date' => now()->addDays($this->po_expired_days)->format('Y-m-d')
+            ]);
+        }
+    }
 
     public function organization(): BelongsTo
     {

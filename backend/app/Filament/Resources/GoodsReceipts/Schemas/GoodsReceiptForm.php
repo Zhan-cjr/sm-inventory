@@ -20,8 +20,21 @@ class GoodsReceiptForm
                     ->relationship(
                         name: 'purchaseOrder', 
                         titleAttribute: 'po_number', 
-                        modifyQueryUsing: fn (\Illuminate\Database\Eloquent\Builder $query) => $query->where('status', 'approved')
+                        modifyQueryUsing: function (\Illuminate\Database\Eloquent\Builder $query, ?\Illuminate\Database\Eloquent\Model $record) {
+                            $query->where(function ($sub) {
+                                $sub->where('status', 'approved')
+                                    ->where(function ($q) {
+                                        $q->whereNull('expired_date')
+                                          ->orWhere('expired_date', '>=', now()->toDateString());
+                                    });
+                            });
+
+                            if ($record && $record->purchase_order_id) {
+                                $query->orWhere('id', $record->purchase_order_id);
+                            }
+                        }
                     )
+                    ->disabledOn('edit')
                     ->searchable()
                     ->preload(),
                 Select::make('supplier_id')
@@ -51,6 +64,7 @@ class GoodsReceiptForm
                     ->required(),
                 DateTimePicker::make('receipt_date')
                     ->required()
+                    ->disabledOn('edit')
                     ->live()
                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
                         $supplierId = $get('supplier_id');

@@ -46,7 +46,7 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Tgl Terima</td>
-                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model.live="receipt_date"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model.live="receipt_date" @if($goodsReceipt) disabled style="background-color: #e5e7eb; cursor: not-allowed;" @endif></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Metode Bayar</td>
@@ -66,7 +66,7 @@
                         <td class="pos-label">Pilih PO (Opsional)</td>
                         <td>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <select class="pos-input" wire:model.live="purchase_order_id" style="border-color: #3b82f6; flex: 1;" @if(!$supplier_id) disabled title="Pilih supplier terlebih dahulu" @endif>
+                                <select class="pos-input" wire:model.live="purchase_order_id" style="border-color: #3b82f6; flex: 1;" @if($goodsReceipt) disabled style="background-color: #e5e7eb; cursor: not-allowed;" @elseif(!$supplier_id) disabled title="Pilih supplier terlebih dahulu" @endif>
                                     <option value="">-- Penerimaan Tanpa PO --</option>
                                     @foreach($purchaseOrders as $po)
                                         <option value="{{ $po->id }}">{{ $po->po_number }}</option>

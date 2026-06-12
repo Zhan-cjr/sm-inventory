@@ -35,6 +35,11 @@ class DocumentPrintController extends Controller
             case 'po':
                 $documents = PurchaseOrder::with(['supplier', 'branch', 'items.product', 'creator'])
                     ->whereIn('id', $ids)->get();
+                foreach ($documents as $doc) {
+                    if ($doc->expired_date && $doc->expired_date < now()->toDateString()) {
+                        abort(403, 'PO ' . $doc->po_number . ' sudah kadaluwarsa dan tidak dapat dicetak.');
+                    }
+                }
                 $viewName = 'print.documents.purchase-order';
                 $title = 'Nota Pesanan Pembelian';
                 break;

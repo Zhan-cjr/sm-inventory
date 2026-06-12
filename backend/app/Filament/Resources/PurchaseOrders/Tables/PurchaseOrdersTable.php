@@ -37,6 +37,10 @@ class PurchaseOrdersTable
                 TextColumn::make('expected_delivery_date')
                     ->date()
                     ->sortable(),
+                TextColumn::make('expired_date')
+                    ->label('Tgl Kedaluwarsa')
+                    ->date()
+                    ->sortable(),
                 TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -92,7 +96,7 @@ class PurchaseOrdersTable
                     ->color('info')
                     ->url(fn (\App\Models\PurchaseOrder $record) => route('print.document', ['type' => 'po', 'ids' => [$record->id]]))
                     ->openUrlInNewTab()
-                    ->visible(fn (\App\Models\PurchaseOrder $record) => strtolower($record->status) === 'approved'),
+                    ->visible(fn (\App\Models\PurchaseOrder $record) => strtolower($record->status) === 'approved' && (!$record->expired_date || $record->expired_date >= now()->toDateString())),
                 Action::make('request_approval')
                     ->label('Request Approval')
                     ->icon('heroicon-o-paper-airplane')

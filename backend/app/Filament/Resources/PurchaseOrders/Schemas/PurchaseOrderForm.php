@@ -31,12 +31,36 @@ class PurchaseOrderForm
                     ->relationship('supplier', 'name')
                     ->required()
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->live()
+                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        if ($state) {
+                            $supplier = \App\Models\Supplier::find($state);
+                            if ($supplier && $get('po_date') && $supplier->default_po_expired_days > 0) {
+                                $poDate = \Carbon\Carbon::parse($get('po_date'));
+                                $set('expired_date', $poDate->addDays($supplier->default_po_expired_days)->format('Y-m-d'));
+                            }
+                        }
+                    }),
                 TextInput::make('po_number')
                     ->required(),
                 DatePicker::make('po_date')
-                    ->required(),
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        $supplierId = $get('supplier_id');
+                        if ($supplierId && $state) {
+                            $supplier = \App\Models\Supplier::find($supplierId);
+                            if ($supplier && $supplier->default_po_expired_days > 0) {
+                                $poDate = \Carbon\Carbon::parse($state);
+                                $set('expired_date', $poDate->addDays($supplier->default_po_expired_days)->format('Y-m-d'));
+                            }
+                        }
+                    }),
                 DatePicker::make('expected_delivery_date'),
+                DatePicker::make('expired_date')
+                    ->label('Tgl Kadaluwarsa (Expired PO)')
+                    ->disabledOn('edit'),
                 TextInput::make('status')
                     ->required()
                     ->default('DRAFT'),

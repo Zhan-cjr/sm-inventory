@@ -33,6 +33,11 @@ class SupplierForm
                     ->numeric()
                     ->default(0)
                     ->helperText('0 = Cash/COD. Di atas 0 = Tempo (Kredit)'),
+                TextInput::make('default_po_expired_days')
+                    ->label('Expired PO Default (Hari)')
+                    ->numeric()
+                    ->default(0)
+                    ->helperText('0 = Tidak ada expired. Di atas 0 = Otomatis set expired PO berdasarkan Approval Date + jumlah hari ini.'),
                 Select::make('payment_method')
                     ->label('Cara Pembayaran Default')
                     ->options([

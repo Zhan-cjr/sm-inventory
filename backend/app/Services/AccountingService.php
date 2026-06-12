@@ -312,13 +312,13 @@ class AccountingService
             return false;
         }
 
-        // Cek jika Jurnal sudah pernah dibuat
         $existingJournal = JournalEntry::where('journalable_id', $receipt->id)
             ->where('journalable_type', \App\Models\GoodsReceipt::class)
             ->first();
             
         if ($existingJournal) {
-            return false;
+            $existingJournal->lines()->delete();
+            $existingJournal->delete();
         }
 
         // 2. Buat Header Jurnal
@@ -412,13 +412,13 @@ class AccountingService
             return false;
         }
 
-        // Cek jika Jurnal sudah pernah dibuat
         $existingJournal = JournalEntry::where('journalable_id', $return->id)
             ->where('journalable_type', \App\Models\PurchaseReturn::class)
             ->first();
             
         if ($existingJournal) {
-            return false;
+            $existingJournal->lines()->delete();
+            $existingJournal->delete();
         }
 
         // 2. Buat Header Jurnal
@@ -508,13 +508,13 @@ class AccountingService
             return false;
         }
 
-        // Cek jika Jurnal sudah pernah dibuat
         $existingJournal = JournalEntry::where('journalable_id', $order->id)
             ->where('journalable_type', \App\Models\EcommerceOrder::class)
             ->first();
             
         if ($existingJournal) {
-            return false;
+            $existingJournal->lines()->delete();
+            $existingJournal->delete();
         }
 
         // 2. Buat Header Jurnal
@@ -671,7 +671,8 @@ class AccountingService
             ->first();
             
         if ($existingJournal) {
-            return false;
+            $existingJournal->lines()->delete();
+            $existingJournal->delete();
         }
 
         // Kalkulasi Total Plus dan Minus berdasarkan Harga Pokok
@@ -790,7 +791,8 @@ class AccountingService
             ->first();
             
         if ($existingJournal) {
-            return false;
+            $existingJournal->lines()->delete();
+            $existingJournal->delete();
         }
 
         $totalLoss = 0; 

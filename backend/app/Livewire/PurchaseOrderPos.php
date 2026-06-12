@@ -14,6 +14,7 @@ class PurchaseOrderPos extends Component
 {
     public $po_number;
     public $po_date;
+    public $expired_date;
     public $faktur;
     public $branch_id;
     public $notes;
@@ -46,6 +47,7 @@ class PurchaseOrderPos extends Component
             
             $this->po_number = $purchaseOrder->po_number;
             $this->po_date = $purchaseOrder->po_date;
+            $this->expired_date = $purchaseOrder->expired_date;
             $this->faktur = $purchaseOrder->faktur;
             $this->branch_id = $purchaseOrder->branch_id;
             $this->notes = $purchaseOrder->notes;
@@ -109,10 +111,27 @@ class PurchaseOrderPos extends Component
         }
     }
 
-    public function updatedSupplierId()
+    public function updatedSupplierId($value)
     {
         $this->cart = [];
         $this->calculateTotals();
+        
+        $supplier = Supplier::find($value);
+        if ($supplier && $this->po_date && $supplier->default_po_expired_days > 0) {
+            $this->expired_date = \Carbon\Carbon::parse($this->po_date)->addDays($supplier->default_po_expired_days)->format('Y-m-d');
+        } else {
+            $this->expired_date = null;
+        }
+    }
+
+    public function updatedPoDate($value)
+    {
+        if ($this->supplier_id && $value) {
+            $supplier = Supplier::find($this->supplier_id);
+            if ($supplier && $supplier->default_po_expired_days > 0) {
+                $this->expired_date = \Carbon\Carbon::parse($value)->addDays($supplier->default_po_expired_days)->format('Y-m-d');
+            }
+        }
     }
 
     public function selectProduct($productId)
@@ -418,6 +437,7 @@ class PurchaseOrderPos extends Component
             'supplier_id' => $this->supplier_id,
             'po_number' => $this->po_number,
             'po_date' => $this->po_date,
+            'expired_date' => empty($this->expired_date) ? null : $this->expired_date,
             'faktur' => $this->faktur,
             'status' => $status,
             'total_amount' => $this->grandTotal,

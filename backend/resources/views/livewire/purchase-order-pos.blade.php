@@ -46,7 +46,11 @@
                     </tr>
                     <tr>
                         <td class="pos-label">Tanggal</td>
-                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="po_date"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model.live="po_date"></td>
+                    </tr>
+                    <tr>
+                        <td class="pos-label">Tgl Kedaluwarsa</td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="expired_date" @if($purchaseOrder) disabled style="background-color: #e5e7eb; cursor: not-allowed;" @endif></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Faktur</td>
