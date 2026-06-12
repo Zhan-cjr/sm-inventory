@@ -64,18 +64,18 @@ export default function LocationsPage() {
       <div className="flex-1 flex flex-col md:flex-row relative bg-white border-t border-slate-200">
         
         {/* Sidebar List */}
-        <div className="w-full md:w-[400px] h-[50vh] md:h-[calc(100vh-220px)] overflow-y-auto bg-white border-r border-slate-200 z-10 p-5 space-y-5">
+        <div className="w-full md:w-[400px] h-[calc(100vh-220px)] overflow-y-auto bg-white border-r border-slate-200 z-10 p-5 space-y-5 custom-scrollbar">
           {filteredBranches.map((branch) => (
             <div 
               key={branch.id}
               onClick={() => setSelectedBranch(branch)}
-              className={`p-5 rounded-2xl border cursor-pointer transition-all ${
+              className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col ${
                 selectedBranch?.id === branch.id 
-                  ? 'border-emerald-500 bg-emerald-50/50 shadow-md ring-1 ring-emerald-500' 
-                  : 'border-slate-200 hover:border-emerald-300 hover:shadow-md'
+                  ? 'border-emerald-500 bg-emerald-50/30 shadow-lg ring-1 ring-emerald-500' 
+                  : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-md'
               }`}
             >
-              <h3 className="font-bold text-lg text-slate-900 mb-2">{branch.name}</h3>
+              <h3 className="font-bold text-lg text-slate-900 mb-3">{branch.name}</h3>
               
               <div className="flex items-start gap-3 text-slate-600 mb-3">
                 <MapPin size={18} className="shrink-0 text-emerald-600 mt-0.5" />
@@ -86,7 +86,7 @@ export default function LocationsPage() {
                 <p className="text-sm font-medium">{branch.open_hours}</p>
               </div>
               
-              <div className="pt-4 border-t border-slate-200">
+              <div className="pt-4 border-t border-slate-100 mb-4">
                 <p className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Fasilitas Cabang:</p>
                 <div className="flex flex-wrap gap-2">
                   {branch.facilities.map((facId: string) => {
@@ -94,7 +94,7 @@ export default function LocationsPage() {
                     if (!fac) return null;
                     const Icon = IconMapper[fac.icon] || MapPin;
                     return (
-                      <div key={fac.id} className="bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg flex items-center gap-2 text-slate-600" title={fac.name}>
+                      <div key={fac.id} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg flex items-center gap-2 text-slate-600 shadow-sm" title={fac.name}>
                         <Icon size={14} className="text-emerald-600" />
                         <span className="text-xs font-medium">{fac.name}</span>
                       </div>
@@ -102,20 +102,33 @@ export default function LocationsPage() {
                   })}
                 </div>
               </div>
+
+              <div className="mt-auto pt-2">
+                <a 
+                  href={`https://maps.google.com/?q=${branch.lat},${branch.lng}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
+                >
+                  <MapPin size={16} /> Buka di Google Maps
+                </a>
+              </div>
             </div>
           ))}
           {filteredBranches.length === 0 && (
             <div className="text-center py-10">
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="text-slate-400" size={24} />
+               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="text-slate-300" size={24} />
               </div>
-              <p className="text-slate-500">Cabang tidak ditemukan.</p>
+              <p className="text-slate-500 font-medium">Cabang tidak ditemukan.</p>
+              <p className="text-slate-400 text-sm mt-1">Coba gunakan kata kunci lain.</p>
             </div>
           )}
         </div>
 
-        {/* Map View */}
-        <div className="flex-1 h-[50vh] md:h-[calc(100vh-220px)] bg-slate-100 relative z-0">
+        {/* Map View - Hidden on mobile, shown on desktop */}
+        <div className="hidden md:block flex-1 h-[calc(100vh-220px)] bg-slate-100 relative z-0">
           <DynamicMap 
             branches={filteredBranches}
             selectedBranch={selectedBranch}
