@@ -102,7 +102,14 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const cat = params.get('category');
+      if (cat) return cat;
+    }
+    return 'all';
+  });
   const [checkoutSuccessOrder, setCheckoutSuccessOrder] = useState<any | null>(null);
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);

@@ -4,7 +4,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { useCompanyProfile } from "@/lib/hooks";
 import { IconMapper } from "@/lib/icon-mapper";
 import { ShoppingCart, Sparkles } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 
 // Parallax Image Component
 function ParallaxImage({ src, alt }: { src: string, alt: string }) {
@@ -31,6 +31,22 @@ function ParallaxImage({ src, alt }: { src: string, alt: string }) {
 
 export default function FacilitiesPage() {
   const { facilities, isLoading } = useCompanyProfile();
+
+  useEffect(() => {
+    if (!isLoading && facilities.length > 0) {
+      const hash = window.location.hash;
+      if (hash) {
+        setTimeout(() => {
+          const element = document.querySelector(hash);
+          if (element) {
+            // Offset for fixed navbar if any, otherwise standard scrollIntoView
+            const y = element.getBoundingClientRect().top + window.scrollY - 100;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+          }
+        }, 300);
+      }
+    }
+  }, [isLoading, facilities]);
 
   if (isLoading) {
     return (

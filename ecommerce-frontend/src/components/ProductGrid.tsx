@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, Star, PackageOpen, Sparkles, Check, Plus } from 'lucide-react';
 import { ProductImage } from './ProductImage';
 import { useEcom, Product } from '../context/EcomContext';
@@ -249,8 +249,13 @@ const ProductGrid = () => {
     fetchProducts();
   }, [selectedBranch]);
 
-  // Reset selected category filter when branch changes
+  // Reset selected category filter when branch changes, except on initial load
+  const isFirstBranchLoad = useRef(true);
   useEffect(() => {
+    if (isFirstBranchLoad.current) {
+      isFirstBranchLoad.current = false;
+      return;
+    }
     setSelectedCategory('all');
   }, [selectedBranch]);
 
