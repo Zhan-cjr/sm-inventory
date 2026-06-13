@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Printer, X } from 'lucide-react';
 import Barcode from 'react-barcode';
 
-const generateRawTextReceipt = (transaction, branchSettings, autoPrintSettings, columns = 32) => {
+const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, columns = 32) => {
   const { 
     items, totalAmount, discountAmount, finalAmount, paymentMethod, 
     terminalId, receivedAmount, changeAmount, branchName, branchAddress, orgName, 
@@ -64,7 +64,6 @@ const generateRawTextReceipt = (transaction, branchSettings, autoPrintSettings, 
     }
   }
 
-  const isHeaderBottom = branchSettings?.receipt_type == 2 || autoPrintSettings?.receiptType == 2;
   const headerOutputLines = [];
 
   if (headerLines.length === 0) {
@@ -250,7 +249,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
   const handlePrintRawText = () => {
     // Removed ESC p 0 25 250 (Buka Cash Drawer 1) due to null bytes blocking print dialogs
-    const rawText = generateRawTextReceipt(transaction, branchSettings, autoPrintSettings, 35);
+    const rawText = generateRawTextReceipt(transaction, branchSettings, isHeaderBottom, 35);
     
     if (window.electronAPI && window.electronAPI.printRaw) {
       window.electronAPI.printRaw(rawText, autoPrintSettings?.printerName).then(() => {
