@@ -197,7 +197,8 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
   }
   
   if (isHeaderBottom) {
-    lines.push(...headerOutputLines);
+    lines.push(divider);
+    lines.push(...headerOutputLines.filter(l => l !== divider));
   }
 
   // Feed paper (5 lines) to allow tearing
@@ -214,6 +215,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
   };
 
   const hasPrinted = useRef(false);
+  const isHeaderBottom = branchSettings?.receipt_type == 2 || autoPrintSettings?.receiptType == 2;
 
   const executeGraphicPrint = () => {
     if (window.electronAPI) {
@@ -339,7 +341,6 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
   const isHidden = autoPrintSettings?.autoPrint;
   const overlayStyle = isHidden ? { position: 'fixed', top: 0, left: 0, width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' } : {};
-  const isHeaderBottom = branchSettings?.receipt_type == 2 || autoPrintSettings?.receiptType == 2;
 
   return (
     <div className={isHidden ? "" : "change-modal-overlay"} style={overlayStyle}>
