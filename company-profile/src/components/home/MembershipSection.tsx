@@ -24,6 +24,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import MembershipModal from "./MembershipModal";
+import TransactionHistoryModal from "./TransactionHistoryModal";
 
 export default function MembershipSection() {
   const [member, setMember] = useState<any>(null);
@@ -33,6 +34,7 @@ export default function MembershipSection() {
   const [alertMessage, setAlertMessage] = useState("Silakan Masuk / Daftar terlebih dahulu.");
   const [showQRModal, setShowQRModal] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -317,7 +319,7 @@ export default function MembershipSection() {
               </Link>
 
               <button 
-                onClick={() => handleRequiresAuth(() => console.log('Buka Riwayat Transaksi'))} 
+                onClick={() => handleRequiresAuth(() => setShowHistoryModal(true))} 
                 className="flex flex-col items-center group text-center bg-transparent border-none p-0 outline-none"
               >
                 <div className="w-14 h-14 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 mb-3 group-hover:bg-purple-100 transition-colors mx-auto">
@@ -335,6 +337,12 @@ export default function MembershipSection() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleModalSuccess}
+      />
+      
+      <TransactionHistoryModal 
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        member={member}
       />
     </section>
   );
