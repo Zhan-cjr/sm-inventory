@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Printer, X } from 'lucide-react';
 import Barcode from 'react-barcode';
 
-const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, columns = 32, autoPrintSettings = null) => {
+const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, columns = 32) => {
   const {
     items, totalAmount, discountAmount, finalAmount, paymentMethod,
     terminalId, receivedAmount, changeAmount, branchName, branchAddress, orgName,
@@ -197,8 +197,6 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
   }
 
   if (isHeaderBottom) {
-    // Feed 4 baris setelah footer dan sebelum header
-    lines.push('\n\n\n\n');
     lines.push(divider);
     lines.push(...headerOutputLines.filter(l => l !== divider));
   }
@@ -253,7 +251,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
   const handlePrintRawText = () => {
     // Removed ESC p 0 25 250 (Buka Cash Drawer 1) due to null bytes blocking print dialogs
-    const rawText = generateRawTextReceipt(transaction, branchSettings, isHeaderBottom, 35, autoPrintSettings);
+    const rawText = generateRawTextReceipt(transaction, branchSettings, isHeaderBottom, 35);
 
     if (window.electronAPI && window.electronAPI.printRaw) {
       window.electronAPI.printRaw(rawText, autoPrintSettings?.printerName).then(() => {
@@ -540,8 +538,6 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
           {isHeaderBottom && (
             <div className="receipt-header" style={{ marginTop: '1rem', borderTop: '1px dashed #ccc', paddingTop: '1rem' }}>
-              {/* Feed 4 baris sebelum header bawah */}
-              <div style={{ height: '3.5rem' }}></div>
               {!!branchSettings?.receipt_show_logo && (
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.6rem' }}>
                   <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -173,8 +173,7 @@ export const POSTransaction = ({
   const [isPrinterSettingsOpen, setIsPrinterSettingsOpen] = useState(false);
   const [localPrinterSettings, setLocalPrinterSettings] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('pos_printer_settings'));
-      return saved || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
+      return JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
     } catch (e) {
       return { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
     }
@@ -298,12 +297,11 @@ export const POSTransaction = ({
     if (window.electronAPI) {
       window.electronAPI.getConfig().then(config => {
         if (config) {
-          setLocalPrinterSettings(prev => ({
-            ...prev,
+          setLocalPrinterSettings({
             autoPrint: !!config.autoPrint,
             printMode: config.printMode || 'TEXT',
             printerName: config.printerName || ''
-          }));
+          });
         }
       });
     }
