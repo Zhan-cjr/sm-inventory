@@ -48,7 +48,10 @@ export default function MembershipModal({ isOpen, onClose, onSuccess }: Membersh
     try {
       const res = await fetch(`${getEcomApiUrl()}/ecommerce/members/forgot-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ phone: forgotPhone })
       });
       const data = await res.json();
@@ -73,7 +76,10 @@ export default function MembershipModal({ isOpen, onClose, onSuccess }: Membersh
     try {
       const res = await fetch(`${getEcomApiUrl()}/ecommerce/members/reset-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           phone: forgotPhone,
           otp: forgotOtp,
@@ -107,7 +113,10 @@ export default function MembershipModal({ isOpen, onClose, onSuccess }: Membersh
     try {
       const res = await fetch(`${getEcomApiUrl()}/ecommerce/members/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           phone: loginPhone,
           password: loginPassword,
@@ -136,7 +145,10 @@ export default function MembershipModal({ isOpen, onClose, onSuccess }: Membersh
     try {
       const res = await fetch(`${getEcomApiUrl()}/ecommerce/members`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           name: regName,
           phone: regPhone,
