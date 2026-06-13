@@ -28,7 +28,7 @@ export default function TransactionHistoryModal({ isOpen, onClose, member }: Tra
       });
       if (res.ok) {
         const data = await res.json();
-        setHistory(data);
+        setHistory(data.history || []);
       }
     } catch (err) {
       console.error('Gagal mengambil riwayat belanja', err);
