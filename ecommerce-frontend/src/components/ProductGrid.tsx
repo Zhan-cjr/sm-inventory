@@ -108,7 +108,7 @@ const ProductCard = ({ product }: { product: Product }) => {
   };
 
   return (
-    <div className={`group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl hover:border-brand-blue/20 transition-all duration-300 flex flex-col h-full relative ${isOutOfStock ? 'opacity-60 grayscale-[10%]' : ''}`}>
+    <div className={`group glass-panel-dark rounded-[2rem] border border-slate-200/60 overflow-hidden shadow-sm hover:shadow-2xl hover:border-brand-blue/30 transition-all duration-500 flex flex-col h-full relative ${isOutOfStock ? 'opacity-60 grayscale-[10%]' : ''}`}>
       
       {/* Plus One Animation Floating Particle */}
       {showPlusOne && (
@@ -334,10 +334,10 @@ const ProductGrid = () => {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                  className={`px-5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-300 ${
                     isCatSelected
-                      ? 'bg-brand-blue text-white shadow-md shadow-brand-blue/20'
-                      : 'bg-white text-slate-600 border border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                      ? 'bg-brand-blue text-white shadow-[0_8px_20px_rgba(36,42,122,0.3)] hover:-translate-y-0.5'
+                      : 'bg-white/80 backdrop-blur-md text-slate-600 border border-slate-200/60 hover:border-slate-300 hover:bg-white hover:-translate-y-0.5 shadow-sm'
                   }`}
                 >
                   {cat.name}
@@ -358,7 +358,7 @@ const ProductGrid = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-20 bg-white rounded-2xl border border-slate-100">
+          <div className="text-center py-20 glass-panel-dark rounded-[2rem] border border-slate-200/60 shadow-sm">
             <PackageOpen size={48} className="mx-auto text-slate-300 mb-4" />
             <h3 className="text-lg font-semibold text-slate-800">
               {searchQuery || selectedCategory !== 'all' ? 'Produk Tidak Ditemukan' : 'Belum Ada Produk'}

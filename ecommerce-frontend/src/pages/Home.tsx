@@ -16,7 +16,7 @@ const Home = () => {
       <CategoryIcons />
       
       {/* Value Propositions / Features */}
-      <div className="bg-white py-8 sm:py-12 mt-4 shadow-[0_4px_40px_-10px_rgba(0,0,0,0.03)] border-y border-slate-100 relative z-20">
+      <div className="bg-white/60 backdrop-blur-3xl py-8 sm:py-12 mt-4 shadow-sm border-y border-slate-200/50 relative z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
             <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-3 sm:gap-4 group cursor-default">
@@ -67,7 +67,7 @@ const Home = () => {
 
       {/* Call to Action Banner */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="bg-gradient-to-r from-brand-blue to-indigo-900 rounded-3xl p-8 md:p-12 relative overflow-hidden shadow-2xl">
+        <div className="bg-gradient-to-r from-brand-blue to-indigo-900 rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden shadow-2xl border border-brand-blue/20">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mt-20 -mr-20" />
           <div className="absolute bottom-0 left-0 w-40 h-40 bg-brand-red/20 rounded-full blur-2xl -mb-10 -ml-10" />
           
@@ -80,7 +80,7 @@ const Home = () => {
             </div>
             <button 
               onClick={() => setIsMemberModalOpen(true)}
-              className="bg-white text-brand-blue font-bold px-8 py-4 rounded-xl hover:bg-slate-50 hover:shadow-lg transition-all flex-shrink-0"
+              className="bg-white text-brand-blue font-bold px-8 py-4 rounded-2xl hover:bg-slate-50 hover:shadow-lg hover:-translate-y-1 transition-all flex-shrink-0"
             >
               Daftar Gratis
             </button>

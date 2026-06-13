@@ -70,7 +70,7 @@ const Navbar = () => {
           </div>
         </div>
       )}
-      <nav className={`fixed left-0 right-0 z-50 transition-all duration-300 ${announcement ? 'top-8' : 'top-0'} ${isScrolled ? 'glass shadow-sm py-2 md:py-3' : 'bg-white py-3.5 md:py-5'}`}>
+      <nav className={`fixed left-0 right-0 z-50 transition-all duration-300 ${announcement ? 'top-8' : 'top-0'} ${isScrolled ? 'glass-panel-dark py-2 md:py-3' : 'bg-white/80 backdrop-blur-md py-3.5 md:py-5'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Desktop Navbar */}
@@ -109,7 +109,7 @@ const Navbar = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Cari produk halal..." 
-                  className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all"
+                  className="w-full pl-4 pr-10 py-2.5 bg-slate-50/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all shadow-inner"
                 />
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               </div>
@@ -201,7 +201,7 @@ const Navbar = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari produk halal..." 
-                className="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:bg-white transition-all"
+                className="w-full pl-3 pr-9 py-2 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:bg-white transition-all shadow-inner"
               />
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
             </div>

@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-red: #E31E24;
-  --color-brand-blue: #2F338D;
-  --color-brand-green: #A5CD39;
+  --color-brand-red: #E60012;
+  --color-brand-blue: #242A7A;
+  --color-brand-green: #9DC31A;
   
   --color-primary: var(--color-brand-blue);
-  --color-primary-hover: #1f226b;
+  --color-primary-hover: #151a54;
   --color-secondary: var(--color-brand-red);
-  --color-secondary-hover: #c4181f;
+  --color-secondary-hover: #ff3344;
   --color-success: var(--color-brand-green);
 }
 
@@ -51,14 +51,30 @@ body {
 /* Glassmorphism */
 .glass {
   background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .dark .glass {
   background: rgba(15, 23, 42, 0.85);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+}
+
+.glass-panel-dark {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 10px 40px rgba(36, 42, 122, 0.08);
 }
 
 /* Animations */

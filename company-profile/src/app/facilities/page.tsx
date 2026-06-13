@@ -142,7 +142,7 @@ export default function FacilitiesPage() {
                       {facility.name.toLowerCase().includes('padel') && (
                         <div className="mt-8">
                           <a 
-                            href="#" 
+                            href="https://padel.admselamat.my.id" 
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-light hover:-translate-y-1 transition-all"

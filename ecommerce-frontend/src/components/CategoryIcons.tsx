@@ -54,7 +54,7 @@ const CategoryIcons = () => {
                 onClick={() => handleCategoryClick(cat.id, cat.name)}
                 className="flex flex-col items-center justify-start gap-2 group cursor-pointer"
               >
-                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-active:scale-95 shadow-sm border border-white/50 ${visual.color}`}>
+                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-[1.25rem] flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-[0_4px_15px_rgba(0,0,0,0.03)] group-hover:shadow-lg border border-white/50 ${visual.color}`}>
                   {visual.icon}
                 </div>
                 <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-[60px] sm:max-w-[70px]">

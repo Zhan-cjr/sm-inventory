@@ -311,12 +311,12 @@ export default function MembershipSection() {
                 <span className="text-[11px] leading-tight font-medium text-slate-600">Fasilitas</span>
               </Link>
 
-              <Link href="/facilities#padel" className="flex flex-col items-center group text-center">
+              <a href="https://padel.admselamat.my.id" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center group text-center">
                 <div className="w-14 h-14 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 mb-3 group-hover:bg-rose-100 transition-colors">
                   <CalendarDays size={24} strokeWidth={2} />
                 </div>
                 <span className="text-[11px] leading-tight font-medium text-slate-600">Booking<br/>Lapangan</span>
-              </Link>
+              </a>
 
               <button 
                 onClick={() => handleRequiresAuth(() => setShowHistoryModal(true))} 
