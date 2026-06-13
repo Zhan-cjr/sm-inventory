@@ -32,6 +32,7 @@ export default function MembershipSection() {
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState("Silakan Masuk / Daftar terlebih dahulu.");
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function MembershipSection() {
   const handleLogout = () => {
     setMember(null);
     localStorage.removeItem('ecom_member');
+    setShowLogoutConfirm(false);
   };
 
   const handleRequiresAuth = (action: () => void, customAlert?: string) => {
@@ -158,6 +160,46 @@ export default function MembershipSection() {
             )}
           </AnimatePresence>
 
+          {/* Logout Confirmation Modal */}
+          <AnimatePresence>
+            {showLogoutConfirm && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+              >
+                <motion.div 
+                  initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                  className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-center relative border border-slate-100"
+                >
+                  <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center text-red-500 mx-auto mb-4">
+                    <LogOut size={28} />
+                  </div>
+                  <h3 className="text-xl font-extrabold text-slate-800 mb-2">Yakin Ingin Keluar?</h3>
+                  <p className="text-sm text-slate-500 mb-6">Anda harus masuk kembali untuk melihat koin dan riwayat transaksi.</p>
+                  
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setShowLogoutConfirm(false)}
+                      className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                    >
+                      Batal
+                    </button>
+                    <button 
+                      onClick={handleLogout}
+                      className="flex-1 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors shadow-md shadow-red-500/20"
+                    >
+                      Ya, Keluar
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* User Info / Login Block */}
           <div className="bg-white rounded-2xl p-4 shadow-sm mb-4 flex items-center justify-between border border-slate-100 min-h-[80px]">
             {member ? (
@@ -182,11 +224,11 @@ export default function MembershipSection() {
                   </div>
                   <div className="flex flex-col items-center">
                     <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center text-white mb-1 shadow-sm">
-                      <span className="font-bold text-sm leading-none">Y</span>
+                      <span className="font-bold text-[10px] leading-none">SM</span>
                     </div>
                     <span className="text-xs font-bold text-slate-700">{member.points || 0}</span>
                   </div>
-                  <button onClick={handleLogout} className="text-slate-400 hover:text-secondary ml-1 transition-colors" title="Keluar">
+                  <button onClick={() => setShowLogoutConfirm(true)} className="text-slate-400 hover:text-secondary ml-1 transition-colors" title="Keluar">
                     <LogOut size={18} />
                   </button>
                 </div>
