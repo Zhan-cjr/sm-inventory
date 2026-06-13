@@ -51,8 +51,7 @@ export default function MembershipSection() {
   }, []);
 
   const getEcomApiUrl = () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://api-sminventory/api/company-profile';
-    return apiUrl.replace('/company-profile', '/v1');
+    return '/api/v1';
   };
 
   const syncMemberPoints = async (memberPhone: string) => {

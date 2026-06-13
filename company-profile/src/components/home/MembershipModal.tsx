@@ -14,8 +14,7 @@ interface MembershipModalProps {
 }
 
 const getEcomApiUrl = () => {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://api-sminventory/api/company-profile';
-  return apiUrl.replace('/company-profile', '/v1');
+  return '/api/v1';
 };
 
 export default function MembershipModal({ isOpen, onClose, onSuccess }: MembershipModalProps) {
