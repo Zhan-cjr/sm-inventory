@@ -1,6 +1,6 @@
 {
   "name": "desktop-pos",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -8,7 +8,7 @@
   },
   "build": {
     "appId": "com.amnal.poskasir",
-    "productName": "POS Kasir Desktop",
+    "productName": "POS SM Inventory",
     "directories": {
       "output": "build_dist"
     },

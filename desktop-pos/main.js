@@ -192,7 +192,7 @@ ipcMain.handle('print-raw', async (event, rawText, printerName) => {
     
     // Fix header position if receiptType is 2 (Header di Bawah)
     if (config && config.receiptType === 2) {
-      const lines = finalText.split(/\\r?\\n/);
+      const lines = finalText.split(/\r?\n/);
       let dividerIndex = -1;
       for (let i = 0; i < Math.min(15, lines.length); i++) {
         if (lines[i].startsWith('---')) {
@@ -201,7 +201,6 @@ ipcMain.handle('print-raw', async (event, rawText, printerName) => {
         }
       }
       
-      // If we found a divider and the receipt doesn't already start with Kasir or *** COPY
       if (dividerIndex !== -1 && !lines[0].startsWith('Kasir:') && !lines[0].includes('*** COPY')) {
         const header = lines.slice(0, dividerIndex + 1);
         const body = lines.slice(dividerIndex + 1);
@@ -210,31 +209,42 @@ ipcMain.handle('print-raw', async (event, rawText, printerName) => {
           body.pop();
         }
         
-        finalText = body.join('\\r\\n') + '\\r\\n' + header.join('\\r\\n') + '\\r\\n\\r\\n\\r\\n\\r\\n\\r\\n';
+        finalText = body.join('\n') + '\n' + header.join('\n') + '\n\n\n\n\n';
       }
     }
 
-    const tempFile = path.join(os.tmpdir(), `pos-print-${Date.now()}.txt`);
-    // Ensure Windows CRLF line endings
-    const textWithCRLF = finalText.replace(/\\r?\\n/g, '\\r\\n');
-    fs.writeFileSync(tempFile, textWithCRLF, { encoding: 'utf8' });
-    
-    let command = '';
-    if (printerName) {
-      command = `powershell -Command "Get-Content -Path '${tempFile}' -Raw | Out-Printer -Name '${printerName}'"`;
-    } else {
-      command = `powershell -Command "Get-Content -Path '${tempFile}' -Raw | Out-Printer"`;
-    }
-    
     return new Promise((resolve) => {
-      exec(command, (error, stdout, stderr) => {
-        try { fs.unlinkSync(tempFile); } catch (e) {} // clean up
-        if (error) {
-          console.error(`Raw print exec error: ${error}`);
-          resolve({ success: false, error: error.message });
-        } else {
-          resolve({ success: true });
+      let printWindow = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true
         }
+      });
+
+      const escapedText = finalText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const htmlContent = `<html><head><style>@page { margin: 0; } body { margin: 0; padding: 0; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>${escapedText}</pre></body></html>`;
+      const htmlUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
+      
+      printWindow.loadURL(htmlUrl).then(() => {
+        printWindow.webContents.print({
+          silent: true,
+          printBackground: true,
+          deviceName: printerName || '',
+          margins: { marginType: 'none' }
+        }, (success, failureReason) => {
+          printWindow.close();
+          if (!success) {
+            console.error('Print failed:', failureReason);
+            resolve({ success: false, error: failureReason });
+          } else {
+            resolve({ success: true });
+          }
+        });
+      }).catch(err => {
+        printWindow.close();
+        console.error('Load HTML failed:', err);
+        resolve({ success: false, error: err.message });
       });
     });
   } catch (err) {

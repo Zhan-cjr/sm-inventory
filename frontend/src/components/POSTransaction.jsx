@@ -173,9 +173,10 @@ export const POSTransaction = ({
   const [isPrinterSettingsOpen, setIsPrinterSettingsOpen] = useState(false);
   const [localPrinterSettings, setLocalPrinterSettings] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
+      const saved = JSON.parse(localStorage.getItem('pos_printer_settings'));
+      return saved || { autoPrint: false, printMode: 'TEXT', receiptType: 1, feedBeforeHeaderBottom: false };
     } catch (e) {
-      return { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
+      return { autoPrint: false, printMode: 'TEXT', receiptType: 1, feedBeforeHeaderBottom: false };
     }
   });
   const [posSettings, setPosSettings] = useState(() => {
@@ -297,11 +298,12 @@ export const POSTransaction = ({
     if (window.electronAPI) {
       window.electronAPI.getConfig().then(config => {
         if (config) {
-          setLocalPrinterSettings({
+          setLocalPrinterSettings(prev => ({
+            ...prev,
             autoPrint: !!config.autoPrint,
             printMode: config.printMode || 'TEXT',
             printerName: config.printerName || ''
-          });
+          }));
         }
       });
     }
@@ -2159,11 +2161,20 @@ export const POSTransaction = ({
                   Hemat (Header di Bawah)
                 </label>
               </div>
+
+              {localPrinterSettings.receiptType === 2 && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', flex: 1 }}>
+                    <input type="checkbox" checked={!!localPrinterSettings.feedBeforeHeaderBottom} onChange={(e) => setLocalPrinterSettings(p => ({ ...p, feedBeforeHeaderBottom: e.target.checked }))} />
+                    Beri jeda 4 baris sebelum Header Bawah dicetak
+                  </label>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn-secondary" onClick={() => {
-                const saved = JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
+                const saved = JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1, feedBeforeHeaderBottom: false };
                 setLocalPrinterSettings(saved);
                 setIsPrinterSettingsOpen(false);
               }}>Batal</button>
