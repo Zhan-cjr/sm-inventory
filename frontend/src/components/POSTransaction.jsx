@@ -173,9 +173,9 @@ export const POSTransaction = ({
   const [isPrinterSettingsOpen, setIsPrinterSettingsOpen] = useState(false);
   const [localPrinterSettings, setLocalPrinterSettings] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT' };
+      return JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
     } catch (e) {
-      return { autoPrint: false, printMode: 'TEXT' };
+      return { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
     }
   });
   const [posSettings, setPosSettings] = useState(() => {
@@ -2147,11 +2147,23 @@ export const POSTransaction = ({
                   </span>
                 </label>
               </div>
+
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', marginTop: '1.5rem', color: '#334155' }}>Format Struk</label>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', flex: 1 }}>
+                  <input type="radio" name="receiptType" checked={localPrinterSettings.receiptType !== 2} onChange={() => setLocalPrinterSettings(p => ({ ...p, receiptType: 1 }))} />
+                  Standar (Header di Atas)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', flex: 1 }}>
+                  <input type="radio" name="receiptType" checked={localPrinterSettings.receiptType === 2} onChange={() => setLocalPrinterSettings(p => ({ ...p, receiptType: 2 }))} />
+                  Hemat (Header di Bawah)
+                </label>
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn-secondary" onClick={() => {
-                const saved = JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT' };
+                const saved = JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
                 setLocalPrinterSettings(saved);
                 setIsPrinterSettingsOpen(false);
               }}>Batal</button>

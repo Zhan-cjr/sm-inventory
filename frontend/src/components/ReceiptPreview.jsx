@@ -64,21 +64,28 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
     }
   }
 
+  const isHeaderBottom = autoPrintSettings?.receiptType == 2;
+  const headerOutputLines = [];
+
   if (headerLines.length === 0) {
-    lines.push(center(orgName || 'TOSERBA SELAMAT', columns));
-    lines.push(center(branchName || 'Cabang Utama', columns));
-    lines.push(center('THE MOSLEM FAMILY', columns));
+    headerOutputLines.push(center(orgName || 'TOSERBA SELAMAT', columns));
+    headerOutputLines.push(center(branchName || 'Cabang Utama', columns));
+    headerOutputLines.push(center('THE MOSLEM FAMILY', columns));
   } else {
     headerLines.forEach(text => {
-      lines.push(center(text, columns));
+      headerOutputLines.push(center(text, columns));
     });
   }
   
   if (isReprint) {
-    lines.push(center('*** COPY / REPRINT ***', columns));
+    headerOutputLines.push(center('*** COPY / REPRINT ***', columns));
   }
 
-  lines.push(divider);
+  headerOutputLines.push(divider);
+
+  if (!isHeaderBottom) {
+    lines.push(...headerOutputLines);
+  }
 
   lines.push(pad(`Kasir: ${userName || 'Kasir'}`, columns));
   if (customerName) {
@@ -190,6 +197,10 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
     });
   }
   
+  if (isHeaderBottom) {
+    lines.push(...headerOutputLines);
+  }
+
   // Feed paper (5 lines) to allow tearing
   lines.push('\n\n\n\n\n');
 
@@ -329,6 +340,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
   const isHidden = autoPrintSettings?.autoPrint;
   const overlayStyle = isHidden ? { position: 'fixed', top: 0, left: 0, width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' } : {};
+  const isHeaderBottom = autoPrintSettings?.receiptType == 2;
 
   return (
     <div className={isHidden ? "" : "change-modal-overlay"} style={overlayStyle}>
@@ -339,40 +351,42 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
         </header>
         
         <div className="receipt-paper" id="printable-receipt">
-          <div className="receipt-header">
-            {!!branchSettings?.receipt_show_logo && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.6rem' }}>
-                <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect width="100" height="100" rx="30" fill="#4f46e5" />
-                  <path d="M30 30H70L30 70H70" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-            )}
+          {!isHeaderBottom && (
+            <div className="receipt-header">
+              {!!branchSettings?.receipt_show_logo && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.6rem' }}>
+                  <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100" height="100" rx="30" fill="#4f46e5" />
+                    <path d="M30 30H70L30 70H70" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
 
-            {headerLines.length === 0 ? (
-              <>
-                <h2 className="org-name">{orgName}</h2>
-                <p className="branch-name">{branchName}</p>
-                {branchAddress && <p className="branch-address" style={{ fontSize: '10px', margin: '2px 0 0 0' }}>{branchAddress}</p>}
-              </>
-            ) : (
-              headerLines.map((line, idx) => (
-                <p key={idx} style={{ 
-                  margin: '2px 0', 
-                  fontSize: '11px', 
-                  fontWeight: line.bold ? 'bold' : 'normal',
-                  textAlign: 'center',
-                  color: 'black'
-                }}>
-                  {line.text}
-                </p>
-              ))
-            )}
-            {isReprint && <p style={{ textAlign: 'center', fontWeight: 'bold', margin: '4px 0', fontSize: '12px' }}>*** COPY / REPRINT ***</p>}
-            <p className="divider">----------------------------------------</p>
-          </div>
+              {headerLines.length === 0 ? (
+                <>
+                  <h2 className="org-name">{orgName}</h2>
+                  <p className="branch-name">{branchName}</p>
+                  {branchAddress && <p className="branch-address" style={{ fontSize: '10px', margin: '2px 0 0 0' }}>{branchAddress}</p>}
+                </>
+              ) : (
+                headerLines.map((line, idx) => (
+                  <p key={idx} style={{ 
+                    margin: '2px 0', 
+                    fontSize: '11px', 
+                    fontWeight: line.bold ? 'bold' : 'normal',
+                    textAlign: 'center',
+                    color: 'black'
+                  }}>
+                    {line.text}
+                  </p>
+                ))
+              )}
+              {isReprint && <p style={{ textAlign: 'center', fontWeight: 'bold', margin: '4px 0', fontSize: '12px' }}>*** COPY / REPRINT ***</p>}
+              <p className="divider">----------------------------------------</p>
+            </div>
+          )}
           
-          <div className="receipt-info">
+          <div className="receipt-info" style={{ marginTop: isHeaderBottom ? '0.5rem' : '0' }}>
             <p>Kasir: {userName}</p>
             {customerName && <p>Member: {customerName}</p>}
             <p>Tgl  : {new Date(timestamp).toLocaleString('id-ID')}</p>
@@ -521,6 +535,41 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
               </div>
             )}
           </div>
+
+          {isHeaderBottom && (
+            <div className="receipt-header" style={{ marginTop: '1rem', borderTop: '1px dashed #ccc', paddingTop: '1rem' }}>
+              {!!branchSettings?.receipt_show_logo && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.6rem' }}>
+                  <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100" height="100" rx="30" fill="#4f46e5" />
+                    <path d="M30 30H70L30 70H70" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
+
+              {headerLines.length === 0 ? (
+                <>
+                  <h2 className="org-name">{orgName}</h2>
+                  <p className="branch-name">{branchName}</p>
+                  {branchAddress && <p className="branch-address" style={{ fontSize: '10px', margin: '2px 0 0 0' }}>{branchAddress}</p>}
+                </>
+              ) : (
+                headerLines.map((line, idx) => (
+                  <p key={idx} style={{ 
+                    margin: '2px 0', 
+                    fontSize: '11px', 
+                    fontWeight: line.bold ? 'bold' : 'normal',
+                    textAlign: 'center',
+                    color: 'black'
+                  }}>
+                    {line.text}
+                  </p>
+                ))
+              )}
+              {isReprint && <p style={{ textAlign: 'center', fontWeight: 'bold', margin: '4px 0', fontSize: '12px' }}>*** COPY / REPRINT ***</p>}
+              <p className="divider">----------------------------------------</p>
+            </div>
+          )}
         </div>
 
         <footer className="receipt-preview-footer" style={{ display: 'flex', gap: '10px' }}>

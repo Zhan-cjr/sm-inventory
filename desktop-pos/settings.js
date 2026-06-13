@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const serverUrlInput = document.getElementById('serverUrl');
   const printerNameSelect = document.getElementById('printerName');
   const printModeSelect = document.getElementById('printMode');
+  const receiptTypeSelect = document.getElementById('receiptType');
   const autoPrintCheckbox = document.getElementById('autoPrint');
   
   const form = document.getElementById('settingsForm');
@@ -26,6 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (config.serverUrl) serverUrlInput.value = config.serverUrl;
       if (config.printerName) printerNameSelect.value = config.printerName;
       if (config.printMode) printModeSelect.value = config.printMode;
+      if (config.receiptType) receiptTypeSelect.value = config.receiptType;
       if (config.autoPrint) autoPrintCheckbox.checked = config.autoPrint;
     }
   }
@@ -41,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       serverUrl: serverUrlInput.value,
       printerName: printerNameSelect.value,
       printMode: printModeSelect.value,
+      receiptType: parseInt(receiptTypeSelect.value, 10),
       autoPrint: autoPrintCheckbox.checked
     };
 
