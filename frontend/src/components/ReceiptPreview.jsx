@@ -3,10 +3,10 @@ import { Printer, X } from 'lucide-react';
 import Barcode from 'react-barcode';
 
 const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, columns = 32) => {
-  const { 
-    items, totalAmount, discountAmount, finalAmount, paymentMethod, 
-    terminalId, receivedAmount, changeAmount, branchName, branchAddress, orgName, 
-    userName, customerName, timestamp, receipt_number, isReprint 
+  const {
+    items, totalAmount, discountAmount, finalAmount, paymentMethod,
+    terminalId, receivedAmount, changeAmount, branchName, branchAddress, orgName,
+    userName, customerName, timestamp, receipt_number, isReprint
   } = transaction;
 
   const pad = (str, len, char = ' ') => {
@@ -35,7 +35,7 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
       .replace(/{org_name}/g, orgName || '')
       .replace(/{branch_name}/g, branchName || '')
       .replace(/{branch_address}/g, branchAddress || '');
-    
+
     if (result.includes('{branch_phone}')) {
       const phone = branchSettings?.phone || '';
       if (!phone) {
@@ -75,7 +75,7 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
       headerOutputLines.push(center(text, columns));
     });
   }
-  
+
   headerOutputLines.push(divider);
 
   if (!isHeaderBottom) {
@@ -195,7 +195,7 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
       lines.push(center(text, columns));
     });
   }
-  
+
   if (isHeaderBottom) {
     lines.push(divider);
     lines.push(...headerOutputLines.filter(l => l !== divider));
@@ -223,11 +223,11 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
       try {
         css = Array.from(document.styleSheets)
           .map(styleSheet => {
-            try { return Array.from(styleSheet.cssRules).map(rule => rule.cssText).join(''); } 
+            try { return Array.from(styleSheet.cssRules).map(rule => rule.cssText).join(''); }
             catch (e) { return ''; }
           }).join('\n');
-      } catch (e) {}
-      
+      } catch (e) { }
+
       const receiptHtml = document.getElementById('printable-receipt').outerHTML;
       const fullHtml = `<html><head><style>${css}</style></head><body style="background: white;">${receiptHtml}</body></html>`;
       window.electronAPI.silentPrint(fullHtml, autoPrintSettings?.printerName);
@@ -252,39 +252,39 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
   const handlePrintRawText = () => {
     // Removed ESC p 0 25 250 (Buka Cash Drawer 1) due to null bytes blocking print dialogs
     const rawText = generateRawTextReceipt(transaction, branchSettings, isHeaderBottom, 35);
-    
+
     if (window.electronAPI && window.electronAPI.printRaw) {
       window.electronAPI.printRaw(rawText, autoPrintSettings?.printerName).then(() => {
         if (onClose) onClose();
       });
     } else {
       const htmlString = '<html><head><title>Struk ESC/POS</title><style>@page { margin: 0; } body { margin: 0; padding: 0; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>';
-      
+
       if (window.electronAPI) {
         window.electronAPI.silentPrint(htmlString, autoPrintSettings?.printerName);
         if (onClose) onClose();
       } else {
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'absolute';
-      iframe.style.width = '0px';
-      iframe.style.height = '0px';
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
-      
-      const doc = iframe.contentWindow.document || iframe.contentDocument;
-      doc.open();
-      doc.write(htmlString);
-      doc.close();
-      
-      setTimeout(() => {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0px';
+        iframe.style.height = '0px';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow.document || iframe.contentDocument;
+        doc.open();
+        doc.write(htmlString);
+        doc.close();
+
         setTimeout(() => {
-          document.body.removeChild(iframe);
-          if (onClose) onClose();
-        }, 1000);
-      }, 500);
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            if (onClose) onClose();
+          }, 1000);
+        }, 500);
       }
     }
   };
@@ -295,7 +295,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
       .replace(/{org_name}/g, orgName || '')
       .replace(/{branch_name}/g, branchName || '')
       .replace(/{branch_address}/g, branchAddress || '');
-    
+
     if (result.includes('{branch_phone}')) {
       const phone = branchSettings?.phone || '';
       if (!phone) {
@@ -349,7 +349,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
           <h3>Pratinjau Struk</h3>
           <button onClick={onClose} className="btn-close-preview"><X size={20} /></button>
         </header>
-        
+
         <div className="receipt-paper" id="printable-receipt">
           {!isHeaderBottom && (
             <div className="receipt-header">
@@ -370,9 +370,9 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
                 </>
               ) : (
                 headerLines.map((line, idx) => (
-                  <p key={idx} style={{ 
-                    margin: '2px 0', 
-                    fontSize: '11px', 
+                  <p key={idx} style={{
+                    margin: '2px 0',
+                    fontSize: '11px',
                     fontWeight: line.bold ? 'bold' : 'normal',
                     textAlign: 'center',
                     color: 'black'
@@ -384,7 +384,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
               <p className="divider">----------------------------------------</p>
             </div>
           )}
-          
+
           <div className="receipt-info" style={{ marginTop: isHeaderBottom ? '0.5rem' : '0' }}>
             {isReprint && <p style={{ textAlign: 'center', fontWeight: 'bold', margin: '0 0 4px 0', fontSize: '12px' }}>*** COPY / REPRINT ***</p>}
             <p>Kasir: {userName}</p>
@@ -408,10 +408,10 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
                   <span>{formatCurrency(item.quantity * item.unitPrice)}</span>
                 </div>
                 {item.manualDiscount > 0 && (
-                    <div className="item-discount">
-                        <span>  (Diskon Item)</span>
-                        <span>-{formatCurrency(item.quantity * item.manualDiscount)}</span>
-                    </div>
+                  <div className="item-discount">
+                    <span>  (Diskon Item)</span>
+                    <span>-{formatCurrency(item.quantity * item.manualDiscount)}</span>
+                  </div>
                 )}
               </div>
             ))}
@@ -509,9 +509,9 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
               </>
             ) : (
               footerLines.map((line, idx) => (
-                <p key={idx} style={{ 
-                  margin: '2px 0', 
-                  fontSize: '11px', 
+                <p key={idx} style={{
+                  margin: '2px 0',
+                  fontSize: '11px',
                   fontWeight: line.bold ? 'bold' : 'normal',
                   textAlign: 'center',
                   color: 'black'
@@ -523,14 +523,14 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
             {receipt_number && <p style={{ marginTop: '0.6rem', fontWeight: 'bold', fontSize: '0.9rem', color: 'black' }}>NOTA: {receipt_number}</p>}
             {receipt_number && (
               <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Barcode 
-                  value={receipt_number} 
-                  format="CODE128" 
-                  width={1.5} 
-                  height={40} 
-                  fontSize={12} 
-                  margin={0} 
-                  displayValue={false} 
+                <Barcode
+                  value={receipt_number}
+                  format="CODE128"
+                  width={1.5}
+                  height={40}
+                  fontSize={12}
+                  margin={0}
+                  displayValue={false}
                 />
               </div>
             )}
@@ -555,9 +555,9 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
                 </>
               ) : (
                 headerLines.map((line, idx) => (
-                  <p key={idx} style={{ 
-                    margin: '2px 0', 
-                    fontSize: '11px', 
+                  <p key={idx} style={{
+                    margin: '2px 0',
+                    fontSize: '11px',
                     fontWeight: line.bold ? 'bold' : 'normal',
                     textAlign: 'center',
                     color: 'black'

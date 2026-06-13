@@ -187,14 +187,43 @@ ipcMain.handle('silent-print', (event, htmlContent, printerName) => {
 
 ipcMain.handle('print-raw', async (event, rawText, printerName) => {
   try {
+    const config = loadConfig();
+    let finalText = rawText;
+    
+    // Fix header position if receiptType is 2 (Header di Bawah)
+    if (config && config.receiptType === 2) {
+      const lines = finalText.split(/\\r?\\n/);
+      let dividerIndex = -1;
+      for (let i = 0; i < Math.min(15, lines.length); i++) {
+        if (lines[i].startsWith('---')) {
+          dividerIndex = i;
+          break;
+        }
+      }
+      
+      // If we found a divider and the receipt doesn't already start with Kasir or *** COPY
+      if (dividerIndex !== -1 && !lines[0].startsWith('Kasir:') && !lines[0].includes('*** COPY')) {
+        const header = lines.slice(0, dividerIndex + 1);
+        const body = lines.slice(dividerIndex + 1);
+        
+        while (body.length > 0 && body[body.length - 1].trim() === '') {
+          body.pop();
+        }
+        
+        finalText = body.join('\\r\\n') + '\\r\\n' + header.join('\\r\\n') + '\\r\\n\\r\\n\\r\\n\\r\\n\\r\\n';
+      }
+    }
+
     const tempFile = path.join(os.tmpdir(), `pos-print-${Date.now()}.txt`);
-    fs.writeFileSync(tempFile, rawText, { encoding: 'utf8' });
+    // Ensure Windows CRLF line endings
+    const textWithCRLF = finalText.replace(/\\r?\\n/g, '\\r\\n');
+    fs.writeFileSync(tempFile, textWithCRLF, { encoding: 'utf8' });
     
     let command = '';
     if (printerName) {
-      command = `powershell -Command "Get-Content -Path '${tempFile}' | Out-Printer -Name '${printerName}'"`;
+      command = `powershell -Command "Get-Content -Path '${tempFile}' -Raw | Out-Printer -Name '${printerName}'"`;
     } else {
-      command = `powershell -Command "Get-Content -Path '${tempFile}' | Out-Printer"`;
+      command = `powershell -Command "Get-Content -Path '${tempFile}' -Raw | Out-Printer"`;
     }
     
     return new Promise((resolve) => {
