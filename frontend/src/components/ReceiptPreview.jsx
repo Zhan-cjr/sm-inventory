@@ -77,14 +77,14 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
     });
   }
   
-  if (isReprint) {
-    headerOutputLines.push(center('*** COPY / REPRINT ***', columns));
-  }
-
   headerOutputLines.push(divider);
 
   if (!isHeaderBottom) {
     lines.push(...headerOutputLines);
+  }
+
+  if (isReprint) {
+    lines.push(center('*** COPY / REPRINT ***', columns));
   }
 
   lines.push(pad(`Kasir: ${userName || 'Kasir'}`, columns));
@@ -381,12 +381,12 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
                   </p>
                 ))
               )}
-              {isReprint && <p style={{ textAlign: 'center', fontWeight: 'bold', margin: '4px 0', fontSize: '12px' }}>*** COPY / REPRINT ***</p>}
               <p className="divider">----------------------------------------</p>
             </div>
           )}
           
           <div className="receipt-info" style={{ marginTop: isHeaderBottom ? '0.5rem' : '0' }}>
+            {isReprint && <p style={{ textAlign: 'center', fontWeight: 'bold', margin: '0 0 4px 0', fontSize: '12px' }}>*** COPY / REPRINT ***</p>}
             <p>Kasir: {userName}</p>
             {customerName && <p>Member: {customerName}</p>}
             <p>Tgl  : {new Date(timestamp).toLocaleString('id-ID')}</p>
@@ -566,7 +566,6 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
                   </p>
                 ))
               )}
-              {isReprint && <p style={{ textAlign: 'center', fontWeight: 'bold', margin: '4px 0', fontSize: '12px' }}>*** COPY / REPRINT ***</p>}
               <p className="divider">----------------------------------------</p>
             </div>
           )}
