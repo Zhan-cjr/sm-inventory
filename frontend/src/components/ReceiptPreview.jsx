@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Printer, X } from 'lucide-react';
 import Barcode from 'react-barcode';
 
-const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
+const generateRawTextReceipt = (transaction, branchSettings, autoPrintSettings, columns = 32) => {
   const { 
     items, totalAmount, discountAmount, finalAmount, paymentMethod, 
     terminalId, receivedAmount, changeAmount, branchName, branchAddress, orgName, 
@@ -64,7 +64,7 @@ const generateRawTextReceipt = (transaction, branchSettings, columns = 32) => {
     }
   }
 
-  const isHeaderBottom = autoPrintSettings?.receiptType == 2;
+  const isHeaderBottom = branchSettings?.receipt_type == 2 || autoPrintSettings?.receiptType == 2;
   const headerOutputLines = [];
 
   if (headerLines.length === 0) {
@@ -250,14 +250,14 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
   const handlePrintRawText = () => {
     // Removed ESC p 0 25 250 (Buka Cash Drawer 1) due to null bytes blocking print dialogs
-    const rawText = generateRawTextReceipt(transaction, branchSettings, 35);
+    const rawText = generateRawTextReceipt(transaction, branchSettings, autoPrintSettings, 35);
     
     if (window.electronAPI && window.electronAPI.printRaw) {
       window.electronAPI.printRaw(rawText, autoPrintSettings?.printerName).then(() => {
         if (onClose) onClose();
       });
     } else {
-      const htmlString = '<html><head><title>Struk ESC/POS</title><style>@page { margin: 0; } body { margin: 0; padding: 0 0 0 12mm; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>';
+      const htmlString = '<html><head><title>Struk ESC/POS</title><style>@page { margin: 0; } body { margin: 0; padding: 0; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>';
       
       if (window.electronAPI) {
         window.electronAPI.silentPrint(htmlString, autoPrintSettings?.printerName);
@@ -340,7 +340,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
   const isHidden = autoPrintSettings?.autoPrint;
   const overlayStyle = isHidden ? { position: 'fixed', top: 0, left: 0, width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' } : {};
-  const isHeaderBottom = autoPrintSettings?.receiptType == 2;
+  const isHeaderBottom = branchSettings?.receipt_type == 2 || autoPrintSettings?.receiptType == 2;
 
   return (
     <div className={isHidden ? "" : "change-modal-overlay"} style={overlayStyle}>
