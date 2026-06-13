@@ -61,20 +61,20 @@ function ArticleDetailContent() {
 
   if (isLoading) {
     return (
-      <div className="flex-grow flex items-center justify-center pt-24 min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+      <div className="flex-grow flex items-center justify-center pt-24 min-h-screen bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (error || !article) {
     return (
-      <div className="flex-grow flex flex-col items-center justify-center pt-24 text-center px-4 min-h-screen">
+      <div className="flex-grow flex flex-col items-center justify-center pt-24 text-center px-4 min-h-screen bg-slate-50 text-slate-900">
         <h1 className="text-4xl font-bold mb-4">Artikel Tidak Ditemukan</h1>
-        <p className="text-slate-400 mb-8">Maaf, berita atau artikel yang Anda cari tidak dapat ditemukan atau mungkin telah dihapus.</p>
+        <p className="text-slate-600 mb-8 font-medium">Maaf, berita atau artikel yang Anda cari tidak dapat ditemukan atau mungkin telah dihapus.</p>
         <button 
           onClick={() => router.push('/news')}
-          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-6 py-3 rounded-full transition-colors"
+          className="flex items-center gap-2 bg-secondary hover:bg-secondary/90 text-white font-bold px-6 py-3 rounded-full transition-colors"
         >
           <ArrowLeft size={18} />
           Kembali ke Halaman Berita
@@ -95,12 +95,12 @@ function ArticleDetailContent() {
     <main className="pt-24 pb-20 flex-grow min-h-screen">
       <div className="container mx-auto px-4 md:px-6">
         {/* Breadcrumbs */}
-        <div className="flex items-center gap-2 text-sm text-slate-400 mb-8 pt-4">
-          <Link href="/" className="hover:text-white transition-colors">Beranda</Link>
+        <div className="flex items-center gap-2 text-sm text-slate-500 font-medium mb-8 pt-4">
+          <Link href="/" className="hover:text-primary transition-colors">Beranda</Link>
           <ChevronRight size={14} />
-          <Link href="/news" className="hover:text-white transition-colors">Berita</Link>
+          <Link href="/news" className="hover:text-primary transition-colors">Berita</Link>
           <ChevronRight size={14} />
-          <span className="text-red-400 truncate max-w-[200px] md:max-w-xs">{article.title}</span>
+          <span className="text-secondary font-bold truncate max-w-[200px] md:max-w-xs">{article.title}</span>
         </div>
 
         <div className="max-w-4xl mx-auto">
@@ -111,17 +111,17 @@ function ArticleDetailContent() {
             className="mb-8"
           >
             <div className="flex flex-wrap items-center gap-4 mb-4">
-              <span className="bg-red-600/20 text-red-400 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border border-red-500/20 flex items-center gap-1.5">
+              <span className="bg-secondary/10 text-secondary px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-secondary/20 flex items-center gap-1.5">
                 <Tag size={12} />
                 {article.type}
               </span>
-              <span className="text-sm text-slate-400 flex items-center gap-1.5">
+              <span className="text-sm text-slate-500 font-medium flex items-center gap-1.5">
                 <Calendar size={14} />
                 {formattedDate}
               </span>
             </div>
             
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight mb-8">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-slate-900 leading-tight mb-8">
               {article.title}
             </h1>
           </motion.div>
@@ -132,7 +132,7 @@ function ArticleDetailContent() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.1 }}
-              className="w-full aspect-video md:aspect-[21/9] rounded-2xl overflow-hidden mb-12 shadow-2xl shadow-black/50 border border-slate-800"
+              className="w-full aspect-video md:aspect-[21/9] rounded-2xl overflow-hidden mb-12 shadow-xl shadow-slate-300/50 border border-slate-200"
             >
               <img 
                 src={`${new URL(process.env.NEXT_PUBLIC_API_URL || 'https://admin.toserbaselamat.id').origin}/storage/${article.image_url}`} 
@@ -147,15 +147,15 @@ function ArticleDetailContent() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="prose prose-invert prose-lg max-w-none prose-a:text-red-400 prose-a:no-underline hover:prose-a:text-red-300 prose-img:rounded-xl prose-headings:text-white"
+            className="prose prose-lg max-w-none prose-a:text-secondary prose-a:font-bold prose-a:no-underline hover:prose-a:text-secondary/80 prose-img:rounded-xl prose-headings:text-slate-900 prose-p:text-slate-600 prose-li:text-slate-600"
             dangerouslySetInnerHTML={{ __html: article.content }}
           />
 
           {/* Footer actions */}
-          <div className="mt-16 pt-8 border-t border-slate-800 flex justify-between items-center">
+          <div className="mt-16 pt-8 border-t border-slate-200 flex justify-between items-center">
             <button 
               onClick={() => router.push('/news')}
-              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+              className="flex items-center gap-2 text-slate-500 font-bold hover:text-primary transition-colors"
             >
               <ArrowLeft size={18} />
               Kembali ke Berita
@@ -169,11 +169,11 @@ function ArticleDetailContent() {
 
 export default function ArticleDetailPage() {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 selection:bg-red-500/30 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-800 selection:bg-secondary/20 flex flex-col">
       <Navbar />
       <Suspense fallback={
         <div className="flex-grow flex items-center justify-center pt-24 min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         </div>
       }>
         <ArticleDetailContent />

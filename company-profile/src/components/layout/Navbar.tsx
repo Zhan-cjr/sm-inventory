@@ -39,7 +39,7 @@ export function Navbar() {
       className={cn(
         "fixed top-0 w-full z-50 transition-all duration-500",
         scrolled
-          ? "glass-panel-dark shadow-xl py-3 border-b border-white/5"
+          ? "bg-white/90 backdrop-blur-md shadow-md py-3 border-b border-slate-200"
           : "bg-transparent py-6"
       )}
     >
@@ -51,10 +51,10 @@ export function Navbar() {
               <img 
                 src={`/storage/${logoPath}`} 
                 alt="Logo" 
-                className="h-10 w-auto object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] group-hover:scale-105 transition-transform"
+                className="h-10 w-auto object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
               />
             ) : (
-              <div className="bg-blue-500/20 text-blue-400 border border-blue-500/30 p-2 rounded-xl group-hover:bg-blue-500/30 transition-colors shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+              <div className="bg-primary text-white border border-primary/30 p-2 rounded-xl group-hover:bg-primary-light transition-colors shadow-sm">
                 <ShoppingBag size={24} />
               </div>
             )}
@@ -67,16 +67,16 @@ export function Navbar() {
                 key={link.name}
                 href={link.href}
                 className={cn(
-                  "text-sm font-semibold transition-all hover:text-blue-400 drop-shadow-sm",
+                  "text-sm font-semibold transition-all hover:text-primary drop-shadow-sm",
                   pathname === link.href
-                    ? "text-blue-400"
-                    : "text-slate-300"
+                    ? "text-primary"
+                    : "text-slate-700"
                 )}
               >
                 {link.name}
               </Link>
             ))}
-            <a href="http://shopping.toserbaselamat.id" className="hidden md:flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-slate-950 px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] hover:-translate-y-0.5">
+            <a href="http://shopping.toserbaselamat.id" className="hidden md:flex items-center gap-2 bg-secondary hover:bg-secondary-light text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_4px_15px_rgba(230,0,18,0.3)] hover:shadow-[0_6px_20px_rgba(230,0,18,0.4)] hover:-translate-y-0.5">
               <ShoppingBag size={18} />
               Belanja Online
             </a>
@@ -86,7 +86,7 @@ export function Navbar() {
           <button
             className={cn(
               "md:hidden p-2 rounded-md transition-colors",
-              scrolled || isOpen ? "text-white hover:text-blue-400" : "text-white hover:text-blue-400"
+              scrolled || isOpen ? "text-slate-900 hover:text-primary" : "text-slate-900 hover:text-primary"
             )}
             onClick={() => setIsOpen(!isOpen)}
           >
@@ -102,7 +102,7 @@ export function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden glass-panel-dark border-t border-white/10 shadow-2xl overflow-hidden backdrop-blur-xl"
+            className="md:hidden bg-white border-t border-slate-200 shadow-2xl overflow-hidden"
           >
             <div className="container mx-auto px-4 py-6 flex flex-col gap-4">
               {navLinks.map((link) => (
@@ -112,8 +112,8 @@ export function Navbar() {
                   className={cn(
                     "block px-4 py-3 rounded-xl text-base font-medium transition-all",
                     pathname === link.href
-                      ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                      : "text-slate-300 hover:bg-white/5 hover:text-white"
+                      ? "bg-primary/10 text-primary border border-primary/20"
+                      : "text-slate-700 hover:bg-slate-50 hover:text-primary"
                   )}
                   onClick={() => setIsOpen(false)}
                 >
@@ -122,7 +122,7 @@ export function Navbar() {
               ))}
               <a
                 href="http://shopping.toserbaselamat.id"
-                className="flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-slate-950 px-5 py-4 rounded-xl font-bold transition-all mt-4 justify-center shadow-[0_0_20px_rgba(59,130,246,0.2)]"
+                className="flex items-center gap-2 bg-secondary hover:bg-secondary-light text-white px-5 py-4 rounded-xl font-bold transition-all mt-4 justify-center shadow-md"
               >
                 <ShoppingBag size={18} />
                 Belanja Online Sekarang

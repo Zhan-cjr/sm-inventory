@@ -11,8 +11,8 @@ import dynamic from "next/dynamic";
 const DynamicMap = dynamic(() => import("@/components/MapComponent"), {
   ssr: false,
   loading: () => (
-    <div className="h-full w-full flex items-center justify-center bg-slate-100">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    <div className="h-full w-full flex items-center justify-center bg-slate-50">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
     </div>
   ),
 });
@@ -38,8 +38,8 @@ export default function LocationsPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center max-w-3xl mx-auto"
         >
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">Temukan Cabang <span className="text-blue-600">Terdekat</span></h1>
-          <p className="text-lg text-slate-600 mb-8">
+          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-6">Temukan Cabang <span className="text-primary">Terdekat</span></h1>
+          <p className="text-lg text-slate-600 font-medium mb-8">
             Kunjungi lokasi Toserba Selamat yang tersebar di berbagai wilayah untuk melayani kebutuhan keluarga Anda.
           </p>
           
@@ -50,7 +50,7 @@ export default function LocationsPage() {
               placeholder="Cari nama cabang atau wilayah..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-700 bg-white"
+              className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 shadow-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none text-slate-900 font-medium bg-white"
             />
           </div>
         </motion.div>
@@ -58,7 +58,7 @@ export default function LocationsPage() {
 
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       ) : (
       <div className="flex-1 flex flex-col md:flex-row relative bg-white border-t border-slate-200">
@@ -71,19 +71,19 @@ export default function LocationsPage() {
               onClick={() => setSelectedBranch(branch)}
               className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col ${
                 selectedBranch?.id === branch.id 
-                  ? 'border-blue-500 bg-blue-50/30 shadow-lg ring-1 ring-blue-500' 
-                  : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-md'
+                  ? 'border-primary bg-primary/5 shadow-lg ring-1 ring-primary' 
+                  : 'border-slate-200 bg-white hover:border-primary/30 hover:shadow-md'
               }`}
             >
               <h3 className="font-bold text-lg text-slate-900 mb-3">{branch.name}</h3>
               
-              <div className="flex items-start gap-3 text-slate-600 mb-3">
-                <MapPin size={18} className="shrink-0 text-blue-600 mt-0.5" />
+              <div className="flex items-start gap-3 text-slate-600 font-medium mb-3">
+                <MapPin size={18} className="shrink-0 text-primary mt-0.5" />
                 <p className="text-sm leading-relaxed">{branch.address}</p>
               </div>
-              <div className="flex items-center gap-3 text-slate-600 mb-5">
-                <Clock size={18} className="shrink-0 text-blue-600" />
-                <p className="text-sm font-medium">{branch.open_hours}</p>
+              <div className="flex items-center gap-3 text-slate-600 font-medium mb-5">
+                <Clock size={18} className="shrink-0 text-primary" />
+                <p className="text-sm">{branch.open_hours}</p>
               </div>
               
               <div className="pt-4 border-t border-slate-100 mb-4">
@@ -95,7 +95,7 @@ export default function LocationsPage() {
                     const Icon = IconMapper[fac.icon] || MapPin;
                     return (
                       <div key={fac.id} className="bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg flex items-center gap-2 text-slate-600 shadow-sm" title={fac.name}>
-                        <Icon size={14} className="text-blue-600" />
+                        <Icon size={14} className="text-primary" />
                         <span className="text-xs font-medium">{fac.name}</span>
                       </div>
                     );
@@ -109,7 +109,7 @@ export default function LocationsPage() {
                   target="_blank" 
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
+                  className="w-full py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
                 >
                   <MapPin size={16} /> Buka di Google Maps
                 </a>

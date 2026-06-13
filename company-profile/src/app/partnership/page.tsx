@@ -66,10 +66,10 @@ export default function PartnershipPage() {
   };
 
   return (
-    <div className="bg-slate-950 min-h-screen pt-28 pb-32 text-slate-50 relative overflow-hidden">
+    <div className="bg-slate-50 min-h-screen pt-28 pb-32 text-slate-900 relative overflow-hidden">
       {/* Background Decor */}
-      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-red-900/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-900/20 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-secondary/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="container mx-auto px-4 max-w-7xl relative z-10">
         
@@ -83,13 +83,13 @@ export default function PartnershipPage() {
           }}
           className="text-center mb-16 sm:mb-24"
         >
-          <motion.div variants={fadeIn} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel border-white/10 text-lime-400 text-xs sm:text-sm font-semibold tracking-widest uppercase mb-6 bg-lime-500/10 border-lime-500/20">
+          <motion.div variants={fadeIn} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel border-accent/30 text-accent text-xs sm:text-sm font-bold tracking-widest uppercase mb-6 bg-white/80 shadow-sm">
             <Handshake size={16} /> Kemitraan UMKM & B2B
           </motion.div>
-          <motion.h1 variants={fadeIn} className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white mb-6 sm:mb-8 tracking-tight">
-            Tumbuh Bersama <span className="bg-gradient-to-r from-blue-400 to-lime-400 text-gradient">Kami</span>
+          <motion.h1 variants={fadeIn} className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-slate-900 mb-6 sm:mb-8 tracking-tight">
+            Tumbuh Bersama <span className="bg-gradient-to-r from-primary to-accent text-gradient">Kami</span>
           </motion.h1>
-          <motion.p variants={fadeIn} className="text-base sm:text-lg md:text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed px-2">
+          <motion.p variants={fadeIn} className="text-base sm:text-lg md:text-xl text-slate-600 font-medium max-w-3xl mx-auto leading-relaxed px-2">
             Toserba Selamat membuka peluang kemitraan bagi UMKM dan Perusahaan yang memiliki produk unggulan untuk dipasarkan di seluruh jaringan ritel kami.
           </motion.p>
         </motion.div>
@@ -102,49 +102,49 @@ export default function PartnershipPage() {
             transition={{ duration: 0.8 }}
             className="lg:col-span-2 space-y-6"
           >
-            <div className="glass-panel-dark p-8 rounded-3xl border border-white/5 relative overflow-hidden group h-full">
-              <h3 className="text-2xl font-bold text-white mb-6">Mengapa Bermitra?</h3>
+            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl relative overflow-hidden group h-full">
+              <h3 className="text-2xl font-bold text-slate-900 mb-6">Mengapa Bermitra?</h3>
               
               <div className="space-y-6">
                 <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                     <Store size={24} />
                   </div>
                   <div>
-                    <h4 className="text-white font-semibold mb-1">Jaringan Penjualan Luas</h4>
-                    <p className="text-slate-400 text-sm leading-relaxed">Akses ke puluhan cabang kami yang tersebar strategis dengan ribuan pelanggan aktif setiap harinya.</p>
+                    <h4 className="text-slate-900 font-bold mb-1">Jaringan Penjualan Luas</h4>
+                    <p className="text-slate-600 font-medium text-sm leading-relaxed">Akses ke puluhan cabang kami yang tersebar strategis dengan ribuan pelanggan aktif setiap harinya.</p>
                   </div>
                 </div>
                 
                 <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-lime-500/10 border border-lime-500/20 flex items-center justify-center text-lime-400 shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
                     <TrendingUp size={24} />
                   </div>
                   <div>
-                    <h4 className="text-white font-semibold mb-1">Pertumbuhan Bisnis</h4>
-                    <p className="text-slate-400 text-sm leading-relaxed">Ekspansi pasar produk Anda secara masif melalui ekosistem offline dan online Toserba Selamat.</p>
+                    <h4 className="text-slate-900 font-bold mb-1">Pertumbuhan Bisnis</h4>
+                    <p className="text-slate-600 font-medium text-sm leading-relaxed">Ekspansi pasar produk Anda secara masif melalui ekosistem offline dan online Toserba Selamat.</p>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary shrink-0">
                     <Building2 size={24} />
                   </div>
                   <div>
-                    <h4 className="text-white font-semibold mb-1">Pembayaran Terjamin</h4>
-                    <p className="text-slate-400 text-sm leading-relaxed">Sistem keuangan yang profesional, transparan, dan dapat diandalkan untuk kenyamanan berbisnis.</p>
+                    <h4 className="text-slate-900 font-bold mb-1">Pembayaran Terjamin</h4>
+                    <p className="text-slate-600 font-medium text-sm leading-relaxed">Sistem keuangan yang profesional, transparan, dan dapat diandalkan untuk kenyamanan berbisnis.</p>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-12 p-6 rounded-2xl bg-slate-900/50 border border-white/5">
-                <h4 className="text-white font-semibold mb-3 flex items-center gap-2"><CheckCircle2 className="text-lime-400" size={18} /> Kategori Mitra Prioritas</h4>
-                <ul className="space-y-2 text-sm text-slate-400">
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Makanan & Minuman Kemasan</li>
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Fashion & Pakaian Muslim</li>
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Kebutuhan Rumah Tangga</li>
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Alat Tulis & Kantor</li>
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Supplier Bahan Baku Resto/Hotel</li>
+              <div className="mt-12 p-6 rounded-2xl bg-slate-50 border border-slate-200">
+                <h4 className="text-slate-900 font-bold mb-3 flex items-center gap-2"><CheckCircle2 className="text-accent" size={18} /> Kategori Mitra Prioritas</h4>
+                <ul className="space-y-2 text-sm text-slate-600 font-medium">
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Makanan & Minuman Kemasan</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Fashion & Pakaian Muslim</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Kebutuhan Rumah Tangga</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Alat Tulis & Kantor</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Supplier Bahan Baku Resto/Hotel</li>
                 </ul>
               </div>
             </div>
@@ -157,14 +157,14 @@ export default function PartnershipPage() {
             transition={{ duration: 0.8 }}
             className="lg:col-span-3"
           >
-            <div className="glass-panel-dark p-8 sm:p-12 rounded-[2rem] border border-blue-500/20 h-full relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-bl from-blue-500/5 to-transparent pointer-events-none" />
+            <div className="bg-white p-8 sm:p-12 rounded-[2rem] border border-slate-200 shadow-xl h-full relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-bl from-primary/5 to-transparent pointer-events-none" />
               
-              <h2 className="text-3xl font-bold text-white mb-2">Formulir Pengajuan Kemitraan</h2>
-              <p className="text-slate-400 mb-8">Lengkapi data usaha Anda. Tim kurasi kami akan menghubungi Anda untuk proses kurasi lebih lanjut jika memenuhi kriteria.</p>
+              <h2 className="text-3xl font-bold text-slate-900 mb-2">Formulir Pengajuan Kemitraan</h2>
+              <p className="text-slate-600 font-medium mb-8">Lengkapi data usaha Anda. Tim kurasi kami akan menghubungi Anda untuk proses kurasi lebih lanjut jika memenuhi kriteria.</p>
               
               {status === "success" && (
-                <div className="mb-8 p-4 rounded-xl bg-lime-500/10 border border-lime-500/30 text-lime-400 flex items-start gap-3">
+                <div className="mb-8 p-4 rounded-xl bg-accent/10 border border-accent/30 text-accent flex items-start gap-3">
                   <CheckCircle2 className="shrink-0 mt-0.5" />
                   <div>
                     <h4 className="font-bold mb-1">Berhasil Terkirim!</h4>
@@ -174,7 +174,7 @@ export default function PartnershipPage() {
               )}
 
               {status === "error" && (
-                <div className="mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-start gap-3">
+                <div className="mb-8 p-4 rounded-xl bg-secondary/10 border border-secondary/30 text-secondary flex items-start gap-3">
                   <AlertCircle className="shrink-0 mt-0.5" />
                   <div>
                     <h4 className="font-bold mb-1">Pengiriman Gagal</h4>
@@ -186,7 +186,7 @@ export default function PartnershipPage() {
               <form className="space-y-6 relative z-10" onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300 ml-1">Nama Usaha / Merek</label>
+                    <label className="text-sm font-bold text-slate-700 ml-1">Nama Usaha / Merek</label>
                     <input 
                       type="text" 
                       name="business_name"
@@ -194,11 +194,11 @@ export default function PartnershipPage() {
                       onChange={handleChange}
                       required
                       placeholder="Contoh: Keripik Singkong Barokah" 
-                      className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-medium"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300 ml-1">Nama Pemilik / PIC</label>
+                    <label className="text-sm font-bold text-slate-700 ml-1">Nama Pemilik / PIC</label>
                     <input 
                       type="text" 
                       name="owner_name"
@@ -206,14 +206,14 @@ export default function PartnershipPage() {
                       onChange={handleChange}
                       required
                       placeholder="Nama lengkap PIC" 
-                      className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-medium"
                     />
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300 ml-1">Nomor Handphone / WA</label>
+                    <label className="text-sm font-bold text-slate-700 ml-1">Nomor Handphone / WA</label>
                     <input 
                       type="tel" 
                       name="phone"
@@ -221,29 +221,29 @@ export default function PartnershipPage() {
                       onChange={handleChange}
                       required
                       placeholder="Nomor WA aktif" 
-                      className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-medium"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300 ml-1">Email Resmi</label>
+                    <label className="text-sm font-bold text-slate-700 ml-1">Email Resmi</label>
                     <input 
                       type="email" 
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="opsional@email.com" 
-                      className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-medium"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300 ml-1">Bentuk Kemitraan</label>
+                  <label className="text-sm font-bold text-slate-700 ml-1">Bentuk Kemitraan</label>
                   <select 
                     name="category"
                     value={formData.category}
                     onChange={handleChange}
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all appearance-none cursor-pointer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all appearance-none cursor-pointer font-medium"
                   >
                     <option value="Pemasok Barang (Supplier)">Pemasok Barang (Supplier)</option>
                     <option value="Sewa Tempat (Tenant)">Sewa Tempat Jualan (Tenant)</option>
@@ -253,7 +253,7 @@ export default function PartnershipPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-300 ml-1">Deskripsi Produk/Usaha</label>
+                  <label className="text-sm font-bold text-slate-700 ml-1">Deskripsi Produk/Usaha</label>
                   <textarea 
                     name="description"
                     value={formData.description}
@@ -261,14 +261,14 @@ export default function PartnershipPage() {
                     required
                     rows={4}
                     placeholder="Ceritakan secara singkat tentang produk Anda, keunggulannya, estimasi kapasitas produksi, dll..." 
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all resize-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all resize-none font-medium"
                   ></textarea>
                 </div>
 
                 <button 
                   type="submit"
                   disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] hover:-translate-y-1 w-full inline-flex justify-center items-center gap-3"
+                  className="bg-primary hover:bg-primary/90 disabled:bg-primary/50 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(36,42,122,0.2)] hover:shadow-[0_0_25px_rgba(36,42,122,0.4)] hover:-translate-y-1 w-full inline-flex justify-center items-center gap-3"
                 >
                   {loading ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>

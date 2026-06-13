@@ -34,10 +34,10 @@ export default function AboutPage() {
   ];
 
   return (
-    <div className="bg-slate-950 min-h-screen pt-28 pb-32 text-slate-50 relative overflow-hidden">
+    <div className="bg-slate-50 min-h-screen pt-28 pb-32 text-slate-900 relative overflow-hidden">
       {/* Background Decor */}
-      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-900/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-900/10 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-accent/20 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="container mx-auto px-4 max-w-6xl relative z-10">
         
@@ -51,20 +51,19 @@ export default function AboutPage() {
           }}
           className="text-center mb-24"
         >
-          <motion.div variants={fadeIn} className="inline-block px-4 py-1.5 rounded-full glass-panel border-white/10 text-blue-400 text-xs sm:text-sm font-semibold tracking-widest uppercase mb-6">
+          <motion.div variants={fadeIn} className="inline-block px-4 py-1.5 rounded-full glass-panel border-primary/20 text-primary text-xs sm:text-sm font-bold tracking-widest uppercase mb-6 bg-white/80">
             Mengenal Lebih Dekat
           </motion.div>
-          <motion.h1 variants={fadeIn} className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white mb-6 sm:mb-8 tracking-tight">
-            Tentang <span className="bg-gradient-to-r from-blue-400 to-red-500 text-gradient">Toserba Selamat</span>
+          <motion.h1 variants={fadeIn} className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-slate-900 mb-6 sm:mb-8 tracking-tight">
+            Tentang <span className="bg-gradient-to-r from-primary via-accent to-secondary text-gradient">Toserba Selamat</span>
           </motion.h1>
-          <motion.p variants={fadeIn} className="text-base sm:text-lg md:text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed px-2">
+          <motion.p variants={fadeIn} className="text-base sm:text-lg md:text-xl text-slate-600 font-medium max-w-3xl mx-auto leading-relaxed px-2">
             Lebih dari sekadar pusat perbelanjaan, kami adalah destinasi gaya hidup terpadu yang memadukan kebutuhan modern dengan nilai-nilai luhur dan keramahan keluarga.
           </motion.p>
         </motion.div>
 
-        {/* The Journey (Timeline Alternative) */}
         <div className="mb-32 relative">
-          <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-blue-500/0 via-blue-500/50 to-blue-500/0 hidden lg:block" />
+          <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-primary/0 via-primary/50 to-primary/0 hidden lg:block" />
           
           <div className="grid lg:grid-cols-2 gap-10 sm:gap-16 lg:gap-24 items-center relative">
             <motion.div 
@@ -74,17 +73,17 @@ export default function AboutPage() {
               transition={{ duration: 0.8 }}
               className="relative lg:text-right lg:pr-12"
             >
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 sm:mb-6">Perjalanan Kami</h2>
-              <p className="text-slate-400 mb-4 sm:mb-6 leading-relaxed text-base sm:text-lg">
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4 sm:mb-6">Perjalanan Kami</h2>
+              <p className="text-slate-600 font-medium mb-4 sm:mb-6 leading-relaxed text-base sm:text-lg">
                 Berawal dari sebuah toko sederhana, Toserba Selamat telah berkembang pesat menjadi jaringan ritel dan hospitality terkemuka.
               </p>
-              <p className="text-slate-400 leading-relaxed text-base sm:text-lg mb-6 sm:mb-8">
+              <p className="text-slate-600 font-medium leading-relaxed text-base sm:text-lg mb-6 sm:mb-8">
                 Komitmen kami tidak pernah berubah: menyajikan produk berkualitas tinggi dengan harga terjangkau dalam balutan pelayanan yang sepenuh hati dan fasilitas terintegrasi yang lengkap.
               </p>
-              <div className="inline-flex flex-col items-start lg:items-end p-5 sm:p-6 glass-panel-dark rounded-2xl border border-white/5 shadow-2xl relative overflow-hidden group">
-                <div className="absolute inset-0 bg-blue-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
-                <div className="text-4xl sm:text-5xl font-black text-blue-400 mb-2 relative z-10">26+</div>
-                <div className="text-sm sm:text-base text-slate-300 font-medium relative z-10">Cabang Tersebar untuk melayani Anda lebih dekat.</div>
+              <div className="inline-flex flex-col items-start lg:items-end p-5 sm:p-6 bg-white rounded-2xl border border-slate-200 shadow-xl hover:shadow-2xl transition-all relative overflow-hidden group">
+                <div className="absolute inset-0 bg-primary/5 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+                <div className="text-4xl sm:text-5xl font-black text-primary mb-2 relative z-10">26+</div>
+                <div className="text-sm sm:text-base text-slate-700 font-medium relative z-10">Cabang Tersebar untuk melayani Anda lebih dekat.</div>
               </div>
             </motion.div>
             
@@ -95,9 +94,9 @@ export default function AboutPage() {
               transition={{ duration: 0.8 }}
               className="relative lg:pl-12"
             >
-              <div className="absolute top-1/2 -left-[11px] w-5 h-5 rounded-full bg-slate-950 border-4 border-blue-500 z-20 hidden lg:block shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
-              <div className="rounded-3xl overflow-hidden glass-panel p-2 shadow-2xl relative">
-                <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/20 to-transparent mix-blend-overlay z-10" />
+              <div className="absolute top-1/2 -left-[11px] w-5 h-5 rounded-full bg-white border-4 border-primary z-20 hidden lg:block shadow-[0_0_15px_rgba(36,42,122,0.3)]" />
+              <div className="rounded-3xl overflow-hidden bg-white p-2 shadow-xl border border-slate-100 relative">
+                <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 to-transparent mix-blend-overlay z-10" />
                 <img 
                   src="https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=2574&auto=format&fit=crop" 
                   alt="Sejarah Kami" 
@@ -117,8 +116,8 @@ export default function AboutPage() {
           className="pt-10"
         >
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-white">Nilai Inti <span className="text-blue-500">Perusahaan</span></h2>
-            <p className="text-slate-400 text-base sm:text-lg md:text-xl">Prinsip yang membimbing setiap langkah dan pelayanan kami.</p>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-slate-900">Nilai Inti <span className="text-primary">Perusahaan</span></h2>
+            <p className="text-slate-600 font-medium text-base sm:text-lg md:text-xl">Prinsip yang membimbing setiap langkah dan pelayanan kami.</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
@@ -127,16 +126,16 @@ export default function AboutPage() {
               return (
                 <div 
                   key={idx} 
-                  className={`glass-panel-dark p-6 sm:p-8 md:p-10 rounded-3xl sm:rounded-[2rem] border border-white/5 hover:border-white/10 transition-colors group relative overflow-hidden ${val.span}`}
+                  className={`bg-white p-6 sm:p-8 md:p-10 rounded-3xl sm:rounded-[2rem] border border-slate-200 hover:border-primary/30 hover:shadow-xl transition-all group relative overflow-hidden ${val.span}`}
                 >
                   <div className={`absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl ${val.color} opacity-0 group-hover:opacity-10 transition-opacity duration-700 rounded-full blur-[80px] -mr-20 -mt-20`} />
                   
-                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl mb-6 sm:mb-8 flex items-center justify-center bg-gradient-to-br ${val.color} shadow-lg shadow-black/20 group-hover:scale-110 transition-transform duration-500`}>
+                  <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl mb-6 sm:mb-8 flex items-center justify-center bg-gradient-to-br ${val.color} shadow-md shadow-black/10 group-hover:scale-110 transition-transform duration-500`}>
                     <Icon className="text-white sm:w-8 sm:h-8" size={28} />
                   </div>
                   
-                  <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-slate-400 transition-all">{val.title}</h3>
-                  <p className="text-slate-400 leading-relaxed text-sm sm:text-base md:text-lg">{val.desc}</p>
+                  <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-slate-900 group-hover:text-primary transition-all">{val.title}</h3>
+                  <p className="text-slate-600 font-medium leading-relaxed text-sm sm:text-base md:text-lg">{val.desc}</p>
                 </div>
               );
             })}
