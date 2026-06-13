@@ -174,9 +174,9 @@ export const POSTransaction = ({
   const [localPrinterSettings, setLocalPrinterSettings] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('pos_printer_settings'));
-      return saved || { autoPrint: false, printMode: 'TEXT', receiptType: 1, feedBeforeHeaderBottom: false };
+      return saved || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
     } catch (e) {
-      return { autoPrint: false, printMode: 'TEXT', receiptType: 1, feedBeforeHeaderBottom: false };
+      return { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
     }
   });
   const [posSettings, setPosSettings] = useState(() => {
@@ -2161,20 +2161,11 @@ export const POSTransaction = ({
                   Hemat (Header di Bawah)
                 </label>
               </div>
-
-              {localPrinterSettings.receiptType === 2 && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', flex: 1 }}>
-                    <input type="checkbox" checked={!!localPrinterSettings.feedBeforeHeaderBottom} onChange={(e) => setLocalPrinterSettings(p => ({ ...p, feedBeforeHeaderBottom: e.target.checked }))} />
-                    Beri jeda 4 baris sebelum Header Bawah dicetak
-                  </label>
-                </div>
-              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn-secondary" onClick={() => {
-                const saved = JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1, feedBeforeHeaderBottom: false };
+                const saved = JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
                 setLocalPrinterSettings(saved);
                 setIsPrinterSettingsOpen(false);
               }}>Batal</button>

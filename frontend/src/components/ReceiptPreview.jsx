@@ -197,9 +197,8 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
   }
 
   if (isHeaderBottom) {
-    if (autoPrintSettings?.feedBeforeHeaderBottom) {
-      lines.push('\n\n\n\n');
-    }
+    // Feed 4 baris setelah footer dan sebelum header
+    lines.push('\n\n\n\n');
     lines.push(divider);
     lines.push(...headerOutputLines.filter(l => l !== divider));
   }
@@ -541,9 +540,8 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
           {isHeaderBottom && (
             <div className="receipt-header" style={{ marginTop: '1rem', borderTop: '1px dashed #ccc', paddingTop: '1rem' }}>
-              {autoPrintSettings?.feedBeforeHeaderBottom && (
-                 <div style={{ height: '3.5rem' }}></div>
-              )}
+              {/* Feed 4 baris sebelum header bawah */}
+              <div style={{ height: '3.5rem' }}></div>
               {!!branchSettings?.receipt_show_logo && (
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.6rem' }}>
                   <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
