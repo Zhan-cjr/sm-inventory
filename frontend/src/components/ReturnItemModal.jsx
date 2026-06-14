@@ -53,12 +53,37 @@ export const ReturnItemModal = ({ authToken, onSuccess, onCancel }) => {
           const req = store.getAll();
           
           req.onsuccess = () => {
-            const matched = req.result.find(tx => 
+            const allTxs = req.result;
+            const matched = allTxs.find(tx => 
               tx.receipt_number === receipt || 
               tx.localId === receipt || 
               tx.id === receipt
             );
-            resolve(matched ? normalizeLocalTransaction(matched) : null);
+            
+            if (!matched) {
+              resolve(null);
+              return;
+            }
+
+            const normalized = normalizeLocalTransaction(matched);
+
+            // Calculate offline returned quantities
+            const returnedQuantities = {};
+            allTxs.forEach(tx => {
+              if (tx.items && Array.isArray(tx.items)) {
+                tx.items.forEach(item => {
+                  if (item.originalTransactionId === normalized.id) {
+                    returnedQuantities[item.productId] = (returnedQuantities[item.productId] || 0) + Math.abs(item.quantity);
+                  }
+                });
+              }
+            });
+
+            normalized.items.forEach(item => {
+               item.returned_quantity = returnedQuantities[item.product_id] || 0;
+            });
+
+            resolve(normalized);
           };
           
           req.onerror = () => resolve(null);
@@ -217,16 +242,21 @@ export const ReturnItemModal = ({ authToken, onSuccess, onCancel }) => {
                     <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <td style={{ padding: '0.75rem' }}>{item.product?.name || 'Item Tidak Dikenal'}</td>
                       <td style={{ padding: '0.75rem', textAlign: 'center' }}>{formatCurrency(item.unit_price)}</td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>{item.quantity}</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        <div>{item.quantity}</div>
+                        {(item.returned_quantity > 0) && (
+                          <div style={{ fontSize: '0.8rem', color: '#f87171' }}>(Sdh Retur: {item.returned_quantity})</div>
+                        )}
+                      </td>
                       <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                         <input 
                           type="number" 
                           min="0" 
-                          max={item.quantity}
+                          max={Math.max(0, item.quantity - (item.returned_quantity || 0))}
                           className="modern-barcode-input"
                           style={{ width: '70px', padding: '0.25rem', textAlign: 'center' }}
                           value={returnItems[item.id]}
-                          onChange={(e) => handleQuantityChange(item.id, item.quantity, e.target.value)}
+                          onChange={(e) => handleQuantityChange(item.id, Math.max(0, item.quantity - (item.returned_quantity || 0)), e.target.value)}
                         />
                       </td>
                     </tr>

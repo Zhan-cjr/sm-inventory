@@ -454,8 +454,9 @@ export const POSTransaction = ({
       })
       .catch(err => console.error('Failed to sync server time:', err));
 
-    fetch('/api/v1/products', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
+    const fetchCatalog = () => {
+      fetch('/api/v1/products', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
     })
       .then(res => {
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -653,6 +654,12 @@ export const POSTransaction = ({
           } catch (e) { }
         }
       });
+    };
+
+    fetchCatalog();
+    const catalogTimer = setInterval(() => {
+      if (navigator.onLine) fetchCatalog();
+    }, 60000); // 1 menit
 
     fetch(`/api/v1/terminals?branch_id=${branchId}`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
@@ -767,6 +774,8 @@ export const POSTransaction = ({
         }
         setIsCheckingShift(false);
       });
+
+    return () => clearInterval(catalogTimer);
   }, [authToken, branchId]);
 
   const handleSelectTerminal = (terminal) => {

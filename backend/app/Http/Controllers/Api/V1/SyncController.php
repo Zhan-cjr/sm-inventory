@@ -166,6 +166,7 @@ class SyncController extends Controller
                             'unit_price' => $item['unitPrice'],
                             'discount_per_item' => ($item['manualDiscount'] ?? 0) + ($item['discountPerItem'] ?? 0),
                             'promotion_id' => $item['promotionId'] ?? $item['promotion_id'] ?? null,
+                            'original_transaction_id' => $item['originalTransactionId'] ?? null,
                         ]);
 
                         if (!$isService && isset($item['productType']) && $item['productType'] === 'digital') {

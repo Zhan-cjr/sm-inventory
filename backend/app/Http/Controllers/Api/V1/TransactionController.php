@@ -201,6 +201,7 @@ class TransactionController extends Controller
                         'unit_price' => $item['unit_price'],
                         'discount_per_item' => ($item['discount_per_item'] ?? 0) + ($item['discountPerItem'] ?? 0),
                         'promotion_id' => $item['promotionId'] ?? $item['promotion_id'] ?? null,
+                        'original_transaction_id' => $item['originalTransactionId'] ?? $item['original_transaction_id'] ?? null,
                     ]);
 
                     // Check Assembly
@@ -356,6 +357,15 @@ class TransactionController extends Controller
 
         if (!$transaction) {
             return response()->json(['message' => 'Transaksi tidak ditemukan.'], 404);
+        }
+
+        foreach ($transaction->items as $item) {
+            $returnedQuantity = \App\Models\TransactionItem::where('original_transaction_id', $transaction->id)
+                ->where('product_id', $item->product_id)
+                ->sum('quantity');
+            
+            // return quantities are stored as negative numbers
+            $item->returned_quantity = abs($returnedQuantity);
         }
 
         $this->refreshPendingPpobTransactions($transaction);
