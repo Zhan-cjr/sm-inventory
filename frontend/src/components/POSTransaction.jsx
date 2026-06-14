@@ -98,9 +98,13 @@ export const POSTransaction = ({
   })();
 
   const formatThousandSeparator = (valStr) => {
-    if (valStr === null || valStr === undefined) return '';
-    const clean = valStr.toString().replace(/[^0-9]/g, '');
-    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    if (valStr === null || valStr === undefined || valStr === '') return '';
+    const strVal = String(valStr);
+    const isNegative = strVal.startsWith('-');
+    const clean = strVal.replace(/[^0-9]/g, '');
+    if (!clean) return isNegative ? '-' : '';
+    const formatted = clean.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return isNegative ? '-' + formatted : formatted;
   };
 
   const [items, setItems] = useState(() => {
@@ -1351,6 +1355,7 @@ export const POSTransaction = ({
     // Preserve items in the cart!
     setManualTotalDiscount(0);
     setQueuedDiscount(null);
+    setIsReturnMode(false);
     setReceivedAmount('');
     setPayments([]);
     setInputValue('');
@@ -1405,7 +1410,7 @@ export const POSTransaction = ({
       setIsBankSelectOpen(true);
     } else if (method === 'CASH') {
       const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-      setDirectCashInput(sisa > 0 ? formatThousandSeparator(sisa) : '');
+      setDirectCashInput(sisa !== 0 ? formatThousandSeparator(sisa) : '');
       setIsDirectCashModalOpen(true);
     } else {
       processTransaction(method);
@@ -1752,6 +1757,11 @@ export const POSTransaction = ({
       const setting = settingsList.find(s => s.shortcut_key && s.shortcut_key.toLowerCase() === e.key.toLowerCase());
       const isActive = (val) => val === true || val === 1 || val === "1";
       if (!setting || !isActive(setting.is_active)) return;
+
+      // Block shortcuts if any modal overlay is present
+      if (document.querySelector('.change-modal-overlay') || document.querySelector('.modal-overlay')) {
+        return;
+      }
 
       // If focusing on input, we only allow key presses that are exactly registered in settingsList
       if (e.target.tagName === 'INPUT') {
@@ -2429,7 +2439,7 @@ export const POSTransaction = ({
                 <button key={bank.id} className="bank-item-btn" onClick={() => {
                   setSelectedBank(bank);
                   const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-                  setDirectCardInput(sisa > 0 ? formatThousandSeparator(sisa) : '');
+                  setDirectCardInput(sisa !== 0 ? formatThousandSeparator(sisa) : '');
                   setIsBankSelectOpen(false);
                   setIsDirectCardAmountModalOpen(true);
                 }}>
@@ -2794,7 +2804,7 @@ export const POSTransaction = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const val = parseFloat(directCashInput.replace(/\./g, ''));
-                  if (!isNaN(val) && val > 0) {
+                  if (!isNaN(val) && val !== 0) {
                     setIsDirectCashModalOpen(false);
                     processTransaction('CASH', null, val);
                   }
@@ -2810,7 +2820,7 @@ export const POSTransaction = ({
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsDirectCashModalOpen(false); setDirectCashInput(''); }}>BATAL (Esc)</button>
               <button className="btn-success" style={{ flex: 1 }} onClick={() => {
                 const val = parseFloat(directCashInput.replace(/\./g, ''));
-                if (!isNaN(val) && val > 0) {
+                if (!isNaN(val) && val !== 0) {
                   setIsDirectCashModalOpen(false);
                   processTransaction('CASH', null, val);
                 }
@@ -2839,7 +2849,7 @@ export const POSTransaction = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const val = parseFloat(directCardInput.replace(/\./g, ''));
-                  if (!isNaN(val) && val > 0) {
+                  if (!isNaN(val) && val !== 0) {
                     setIsDirectCardAmountModalOpen(false);
                     processTransaction('CARD', selectedBank?.id, val);
                   }
@@ -2855,7 +2865,7 @@ export const POSTransaction = ({
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsDirectCardAmountModalOpen(false); setDirectCardInput(''); }}>BATAL (Esc)</button>
               <button className="btn-success" style={{ flex: 1 }} onClick={() => {
                 const val = parseFloat(directCardInput.replace(/\./g, ''));
-                if (!isNaN(val) && val > 0) {
+                if (!isNaN(val) && val !== 0) {
                   setIsDirectCardAmountModalOpen(false);
                   processTransaction('CARD', selectedBank?.id, val);
                 }

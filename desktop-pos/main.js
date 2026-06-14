@@ -103,7 +103,7 @@ function createMainWindow() {
       ]
     }
   ];
-  
+
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 }
@@ -162,7 +162,7 @@ ipcMain.handle('silent-print', (event, htmlContent, printerName) => {
     });
 
     const htmlUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
-    
+
     printWindow.loadURL(htmlUrl).then(() => {
       printWindow.webContents.print({
         silent: true,
@@ -189,7 +189,7 @@ ipcMain.handle('print-raw', async (event, rawText, printerName) => {
   try {
     const config = loadConfig();
     let finalText = rawText;
-    
+
     // Fix header position if receiptType is 2 (Header di Bawah)
     if (config && config.receiptType === 2) {
       const lines = finalText.split(/\r?\n/);
@@ -200,16 +200,18 @@ ipcMain.handle('print-raw', async (event, rawText, printerName) => {
           break;
         }
       }
-      
+
       if (dividerIndex !== -1 && !lines[0].startsWith('Kasir:') && !lines[0].includes('*** COPY')) {
         const header = lines.slice(0, dividerIndex + 1);
         const body = lines.slice(dividerIndex + 1);
-        
+
         while (body.length > 0 && body[body.length - 1].trim() === '') {
           body.pop();
         }
-        
-        finalText = body.join('\n') + '\n' + header.join('\n') + '\n\n\n\n\n';
+
+        // Gunakan spasi untuk tiap baris kosong agar driver Windows Generic / Text Only tidak membuangnya
+        const feed = '\n \n \n \n \n \n';
+        finalText = body.join('\n') + feed + header.join('\n') + '\n.\n';
       }
     }
 
@@ -225,7 +227,7 @@ ipcMain.handle('print-raw', async (event, rawText, printerName) => {
       const escapedText = finalText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const htmlContent = `<html><head><style>@page { margin: 0; } body { margin: 0; padding: 0; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>${escapedText}</pre></body></html>`;
       const htmlUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
-      
+
       printWindow.loadURL(htmlUrl).then(() => {
         printWindow.webContents.print({
           silent: true,
@@ -257,7 +259,7 @@ ipcMain.handle('open-cash-drawer', async (event, printerName) => {
     const config = loadConfig();
     let targetPrinter = (config && config.drawerPath) ? config.drawerPath : (printerName || (config && config.printerName) || 'LPT1');
     targetPrinter = targetPrinter.trim();
-    
+
     // Create drawer.bin with ESC p 0 25 250 command
     const drawerBytes = Buffer.from([0x1B, 0x70, 0x00, 0x19, 0xFA]);
     const binPath = path.join(app.getPath('userData'), 'drawer.bin');

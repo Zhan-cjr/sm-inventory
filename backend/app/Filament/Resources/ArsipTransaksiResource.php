@@ -264,6 +264,13 @@ class ArsipTransaksiResource extends Resource
                 Tables\Columns\TextColumn::make('total_amount')
                     ->label('Penjualan')
                     ->money('IDR', true)
+                    ->state(function (Transaction $record) {
+                        if ($record->transaction_type === 'RETURN') {
+                            $salesAmount = $record->items->where('quantity', '>', 0)->sum(function($i) { return $i->quantity * $i->unit_price; });
+                            return $salesAmount;
+                        }
+                        return $record->total_amount;
+                    })
                     ->summarize(Sum::make()->label('Total')->money('IDR')),
                 Tables\Columns\TextColumn::make('final_amount')
                     ->label('Total Trans')
@@ -374,7 +381,13 @@ class ArsipTransaksiResource extends Resource
                 Tables\Columns\TextColumn::make('retur')
                     ->label('Retur')
                     ->money('IDR', true)
-                    ->state(fn (Transaction $record) => $record->transaction_type === 'RETURN' ? abs($record->final_amount) : 0)
+                    ->state(function (Transaction $record) {
+                        if ($record->transaction_type === 'RETURN') {
+                            $returnAmount = $record->items->where('quantity', '<', 0)->sum(function($i) { return abs($i->quantity * $i->unit_price); });
+                            return $returnAmount > 0 ? $returnAmount : abs($record->final_amount);
+                        }
+                        return 0;
+                    })
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
@@ -596,6 +609,11 @@ class ArsipTransaksiResource extends Resource
     public static function canCreate(): bool
     {
         return false; // Arsip is read-only
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with('items');
     }
 }
 
