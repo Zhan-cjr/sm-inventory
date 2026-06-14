@@ -1756,6 +1756,20 @@ export const POSTransaction = ({
       // Find if the key pressed is one of the active registered shortcut keys (case-insensitive)
       const setting = settingsList.find(s => s.shortcut_key && s.shortcut_key.toLowerCase() === e.key.toLowerCase());
       const isActive = (val) => val === true || val === 1 || val === "1";
+
+      // Global Escape handler for modals
+      if (e.key === 'Escape') {
+        const modals = document.querySelectorAll('.change-modal-overlay, .modal-overlay');
+        if (modals.length > 0) {
+          const topModal = modals[modals.length - 1];
+          const batalBtn = Array.from(topModal.querySelectorAll('button')).find(btn => btn.textContent.toLowerCase().includes('batal'));
+          if (batalBtn) {
+            batalBtn.click();
+            return;
+          }
+        }
+      }
+
       if (!setting || !isActive(setting.is_active)) return;
 
       // Block shortcuts if any modal overlay is present
