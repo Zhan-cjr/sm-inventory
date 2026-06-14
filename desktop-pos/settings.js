@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (config.printerName) printerNameSelect.value = config.printerName;
       if (config.printMode) printModeSelect.value = config.printMode;
       if (config.receiptType) receiptTypeSelect.value = config.receiptType;
+      if (config.columns !== undefined) document.getElementById('columns').value = config.columns;
+      if (config.feedLines !== undefined) document.getElementById('feedLines').value = config.feedLines;
       if (config.autoPrint) autoPrintCheckbox.checked = config.autoPrint;
     }
   }
@@ -44,6 +46,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       printerName: printerNameSelect.value,
       printMode: printModeSelect.value,
       receiptType: parseInt(receiptTypeSelect.value, 10),
+      columns: parseInt(document.getElementById('columns').value, 10) || 32,
+      feedLines: parseInt(document.getElementById('feedLines').value, 10) || 0,
       autoPrint: autoPrintCheckbox.checked
     };
 

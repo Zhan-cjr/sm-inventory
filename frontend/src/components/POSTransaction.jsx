@@ -173,9 +173,9 @@ export const POSTransaction = ({
   const [isPrinterSettingsOpen, setIsPrinterSettingsOpen] = useState(false);
   const [localPrinterSettings, setLocalPrinterSettings] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
+      return JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1, columns: 32, feedLines: 4, printerName: '' };
     } catch (e) {
-      return { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
+      return { autoPrint: false, printMode: 'TEXT', receiptType: 1, columns: 32, feedLines: 4, printerName: '' };
     }
   });
   const [posSettings, setPosSettings] = useState(() => {
@@ -297,11 +297,15 @@ export const POSTransaction = ({
     if (window.electronAPI) {
       window.electronAPI.getConfig().then(config => {
         if (config) {
-          setLocalPrinterSettings({
-            autoPrint: !!config.autoPrint,
-            printMode: config.printMode || 'TEXT',
-            printerName: config.printerName || ''
-          });
+          setLocalPrinterSettings(prev => ({
+            ...prev,
+            autoPrint: config.autoPrint !== undefined ? !!config.autoPrint : prev.autoPrint,
+            printMode: config.printMode || prev.printMode,
+            printerName: config.printerName !== undefined ? config.printerName : prev.printerName,
+            receiptType: config.receiptType || prev.receiptType,
+            columns: config.columns || prev.columns,
+            feedLines: config.feedLines !== undefined ? config.feedLines : prev.feedLines
+          }));
         }
       });
     }
@@ -2159,6 +2163,41 @@ export const POSTransaction = ({
                   Hemat (Header di Bawah)
                 </label>
               </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Banyak Huruf (Kolom)</label>
+                  <input 
+                    type="number" 
+                    className="modern-barcode-input" 
+                    value={localPrinterSettings.columns || 32} 
+                    onChange={(e) => setLocalPrinterSettings(p => ({ ...p, columns: parseInt(e.target.value) || 32 }))}
+                    style={{ width: '100%', padding: '0.5rem' }}
+                  />
+                  <small style={{ color: '#64748b', fontSize: '0.75rem' }}>Biasa 32 atau 40 (Thermal 58mm/80mm)</small>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Tambahkan Feed</label>
+                  <input 
+                    type="number" 
+                    className="modern-barcode-input" 
+                    value={localPrinterSettings.feedLines || 0} 
+                    onChange={(e) => setLocalPrinterSettings(p => ({ ...p, feedLines: parseInt(e.target.value) || 0 }))}
+                    style={{ width: '100%', padding: '0.5rem' }}
+                  />
+                  <small style={{ color: '#64748b', fontSize: '0.75rem' }}>Baris kosong di bawah struk</small>
+                </div>
+              </div>
+
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Nama Printer Target (Opsional)</label>
+              <input 
+                type="text" 
+                className="modern-barcode-input" 
+                placeholder="Biarkan kosong untuk default"
+                value={localPrinterSettings.printerName || ''} 
+                onChange={(e) => setLocalPrinterSettings(p => ({ ...p, printerName: e.target.value }))}
+                style={{ width: '100%', padding: '0.5rem', marginBottom: '1.5rem' }}
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

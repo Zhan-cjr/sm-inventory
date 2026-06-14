@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Printer, X } from 'lucide-react';
 import Barcode from 'react-barcode';
 
-const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, columns = 32) => {
+const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, columns = 32, feedLines = 4) => {
   const {
     items, totalAmount, discountAmount, finalAmount, paymentMethod,
     terminalId, receivedAmount, changeAmount, branchName, branchAddress, orgName,
@@ -196,15 +196,18 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
     });
   }
 
+  // Feed paper (Feed selalu setelah footer)
+  if (feedLines > 0) {
+    lines.push('\r\n'.repeat(feedLines));
+  }
+
+  // Header di bawah (Mode Hemat: dicetak setelah feed agar menjadi header untuk struk berikutnya)
   if (isHeaderBottom) {
     lines.push(divider);
     lines.push(...headerOutputLines.filter(l => l !== divider));
   }
 
-  // Feed paper (5 lines) to allow tearing
-  lines.push('\n\n\n\n\n');
-
-  return lines.join('\n');
+  return lines.join('\r\n');
 };
 
 export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, autoPrintSettings }) => {
@@ -251,7 +254,9 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
   const handlePrintRawText = () => {
     // Removed ESC p 0 25 250 (Buka Cash Drawer 1) due to null bytes blocking print dialogs
-    const rawText = generateRawTextReceipt(transaction, branchSettings, isHeaderBottom, 35);
+    const printCols = autoPrintSettings?.columns || 32;
+    const feedLines = autoPrintSettings?.feedLines ?? 4;
+    const rawText = generateRawTextReceipt(transaction, branchSettings, isHeaderBottom, printCols, feedLines);
 
     if (window.electronAPI && window.electronAPI.printRaw) {
       window.electronAPI.printRaw(rawText, autoPrintSettings?.printerName).then(() => {
