@@ -64,6 +64,8 @@ class ReportPrintController extends Controller
                 return $this->printPromoSellout($request);
             case 'supplier-deductions':
                 return $this->printSupplierDeductions($filters);
+            case 'rekapitulasi_transaksi':
+                return $this->printRekapitulasiTransaksi($request);
             default:
                 abort(404, 'Tipe laporan tidak ditemukan');
         }
@@ -143,6 +145,128 @@ class ReportPrintController extends Controller
         }
 
         return 'Semua Waktu';
+    }
+
+    private function printRekapitulasiTransaksi(Request $request)
+    {
+        $filters = $request->input('tableFilters', []);
+        
+        $branchQuery = \App\Models\Branch::query();
+        if (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $branchQuery->where('id', $filters['branch_id']['value']);
+        }
+        $branches = $branchQuery->get();
+
+        $startDateTime = Carbon::now()->startOfMonth();
+        $endDateTime = Carbon::now()->endOfMonth();
+
+        $dateData = $filters['transaction_date'] ?? null;
+        if ($dateData) {
+            $period = $dateData['period'] ?? null;
+            if ($period === 'today') {
+                $startDateTime = Carbon::today();
+                $endDateTime = Carbon::today()->endOfDay();
+            } elseif ($period === 'yesterday') {
+                $startDateTime = Carbon::yesterday();
+                $endDateTime = Carbon::yesterday()->endOfDay();
+            } elseif ($period === 'this_week') {
+                $startDateTime = Carbon::now()->startOfWeek();
+                $endDateTime = Carbon::now()->endOfWeek();
+            } elseif ($period === 'last_week') {
+                $startDateTime = Carbon::now()->subWeek()->startOfWeek();
+                $endDateTime = Carbon::now()->subWeek()->endOfWeek();
+            } elseif ($period === 'this_month') {
+                $startDateTime = Carbon::now()->startOfMonth();
+                $endDateTime = Carbon::now()->endOfMonth();
+            } elseif ($period === 'last_month') {
+                $startDateTime = Carbon::now()->subMonth()->startOfMonth();
+                $endDateTime = Carbon::now()->subMonth()->endOfMonth();
+            } elseif ($period === 'custom') {
+                if (!empty($dateData['created_from'])) $startDateTime = Carbon::parse($dateData['created_from'])->startOfDay();
+                if (!empty($dateData['created_until'])) $endDateTime = Carbon::parse($dateData['created_until'])->endOfDay();
+            }
+        }
+        $branches = $branchQuery->get();
+
+        $returReasonIds = \App\Models\AdjustmentReason::where('name', 'like', '%retur%')->pluck('id');
+
+        $resultBranches = [];
+        $grandTotals = [
+            'penerimaan' => 0,
+            'retur_beli' => 0,
+            'koreksi_retur' => 0,
+            'penjualan' => 0,
+            'retur_jual' => 0,
+            'pengeluaran' => 0,
+        ];
+
+        foreach ($branches as $branch) {
+            $bId = $branch->id;
+
+            $penerimaan = \App\Models\GoodsReceipt::whereIn('status', ['RECEIVED', 'COMPLETED', 'completed', 'approved'])
+                ->where('branch_id', $bId)
+                ->whereBetween('receipt_date', [$startDateTime, $endDateTime])
+                ->sum('total_amount');
+
+            $returBeli = \App\Models\PurchaseReturn::whereIn('status', ['completed', 'approved'])
+                ->where('branch_id', $bId)
+                ->whereBetween('return_date', [$startDateTime, $endDateTime])
+                ->sum('total_amount');
+
+            $koreksiReturIds = \App\Models\StockAdjustment::whereIn('status', ['COMPLETED', 'completed', 'APPROVED', 'approved'])
+                ->whereIn('adjustment_reason_id', $returReasonIds)
+                ->where('branch_id', $bId)
+                ->whereBetween('adjustment_date', [$startDateTime, $endDateTime])
+                ->pluck('id');
+
+            $koreksiRetur = 0;
+            if (!$koreksiReturIds->isEmpty()) {
+                $koreksiRetur = \App\Models\StockAdjustmentItem::whereIn('stock_adjustment_id', $koreksiReturIds)
+                    ->sum(\Illuminate\Support\Facades\DB::raw('ABS(adjustment_quantity * unit_cost)'));
+            }
+
+            $penjualan = Transaction::where('transaction_type', 'SALES')
+                ->where('is_voided', false)
+                ->where('branch_id', $bId)
+                ->whereBetween('transaction_date', [$startDateTime, $endDateTime])
+                ->sum('final_amount');
+
+            $returJual = abs((float) Transaction::where('transaction_type', 'RETURN')
+                ->where('is_voided', false)
+                ->where('branch_id', $bId)
+                ->whereBetween('transaction_date', [$startDateTime, $endDateTime])
+                ->sum('final_amount'));
+
+            $pengeluaran = \App\Models\Expense::where('branch_id', $bId)
+                ->whereBetween('expense_date', [$startDateTime, $endDateTime])
+                ->sum('amount');
+
+            $resultBranches[] = [
+                'branch_name' => $branch->name,
+                'penerimaan' => $penerimaan,
+                'retur_beli' => $returBeli,
+                'koreksi_retur' => $koreksiRetur,
+                'penjualan' => $penjualan,
+                'retur_jual' => $returJual,
+                'pengeluaran' => $pengeluaran,
+            ];
+
+            $grandTotals['penerimaan'] += $penerimaan;
+            $grandTotals['retur_beli'] += $returBeli;
+            $grandTotals['koreksi_retur'] += $koreksiRetur;
+            $grandTotals['penjualan'] += $penjualan;
+            $grandTotals['retur_jual'] += $returJual;
+            $grandTotals['pengeluaran'] += $pengeluaran;
+        }
+
+        $period = $this->getPeriodString($filters, 'transaction_date');
+
+        return view('print.reports.rekapitulasi-transaksi', [
+            'branches' => $resultBranches,
+            'totals' => $grandTotals,
+            'period' => $period,
+            'title' => 'Rekapitulasi Transaksi'
+        ]);
     }
 
     private function printPenjualanKasir($filters)

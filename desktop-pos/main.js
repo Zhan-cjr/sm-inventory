@@ -251,3 +251,35 @@ ipcMain.handle('print-raw', async (event, rawText, printerName) => {
     return { success: false, error: err.message };
   }
 });
+
+ipcMain.handle('open-cash-drawer', async (event, printerName) => {
+  try {
+    const config = loadConfig();
+    const targetPrinter = printerName || (config && config.printerName) || 'LPT1';
+    
+    // Create drawer.bin with ESC p 0 25 250 command
+    const drawerBytes = Buffer.from([0x1B, 0x70, 0x00, 0x19, 0xFA]);
+    const binPath = path.join(app.getPath('userData'), 'drawer.bin');
+    fs.writeFileSync(binPath, drawerBytes);
+
+    return new Promise((resolve) => {
+      let cmd = '';
+      if (targetPrinter.toUpperCase().startsWith('LPT') || targetPrinter.toUpperCase().startsWith('COM')) {
+        cmd = `copy /B "${binPath}" ${targetPrinter}:`;
+      } else {
+        cmd = `copy /B "${binPath}" "\\\\127.0.0.1\\${targetPrinter}"`;
+      }
+
+      exec(cmd, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Drawer open error: ${error.message}`);
+          resolve({ success: false, error: error.message });
+          return;
+        }
+        resolve({ success: true });
+      });
+    });
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});

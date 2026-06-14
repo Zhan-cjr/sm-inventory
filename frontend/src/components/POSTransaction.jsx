@@ -1808,6 +1808,9 @@ export const POSTransaction = ({
           });
           break;
         case 'btn_kas':
+          if (window.electronAPI && window.electronAPI.openCashDrawer) {
+            window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
+          }
           setIsCashMovementModalOpen(true);
           break;
         case 'btn_void_item':
@@ -1844,6 +1847,9 @@ export const POSTransaction = ({
           setIsQtyModalOpen(true);
           break;
         case 'btn_close_shift':
+          if (window.electronAPI && window.electronAPI.openCashDrawer) {
+            window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
+          }
           setIsCloseShiftModalOpen(true);
           break;
         case 'btn_reprint_last':
@@ -3279,7 +3285,12 @@ export const POSTransaction = ({
             <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction())}><Lock size={16} />{renderBtnLabel('btn_hold', 'Hold', 'PgUp')}</button>
             <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true))}><History size={16} />{renderBtnLabel('btn_recall', 'Recall', 'PgDn')}</button>
             <button className="func-btn action" onClick={() => setIsMemberModalOpen(true)}><User size={16} />{renderBtnLabel('btn_member', 'Member', 'Home')}</button>
-            <button className="func-btn action" onClick={() => setIsCashMovementModalOpen(true)}><Wallet size={16} />{renderBtnLabel('btn_kas', 'Kas M/K', '')}</button>
+            <button className="func-btn action" onClick={() => {
+              if (window.electronAPI && window.electronAPI.openCashDrawer) {
+                window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
+              }
+              setIsCashMovementModalOpen(true);
+            }}><Wallet size={16} />{renderBtnLabel('btn_kas', 'Kas M/K', '')}</button>
             <button className="func-btn secondary" onClick={() => requestAuthorization("RETURN", () => setIsReturnModalOpen(true))}><RotateCcw size={16} />{renderBtnLabel('btn_retur', 'Retur', 'End')}</button>
             <button className="func-btn secondary" onClick={() => requestAuthorization("REPRINT_LAST", () => handleReprintLast())}><History size={16} />{renderBtnLabel('btn_reprint_last', 'Reprint 1', 'F11')}</button>
             <button className="func-btn action" onClick={() => requestAuthorization("REPRINT_OLD", () => setIsReprintOldModalOpen(true))}><Search size={16} />{renderBtnLabel('btn_reprint_old', 'Reprint L', 'F12')}</button>
@@ -3289,7 +3300,12 @@ export const POSTransaction = ({
             <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0))}><Eraser size={16} />{renderBtnLabel('btn_void_item', 'Void Item', 'Delete')}</button>
             <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={16} />{renderBtnLabel('btn_void_all', 'Void All', 'Escape')}</button>
             <button className="func-btn danger" onClick={handleClearDiscount} style={{ background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' }}><X size={16} />{renderBtnLabel('btn_clear', 'Clear', 'Insert')}</button>
-            <button className="func-btn secondary" onClick={() => setIsCloseShiftModalOpen(true)}><LogOut size={16} />{renderBtnLabel('btn_close_shift', 'Tutup Shift', 'F8')}</button>
+            <button className="func-btn secondary" onClick={() => {
+              if (window.electronAPI && window.electronAPI.openCashDrawer) {
+                window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
+              }
+              setIsCloseShiftModalOpen(true);
+            }}><LogOut size={16} />{renderBtnLabel('btn_close_shift', 'Tutup Shift', 'F8')}</button>
           </div>
 
           <div className="input-action-section" style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
