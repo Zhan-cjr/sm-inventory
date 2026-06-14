@@ -1473,6 +1473,7 @@ export const POSTransaction = ({
         payments: finalPayments,
         bankId: bankId,
         terminalId: terminalInfo.id,
+        terminalCode: terminalInfo?.code,
         customerId: selectedCustomer?.id,
         shiftId: activeShift?.id,
         receivedAmount: currentReceived,
@@ -1615,6 +1616,8 @@ export const POSTransaction = ({
     const ppobs = data.ppob_transactions ? [...data.ppob_transactions] : [];
     return {
       receiptNumber: data.receipt_number,
+      terminalId: data.terminal_id,
+      terminalCode: data.terminal?.code || data.terminal_code,
       timestamp: data.created_at,
       items: data.items.map(item => {
         let sn = null;

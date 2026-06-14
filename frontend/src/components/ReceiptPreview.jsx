@@ -6,8 +6,11 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
   const {
     items, totalAmount, discountAmount, finalAmount, paymentMethod,
     terminalId, receivedAmount, changeAmount, branchName, branchAddress, orgName,
-    userName, customerName, timestamp, receipt_number, isReprint
+    userName, customerName, timestamp, isReprint
   } = transaction;
+
+  const receipt_number = transaction.receipt_number || transaction.receiptNumber;
+  const terminal_code = transaction.terminalCode || transaction.terminal_code || terminalId?.split('-')[0] || 'T01';
 
   const pad = (str, len, char = ' ') => {
     str = String(str);
@@ -95,7 +98,7 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
     hour: '2-digit', minute: '2-digit'
   });
   lines.push(pad(`Tgl  : ${dateStr}`, columns));
-  lines.push(pad(`Kassa: ${terminalId?.split('-')[0] || 'T01'}`, columns));
+  lines.push(pad(`Kassa: ${terminal_code}`, columns));
   if (receipt_number) {
     lines.push(pad(`Nota : ${receipt_number}`, columns));
   }
@@ -109,8 +112,10 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
     if (item.ppobStatus) lines.push(pad(`  Status: ${item.ppobStatus}`, columns));
     if (item.ppobMessage) lines.push(pad(`  Ket: ${item.ppobMessage}`, columns));
 
-    const qtyPrice = `${item.quantity} x ${item.unitPrice.toLocaleString('id-ID')}`;
-    const sub = (item.quantity * item.unitPrice).toLocaleString('id-ID');
+    const unitPriceNum = Number(item.unitPrice);
+    const qtyNum = Number(item.quantity);
+    const qtyPrice = `${item.quantity} x ${unitPriceNum.toLocaleString('id-ID')}`;
+    const sub = (qtyNum * unitPriceNum).toLocaleString('id-ID');
     const space = columns - qtyPrice.length - sub.length;
     if (space > 0) {
       lines.push(qtyPrice + ' '.repeat(space) + sub);
@@ -132,7 +137,10 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
   lines.push(divider);
 
   const formatRow = (label, val) => {
-    const valStr = typeof val === 'number' ? val.toLocaleString('id-ID') : String(val);
+    let valStr = String(val);
+    if (!isNaN(val) && val !== null && val !== '') {
+      valStr = Number(val).toLocaleString('id-ID');
+    }
     const space = columns - label.length - valStr.length;
     return label + ' '.repeat(Math.max(1, space)) + valStr;
   };
@@ -217,7 +225,10 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
 };
 
 export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, autoPrintSettings }) => {
-  const { items, totalAmount, discountAmount, finalAmount, paymentMethod, bankId, terminalId, receivedAmount, changeAmount, appliedPromos, branchName, branchAddress, orgName, userName, customerName, timestamp, receipt_number, isReprint } = transaction;
+  const { items, totalAmount, discountAmount, finalAmount, paymentMethod, bankId, terminalId, receivedAmount, changeAmount, appliedPromos, branchName, branchAddress, orgName, userName, customerName, timestamp, isReprint } = transaction;
+
+  const receipt_number = transaction.receipt_number || transaction.receiptNumber;
+  const terminal_code = transaction.terminalCode || transaction.terminal_code || terminalId?.split('-')[0] || 'T01';
 
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
@@ -401,7 +412,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
             <p>Kasir: {userName}</p>
             {customerName && <p>Member: {customerName}</p>}
             <p>Tgl  : {new Date(timestamp).toLocaleString('id-ID')}</p>
-            <p>Kassa: {terminalId?.split('-')[0] || 'T01'}</p>
+            <p>Kassa: {terminal_code}</p>
             <p className="divider">----------------------------------------</p>
           </div>
 
