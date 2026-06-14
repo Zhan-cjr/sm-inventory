@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const printerNameSelect = document.getElementById('printerName');
   const printModeSelect = document.getElementById('printMode');
   const receiptTypeSelect = document.getElementById('receiptType');
+  const drawerPathInput = document.getElementById('drawerPath');
   const autoPrintCheckbox = document.getElementById('autoPrint');
   
   const form = document.getElementById('settingsForm');
@@ -26,6 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (config.posUrl) posUrlInput.value = config.posUrl;
       if (config.serverUrl) serverUrlInput.value = config.serverUrl;
       if (config.printerName) printerNameSelect.value = config.printerName;
+      if (config.drawerPath) drawerPathInput.value = config.drawerPath;
       if (config.printMode) printModeSelect.value = config.printMode;
       if (config.receiptType) receiptTypeSelect.value = config.receiptType;
       if (config.columns !== undefined) document.getElementById('columns').value = config.columns;
@@ -44,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       posUrl: posUrlInput.value,
       serverUrl: serverUrlInput.value,
       printerName: printerNameSelect.value,
+      drawerPath: drawerPathInput.value,
       printMode: printModeSelect.value,
       receiptType: parseInt(receiptTypeSelect.value, 10),
       columns: parseInt(document.getElementById('columns').value, 10) || 32,

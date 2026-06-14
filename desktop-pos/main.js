@@ -255,7 +255,8 @@ ipcMain.handle('print-raw', async (event, rawText, printerName) => {
 ipcMain.handle('open-cash-drawer', async (event, printerName) => {
   try {
     const config = loadConfig();
-    const targetPrinter = printerName || (config && config.printerName) || 'LPT1';
+    let targetPrinter = (config && config.drawerPath) ? config.drawerPath : (printerName || (config && config.printerName) || 'LPT1');
+    targetPrinter = targetPrinter.trim();
     
     // Create drawer.bin with ESC p 0 25 250 command
     const drawerBytes = Buffer.from([0x1B, 0x70, 0x00, 0x19, 0xFA]);

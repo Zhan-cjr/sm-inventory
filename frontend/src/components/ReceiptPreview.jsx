@@ -279,6 +279,9 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
     const rawText = generateRawTextReceipt(transaction, branchSettings, isHeaderBottom, printCols, feedLines);
 
     if (window.electronAPI && window.electronAPI.printRaw) {
+      if (window.electronAPI.openCashDrawer) {
+        window.electronAPI.openCashDrawer(autoPrintSettings?.printerName).catch(e => console.error(e));
+      }
       window.electronAPI.printRaw(rawText, autoPrintSettings?.printerName).then(() => {
         if (onClose) onClose();
       });
