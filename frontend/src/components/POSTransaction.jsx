@@ -1617,7 +1617,7 @@ export const POSTransaction = ({
     return {
       receiptNumber: data.receipt_number,
       terminalId: data.terminal_id,
-      terminalCode: data.terminal?.code || data.terminal_code,
+      terminalCode: data.terminal?.code || data.terminal_code || allTerminals?.find(t => t.id === data.terminal_id)?.code || data.terminal_id?.substring(0, 8),
       timestamp: data.created_at,
       items: data.items.map(item => {
         let sn = null;
