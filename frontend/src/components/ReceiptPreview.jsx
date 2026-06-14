@@ -197,14 +197,21 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
   }
 
   // Feed paper (Feed selalu setelah footer)
-  if (feedLines > 0) {
-    lines.push('\r\n'.repeat(feedLines));
+  for (let i = 0; i < feedLines; i++) {
+    // Gunakan satu spasi (' ') alih-alih baris kosong seutuhnya.
+    // Ini mencegah Windows Generic/Text Only driver menghapus/mengabaikan baris kosong berturut-turut.
+    lines.push(' ');
   }
 
   // Header di bawah (Mode Hemat: dicetak setelah feed agar menjadi header untuk struk berikutnya)
   if (isHeaderBottom) {
     lines.push(divider);
     lines.push(...headerOutputLines.filter(l => l !== divider));
+  } else if (feedLines > 0) {
+    // Trik untuk Generic Text Only jika header tidak di bawah:
+    // Windows Print Spooler sering membuang baris di akhir dokumen meski ada spasinya.
+    // Kita tambahkan satu karakter titik (.) di paling akhir dokumen.
+    lines.push('.');
   }
 
   return lines.join('\r\n');
