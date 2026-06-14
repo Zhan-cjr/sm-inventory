@@ -205,8 +205,7 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
 
   // Header di bawah (Mode Hemat: dicetak setelah feed agar menjadi header untuk struk berikutnya)
   if (isHeaderBottom) {
-    lines.push(divider);
-    lines.push(...headerOutputLines.filter(l => l !== divider));
+    lines.push(...headerOutputLines);
   } else if (feedLines > 0) {
     // Trik untuk Generic Text Only jika header tidak di bawah:
     // Windows Print Spooler sering membuang baris di akhir dokumen meski ada spasinya.
@@ -549,7 +548,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
           </div>
 
           {isHeaderBottom && (
-            <div className="receipt-header" style={{ marginTop: '1rem', borderTop: '1px dashed #ccc', paddingTop: '1rem' }}>
+            <div className="receipt-header" style={{ marginTop: '1rem', paddingTop: '1rem' }}>
               {!!branchSettings?.receipt_show_logo && (
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.6rem' }}>
                   <svg width="42" height="42" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
