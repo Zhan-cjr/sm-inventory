@@ -12,10 +12,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Columns\Summarizers\Summarizer;
 use Carbon\Carbon;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class RekapitulasiTransaksi extends Page implements HasTable
 {
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-chart-bar';
     protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';

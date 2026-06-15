@@ -13,10 +13,12 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class LaporanKeuangan extends Page implements HasForms
 {
     use InteractsWithForms;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-presentation-chart-line';
     protected static ?string $navigationLabel = 'Laporan Keuangan';

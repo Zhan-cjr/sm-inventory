@@ -15,10 +15,12 @@ use App\Models\JournalEntry;
 use App\Models\JournalEntryLine;
 use App\Models\Account;
 use Illuminate\Support\Facades\DB;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class TutupBukuTahunan extends Page implements HasForms
 {
     use InteractsWithForms;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-lock-closed';
     protected static string|\UnitEnum|null $navigationGroup = 'AKUNTANSI';

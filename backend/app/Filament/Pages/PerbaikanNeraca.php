@@ -11,10 +11,12 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use App\Services\AccountingService;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class PerbaikanNeraca extends Page implements HasTable
 {
     use InteractsWithTable;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-wrench-screwdriver';
     protected static ?string $navigationLabel = 'Diagnosa & Perbaikan Neraca';

@@ -13,6 +13,8 @@ class ListCPBranches extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            \Filament\Actions\ImportAction::make()
+                ->importer(\App\Filament\Imports\CPBranchImporter::class),
             CreateAction::make(),
         ];
     }

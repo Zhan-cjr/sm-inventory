@@ -20,10 +20,12 @@ use App\Models\Account;
 use App\Models\Branch;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Get;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class SetupSaldoAwal extends Page implements HasForms
 {
     use InteractsWithForms;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-scale';
     protected static string|\UnitEnum|null $navigationGroup = 'AKUNTANSI';

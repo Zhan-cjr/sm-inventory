@@ -16,10 +16,12 @@ use Filament\Schemas\Schema;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class ConsignmentBilling extends Page implements HasForms
 {
     use InteractsWithForms;
+    use HasPageShield;
 
     public static function getNavigationGroup(): ?string
     {

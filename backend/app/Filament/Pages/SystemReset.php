@@ -8,9 +8,12 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class SystemReset extends Page
 {
+    use HasPageShield;
+
     protected string $view = 'filament.pages.system-reset';
 
     public static function getNavigationGroup(): ?string
@@ -31,14 +34,6 @@ class SystemReset extends Page
     public function getTitle(): string | \Illuminate\Contracts\Support\Htmlable
     {
         return 'Reset Database';
-    }
-
-    public static function canAccess(): bool
-    {
-        // Pastikan hanya super admin atau role tertinggi yang bisa akses.
-        // Asumsi auth()->user()->hasRole('super-admin') atau cek email.
-        // Sesuai kebutuhan, untuk saat ini dibiarkan true atau cek role jika ada
-        return true; 
     }
 
     protected function getHeaderActions(): array

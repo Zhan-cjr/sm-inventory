@@ -15,10 +15,12 @@ use App\Models\GoodsReceipt;
 use App\Models\Branch;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
 class BarcodePrinter extends Page implements HasForms
 {
     use InteractsWithForms;
+    use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-qr-code';
     protected static \UnitEnum|string|null $navigationGroup = 'UTILITY';

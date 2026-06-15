@@ -29,17 +29,11 @@ class PurchaseOrderPolicy
 
     public function update(AuthUser $authUser, PurchaseOrder $purchaseOrder): bool
     {
-        if (in_array(strtoupper($purchaseOrder->status), ['RECEIVED', 'PARTIALLY_RECEIVED'])) {
-            return false;
-        }
         return $authUser->can('Update:PurchaseOrder');
     }
 
     public function delete(AuthUser $authUser, PurchaseOrder $purchaseOrder): bool
     {
-        if (in_array(strtoupper($purchaseOrder->status), ['RECEIVED', 'PARTIALLY_RECEIVED'])) {
-            return false;
-        }
         return $authUser->can('Delete:PurchaseOrder');
     }
 
