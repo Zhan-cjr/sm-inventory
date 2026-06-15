@@ -15,6 +15,26 @@ class UserForm
             ->components([
                 TextInput::make('name')
                     ->required(),
+                TextInput::make('username')
+                    ->label('Username')
+                    ->unique(ignoreRecord: true)
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function (?string $state, ?\Illuminate\Database\Eloquent\Model $record, $component) {
+                        if (blank($state)) {
+                            return;
+                        }
+                        
+                        $exists = \App\Models\User::where('username', $state)
+                            ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
+                            ->exists();
+                            
+                        if ($exists) {
+                            throw \Illuminate\Validation\ValidationException::withMessages([
+                                $component->getStatePath() => 'Username sudah digunakan oleh pengguna lain.',
+                            ]);
+                        }
+                    })
+                    ->required(),
                 TextInput::make('email')
                     ->label('Email address')
                     ->email()

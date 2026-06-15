@@ -18,7 +18,7 @@ class PosAuthController extends Controller
             ->when($branchId, function ($q) use ($branchId) {
                 $q->where('branch_id', $branchId)->orWhereNull('branch_id'); // Admin might have no branch
             })
-            ->select('id', 'name', 'email', 'role', 'pos_authorizations')
+            ->select('id', 'name', 'username', 'email', 'role', 'pos_authorizations')
             ->get();
             
         return response()->json($authorizers);
@@ -27,17 +27,17 @@ class PosAuthController extends Controller
     public function authorizeAction(Request $request)
     {
         $validated = $request->validate([
-            'email' => 'required|email',
+            'username' => 'required',
             'password' => 'required|string',
             'action' => 'required|string',
         ]);
 
-        $user = User::where('email', $validated['email'])->first();
+        $user = User::where('username', $validated['username'])->first();
 
         if (!$user || !Hash::check($validated['password'], $user->password)) {
             return response()->json([
                 'authorized' => false,
-                'message' => 'Email atau Password salah.'
+                'message' => 'Username atau Password salah.'
             ], 401);
         }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 export const Login = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('cashier@selamat.id');
+  const [username, setUsername] = useState('cashier');
   const [password, setPassword] = useState('password');
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -13,9 +13,9 @@ export const Login = ({ onLoginSuccess }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const hashPasswordLocal = (email, password) => {
+  const hashPasswordLocal = (username, password) => {
     const salt = "sminventory_salt_2026";
-    const str = email.toLowerCase().trim() + "|" + password + "|" + salt;
+    const str = username.toLowerCase().trim() + "|" + password + "|" + salt;
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
@@ -43,7 +43,7 @@ export const Login = ({ onLoginSuccess }) => {
               'Content-Type': 'application/json',
               'Accept': 'application/json'
             },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ username, password })
           });
           
           if (!res.ok && res.status >= 500) {
@@ -59,10 +59,10 @@ export const Login = ({ onLoginSuccess }) => {
 
       if (isOffline) {
         const offlineUsers = JSON.parse(localStorage.getItem('pos_offline_users') || '{}');
-        const cachedUser = offlineUsers[email.toLowerCase().trim()];
+        const cachedUser = offlineUsers[username.toLowerCase().trim()];
 
         if (cachedUser) {
-          const enteredHash = hashPasswordLocal(email, password);
+          const enteredHash = hashPasswordLocal(username, password);
           if (enteredHash === cachedUser.hash) {
             localStorage.setItem('pos_preselected_shift', shift);
             onLoginSuccess(cachedUser.token, cachedUser.user);
@@ -80,9 +80,9 @@ export const Login = ({ onLoginSuccess }) => {
       }
 
       // Save offline credentials hash for future use
-      const hash = hashPasswordLocal(email, password);
+      const hash = hashPasswordLocal(username, password);
       const offlineUsers = JSON.parse(localStorage.getItem('pos_offline_users') || '{}');
-      offlineUsers[email.toLowerCase().trim()] = {
+      offlineUsers[username.toLowerCase().trim()] = {
         hash,
         token: data.token,
         user: data.user
@@ -112,14 +112,14 @@ export const Login = ({ onLoginSuccess }) => {
 
         <form onSubmit={handleLogin}>
           <div className="form-group">
-            <label>Email Karyawan</label>
+            <label>Username Karyawan</label>
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               required
               className="login-input"
-              placeholder="email@perusahaan.com"
+              placeholder="username"
             />
           </div>
           <div className="form-group">
@@ -167,8 +167,8 @@ export const Login = ({ onLoginSuccess }) => {
               gap: '0.5rem',
               opacity: isMobile ? 1 : 0.5,
               cursor: isMobile ? 'pointer' : 'not-allowed',
-              border: isMobile ? '1px solid #10b981' : '1px solid var(--border-light)',
-              color: isMobile ? '#10b981' : 'var(--text-muted)'
+              border: isMobile ? '1px solid var(--accent)' : '1px solid var(--border-light)',
+              color: isMobile ? 'var(--accent)' : 'var(--text-muted)'
             }}
             title={!isMobile ? "Hanya tersedia di perangkat HP/Mobile" : "Buka versi PWA Mobile"}
           >
@@ -208,8 +208,8 @@ export const Login = ({ onLoginSuccess }) => {
           <svg width="20" height="20" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '6px' }}>
             <defs>
               <linearGradient id="zGradLogin" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#4f46e5" />
-                <stop offset="100%" stopColor="#06b6d4" />
+                <stop offset="0%" stopColor="var(--primary)" />
+                <stop offset="100%" stopColor="var(--accent)" />
               </linearGradient>
             </defs>
             <rect width="100" height="100" rx="30" fill="url(#zGradLogin)" />

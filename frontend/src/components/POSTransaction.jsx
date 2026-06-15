@@ -934,6 +934,9 @@ export const POSTransaction = ({
       setActiveShift(localShift);
       safeSetItem('pos_active_shift', JSON.stringify(localShift));
       setIsOpenShiftModalOpen(false);
+      if (window.electronAPI && window.electronAPI.openCashDrawer) {
+        window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
+      }
       setAlertMsg({ text: 'Shift offline berhasil dibuka secara lokal. Selamat bertugas!', type: 'success' });
       return;
     }
@@ -959,6 +962,9 @@ export const POSTransaction = ({
           setActiveShift(data.shift);
           safeSetItem('pos_active_shift', JSON.stringify(data.shift));
           setIsOpenShiftModalOpen(false);
+          if (window.electronAPI && window.electronAPI.openCashDrawer) {
+            window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
+          }
           setAlertMsg({ text: 'Shift berhasil dibuka. Selamat bertugas!', type: 'success' });
         } else {
           setAlertMsg({ text: data.message || 'Gagal membuka shift.', type: 'error' });
@@ -977,6 +983,9 @@ export const POSTransaction = ({
         setActiveShift(localShift);
         safeSetItem('pos_active_shift', JSON.stringify(localShift));
         setIsOpenShiftModalOpen(false);
+        if (window.electronAPI && window.electronAPI.openCashDrawer) {
+          window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
+        }
         setAlertMsg({ text: 'Gagal menghubungi server. Shift offline dibuka secara lokal.', type: 'success' });
       });
   };
@@ -2350,8 +2359,8 @@ export const POSTransaction = ({
               }
             </div>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', width: '100%' }}>
-              <button className="btn-danger" style={{ flex: 1 }} onClick={() => { setSelectedCustomer(null); setIsMemberModalOpen(false); }}>HAPUS MEMBER</button>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsMemberModalOpen(false)}>BATAL (ESC)</button>
+              <button className="btn-danger" style={{ flex: 1 }} onClick={() => { setSelectedCustomer(null); setIsMemberModalOpen(false); }}>LEPAS MEMBER DARI STRUK</button>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsMemberModalOpen(false)}>TUTUP (ESC)</button>
             </div>
           </div>
         </div>
@@ -2508,7 +2517,7 @@ export const POSTransaction = ({
             <h1>{orgName}</h1>
             <p>{branchName} | {terminalInfo?.name || 'Terminal'}</p>
             {activeShift && (
-              <div className="active-shift-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', marginTop: '4px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+              <div className="active-shift-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(36, 42, 122, 0.15)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', marginTop: '4px', border: '1px solid rgba(36, 42, 122, 0.3)' }}>
                 <Clock size={12} />
                 <span>AKTIF: {activeShift.shift_name}</span>
               </div>
@@ -2524,14 +2533,14 @@ export const POSTransaction = ({
         <div className="pos-user-status">
           {pendingCount > 0 && (
             <div className={`sync-status mr-4 ${!isOnline ? 'warning-pulse' : ''}`} style={{
-              background: !isOnline ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.1)',
-              border: !isOnline ? '1px solid #ef4444' : '1px solid #3b82f6',
+              background: !isOnline ? 'rgba(230, 0, 18, 0.2)' : 'rgba(36, 42, 122, 0.1)',
+              border: !isOnline ? '1px solid var(--danger)' : '1px solid var(--primary)',
               padding: '4px 12px',
               borderRadius: '20px',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              color: !isOnline ? '#ef4444' : '#3b82f6',
+              color: !isOnline ? 'var(--danger)' : 'var(--primary)',
               fontWeight: 'bold'
             }}>
               <RefreshCw size={18} className={syncStatus === 'syncing' ? 'spin' : ''} />
@@ -2554,7 +2563,7 @@ export const POSTransaction = ({
             <User size={20} />
             <span>{userName}</span>
           </div>
-          <button onClick={() => onLogout()} className="btn-logout-icon" title="Logout Kasir (Istirahat)" style={{ color: '#ef4444' }}>
+          <button onClick={() => onLogout()} className="btn-logout-icon" title="Logout Kasir (Istirahat)" style={{ color: 'var(--danger)' }}>
             <LogOut size={18} />
           </button>
         </div>
@@ -2747,16 +2756,16 @@ export const POSTransaction = ({
           <div className="change-modal-content fade-in" style={{ maxWidth: '600px', width: '90%' }}>
             <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Multi Payment</h2>
 
-            <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+            <div style={{ background: 'rgba(36, 42, 122, 0.1)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
                 <span>Tagihan:</span>
                 <span style={{ fontWeight: 'bold' }}>{formatCurrency(finalAmount)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', marginBottom: '0.5rem', color: '#10b981' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', marginBottom: '0.5rem', color: 'var(--accent)' }}>
                 <span>Total Dibayar:</span>
                 <span style={{ fontWeight: 'bold' }}>{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 'bold', color: payments.reduce((sum, p) => sum + p.amount, 0) >= finalAmount ? '#10b981' : '#ef4444' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 'bold', color: payments.reduce((sum, p) => sum + p.amount, 0) >= finalAmount ? 'var(--accent)' : 'var(--danger)' }}>
                 <span>{payments.reduce((sum, p) => sum + p.amount, 0) >= finalAmount ? 'Kembali:' : 'Sisa:'}</span>
                 <span>{formatCurrency(Math.abs(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0)))}</span>
               </div>
@@ -2773,7 +2782,7 @@ export const POSTransaction = ({
                         <td>{p.label || p.method}</td>
                         <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(p.amount)}</td>
                         <td style={{ width: '40px', textAlign: 'center' }}>
-                          <button onClick={() => setPayments(payments.filter((_, i) => i !== idx))} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                          <button onClick={() => setPayments(payments.filter((_, i) => i !== idx))} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>
                         </td>
                       </tr>
                     ))}
@@ -3332,7 +3341,7 @@ export const POSTransaction = ({
             {/* Kategori Void/Clear */}
             <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0))}><Eraser size={16} />{renderBtnLabel('btn_void_item', 'Void Item', 'Delete')}</button>
             <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={16} />{renderBtnLabel('btn_void_all', 'Void All', 'Escape')}</button>
-            <button className="func-btn danger" onClick={handleClearDiscount} style={{ background: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' }}><X size={16} />{renderBtnLabel('btn_clear', 'Clear', 'Insert')}</button>
+            <button className="func-btn danger" onClick={handleClearDiscount}><X size={16} />{renderBtnLabel('btn_clear', 'Clear', 'Space')}</button>
             <button className="func-btn secondary" onClick={() => {
               if (window.electronAPI && window.electronAPI.openCashDrawer) {
                 window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));

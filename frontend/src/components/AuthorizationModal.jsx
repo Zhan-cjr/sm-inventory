@@ -10,12 +10,12 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
       return [];
     }
   });
-  const [selectedEmail, setSelectedEmail] = useState(() => {
+  const [selectedUsername, setSelectedUsername] = useState(() => {
     try {
       const cached = localStorage.getItem('pos_cached_authorizers');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed.length > 0) return parsed[0].email;
+        if (parsed.length > 0) return parsed[0].username;
       }
       return '';
     } catch (e) {
@@ -40,8 +40,8 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
       .then(data => {
         setAuthorizers(data);
         localStorage.setItem('pos_cached_authorizers', JSON.stringify(data));
-        if (data.length > 0 && !selectedEmail) {
-          setSelectedEmail(data[0].email);
+        if (data.length > 0 && !selectedUsername) {
+          setSelectedUsername(data[0].username);
         }
       })
       .catch(err => {
@@ -51,8 +51,8 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
           try {
             const parsed = JSON.parse(cached);
             setAuthorizers(parsed);
-            if (parsed.length > 0 && !selectedEmail) {
-              setSelectedEmail(parsed[0].email);
+            if (parsed.length > 0 && !selectedUsername) {
+              setSelectedUsername(parsed[0].username);
             }
           } catch (e) {
             console.error('Failed to parse cached authorizers:', e);
@@ -63,7 +63,7 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
 
   const handleAuthorize = async (e) => {
     e.preventDefault();
-    if (!selectedEmail || !password) {
+    if (!selectedUsername || !password) {
       setError('Pilih/masukkan otorisator dan password.');
       return;
     }
@@ -74,9 +74,9 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
     // Gunakan isOnline prop untuk menentukan apakah server bisa diakses
     if (!isOnline) {
       try {
-        const hashPasswordLocal = (email, password) => {
+        const hashPasswordLocal = (username, password) => {
           const salt = "sminventory_salt_2026";
-          const str = email.toLowerCase().trim() + "|" + password + "|" + salt;
+          const str = username.toLowerCase().trim() + "|" + password + "|" + salt;
           let hash = 0;
           for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
@@ -88,19 +88,19 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
 
         const offlineUsers = JSON.parse(localStorage.getItem('pos_offline_users') || '{}');
         // Pencarian case insensitive berdasarkan input
-        const targetEmail = selectedEmail.toLowerCase().trim();
-        const cachedUser = offlineUsers[targetEmail];
+        const targetUsername = selectedUsername.toLowerCase().trim();
+        const cachedUser = offlineUsers[targetUsername];
 
         if (!cachedUser) {
-          throw new Error('Otorisator belum pernah login di perangkat ini saat online. Otorisasi offline tidak dapat dilakukan untuk email tersebut.');
+          throw new Error('Otorisator belum pernah login di perangkat ini saat online. Otorisasi offline tidak dapat dilakukan untuk username tersebut.');
         }
 
-        const enteredHash = hashPasswordLocal(targetEmail, password);
+        const enteredHash = hashPasswordLocal(targetUsername, password);
         if (enteredHash !== cachedUser.hash) {
           throw new Error('Password salah (Mode Offline)');
         }
 
-        const authorizer = authorizers.find(a => a.email.toLowerCase().trim() === targetEmail);
+        const authorizer = authorizers.find(a => a.username.toLowerCase().trim() === targetUsername);
         if (!authorizer) {
           throw new Error('Data izin otorisator tidak ditemukan di cache lokal.');
         }
@@ -129,7 +129,7 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          email: selectedEmail,
+          username: selectedUsername,
           password: password,
           action: actionName
         })
@@ -228,16 +228,16 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
   return (
     <div className="change-modal-overlay">
       <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-        <div className="modal-header-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+        <div className="modal-header-icon" style={{ background: 'rgba(230, 0, 18, 0.1)', color: 'var(--danger)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
           <Lock size={40} />
         </div>
-        <h2 style={{ textAlign: 'center', color: '#ef4444' }}>Otorisasi Diperlukan</h2>
+        <h2 style={{ textAlign: 'center', color: 'var(--danger)' }}>Otorisasi Diperlukan</h2>
         <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
           Tindakan <strong style={{ color: 'white' }}>{actionName}</strong> membutuhkan otorisasi.
         </p>
 
         {error && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem', border: '1px solid rgba(239, 68, 68, 0.2)', textAlign: 'center' }}>
+          <div style={{ background: 'rgba(230, 0, 18, 0.1)', color: 'var(--danger)', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem', border: '1px solid rgba(230, 0, 18, 0.2)', textAlign: 'center' }}>
             {error}
           </div>
         )}
@@ -259,14 +259,14 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
               list="authorizers-list"
               className="modern-barcode-input" 
               style={{ width: '100%', padding: '0.75rem' }}
-              value={selectedEmail}
-              onChange={(e) => setSelectedEmail(e.target.value)}
-              placeholder="Cari atau pilih email..."
+              value={selectedUsername}
+              onChange={(e) => setSelectedUsername(e.target.value)}
+              placeholder="Cari atau pilih username..."
               autoComplete="off"
             />
             <datalist id="authorizers-list">
               {authorizers.map(a => (
-                <option key={a.id} value={a.email}>{a.name} ({a.role})</option>
+                <option key={a.id} value={a.username}>{a.name} ({a.role})</option>
               ))}
             </datalist>
           </div>

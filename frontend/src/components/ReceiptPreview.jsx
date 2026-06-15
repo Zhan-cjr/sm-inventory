@@ -250,7 +250,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
 
       const receiptHtml = document.getElementById('printable-receipt').outerHTML;
       const fullHtml = `<html><head><style>${css}</style></head><body style="background: white;">${receiptHtml}</body></html>`;
-      if (window.electronAPI.openCashDrawer) {
+      if (!isReprint && window.electronAPI.openCashDrawer) {
         window.electronAPI.openCashDrawer(autoPrintSettings?.printerName).catch(e => console.error(e));
       }
       window.electronAPI.silentPrint(fullHtml, autoPrintSettings?.printerName);
@@ -279,7 +279,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
     const rawText = generateRawTextReceipt(transaction, branchSettings, isHeaderBottom, printCols, feedLines);
 
     if (window.electronAPI && window.electronAPI.printRaw) {
-      if (window.electronAPI.openCashDrawer) {
+      if (!isReprint && window.electronAPI.openCashDrawer) {
         window.electronAPI.openCashDrawer(autoPrintSettings?.printerName).catch(e => console.error(e));
       }
       window.electronAPI.printRaw(rawText, autoPrintSettings?.printerName).then(() => {
@@ -289,7 +289,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
       const htmlString = '<html><head><title>Struk ESC/POS</title><style>@page { margin: 0; } body { margin: 0; padding: 0; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>' + rawText + '</pre></body></html>';
 
       if (window.electronAPI) {
-        if (window.electronAPI.openCashDrawer) {
+        if (!isReprint && window.electronAPI.openCashDrawer) {
           window.electronAPI.openCashDrawer(autoPrintSettings?.printerName).catch(e => console.error(e));
         }
         window.electronAPI.silentPrint(htmlString, autoPrintSettings?.printerName);

@@ -216,37 +216,31 @@ ipcMain.handle('print-raw', async (event, rawText, printerName) => {
     }
 
     return new Promise((resolve) => {
-      let printWindow = new BrowserWindow({
-        show: false,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true
+      const binPath = path.join(app.getPath('userData'), 'printjob.txt');
+      const exePath = path.join(app.getPath('userData'), 'RawPrint.exe');
+      
+      // Append newlines and cut command (ESC m) for ESC/POS compliant printers
+      const printData = Buffer.from(finalText + '\n\n\n\n\n\n\x1B\x6D', 'utf8');
+      fs.writeFileSync(binPath, printData);
+      
+      try {
+        if (!fs.existsSync(exePath)) {
+          const exeCode = fs.readFileSync(path.join(__dirname, 'RawPrint.exe'));
+          fs.writeFileSync(exePath, exeCode);
         }
-      });
-
-      const escapedText = finalText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const htmlContent = `<html><head><style>@page { margin: 0; } body { margin: 0; padding: 0; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.1; background-color: white; color: black; } pre { margin: 0; padding: 0; white-space: pre-wrap; word-break: break-all; }</style></head><body><pre>${escapedText}</pre></body></html>`;
-      const htmlUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
-
-      printWindow.loadURL(htmlUrl).then(() => {
-        printWindow.webContents.print({
-          silent: true,
-          printBackground: true,
-          deviceName: printerName || '',
-          margins: { marginType: 'none' }
-        }, (success, failureReason) => {
-          printWindow.close();
-          if (!success) {
-            console.error('Print failed:', failureReason);
-            resolve({ success: false, error: failureReason });
-          } else {
-            resolve({ success: true });
-          }
-        });
-      }).catch(err => {
-        printWindow.close();
-        console.error('Load HTML failed:', err);
-        resolve({ success: false, error: err.message });
+      } catch (err) {
+        console.error('Error copying RawPrint.exe:', err);
+      }
+      
+      const cmd = `"${exePath}" "${binPath}" "${printerName || ''}"`;
+      
+      exec(cmd, (error, stdout, stderr) => {
+        if (error || (stdout && stdout.includes('FAILED'))) {
+          console.error('Raw print error:', error || stderr || stdout);
+          resolve({ success: false, error: (error ? error.message : stdout) });
+        } else {
+          resolve({ success: true });
+        }
       });
     });
   } catch (err) {

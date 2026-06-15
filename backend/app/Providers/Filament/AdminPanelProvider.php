@@ -28,7 +28,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(\App\Filament\Pages\Auth\CustomLogin::class)
             ->colors([
                 'primary' => Color::Indigo,
                 'gray'    => Color::Slate,
