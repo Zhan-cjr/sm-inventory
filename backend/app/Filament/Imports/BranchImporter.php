@@ -57,6 +57,16 @@ class BranchImporter extends Importer
                 ->example('08123456789')
                 ->rules(['nullable', 'string', 'max:50']),
 
+            ImportColumn::make('latitude')
+                ->label('Latitude')
+                ->example('-6.6500')
+                ->rules(['nullable', 'numeric']),
+
+            ImportColumn::make('longitude')
+                ->label('Longitude')
+                ->example('106.8500')
+                ->rules(['nullable', 'numeric']),
+
             ImportColumn::make('is_active')
                 ->label('Aktif (1/0)')
                 ->boolean()
