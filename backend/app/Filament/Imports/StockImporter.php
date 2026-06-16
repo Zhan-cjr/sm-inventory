@@ -75,12 +75,6 @@ class StockImporter extends Importer
                 ->example('1')
                 ->rules(['nullable', 'integer', 'min:1']),
 
-            ImportColumn::make('margin_gol_1')
-                ->label('Margin Gol 1 Cabang (%)')
-                ->numeric()
-                ->example('20')
-                ->rules(['nullable', 'numeric']),
-
             ImportColumn::make('harga_jual_1')
                 ->label('Harga Jual Gol 1 Cabang')
                 ->numeric()
@@ -93,12 +87,6 @@ class StockImporter extends Importer
                 ->example('12')
                 ->rules(['nullable', 'integer', 'min:1']),
 
-            ImportColumn::make('margin_gol_2')
-                ->label('Margin Gol 2 Cabang (%)')
-                ->numeric()
-                ->example('15')
-                ->rules(['nullable', 'numeric']),
-
             ImportColumn::make('harga_jual_2')
                 ->label('Harga Jual Gol 2 Cabang')
                 ->numeric()
@@ -110,12 +98,6 @@ class StockImporter extends Importer
                 ->numeric()
                 ->example('50')
                 ->rules(['nullable', 'integer', 'min:1']),
-
-            ImportColumn::make('margin_gol_3')
-                ->label('Margin Gol 3 Cabang (%)')
-                ->numeric()
-                ->example('10')
-                ->rules(['nullable', 'numeric']),
 
             ImportColumn::make('harga_jual_3')
                 ->label('Harga Jual Gol 3 Cabang')
@@ -217,6 +199,22 @@ class StockImporter extends Importer
         }
 
         return $body;
+    }
+
+    protected function beforeSave(): void
+    {
+        $cost = $this->record->cost_price_tax > 0 ? (float) $this->record->cost_price_tax : (float) $this->record->cost_price;
+        if ($cost > 0) {
+            if ($this->record->harga_jual_1 > 0) {
+                $this->record->margin_gol_1 = round((((float) $this->record->harga_jual_1 - $cost) / $cost) * 100, 2);
+            }
+            if ($this->record->harga_jual_2 > 0) {
+                $this->record->margin_gol_2 = round((((float) $this->record->harga_jual_2 - $cost) / $cost) * 100, 2);
+            }
+            if ($this->record->harga_jual_3 > 0) {
+                $this->record->margin_gol_3 = round((((float) $this->record->harga_jual_3 - $cost) / $cost) * 100, 2);
+            }
+        }
     }
 
     protected function afterSave(): void
