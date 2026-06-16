@@ -371,7 +371,7 @@ const PriceChecker: React.FC = () => {
             <div className="md:w-7/12 p-12 md:p-16 flex flex-col justify-center">
               <div className="text-sm font-bold tracking-widest text-brand-blue uppercase mb-4 flex items-center gap-2">
                 <Info size={18} />
-                {product.category?.name || 'Kategori Umum'}
+                {product.ecommerce_category || product.category?.name || 'Kategori Umum'}
               </div>
               
               <h1 className="text-4xl md:text-6xl font-black text-slate-800 mb-8 leading-tight line-clamp-3">

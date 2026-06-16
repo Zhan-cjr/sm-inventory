@@ -136,7 +136,7 @@ const ProductDetailModal = () => {
         <div className="w-full sm:w-3/5 p-5 sm:p-8 flex flex-col overflow-y-auto">
           <div className="flex-grow">
             <div className="text-xs text-brand-blue font-bold uppercase tracking-wider mb-2">
-              {(product.category && product.category.name) || product.category_id || 'Kategori Umum'}
+              {product.ecommerce_category || (product.category && product.category.name) || product.category_id || 'Kategori Umum'}
             </div>
             
             <h2 className="text-xl sm:text-2xl font-bold text-slate-800 leading-tight mb-3 pr-8 sm:pr-0">
