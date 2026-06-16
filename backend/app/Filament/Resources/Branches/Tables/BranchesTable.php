@@ -14,6 +14,8 @@ class BranchesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->reorderable('sort_order')
+            ->defaultSort('sort_order')
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')

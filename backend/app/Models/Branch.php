@@ -11,7 +11,7 @@ class Branch extends Model
 
     protected $fillable = [
         'organization_id', 'name', 'code', 'address', 
-        'phone', 'manager_id', 'is_active', 'latitude', 'longitude',
+        'phone', 'manager_id', 'is_active', 'latitude', 'longitude', 'sort_order',
         'receipt_type', 'receipt_footer_layout', 'receipt_show_logo', 'receipt_show_tax', 'receipt_tax_message',
         'receipt_tax_rate', 'receipt_tax_rate_message', 'receipt_dpp_rate', 'receipt_dpp_message', 'receipt_total_tax_message',
         'receipt_header_line1', 'receipt_header_line1_bold', 'receipt_header_line2', 'receipt_header_line2_bold',

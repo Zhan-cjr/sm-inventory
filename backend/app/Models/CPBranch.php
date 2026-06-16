@@ -17,6 +17,7 @@ class CPBranch extends Model
         'open_hours',
         'lat',
         'lng',
+        'sort_order',
     ];
 
     public function facilities()
