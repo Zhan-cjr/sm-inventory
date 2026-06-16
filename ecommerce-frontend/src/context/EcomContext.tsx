@@ -9,6 +9,7 @@ export interface Product {
     id: string;
     name: string;
   } | null;
+  ecommerce_category?: string | null;
   selling_price: string;
   original_price?: string;
   rating?: number;
