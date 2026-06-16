@@ -98,7 +98,7 @@ class ProductImporter extends Importer
                 ->label('Min Qty Gol 1')
                 ->numeric()
                 ->example('1')
-                ->rules(['nullable', 'integer', 'min:1']),
+                ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_1')
                 ->label('Harga Jual Gol 1')
@@ -110,7 +110,7 @@ class ProductImporter extends Importer
                 ->label('Min Qty Gol 2')
                 ->numeric()
                 ->example('12')
-                ->rules(['nullable', 'integer', 'min:1']),
+                ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_2')
                 ->label('Harga Jual Gol 2')
@@ -122,7 +122,7 @@ class ProductImporter extends Importer
                 ->label('Min Qty Gol 3')
                 ->numeric()
                 ->example('50')
-                ->rules(['nullable', 'integer', 'min:1']),
+                ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_3')
                 ->label('Harga Jual Gol 3')
@@ -132,10 +132,9 @@ class ProductImporter extends Importer
 
             ImportColumn::make('selling_price')
                 ->label('Harga Jual (Default)')
-                ->requiredMapping()
                 ->numeric()
                 ->example('3000')
-                ->rules(['required', 'numeric', 'min:0']),
+                ->rules(['nullable', 'numeric', 'min:0']),
 
             ImportColumn::make('unit_of_measure')
                 ->label('Satuan')
@@ -283,6 +282,10 @@ class ProductImporter extends Importer
             if ($this->record->harga_jual_3 > 0) {
                 $this->record->margin_gol_3 = round((((float) $this->record->harga_jual_3 - $cost) / $cost) * 100, 2);
             }
+        }
+
+        if (empty($this->record->selling_price) && $this->record->harga_jual_1 > 0) {
+            $this->record->selling_price = $this->record->harga_jual_1;
         }
     }
 

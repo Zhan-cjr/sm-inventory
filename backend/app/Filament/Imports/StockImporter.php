@@ -73,7 +73,7 @@ class StockImporter extends Importer
                 ->label('Min Qty Gol 1 Cabang')
                 ->numeric()
                 ->example('1')
-                ->rules(['nullable', 'integer', 'min:1']),
+                ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_1')
                 ->label('Harga Jual Gol 1 Cabang')
@@ -85,7 +85,7 @@ class StockImporter extends Importer
                 ->label('Min Qty Gol 2 Cabang')
                 ->numeric()
                 ->example('12')
-                ->rules(['nullable', 'integer', 'min:1']),
+                ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_2')
                 ->label('Harga Jual Gol 2 Cabang')
@@ -97,7 +97,7 @@ class StockImporter extends Importer
                 ->label('Min Qty Gol 3 Cabang')
                 ->numeric()
                 ->example('50')
-                ->rules(['nullable', 'integer', 'min:1']),
+                ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_3')
                 ->label('Harga Jual Gol 3 Cabang')
@@ -214,6 +214,10 @@ class StockImporter extends Importer
             if ($this->record->harga_jual_3 > 0) {
                 $this->record->margin_gol_3 = round((((float) $this->record->harga_jual_3 - $cost) / $cost) * 100, 2);
             }
+        }
+
+        if (empty($this->record->selling_price) && $this->record->harga_jual_1 > 0) {
+            $this->record->selling_price = $this->record->harga_jual_1;
         }
     }
 
