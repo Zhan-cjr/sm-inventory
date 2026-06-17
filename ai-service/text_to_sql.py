@@ -21,8 +21,14 @@ def get_db_connection():
         connection_timeout=10
     )
 
+_cached_schema = None
+
 def get_db_schema():
     """Fetch all tables and their columns to build context for the LLM."""
+    global _cached_schema
+    if _cached_schema:
+        return _cached_schema
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -39,6 +45,7 @@ def get_db_schema():
             
         cursor.close()
         conn.close()
+        _cached_schema = schema_text
         return schema_text
     except Exception as e:
         print(f"Error fetching schema: {e}")
@@ -65,29 +72,33 @@ def process_nl_query(query: str):
         if not schema_context:
             return {"answer": "Maaf, tidak dapat terhubung ke database untuk membaca skema saat ini."}
 
-        # 2. Ask Gemini to generate SQL
+        # 2. Ask Gemini to decide: SQL or Direct Answer
         prompt_sql = f"""
-You are an expert MySQL database analyst. 
+You are an intelligent Assistant for the 'SM Inventory' app (developed by Amnal).
 Here is the schema of the database:
 {schema_context}
 
 The user asked: "{query}"
 
-Write a valid MySQL query to accurately answer the user's question. 
-RULES:
-1. ONLY return the raw SQL query. 
-2. DO NOT wrap it in markdown backticks. 
-3. DO NOT provide any explanation.
-4. The query must be READ-ONLY (SELECT statements only).
-5. Ensure the table and column names exactly match the schema provided.
+INSTRUCTIONS:
+- If the user is asking a general question, greeting, or asking about you or Amnal, ANSWER DIRECTLY. Prefix your answer with 'ANSWER: '.
+  (Rule: If asked 'Siapa Amnal?', answer enthusiastically that Amnal is the main developer who built this app self-taught).
+- If the user is asking about inventory data, sales, or anything requiring database lookup, write a read-only MySQL query (SELECT only). Prefix it with 'SQL: '. Do NOT wrap in backticks.
 """
-        sql_response = model.generate_content(prompt_sql)
-        sql_query = clean_sql(sql_response.text)
+        first_response = model.generate_content(prompt_sql).text.strip()
+        print(f"Gemini First Pass: {first_response}")
+
+        # If it's a direct answer, return immediately!
+        if first_response.upper().startswith("ANSWER:"):
+            return {"answer": first_response[7:].strip(), "data": [], "sql_executed": None}
+
+        # Otherwise, parse the SQL
+        sql_query = clean_sql(first_response.replace("SQL:", "", 1))
         print(f"Generated SQL: {sql_query}")
 
         # Basic security & performance check
         if not sql_query.upper().startswith("SELECT"):
-            return {"answer": "Maaf, untuk alasan keamanan, AI hanya diizinkan untuk membaca data (SELECT)."}
+            return {"answer": "Maaf, kueri yang dihasilkan tidak valid (bukan SELECT)."}
             
         # Prevent massive cross-joins from hanging the database
         if "LIMIT" not in sql_query.upper():
