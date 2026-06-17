@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { LayoutDashboard, TrendingUp, Package, LogOut, LineChart, AlertTriangle, DollarSign, PieChart, ArrowLeft } from 'lucide-react';
 import { SuggestedOrders } from './SuggestedOrders';
 import { LowStockList } from './LowStockList';
+import { BIDashboard } from './BIDashboard';
 
 export const ManagerDashboard = ({ user, authToken, onLogout }) => {
   const [metrics, setMetrics] = useState(null);
@@ -41,6 +42,10 @@ export const ManagerDashboard = ({ user, authToken, onLogout }) => {
     return <LowStockList user={user} authToken={authToken} onBack={() => setActiveView('DASHBOARD')} />;
   }
 
+  if (activeView === 'BI_DASHBOARD') {
+    return <BIDashboard user={user} authToken={authToken} onBack={() => setActiveView('DASHBOARD')} />;
+  }
+
   return (
     <div className="app-container">
       <header className="pos-header glassmorphism" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -55,6 +60,9 @@ export const ManagerDashboard = ({ user, authToken, onLogout }) => {
         <div style={{ display: 'flex', gap: '1rem' }}>
            <button onClick={() => setActiveView('FORECASTING')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '10px 20px' }}>
              <LineChart size={18} /> Forecasting
+           </button>
+           <button onClick={() => setActiveView('BI_DASHBOARD')} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '10px 20px', background: 'var(--primary)', color: 'white', borderColor: 'var(--primary)' }}>
+             <PieChart size={18} /> BI & AI
            </button>
            <button onClick={onLogout} style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '10px 20px', borderRadius: '16px', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 500 }}>
              <LogOut size={16} /> Logout
