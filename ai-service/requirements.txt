@@ -4,5 +4,5 @@ pandas
 scikit-learn
 mysql-connector-python
 mlxtend
-groq
+google-generativeai
 python-dotenv

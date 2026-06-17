@@ -1,13 +1,14 @@
 import os
 import re
 import mysql.connector
-import groq
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize Groq Client
-client = groq.Groq(api_key=os.getenv("GROQ_API_KEY", ""))
+# Initialize Gemini Model
+genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
+model = genai.GenerativeModel('gemini-3.1-pro')
 
 def get_db_connection():
     return mysql.connector.connect(
@@ -62,18 +63,20 @@ def clean_sql(raw_sql: str):
 
 def process_nl_query(query: str):
     try:
-        print(f"Processing query via Groq: {query}", flush=True)
+        print(f"Processing query via Gemini: {query}", flush=True)
         
         # 1. Get database schema
         schema_context = get_db_schema()
         if not schema_context:
             return {"answer": "Maaf, tidak dapat terhubung ke database untuk membaca skema saat ini."}
 
-        # 2. Ask Groq to decide: SQL or Direct Answer
-        prompt_system = f"""
+        # 2. Ask Gemini to decide: SQL or Direct Answer
+        prompt_sql = f"""
 You are an intelligent Assistant for the 'SM Inventory' app (developed by Amnal).
 Here is the schema of the database:
 {schema_context}
+
+The user asked: "{query}"
 
 INSTRUCTIONS:
 - If the user is asking a general question, greeting, or asking about you or Amnal, ANSWER DIRECTLY. Prefix your answer with 'ANSWER: '.
@@ -84,17 +87,8 @@ INSTRUCTIONS:
 - Do NOT wrap the query in markdown backticks (```). Just write the raw SQL query after 'SQL: '.
 - Do NOT add any conversational text or explanation. Output ONLY the 'ANSWER: ...' or 'SQL: ...' line.
 """
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": prompt_system},
-                {"role": "user", "content": query}
-            ],
-            temperature=0.1,
-            max_tokens=1024
-        )
-        first_response = response.choices[0].message.content.strip()
-        print(f"Groq First Pass: {first_response}")
+        first_response = model.generate_content(prompt_sql).text.strip()
+        print(f"Gemini First Pass: {first_response}")
 
         # If it's a direct answer, return immediately!
         if first_response.upper().startswith("ANSWER:"):
@@ -122,12 +116,12 @@ INSTRUCTIONS:
         cursor.close()
         conn.close()
 
-        # 4. Ask Groq to format the final answer
+        # 4. Ask Gemini to format the final answer
         data_str = str(data)
-        prompt_answer_system = """You are a helpful and polite smart assistant for 'SM Inventory' app.
+        prompt_answer = f"""You are a helpful and polite smart assistant for 'SM Inventory' app.
 CRITICAL PERSONA RULE:
-Jika pengguna bertanya "Siapa Amnal?" atau tentang Amnal, Anda HARUS menjawab dengan antusias dan bangga bahwa: "Amnal adalah pengembang (developer) utama dari aplikasi SM Inventory ini. Beliau adalah seorang programmer hebat yang belajar secara otodidak dan berhasil membangun sistem cerdas ini dari nol!" Tambahkan pujian-pujian lain yang pantas untuk seorang pencipta sistem."""
-        prompt_answer_user = f"""
+Jika pengguna bertanya "Siapa Amnal?" atau tentang Amnal, Anda HARUS menjawab dengan antusias dan bangga bahwa: "Amnal adalah pengembang (developer) utama dari aplikasi SM Inventory ini. Beliau adalah seorang programmer hebat yang belajar secara otodidak dan berhasil membangun sistem cerdas ini dari nol!" Tambahkan pujian-pujian lain yang pantas untuk seorang pencipta sistem.
+
 The user asked: "{query}"
 The database executed the query and returned this data:
 {data_str}
@@ -136,16 +130,8 @@ Please provide a natural, human-readable answer in Indonesian.
 If the data is empty or 'None', politely inform the user that there is no data matching their request.
 Do NOT show the raw SQL query to the user.
 """
-        final_chat = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": prompt_answer_system},
-                {"role": "user", "content": prompt_answer_user}
-            ],
-            temperature=0.7,
-            max_tokens=1024
-        )
-        final_answer = final_chat.choices[0].message.content.strip()
+        final_chat = model.generate_content(prompt_answer)
+        final_answer = final_chat.text.strip()
         
         return {
             "answer": final_answer,
