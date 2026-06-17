@@ -27,8 +27,8 @@ export const SmartAssistant = () => {
     setIsLoading(true);
 
     try {
-      // Endpoint to our Python AI Microservice
-      const response = await fetch('http://localhost:8001/api/v1/ai/ask', {
+      // Endpoint to our Python AI Microservice (proxied via Nginx in production)
+      const response = await fetch('/api/v1/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: userMessage })
