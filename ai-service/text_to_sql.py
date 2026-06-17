@@ -81,7 +81,7 @@ INSTRUCTIONS:
 - If the user is asking about inventory data, sales, or anything requiring database lookup, write a read-only MySQL query (SELECT only). Prefix it with 'SQL: '. Do NOT wrap in backticks.
 """
         response = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": prompt_system},
                 {"role": "user", "content": query}
@@ -133,7 +133,7 @@ If the data is empty or 'None', politely inform the user that there is no data m
 Do NOT show the raw SQL query to the user.
 """
         final_chat = client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": prompt_answer_system},
                 {"role": "user", "content": prompt_answer_user}
