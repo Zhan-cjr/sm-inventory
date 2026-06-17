@@ -17,7 +17,8 @@ def get_db_connection():
         host=os.getenv("DB_HOST", "localhost"),
         user=os.getenv("DB_USER", "root"),
         password=os.getenv("DB_PASSWORD", ""),
-        database=os.getenv("DB_NAME", "sm_inventory")
+        database=os.getenv("DB_NAME", "sm_inventory"),
+        connection_timeout=10
     )
 
 def get_db_schema():
@@ -57,7 +58,7 @@ def clean_sql(raw_sql: str):
 
 def process_nl_query(query: str):
     try:
-        print(f"Processing query via Gemini: {query}")
+        print(f"Processing query via Gemini: {query}", flush=True)
         
         # 1. Get database schema
         schema_context = get_db_schema()
@@ -84,9 +85,15 @@ RULES:
         sql_query = clean_sql(sql_response.text)
         print(f"Generated SQL: {sql_query}")
 
-        # Basic security check
+        # Basic security & performance check
         if not sql_query.upper().startswith("SELECT"):
             return {"answer": "Maaf, untuk alasan keamanan, AI hanya diizinkan untuk membaca data (SELECT)."}
+            
+        # Prevent massive cross-joins from hanging the database
+        if "LIMIT" not in sql_query.upper():
+            sql_query += " LIMIT 50"
+            
+        print(f"Executing Safe SQL: {sql_query}", flush=True)
 
         # 3. Execute SQL against database
         conn = get_db_connection()
