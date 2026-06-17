@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Bot, X } from 'lucide-react';
+import { SmartAssistant } from '../SmartAssistant';
 
 export function MobileDashboard({ user, authToken }) {
   const [metrics, setMetrics] = useState(null);
@@ -7,6 +9,7 @@ export function MobileDashboard({ user, authToken }) {
   
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState(user?.branch_id || '');
+  const [showAI, setShowAI] = useState(false);
 
   // Fetch branches if user has no default branch or is ADMIN
   const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role?.toUpperCase());
@@ -70,7 +73,28 @@ export function MobileDashboard({ user, authToken }) {
   const formatCurrency = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
 
   return (
-    <div style={{ padding: '1rem', paddingBottom: '5rem', animation: 'fadeIn 0.3s ease-out' }}>
+    <div style={{ padding: '1rem', paddingBottom: '5rem', animation: 'fadeIn 0.3s ease-out', position: 'relative' }}>
+      
+      {showAI ? (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: '60px', zIndex: 9999, background: 'var(--bg-app)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-card)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'white' }}>
+              <Bot color="var(--primary)" /> AI Assistant
+            </h3>
+            <button onClick={() => setShowAI(false)} style={{ background: 'none', border: 'none', color: 'white' }}><X /></button>
+          </div>
+          <div style={{ flex: 1, padding: '1rem', overflowY: 'auto' }}>
+            <SmartAssistant />
+          </div>
+        </div>
+      ) : null}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Dashboard Hari Ini</h2>
+        <button onClick={() => setShowAI(true)} style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)' }}>
+          <Bot size={18} /> Tanya AI
+        </button>
+      </div>
       
       {showBranchSelector && (
         <div style={{ marginBottom: '1rem' }}>
@@ -89,8 +113,6 @@ export function MobileDashboard({ user, authToken }) {
         </div>
       )}
 
-      <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem', fontWeight: 'bold' }}>Dashboard Hari Ini</h2>
-      
       {/* Primary Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
         <div style={{ background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.05))', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '1rem', borderRadius: '12px' }}>

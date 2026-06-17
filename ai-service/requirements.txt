@@ -1,8 +1,8 @@
-fastapi==0.104.1
-uvicorn==0.24.0
-pandas==2.1.3
-scikit-learn==1.3.2
-mysql-connector-python==8.2.0
-mlxtend==0.23.0
+fastapi
+uvicorn
+pandas
+scikit-learn
+mysql-connector-python
+mlxtend
 google-generativeai
-python-dotenv==1.0.0
+python-dotenv
