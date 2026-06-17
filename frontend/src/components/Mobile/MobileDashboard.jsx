@@ -76,7 +76,7 @@ export function MobileDashboard({ user, authToken }) {
     <div style={{ padding: '1rem', paddingBottom: '5rem', animation: 'fadeIn 0.3s ease-out', position: 'relative' }}>
       
       {showAI ? (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: '60px', zIndex: 9999, background: 'var(--bg-app)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: '60px', zIndex: 9999, background: '#0f172a', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-card)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'white' }}>
               <Bot color="var(--primary)" /> AI Assistant

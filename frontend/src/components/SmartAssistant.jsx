@@ -3,7 +3,7 @@ import { Send, Bot, User, Loader2 } from 'lucide-react';
 
 export const SmartAssistant = () => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Halo! Saya AI Smart Assistant Anda. Ada yang bisa saya bantu terkait laporan penjualan, stok barang, atau rekomendasi produk hari ini?' }
+    { role: 'assistant', content: 'Halo! Saya AI Smart Assistant Anda (dikembangkan oleh Amnal). Ada yang bisa saya bantu terkait laporan penjualan, stok barang, atau rekomendasi produk hari ini?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
