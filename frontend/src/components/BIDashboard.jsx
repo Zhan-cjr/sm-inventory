@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ResponsiveContainer, Heatmap, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import { ArrowLeft, BrainCircuit, Activity, Link2 } from 'lucide-react';
 import { SmartAssistant } from './SmartAssistant';
 
