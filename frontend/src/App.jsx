@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { POSTransaction } from './components/POSTransaction';
-import { ManagerDashboard } from './components/ManagerDashboard';
+import { BIDashboard } from './components/BIDashboard';
 import { Login } from './components/Login';
 import { MobileLayout } from './components/Mobile/MobileLayout';
 import { MobileAuthQueue } from './components/Mobile/MobileAuthQueue';
@@ -334,9 +334,9 @@ function App() {
         } />
 
         <Route path="/dashboard" element={
-          isMobileDevice ? <Navigate to="/mobile" replace /> : (isManagerOrAdmin ? (
-            <ManagerDashboard user={user} authToken={token} onLogout={handleLogout} />
-          ) : <Navigate to="/pos" replace />)
+          isManagerOrAdmin ? (
+            <BIDashboard user={user} authToken={token} onBack={() => window.location.href='/mobile'} />
+          ) : <Navigate to="/pos" replace />
         } />
 
         <Route path="/mobile" element={

@@ -53,10 +53,10 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '1.5rem', alignItems: 'stretch' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'stretch' }}>
         
         {/* Main BI Content */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           {/* Apriori Recommendations */}
           <div className="glass-panel" style={{ flex: 'none' }}>
@@ -117,10 +117,10 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
             </div>
           </div>
         </div>
-
+        
         {/* AI Assistant Sidebar */}
-        <div style={{ height: '100%' }}>
-          <SmartAssistant />
+        <div style={{ flex: '1 1 350px', maxWidth: '100%', minHeight: '500px' }}>
+          <SmartAssistant user={user} authToken={authToken} />
         </div>
 
       </div>
