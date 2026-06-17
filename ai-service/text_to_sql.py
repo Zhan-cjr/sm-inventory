@@ -1,4 +1,5 @@
 import os
+import re
 import mysql.connector
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -6,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configure Google Gemini API Key
-genai.configure(api_key=os.getenv("GEMINI_API_KEY", "dummy-key-for-now"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
 
 # Initialize Gemini Model
 model = genai.GenerativeModel('gemini-1.5-flash')
@@ -19,33 +20,101 @@ def get_db_connection():
         database=os.getenv("DB_NAME", "sm_inventory")
     )
 
-def process_nl_query(query: str):
-    """
-    1. Send NL query to LLM to generate SQL
-    2. Run SQL safely against read-only MySQL replica
-    3. Send results back to LLM to generate a human readable answer
-    """
+def get_db_schema():
+    """Fetch all tables and their columns to build context for the LLM."""
     try:
-        # NOTE: This is a scaffold for Gemini. 
-        # In a real environment, you provide the schema context to generate SQL.
-        schema_context = "Table transactions(id, total_amount, transaction_date); Table transaction_items(id, transaction_id, product_id, quantity);"
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SHOW TABLES")
+        tables = cursor.fetchall()
         
+        schema_text = ""
+        for table in tables:
+            table_name = table[0]
+            cursor.execute(f"DESCRIBE {table_name}")
+            columns = cursor.fetchall()
+            col_details = ", ".join([f"{col[0]} ({col[1]})" for col in columns])
+            schema_text += f"Table '{table_name}' has columns: {col_details}.\n"
+            
+        cursor.close()
+        conn.close()
+        return schema_text
+    except Exception as e:
+        print(f"Error fetching schema: {e}")
+        return ""
+
+def clean_sql(raw_sql: str):
+    """Clean markdown backticks from LLM output."""
+    raw_sql = raw_sql.strip()
+    if raw_sql.startswith("```"):
+        # Extract content between backticks
+        match = re.search(r'```(?:sql)?\s*(.*?)\s*```', raw_sql, re.DOTALL | re.IGNORECASE)
+        if match:
+            raw_sql = match.group(1)
+        else:
+            raw_sql = raw_sql.replace("```sql", "").replace("```", "").strip()
+    return raw_sql
+
+def process_nl_query(query: str):
+    try:
         print(f"Processing query via Gemini: {query}")
         
-        # In actual implementation:
-        # 1. Ask Gemini to generate SQL based on schema_context + query
-        # sql_response = model.generate_content(f"Convert this to SQL based on {schema_context}: {query}")
-        # sql_query = extract_sql(sql_response.text)
-        
-        # 2. Execute SQL
-        # data = execute_sql(sql_query)
-        
-        # 3. Ask Gemini to format the final answer based on data
-        # final_response = model.generate_content(f"The user asked: {query}. The data is: {data}. Answer the user naturally in Indonesian.")
+        # 1. Get database schema
+        schema_context = get_db_schema()
+        if not schema_context:
+            return {"answer": "Maaf, tidak dapat terhubung ke database untuk membaca skema saat ini."}
+
+        # 2. Ask Gemini to generate SQL
+        prompt_sql = f"""
+You are an expert MySQL database analyst. 
+Here is the schema of the database:
+{schema_context}
+
+The user asked: "{query}"
+
+Write a valid MySQL query to accurately answer the user's question. 
+RULES:
+1. ONLY return the raw SQL query. 
+2. DO NOT wrap it in markdown backticks. 
+3. DO NOT provide any explanation.
+4. The query must be READ-ONLY (SELECT statements only).
+5. Ensure the table and column names exactly match the schema provided.
+"""
+        sql_response = model.generate_content(prompt_sql)
+        sql_query = clean_sql(sql_response.text)
+        print(f"Generated SQL: {sql_query}")
+
+        # Basic security check
+        if not sql_query.upper().startswith("SELECT"):
+            return {"answer": "Maaf, untuk alasan keamanan, AI hanya diizinkan untuk membaca data (SELECT)."}
+
+        # 3. Execute SQL against database
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(sql_query)
+        data = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        # 4. Ask Gemini to format the final answer
+        prompt_answer = f"""
+You are an intelligent, friendly Smart Assistant for a retail/inventory system (developed by Amnal).
+The user asked: "{query}"
+The database returned the following raw data: {data}
+
+Please formulate a natural, easy-to-understand, and professional answer in Indonesian based on the data.
+DO NOT mention the SQL query. If the data is empty ([]), inform the user nicely that there is no data matching their request.
+Keep the answer concise but informative.
+"""
+        final_response = model.generate_content(prompt_answer)
         
         return {
-            "answer": "Berdasarkan data (Simulasi Gemini), tren penjualan mengalami kenaikan sebesar 15% pada bulan ini.",
-            "data": []
+            "answer": final_response.text,
+            "data": data,
+            "sql_executed": sql_query
         }
+        
+    except mysql.connector.Error as db_err:
+        return {"answer": f"Terjadi kesalahan saat mencari data di database (Mungkin AI salah menulis query): {str(db_err)}"}
     except Exception as e:
-        return {"answer": f"Maaf, terjadi kesalahan saat memproses data via Gemini: {str(e)}"}
+        return {"answer": f"Maaf, terjadi kesalahan internal sistem AI: {str(e)}"}
