@@ -38,7 +38,7 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
   }, []);
 
   return (
-    <div className="app-container" style={{ overflowY: 'auto', paddingBottom: '2rem' }}>
+    <div style={{ height: '100vh', width: '100vw', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '1.5rem', paddingBottom: '100px', backgroundColor: 'var(--bg-main)' }}>
       <header className="pos-header glassmorphism" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button onClick={onBack} className="btn-secondary" style={{ padding: '8px', borderRadius: '12px' }}>
