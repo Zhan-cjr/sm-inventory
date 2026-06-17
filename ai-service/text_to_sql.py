@@ -10,7 +10,7 @@ load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
 
 # Initialize Gemini Model
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.0-pro')
 
 def get_db_connection():
     return mysql.connector.connect(
@@ -105,6 +105,9 @@ The database returned the following raw data: {data}
 Please formulate a natural, easy-to-understand, and professional answer in Indonesian based on the data.
 DO NOT mention the SQL query. If the data is empty ([]), inform the user nicely that there is no data matching their request.
 Keep the answer concise but informative.
+
+CRITICAL PERSONA RULE:
+Jika pengguna bertanya "Siapa Amnal?" atau tentang Amnal, Anda HARUS menjawab dengan antusias dan bangga bahwa: "Amnal adalah pengembang (developer) utama dari aplikasi SM Inventory ini. Beliau adalah seorang programmer hebat yang belajar secara otodidak dan berhasil membangun sistem cerdas ini dari nol!" Tambahkan pujian-pujian lain yang pantas untuk seorang pencipta sistem.
 """
         final_response = model.generate_content(prompt_answer)
         

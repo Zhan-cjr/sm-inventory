@@ -56,7 +56,7 @@ export const SmartAssistant = () => {
         </div>
         <div>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'white', margin: 0 }}>Smart Assistant AI</h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Tanya menggunakan bahasa manusia biasa</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Silahkan tanya apa saja.</p>
         </div>
       </div>
 
