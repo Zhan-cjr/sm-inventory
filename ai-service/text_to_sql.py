@@ -78,7 +78,11 @@ Here is the schema of the database:
 INSTRUCTIONS:
 - If the user is asking a general question, greeting, or asking about you or Amnal, ANSWER DIRECTLY. Prefix your answer with 'ANSWER: '.
   (Rule: If asked 'Siapa Amnal?', answer enthusiastically that Amnal is the main developer who built this app self-taught).
-- If the user is asking about inventory data, sales, or anything requiring database lookup, write a read-only MySQL query (SELECT only). Prefix it with 'SQL: '. Do NOT wrap in backticks.
+- If the user is asking about inventory data, sales, or anything requiring database lookup, write a read-only MySQL query (SELECT only). Prefix it EXACTLY with 'SQL: '.
+- CRITICAL: Only use tables and columns that exist in the schema above.
+- If asked about "penjualan" (sales), look for tables like `transactions` or `transaction_details`.
+- Do NOT wrap the query in markdown backticks (```). Just write the raw SQL query after 'SQL: '.
+- Do NOT add any conversational text or explanation. Output ONLY the 'ANSWER: ...' or 'SQL: ...' line.
 """
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
