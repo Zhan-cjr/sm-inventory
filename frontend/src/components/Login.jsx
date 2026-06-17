@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
 export const Login = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState('cashier');
-  const [password, setPassword] = useState('password');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -110,7 +110,7 @@ export const Login = ({ onLoginSuccess }) => {
 
         {error && <div className="alert-msg slide-down" style={{ marginBottom: '1rem' }}>{error}</div>}
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleLogin} autoComplete="off">
           <div className="form-group">
             <label>Username Karyawan</label>
             <input
@@ -120,6 +120,7 @@ export const Login = ({ onLoginSuccess }) => {
               required
               className="login-input"
               placeholder="username"
+              autoComplete="off"
             />
           </div>
           <div className="form-group">
@@ -131,6 +132,7 @@ export const Login = ({ onLoginSuccess }) => {
               required
               className="login-input"
               placeholder="••••••••"
+              autoComplete="new-password"
             />
           </div>
           <div className="form-group">
