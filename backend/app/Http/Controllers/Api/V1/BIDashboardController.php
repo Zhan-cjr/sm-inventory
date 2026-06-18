@@ -43,7 +43,7 @@ class BIDashboardController extends Controller
         foreach ($transactions as $trx) {
             $date = Carbon::parse($trx->transaction_date);
             // ISO day of week: 1 = Mon, 7 = Sun. Array index is 0-6.
-            $dayIndex = $date->isIsoWeekday() ? $date->dayOfWeekIso - 1 : $date->dayOfWeekIso - 1; 
+            $dayIndex = $date->dayOfWeekIso - 1; 
             $hour = $date->hour;
 
             if ($hour >= 8 && $hour <= 19) {

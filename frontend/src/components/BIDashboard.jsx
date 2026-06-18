@@ -16,7 +16,10 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
         setLoading(true);
         // Fetch Heatmap
         const heatmapRes = await fetch('/api/v1/bi/heatmap', {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+          headers: { 
+            'Authorization': `Bearer ${authToken}`,
+            'Accept': 'application/json'
+          }
         });
         if (heatmapRes.ok) {
           const hData = await heatmapRes.json();
@@ -25,7 +28,10 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
 
         // Fetch Apriori
         const aprioriRes = await fetch('/api/v1/bi/apriori', {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+          headers: { 
+            'Authorization': `Bearer ${authToken}`,
+            'Accept': 'application/json'
+          }
         });
         if (aprioriRes.ok) {
           const aData = await aprioriRes.json();
