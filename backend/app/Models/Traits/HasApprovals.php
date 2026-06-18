@@ -52,7 +52,7 @@ trait HasApprovals
         
         $creatorName = 'System';
         if (class_basename($this) === 'PurchaseOrder') {
-            $creatorName = $this->created_by ?? 'System';
+            $creatorName = $this->creator?->name ?? 'System';
         } else {
             $creatorName = $this->recorder?->name ?? 'System';
         }

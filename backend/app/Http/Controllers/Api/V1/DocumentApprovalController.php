@@ -56,7 +56,7 @@ class DocumentApprovalController extends Controller
             
             $user = 'System';
             if ($type === 'Purchase Order') {
-                $user = $model->created_by ?? 'System';
+                $user = $model->creator?->name ?? 'System';
             } else {
                 $user = $model->recorder?->name ?? 'System';
             }
