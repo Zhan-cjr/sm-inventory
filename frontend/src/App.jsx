@@ -8,6 +8,7 @@ import { MobileAuthQueue } from './components/Mobile/MobileAuthQueue';
 import { MobileEcommerceQueue } from './components/Mobile/MobileEcommerceQueue';
 import { MobileDashboard } from './components/Mobile/MobileDashboard';
 import { MobileProductScanner } from './components/Mobile/MobileProductScanner';
+import { MobileSuggestedOrders } from './components/Mobile/MobileSuggestedOrders';
 import './index.css';
 
 // Interceptor global fetch untuk otomatis menyertakan header X-Device-UUID di semua request API v1
@@ -347,6 +348,7 @@ function App() {
           <Route path="scanner" element={<MobileProductScanner user={user} authToken={token} />} />
           <Route path="auth" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileAuthQueue user={user} authToken={token} />} />
           <Route path="ecommerce" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileEcommerceQueue user={user} authToken={token} />} />
+          <Route path="suggested-orders" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileSuggestedOrders user={user} authToken={token} />} />
         </Route>
       </Routes>
     </Router>

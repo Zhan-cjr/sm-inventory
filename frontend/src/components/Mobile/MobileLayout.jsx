@@ -73,6 +73,18 @@ export function MobileLayout({ user, onLogout }) {
           <span>Cek Barang</span>
         </button>
 
+        {!isRestrictedRole && (
+          <button
+            className={`nav-item ${isActive('/mobile/suggested-orders') ? 'active' : ''}`}
+            onClick={() => navigate('/mobile/suggested-orders')}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            <span>Order Pintar</span>
+          </button>
+        )}
+
         {hasAuthMenu && (
           <button
             className={`nav-item ${isActive('/mobile/auth') ? 'active' : ''}`}
