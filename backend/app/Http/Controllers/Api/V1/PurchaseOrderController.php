@@ -61,43 +61,64 @@ class PurchaseOrderController extends Controller
     private function processBulk($user, $items, $branchId)
     {
         return DB::transaction(function () use ($user, $items, $branchId) {
-            $firstProduct = Product::find($items[0]['product_id']);
-            
-            $po = PurchaseOrder::create([
-                'organization_id' => $firstProduct->organization_id,
-                'branch_id' => $branchId,
-                'supplier_id' => $firstProduct->supplier_id,
-                'po_number' => 'PO-' . date('YmdHis'),
-                'po_date' => now(),
-                'status' => 'DRAFT',
-                'total_amount' => 0,
-                'created_by' => $user->id,
-            ]);
-
-            $totalAmount = 0;
+            // Group items by supplier_id
+            $itemsBySupplier = [];
             foreach ($items as $item) {
                 $product = Product::find($item['product_id']);
-                $qty = $item['suggested_qty'];
-                $subtotal = $qty * $product->cost_price;
-
-                PurchaseOrderItem::create([
-                    'purchase_order_id' => $po->id,
-                    'product_id' => $product->id,
-                    'quantity_ordered' => $qty,
-                    'unit_cost' => $product->cost_price,
-                    'subtotal' => $subtotal,
-                ]);
-
-                $totalAmount += $subtotal;
+                if ($product && $product->supplier_id) {
+                    $itemsBySupplier[$product->supplier_id][] = [
+                        'product' => $product,
+                        'qty' => $item['suggested_qty']
+                    ];
+                }
             }
 
-            $po->update(['total_amount' => $totalAmount]);
+            if (empty($itemsBySupplier)) {
+                return response()->json(['error' => 'Tidak ada produk valid dengan Supplier yang ditemukan'], 400);
+            }
+
+            $createdPOs = [];
+
+            foreach ($itemsBySupplier as $supplierId => $supplierItems) {
+                $firstProduct = $supplierItems[0]['product'];
+                
+                $po = PurchaseOrder::create([
+                    'organization_id' => $firstProduct->organization_id,
+                    'branch_id' => $branchId,
+                    'supplier_id' => $supplierId,
+                    'po_number' => 'PO-' . date('YmdHis') . '-' . rand(100, 999),
+                    'po_date' => now(),
+                    'status' => 'DRAFT',
+                    'total_amount' => 0,
+                    'created_by' => $user->id,
+                ]);
+
+                $totalAmount = 0;
+                foreach ($supplierItems as $sItem) {
+                    $product = $sItem['product'];
+                    $qty = $sItem['qty'];
+                    $subtotal = $qty * $product->cost_price;
+
+                    PurchaseOrderItem::create([
+                        'purchase_order_id' => $po->id,
+                        'product_id' => $product->id,
+                        'quantity_ordered' => $qty,
+                        'unit_cost' => $product->cost_price,
+                        'subtotal' => $subtotal,
+                    ]);
+
+                    $totalAmount += $subtotal;
+                }
+
+                $po->update(['total_amount' => $totalAmount]);
+                $createdPOs[] = $po->po_number;
+            }
 
             return response()->json([
-                'message' => count($items) > 1 
-                    ? 'Draft Pesanan Pembelian Massal berhasil dibuat' 
-                    : 'Draft Pesanan Pembelian berhasil dibuat',
-                'po' => $po,
+                'message' => count($createdPOs) > 1 
+                    ? count($createdPOs) . ' Draft PO berhasil dibuat (terpisah berdasarkan Supplier)' 
+                    : '1 Draft Pesanan Pembelian berhasil dibuat',
+                'po_numbers' => $createdPOs,
                 'items_count' => count($items)
             ]);
         });

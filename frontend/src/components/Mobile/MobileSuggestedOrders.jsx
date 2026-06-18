@@ -130,7 +130,8 @@ export function MobileSuggestedOrders({ user, authToken }) {
       }
       
       const responseData = await res.json();
-      setSuccessMsg(`${responseData.message} (${responseData.po?.po_number})`);
+      const poNumbers = responseData.po_numbers ? responseData.po_numbers.join(', ') : (responseData.po?.po_number || '');
+      setSuccessMsg(`${responseData.message} (${poNumbers})`);
       
       // Remove selected items from view
       setSuggestions(prev => prev.filter(item => !selectedItems.has(item.product_id)));
