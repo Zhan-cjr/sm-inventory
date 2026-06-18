@@ -3,39 +3,43 @@ import { ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid } from '
 import { ArrowLeft, BrainCircuit, Activity, Link2 } from 'lucide-react';
 import { SmartAssistant } from './SmartAssistant';
 
-// Mock data for heatmap: 7 days, 12 hours (8am - 8pm)
-const generateHeatmapData = () => {
-  const days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-  const data = [];
-  days.forEach((day, dIdx) => {
-    for (let h = 8; h <= 19; h++) {
-      data.push({
-        day,
-        hour: `${h}:00`,
-        dayIndex: dIdx,
-        hourIndex: h,
-        value: Math.floor(Math.random() * 100) + (dIdx >= 5 ? 50 : 0) // Weekend is busier
-      });
-    }
-  });
-  return data;
-};
-
-// Mock apriori rules
-const mockRules = [
-  { item1: 'Popok Bayi Merries', item2: 'Susu Formula Bebelac', confidence: '85%' },
-  { item1: 'Roti Tawar Sariroti', item2: 'Selai Kacang Skippy', confidence: '78%' },
-  { item1: 'Kopi Kapal Api', item2: 'Gula Pasir Gulaku', confidence: '92%' },
-  { item1: 'Mie Instan Indomie', item2: 'Telur Ayam 1kg', confidence: '75%' }
-];
+// Removed mock data
 
 export const BIDashboard = ({ user, authToken, onBack }) => {
   const [heatmapData, setHeatmapData] = useState([]);
+  const [aprioriRules, setAprioriRules] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // In real implementation, fetch from Python Service or Laravel backend
-    setHeatmapData(generateHeatmapData());
-  }, []);
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Fetch Heatmap
+        const heatmapRes = await fetch('/api/v1/bi/heatmap', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (heatmapRes.ok) {
+          const hData = await heatmapRes.json();
+          setHeatmapData(hData);
+        }
+
+        // Fetch Apriori
+        const aprioriRes = await fetch('/api/v1/bi/apriori', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (aprioriRes.ok) {
+          const aData = await aprioriRes.json();
+          setAprioriRules(aData);
+        }
+      } catch (error) {
+        console.error('Error fetching BI data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [authToken]);
 
   return (
     <div style={{ height: '100vh', width: '100vw', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '1.5rem', paddingBottom: '100px', backgroundColor: 'var(--bg-main)' }}>
@@ -68,7 +72,11 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
-              {mockRules.map((rule, idx) => (
+              {loading ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Memuat data AI...</div>
+              ) : aprioriRules.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Belum cukup data transaksi untuk menemukan pola.</div>
+              ) : aprioriRules.map((rule, idx) => (
                 <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Membeli</span>
@@ -96,12 +104,19 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
                   we mock the visual of a heatmap here for demonstration of the dashboard layout.
                */}
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gridTemplateRows: 'repeat(7, 1fr)', gap: '4px', width: '100%', padding: '1rem', height: '100%' }}>
-                 {heatmapData.map((d, i) => {
-                   // Calculate color intensity based on value
-                   const intensity = d.value / 150; 
+                 {loading ? (
+                   <div style={{ gridColumn: '1 / -1', gridRow: '1 / -1', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)' }}>Memuat Heatmap...</div>
+                 ) : heatmapData.map((d, i) => {
+                   // Calculate color intensity based on value. Max value is approx dynamically estimated
+                   const maxValue = Math.max(...heatmapData.map(h => h.value), 1);
+                   const intensity = d.value / maxValue;
+                   
+                   // Increase base visibility slightly so empty blocks are visible
+                   const bgOpacity = intensity === 0 ? 0.05 : 0.2 + (intensity * 0.8);
+                   
                    return (
                      <div key={i} title={`${d.day} ${d.hour} - ${d.value} trx`} style={{
-                       background: `rgba(59, 130, 246, ${intensity})`,
+                       background: `rgba(59, 130, 246, ${bgOpacity})`,
                        borderRadius: '4px',
                        width: '100%',
                        height: '100%',

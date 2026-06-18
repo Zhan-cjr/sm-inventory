@@ -286,6 +286,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/shifts/close', [\App\Http\Controllers\Api\V1\ShiftController::class, 'closeShift']);
         Route::post('/shifts/cash-movement', [\App\Http\Controllers\Api\V1\ShiftController::class, 'cashMovement']);
 
+        // BI Dashboard endpoints
+        Route::get('/bi/heatmap', [\App\Http\Controllers\Api\V1\BIDashboardController::class, 'heatmap']);
+        Route::get('/bi/apriori', [\App\Http\Controllers\Api\V1\BIDashboardController::class, 'apriori']);
+
         // Mobile Stock Opname
         Route::get('/stock-opname/active', [StockOpnameApiController::class, 'getActiveSessions']);
         Route::post('/stock-opname/scan', [StockOpnameApiController::class, 'scanProduct']);
