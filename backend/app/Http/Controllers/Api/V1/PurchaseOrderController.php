@@ -84,12 +84,19 @@ class PurchaseOrderController extends Controller
                 $firstProduct = $supplierItems[0]['product'];
                 
                 $needsApproval = false;
+                $approvalReasons = [];
                 foreach ($supplierItems as $sItem) {
                     $originalQty = $sItem['original_qty'] ?? $sItem['qty'];
                     if ((float)$sItem['qty'] > (float)$originalQty) {
                         $needsApproval = true;
-                        break;
+                        $approvalReasons[] = "Kuantitas {$sItem['product']->name} ({$sItem['qty']}) melebihi saran order sistem ({$originalQty}).";
                     }
+                }
+
+                $supplier = \App\Models\Supplier::find($supplierId);
+                $expiredDate = null;
+                if ($supplier && $supplier->default_po_expired_days > 0) {
+                    $expiredDate = now()->addDays($supplier->default_po_expired_days)->format('Y-m-d');
                 }
 
                 $po = PurchaseOrder::create([
@@ -98,6 +105,7 @@ class PurchaseOrderController extends Controller
                     'supplier_id' => $supplierId,
                     'po_number' => 'PO-' . date('YmdHis') . '-' . rand(100, 999),
                     'po_date' => now(),
+                    'expired_date' => $expiredDate,
                     'status' => $needsApproval ? 'pending_approval' : 'approved',
                     'total_amount' => 0,
                     'created_by' => $user->id,
@@ -124,7 +132,7 @@ class PurchaseOrderController extends Controller
                 $po->update(['total_amount' => $totalAmount]);
 
                 if ($needsApproval) {
-                    $po->requestApproval('Kuantitas PO melebihi batas saran sistem (Order Pintar)');
+                    $po->requestApproval('Otomatis: ' . implode(', ', $approvalReasons));
                 }
 
                 $createdPOs[] = $po->po_number;

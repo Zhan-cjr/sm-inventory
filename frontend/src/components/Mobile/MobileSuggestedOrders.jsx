@@ -98,7 +98,7 @@ export function MobileSuggestedOrders({ user, authToken }) {
   const handleQtyChange = (productId, newQty) => {
     setSuggestions(prev => prev.map(item => 
       item.product_id === productId 
-        ? { ...item, edited_qty: parseFloat(newQty) || 0 } 
+        ? { ...item, edited_qty: newQty } 
         : item
     ));
   };
@@ -115,7 +115,7 @@ export function MobileSuggestedOrders({ user, authToken }) {
       .filter(item => selectedItems.has(item.product_id))
       .map(item => ({
         product_id: item.product_id,
-        suggested_qty: item.edited_qty !== undefined ? item.edited_qty : item.suggested_qty,
+        suggested_qty: item.edited_qty !== undefined && item.edited_qty !== '' ? parseFloat(item.edited_qty) || 0 : item.suggested_qty,
         original_qty: item.suggested_qty
       }));
       
