@@ -15,6 +15,8 @@ export function MobileLayout({ user, onLogout }) {
   const isRestrictedRole = !isManagerOrAdmin;
 
   const hasEcommerceAuth = user?.custom_authorizations?.includes('PROCESS_ECOMMERCE');
+  const hasSmartOrderAuth = user?.custom_authorizations?.includes('ACCESS_SMART_ORDER');
+  const hasBIAIAuth = user?.custom_authorizations?.includes('ACCESS_BI_AI');
   const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) || 
                       user?.custom_authorizations?.includes('APPROVE_PO') || 
                       user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
@@ -73,7 +75,7 @@ export function MobileLayout({ user, onLogout }) {
           <span>Cek Barang</span>
         </button>
 
-        {!isRestrictedRole && (
+        {hasSmartOrderAuth && (
           <button
             className={`nav-item ${isActive('/mobile/suggested-orders') ? 'active' : ''}`}
             onClick={() => navigate('/mobile/suggested-orders')}
@@ -111,7 +113,7 @@ export function MobileLayout({ user, onLogout }) {
           </button>
         )}
 
-        {!isRestrictedRole && (
+        {hasBIAIAuth && (
           <button
             className="nav-item"
             onClick={() => navigate('/dashboard')}

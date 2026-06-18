@@ -29,12 +29,6 @@ class DocumentApprovalController extends Controller
             ->where('status', 'pending')
             ->whereIn('approvable_type', $allowedTypes);
 
-        if ($branchId) {
-            $query->whereHasMorph('approvable', $allowedTypes, function ($q) use ($branchId) {
-                $q->where('branch_id', $branchId);
-            });
-        }
-
         $approvals = $query->latest()->get();
         // Eager load creator/recorder relationships to avoid N+1 and get the actual names
         $approvals->load([
@@ -91,10 +85,6 @@ class DocumentApprovalController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($user->branch_id !== null && $approval->approvable->branch_id !== $user->branch_id) {
-            return response()->json(['message' => 'Akses ditolak: Anda tidak dapat memproses dokumen di luar cabang Anda'], 403);
-        }
-
         $notes = $request->input('notes');
 
         if ($action === 'approve') {
@@ -116,10 +106,6 @@ class DocumentApprovalController extends Controller
         $model = $approval->approvable;
         if (!$model) {
             return response()->json(['message' => 'Document not found'], 404);
-        }
-
-        if ($user->branch_id !== null && $model->branch_id !== $user->branch_id) {
-            return response()->json(['message' => 'Unauthorized branch'], 403);
         }
 
         $type = get_class($model) === \App\Models\PurchaseOrder::class ? 'PO' : 'SO';

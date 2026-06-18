@@ -93,6 +93,8 @@ class UserForm
                                         'APPROVE_PO' => 'Approval Purchase Order (PO)',
                                         'APPROVE_STOCK_ADJUSTMENT' => 'Approval Koreksi Stok (SO)',
                                         'PROCESS_ECOMMERCE' => 'Proses Pesanan E-Commerce',
+                                        'ACCESS_SMART_ORDER' => 'Akses Menu Order Pintar (Mobile)',
+                                        'ACCESS_BI_AI' => 'Akses Menu BI & AI (Mobile)',
                                     ])
                                     ->columns(2)
                                     ->helperText('Centang izin khusus untuk backend, berlaku spesifik untuk user ini (termasuk Admin/Superadmin wajib dicentang).'),

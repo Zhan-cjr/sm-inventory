@@ -35,14 +35,6 @@ trait HasApprovals
         $requiredAuth = class_basename($this) === 'PurchaseOrder' ? 'APPROVE_PO' : 'APPROVE_STOCK_ADJUSTMENT';
         
         $supervisors = \App\Models\User::whereNotNull('telegram_chat_id')
-            ->where(function($q) use ($branchId) {
-                if ($branchId) {
-                    $q->where('branch_id', $branchId)
-                      ->orWhereNull('branch_id');
-                } else {
-                    $q->whereNull('branch_id');
-                }
-            })
             ->whereJsonContains('custom_authorizations', $requiredAuth)
             ->get();
 
