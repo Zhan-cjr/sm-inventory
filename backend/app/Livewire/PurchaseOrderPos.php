@@ -429,7 +429,7 @@ class PurchaseOrderPos extends Component
             }
         }
 
-        $status = $needsApproval ? 'PENDING_APPROVAL' : 'APPROVED';
+        $status = $needsApproval ? 'pending_approval' : 'approved';
         
         $data = [
             'organization_id' => $organization->id,
@@ -444,7 +444,7 @@ class PurchaseOrderPos extends Component
             'include_tax' => false,
             'tax_amount' => 0,
             'notes' => $this->notes,
-            'created_by' => auth()->user()->name,
+            'created_by' => auth()->id(),
         ];
 
         if ($this->purchaseOrder) {

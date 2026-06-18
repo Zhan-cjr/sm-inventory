@@ -98,7 +98,7 @@ class PurchaseOrderController extends Controller
                     'supplier_id' => $supplierId,
                     'po_number' => 'PO-' . date('YmdHis') . '-' . rand(100, 999),
                     'po_date' => now(),
-                    'status' => $needsApproval ? 'pending_approval' : 'APPROVED',
+                    'status' => $needsApproval ? 'pending_approval' : 'approved',
                     'total_amount' => 0,
                     'created_by' => $user->id,
                 ]);
