@@ -71,8 +71,8 @@ class PurchaseOrderForm
 
                 Textarea::make('notes')
                     ->columnSpanFull(),
-                TextInput::make('created_by')
-                    ->required(),
+                \Filament\Forms\Components\Hidden::make('created_by')
+                    ->default(fn () => auth()->id()),
                 Checkbox::make('cetak_nota')
                     ->label('Cetak Nota setelah simpan')
                     ->dehydrated(false)
