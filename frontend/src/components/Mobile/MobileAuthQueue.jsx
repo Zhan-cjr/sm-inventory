@@ -9,6 +9,9 @@ export function MobileAuthQueue({ authToken, user }) {
   const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role?.toUpperCase());
   const showBranchSelector = !user?.branch_id || isAdmin;
 
+  const hasPosAuth = user?.pos_authorizations && user.pos_authorizations.length > 0;
+  const hasDocAuth = user?.custom_authorizations?.includes('APPROVE_PO') || user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
+
   useEffect(() => {
     if (showBranchSelector) {
       fetch('/api/v1/branches', { headers: { 'Authorization': `Bearer ${authToken}` } })
@@ -152,113 +155,119 @@ export function MobileAuthQueue({ authToken, user }) {
         </div>
       )}
 
-      {/* POS Authorizations */}
-      <h4 style={{ color: 'var(--text-main)', marginTop: '1.5rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>Otorisasi POS Kasir</h4>
-      {loading && requests.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '1rem' }}>
-          <div className="spin" style={{ width: '20px', height: '20px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
-        </div>
-      ) : requests.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
-          <p>Belum ada permintaan otorisasi POS.</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {requests.map(req => (
-            <div key={req.id} style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: '700', color: '#f59e0b' }}>{req.action}</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {new Date(req.created_at).toLocaleTimeString('id-ID')}
-                </span>
-              </div>
-              <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                Diminta oleh: <strong style={{ color: 'white' }}>{req.cashier?.name}</strong>
-              </p>
-              <p style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-muted)' }}>
-                Cabang: <strong style={{ color: 'white' }}>{req.branch?.name || 'Pusat'}</strong>
-              </p>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button 
-                  onClick={() => handleAction(req.id, 'reject')}
-                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontWeight: 'bold' }}
-                >
-                  TOLAK
-                </button>
-                <button 
-                  onClick={() => handleAction(req.id, 'approve')}
-                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontWeight: 'bold' }}
-                >
-                  SETUJUI
-                </button>
-              </div>
+      {hasPosAuth && (
+        <>
+          <h4 style={{ color: 'var(--text-main)', marginTop: '1.5rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>Otorisasi POS Kasir</h4>
+          {loading && requests.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '1rem' }}>
+              <div className="spin" style={{ width: '20px', height: '20px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
             </div>
-          ))}
-        </div>
+          ) : requests.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
+              <p>Belum ada permintaan otorisasi POS.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {requests.map(req => (
+                <div key={req.id} style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span style={{ fontWeight: '700', color: '#f59e0b' }}>{req.action}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {new Date(req.created_at).toLocaleTimeString('id-ID')}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                    Diminta oleh: <strong style={{ color: 'white' }}>{req.cashier?.name}</strong>
+                  </p>
+                  <p style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-muted)' }}>
+                    Cabang: <strong style={{ color: 'white' }}>{req.branch?.name || 'Pusat'}</strong>
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button 
+                      onClick={() => handleAction(req.id, 'reject')}
+                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontWeight: 'bold' }}
+                    >
+                      TOLAK
+                    </button>
+                    <button 
+                      onClick={() => handleAction(req.id, 'approve')}
+                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontWeight: 'bold' }}
+                    >
+                      SETUJUI
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Document Approvals */}
-      <h4 style={{ color: 'var(--text-main)', marginTop: '2rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>Persetujuan Dokumen (PO & Koreksi Stok)</h4>
-      {loadingDocs && docRequests.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '1rem' }}>
-          <div className="spin" style={{ width: '20px', height: '20px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
-        </div>
-      ) : docRequests.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
-          <p>Belum ada dokumen yang perlu disetujui.</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {docRequests.map(req => (
-            <div key={req.id} style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: '700', color: '#3b82f6' }}>{req.type} ({req.number})</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {new Date(req.created_at).toLocaleTimeString('id-ID')}
-                </span>
-              </div>
-              <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                Total: <strong style={{ color: 'white' }}>Rp {parseFloat(req.total).toLocaleString('id-ID')}</strong>
-              </p>
-              <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                Dibuat oleh: <strong style={{ color: 'white' }}>{req.created_by}</strong>
-              </p>
-              {req.supplier_name && (
-                <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                  Supplier: <strong style={{ color: 'white' }}>{req.supplier_name}</strong>
-                </p>
-              )}
-              <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                Cabang: <strong style={{ color: 'white' }}>{req.branch_name || 'Pusat'}</strong>
-              </p>
-              {req.notes && (
-                <p style={{ fontSize: '0.85rem', color: '#f59e0b', fontStyle: 'italic', marginBottom: '1rem' }}>
-                  {req.notes}
-                </p>
-              )}
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-                <button 
-                  onClick={() => handleRejectClick(req.id)}
-                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', fontWeight: 'bold' }}
-                >
-                  TOLAK
-                </button>
-                <button 
-                  onClick={() => handleReview(req.id)}
-                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #3b82f6', background: 'transparent', color: '#3b82f6', fontWeight: 'bold' }}
-                >
-                  REVIEW
-                </button>
-                <button 
-                  onClick={() => handleDocAction(req.id, 'approve')}
-                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#10b981', color: 'white', fontWeight: 'bold' }}
-                >
-                  SETUJUI
-                </button>
-              </div>
+      {hasDocAuth && (
+        <>
+          <h4 style={{ color: 'var(--text-main)', marginTop: '2rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>Persetujuan Dokumen (PO & Koreksi Stok)</h4>
+          {loadingDocs && docRequests.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '1rem' }}>
+              <div className="spin" style={{ width: '20px', height: '20px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
             </div>
-          ))}
-        </div>
+          ) : docRequests.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
+              <p>Belum ada dokumen yang perlu disetujui.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {docRequests.map(req => (
+                <div key={req.id} style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span style={{ fontWeight: '700', color: '#3b82f6' }}>{req.type} ({req.number})</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {new Date(req.created_at).toLocaleTimeString('id-ID')}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                    Total: <strong style={{ color: 'white' }}>Rp {parseFloat(req.total).toLocaleString('id-ID')}</strong>
+                  </p>
+                  <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                    Dibuat oleh: <strong style={{ color: 'white' }}>{req.created_by}</strong>
+                  </p>
+                  {req.supplier_name && (
+                    <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                      Supplier: <strong style={{ color: 'white' }}>{req.supplier_name}</strong>
+                    </p>
+                  )}
+                  <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                    Cabang: <strong style={{ color: 'white' }}>{req.branch_name || 'Pusat'}</strong>
+                  </p>
+                  {req.notes && (
+                    <p style={{ fontSize: '0.85rem', color: '#f59e0b', fontStyle: 'italic', marginBottom: '1rem' }}>
+                      {req.notes}
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                    <button 
+                      onClick={() => handleRejectClick(req.id)}
+                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', fontWeight: 'bold' }}
+                    >
+                      TOLAK
+                    </button>
+                    <button 
+                      onClick={() => handleReview(req.id)}
+                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #3b82f6', background: 'transparent', color: '#3b82f6', fontWeight: 'bold' }}
+                    >
+                      REVIEW
+                    </button>
+                    <button 
+                      onClick={() => handleDocAction(req.id, 'approve')}
+                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#10b981', color: 'white', fontWeight: 'bold' }}
+                    >
+                      SETUJUI
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {showModal && (
