@@ -83,13 +83,22 @@ class PurchaseOrderController extends Controller
             foreach ($itemsBySupplier as $supplierId => $supplierItems) {
                 $firstProduct = $supplierItems[0]['product'];
                 
+                $needsApproval = false;
+                foreach ($supplierItems as $sItem) {
+                    $originalQty = $sItem['original_qty'] ?? $sItem['qty'];
+                    if ((float)$sItem['qty'] > (float)$originalQty) {
+                        $needsApproval = true;
+                        break;
+                    }
+                }
+
                 $po = PurchaseOrder::create([
                     'organization_id' => $firstProduct->organization_id,
                     'branch_id' => $branchId,
                     'supplier_id' => $supplierId,
                     'po_number' => 'PO-' . date('YmdHis') . '-' . rand(100, 999),
                     'po_date' => now(),
-                    'status' => 'APPROVED',
+                    'status' => $needsApproval ? 'pending_approval' : 'APPROVED',
                     'total_amount' => 0,
                     'created_by' => $user->id,
                 ]);
@@ -113,6 +122,11 @@ class PurchaseOrderController extends Controller
                 }
 
                 $po->update(['total_amount' => $totalAmount]);
+
+                if ($needsApproval) {
+                    $po->requestApproval('Kuantitas PO melebihi batas saran sistem (Order Pintar)');
+                }
+
                 $createdPOs[] = $po->po_number;
             }
 

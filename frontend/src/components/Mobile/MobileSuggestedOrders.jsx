@@ -296,6 +296,12 @@ export function MobileSuggestedOrders({ user, authToken }) {
                     </div>
                     <div>
                       <span style={{ color: 'var(--text-muted)' }}>Saran Order:</span> <br />
+                      <strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>+{item.suggested_qty}</strong>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Qty Order:</span>
                       <input 
                         type="number" 
                         value={item.edited_qty !== undefined ? item.edited_qty : item.suggested_qty} 
@@ -303,14 +309,15 @@ export function MobileSuggestedOrders({ user, authToken }) {
                         min="0"
                         step="0.1"
                         style={{
-                          width: '100%',
-                          padding: '0.25rem',
-                          marginTop: '0.25rem',
+                          width: '100px',
+                          padding: '0.4rem',
                           background: 'white',
                           color: 'black',
                           border: '1px solid #ccc',
-                          borderRadius: '4px',
-                          fontWeight: 'bold'
+                          borderRadius: '6px',
+                          fontWeight: 'bold',
+                          fontSize: '1rem',
+                          textAlign: 'center'
                         }}
                       />
                     </div>
