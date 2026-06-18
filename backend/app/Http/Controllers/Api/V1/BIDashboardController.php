@@ -165,6 +165,8 @@ class BIDashboardController extends Controller
             $confidence = round(($count / $itemCounts[$p1]) * 100);
             
             $rules[] = [
+                'product_id_1' => $p1,
+                'product_id_2' => $p2,
                 'item1' => $productNames[$p1] ?? 'Produk ' . substr($p1, 0, 5),
                 'item2' => $productNames[$p2] ?? 'Produk ' . substr($p2, 0, 5),
                 'confidence' => $confidence . '%',

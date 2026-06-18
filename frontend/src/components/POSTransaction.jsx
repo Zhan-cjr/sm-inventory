@@ -248,6 +248,9 @@ export const POSTransaction = ({
   const [pendingDigitalProduct, setPendingDigitalProduct] = useState(null);
   const [customerNoInput, setCustomerNoInput] = useState('');
 
+  // AI Upselling State
+  const [aprioriRules, setAprioriRules] = useState([]);
+
   const { storeLocalTransaction, syncTransactions, pendingCount, syncStatus } = useOfflineSync(branchId, authToken);
   const discountEngine = useRef(new DiscountEngine([]));
 
@@ -604,6 +607,18 @@ export const POSTransaction = ({
           try { setCustomers(JSON.parse(cached)); } catch (e) { }
         }
       });
+
+    // Fetch Apriori Rules for AI Upselling
+    fetch('/api/v1/bi/apriori', {
+      headers: { 'Authorization': `Bearer ${authToken}`, 'Accept': 'application/json' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAprioriRules(data);
+        }
+      })
+      .catch(err => console.error('Failed to load apriori rules:', err));
 
     fetch('/api/v1/services', {
       headers: { 'Authorization': `Bearer ${authToken}` }
@@ -1208,6 +1223,28 @@ export const POSTransaction = ({
         productType: product.product_type || 'physical',
         customerNo: customerNo
       }]);
+    }
+
+    // AI Upsell Recommendation Logic
+    if (aprioriRules && aprioriRules.length > 0) {
+      const addedId = String(product.id);
+      // Find a rule involving the added product
+      const rule = aprioriRules.find(r => String(r.product_id_1) === addedId || String(r.product_id_2) === addedId);
+      
+      if (rule) {
+        const recId = String(rule.product_id_1) === addedId ? String(rule.product_id_2) : String(rule.product_id_1);
+        const recName = String(rule.product_id_1) === addedId ? rule.item2 : rule.item1;
+        
+        // Check if the recommended product is already in the cart
+        // We use the existing 'items' state plus we know 'product.id' is just added.
+        // If recId is NOT in the current cart, and recId is NOT the product just added
+        const alreadyInCart = items.some(i => String(i.productId) === recId) || String(product.id) === recId;
+        
+        if (!alreadyInCart) {
+          setAlertMsg({ text: `💡 Upsell: Konsumen biasanya juga membeli ${recName} (Peluang ${rule.confidence}).`, type: 'info', persist: true });
+          setTimeout(() => setAlertMsg(null), 6000);
+        }
+      }
     }
 
     // Reset nextItemQty back to empty
