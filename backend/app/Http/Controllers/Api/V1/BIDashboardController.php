@@ -16,7 +16,11 @@ class BIDashboardController extends Controller
      */
     public function heatmap(Request $request)
     {
-        $branchId = $request->input('branch_id'); // Optional filter
+        $user = $request->user();
+        $isAdmin = in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN']);
+        
+        // Use user's branch if not admin, otherwise allow filtering by request
+        $branchId = $isAdmin ? $request->input('branch_id') : $user->branch_id;
 
         $query = Transaction::where('transaction_type', 'SALE')
             ->where('is_voided', false)
@@ -74,7 +78,11 @@ class BIDashboardController extends Controller
      */
     public function apriori(Request $request)
     {
-        $branchId = $request->input('branch_id'); // Optional filter
+        $user = $request->user();
+        $isAdmin = in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN']);
+        
+        // Use user's branch if not admin, otherwise allow filtering by request
+        $branchId = $isAdmin ? $request->input('branch_id') : $user->branch_id;
 
         // We want to find pairs of items frequently bought together.
         // 1. Get all transaction IDs from the last 30 days

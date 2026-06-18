@@ -10,13 +10,35 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
   const [aprioriRules, setAprioriRules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCell, setSelectedCell] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+
+  const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user?.role?.toUpperCase());
+  const showBranchSelector = !user?.branch_id || isAdmin;
+
+  useEffect(() => {
+    // Fetch branches if admin
+    if (showBranchSelector) {
+      fetch('/api/v1/branches', { headers: { 'Authorization': `Bearer ${authToken}` } })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setBranches(data);
+        })
+        .catch(err => console.error('Error fetching branches:', err));
+    }
+  }, [authToken, showBranchSelector]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        const urlParams = new URLSearchParams();
+        if (selectedBranch) {
+          urlParams.append('branch_id', selectedBranch);
+        }
+
         // Fetch Heatmap
-        const heatmapRes = await fetch('/api/v1/bi/heatmap', {
+        const heatmapRes = await fetch('/api/v1/bi/heatmap?' + urlParams.toString(), {
           headers: { 
             'Authorization': `Bearer ${authToken}`,
             'Accept': 'application/json'
@@ -25,10 +47,12 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
         if (heatmapRes.ok) {
           const hData = await heatmapRes.json();
           setHeatmapData(hData);
+        } else {
+          setHeatmapData([]); // Fallback
         }
 
         // Fetch Apriori
-        const aprioriRes = await fetch('/api/v1/bi/apriori', {
+        const aprioriRes = await fetch('/api/v1/bi/apriori?' + urlParams.toString(), {
           headers: { 
             'Authorization': `Bearer ${authToken}`,
             'Accept': 'application/json'
@@ -37,6 +61,8 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
         if (aprioriRes.ok) {
           const aData = await aprioriRes.json();
           setAprioriRules(aData);
+        } else {
+          setAprioriRules([]); // Fallback
         }
       } catch (error) {
         console.error('Error fetching BI data:', error);
@@ -46,7 +72,7 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
     };
 
     fetchData();
-  }, [authToken]);
+  }, [authToken, selectedBranch]);
 
   return (
     <div style={{ height: '100vh', width: '100vw', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '1.5rem', paddingBottom: '100px', backgroundColor: 'var(--bg-main)' }}>
@@ -63,6 +89,32 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
           </h2>
         </div>
       </header>
+
+      {showBranchSelector && branches.length > 0 && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <select 
+            value={selectedBranch} 
+            onChange={(e) => setSelectedBranch(e.target.value)}
+            style={{ 
+              width: '100%', 
+              padding: '12px 16px', 
+              borderRadius: '12px', 
+              background: 'rgba(255,255,255,0.05)', 
+              border: '1px solid rgba(255,255,255,0.1)', 
+              color: 'white', 
+              fontSize: '0.9rem',
+              outline: 'none'
+            }}
+          >
+            <option value="" style={{ color: 'black' }}>Semua Cabang (Gabungan)</option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id} style={{ color: 'black' }}>
+                {b.code} - {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'stretch' }}>
         
