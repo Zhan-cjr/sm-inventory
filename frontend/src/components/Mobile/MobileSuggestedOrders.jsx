@@ -10,16 +10,51 @@ export function MobileSuggestedOrders({ user, authToken }) {
   
   // Selection state for bulk PO
   const [selectedItems, setSelectedItems] = useState(new Set());
+  
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
 
   useEffect(() => {
-    fetchSuggestions();
+    fetchBranches();
   }, []);
 
-  const fetchSuggestions = async () => {
+  useEffect(() => {
+    if (selectedBranchId) {
+      fetchSuggestions(selectedBranchId);
+    }
+  }, [selectedBranchId]);
+
+  const fetchBranches = async () => {
+    try {
+      const res = await fetch('/api/v1/branches', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBranches(data);
+        if (data.length > 0) {
+          // Default to the device branch if available and in the list, otherwise the first branch
+          const deviceBranchId = localStorage.getItem('pos_device_branch_id');
+          const found = data.find(b => b.id === deviceBranchId);
+          setSelectedBranchId(found ? found.id : data[0].id);
+        } else {
+          // If no branches returned but user has one, fallback to user.branch_id
+          const fallbackId = user?.branch_id || localStorage.getItem('pos_device_branch_id');
+          setSelectedBranchId(fallbackId);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch branches:', err);
+      // Fallback
+      setSelectedBranchId(user?.branch_id || localStorage.getItem('pos_device_branch_id'));
+    }
+  };
+
+  const fetchSuggestions = async (branchIdToFetch) => {
     setLoading(true);
     setError(null);
     try {
-      const branchId = user?.branch_id || localStorage.getItem('pos_device_branch_id');
+      const branchId = branchIdToFetch || selectedBranchId || user?.branch_id || localStorage.getItem('pos_device_branch_id');
       const url = branchId ? `/api/v1/suggested-orders?branch_id=${branchId}` : '/api/v1/suggested-orders';
       
       const res = await fetch(url, {
@@ -76,7 +111,7 @@ export function MobileSuggestedOrders({ user, authToken }) {
       }));
       
     try {
-      const branchId = user?.branch_id || localStorage.getItem('pos_device_branch_id');
+      const branchId = selectedBranchId || user?.branch_id || localStorage.getItem('pos_device_branch_id');
       const payload = { items: itemsToOrder };
       if (branchId) payload.branch_id = branchId;
 
@@ -131,6 +166,31 @@ export function MobileSuggestedOrders({ user, authToken }) {
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
           Rekomendasi pesanan berdasarkan Average Daily Sales (ADS) 90 hari terakhir.
         </p>
+
+        {branches.length > 1 && (
+          <div style={{ marginTop: '0.5rem' }}>
+            <select 
+              value={selectedBranchId} 
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                background: 'rgba(255,255,255,0.05)',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.1)',
+                outline: 'none'
+              }}
+            >
+              <option value="" disabled>-- Pilih Cabang --</option>
+              {branches.map(branch => (
+                <option key={branch.id} value={branch.id} style={{ color: 'black' }}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {error && (
