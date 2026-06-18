@@ -9,6 +9,7 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
   const [heatmapData, setHeatmapData] = useState([]);
   const [aprioriRules, setAprioriRules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCell, setSelectedCell] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,37 +105,75 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
               </div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'white' }}>Heatmap Aktivitas Transaksi</h3>
             </div>
-            <div style={{ height: 'calc(100% - 60px)', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-               {/* 
-                  Since Recharts Heatmap is complex and often requires a plugin or custom implementation, 
-                  we mock the visual of a heatmap here for demonstration of the dashboard layout.
-               */}
-               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gridTemplateRows: 'repeat(7, 1fr)', gap: '4px', width: '100%', padding: '1rem', height: '100%' }}>
-                 {loading ? (
-                   <div style={{ gridColumn: '1 / -1', gridRow: '1 / -1', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)' }}>Memuat Heatmap...</div>
-                 ) : heatmapData.map((d, i) => {
-                   // Calculate color intensity based on value. Max value is approx dynamically estimated
-                   const maxValue = Math.max(...heatmapData.map(h => h.value), 1);
-                   const intensity = d.value / maxValue;
-                   
-                   // Increase base visibility slightly so empty blocks are visible
-                   const bgOpacity = intensity === 0 ? 0.05 : 0.2 + (intensity * 0.8);
-                   
-                   return (
-                     <div key={i} title={`${d.day} ${d.hour} - ${d.value} trx`} style={{
-                       background: `rgba(59, 130, 246, ${bgOpacity})`,
-                       borderRadius: '4px',
-                       width: '100%',
-                       height: '100%',
-                       minHeight: '20px'
-                     }}></div>
-                   );
-                 })}
+            <div style={{ height: 'auto', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.05)', padding: '1rem' }}>
+               
+               {/* Label Jam (X-Axis) */}
+               <div style={{ display: 'grid', gridTemplateColumns: '40px repeat(12, 1fr)', gap: '4px', marginBottom: '8px' }}>
+                  <div></div> {/* Spacer */}
+                  {[8,9,10,11,12,13,14,15,16,17,18,19].map(h => (
+                    <div key={h} style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', alignSelf: 'end' }}>
+                      {h}
+                    </div>
+                  ))}
                </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 1rem', marginTop: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-              <span>8:00</span>
-              <span>19:00</span>
+
+               {/* Grid Utama (Y-Axis + Heatmap) */}
+               <div style={{ display: 'grid', gridTemplateColumns: '40px repeat(12, 1fr)', gridTemplateRows: 'repeat(7, 1fr)', gap: '4px', width: '100%' }}>
+                 {loading ? (
+                   <div style={{ gridColumn: '1 / -1', padding: '2rem', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)' }}>Memuat Heatmap...</div>
+                 ) : (
+                   ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].map((dayName, dIdx) => (
+                     <React.Fragment key={`row-${dIdx}`}>
+                       {/* Y-Axis Label */}
+                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px' }}>
+                         {dayName}
+                       </div>
+                       
+                       {/* Sel-sel Heatmap */}
+                       {[8,9,10,11,12,13,14,15,16,17,18,19].map(hIdx => {
+                         const cellData = heatmapData.find(d => d.dayIndex === dIdx && d.hourIndex === hIdx) || { value: 0, day: dayName, hour: `${hIdx}:00` };
+                         const maxValue = Math.max(...heatmapData.map(h => h.value), 1);
+                         const intensity = cellData.value / maxValue;
+                         const bgOpacity = intensity === 0 ? 0.05 : 0.2 + (intensity * 0.8);
+                         
+                         return (
+                           <div 
+                             key={`cell-${dIdx}-${hIdx}`} 
+                             onClick={() => setSelectedCell(cellData)}
+                             style={{
+                               background: `rgba(59, 130, 246, ${bgOpacity})`,
+                               borderRadius: '4px',
+                               width: '100%',
+                               height: '24px',
+                               cursor: 'pointer',
+                               border: selectedCell && selectedCell.dayIndex === dIdx && selectedCell.hourIndex === hIdx ? '1px solid white' : 'none'
+                             }}
+                           ></div>
+                         );
+                       })}
+                     </React.Fragment>
+                   ))
+                 )}
+               </div>
+
+               {/* Info Sel Terpilih (Khusus Mobile) */}
+               <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', minHeight: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                 {selectedCell ? (
+                   <div style={{ textAlign: 'center' }}>
+                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Hari {selectedCell.day}, Jam {selectedCell.hour}</div>
+                     <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'white' }}>{selectedCell.value} Transaksi</div>
+                   </div>
+                 ) : (
+                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Klik kotak di atas untuk melihat detail transaksi.</div>
+                 )}
+               </div>
+
+               {/* Legend (Keterangan Warna) */}
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sepi</span>
+                  <div style={{ flex: 1, height: '8px', margin: '0 1rem', borderRadius: '4px', background: 'linear-gradient(to right, rgba(59,130,246,0.05), rgba(59,130,246,1))' }}></div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ramai</span>
+               </div>
             </div>
           </div>
         </div>
