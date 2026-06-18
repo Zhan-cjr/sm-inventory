@@ -95,6 +95,14 @@ export function MobileSuggestedOrders({ user, authToken }) {
     setSelectedItems(newSelected);
   };
 
+  const handleQtyChange = (productId, newQty) => {
+    setSuggestions(prev => prev.map(item => 
+      item.product_id === productId 
+        ? { ...item, edited_qty: parseFloat(newQty) || 0 } 
+        : item
+    ));
+  };
+
   const handleCreateBulkPO = async () => {
     if (selectedItems.size === 0) return;
     
@@ -107,7 +115,8 @@ export function MobileSuggestedOrders({ user, authToken }) {
       .filter(item => selectedItems.has(item.product_id))
       .map(item => ({
         product_id: item.product_id,
-        suggested_qty: item.suggested_qty
+        suggested_qty: item.edited_qty !== undefined ? item.edited_qty : item.suggested_qty,
+        original_qty: item.suggested_qty
       }));
       
     try {
@@ -272,24 +281,40 @@ export function MobileSuggestedOrders({ user, authToken }) {
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1rem', background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Stok Saat Ini</div>
-                    <div style={{ fontWeight: 'bold', color: item.current_qty <= 0 ? '#ef4444' : 'white' }}>{item.current_qty}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Stok Saat Ini:</span> <br />
+                      <strong>{item.current_qty}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Jual/Hari (ADS):</span> <br />
+                      <strong>{item.ads}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Batas Aman:</span> <br />
+                      <strong>{item.reorder_point}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Saran Order:</span> <br />
+                      <input 
+                        type="number" 
+                        value={item.edited_qty !== undefined ? item.edited_qty : item.suggested_qty} 
+                        onChange={(e) => handleQtyChange(item.product_id, e.target.value)}
+                        min="0"
+                        step="0.1"
+                        style={{
+                          width: '100%',
+                          padding: '0.25rem',
+                          marginTop: '0.25rem',
+                          background: 'white',
+                          color: 'black',
+                          border: '1px solid #ccc',
+                          borderRadius: '4px',
+                          fontWeight: 'bold'
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Penjualan/Hari</div>
-                    <div style={{ fontWeight: 'bold', color: 'white' }}>{item.ads}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Batas Minimum (ROP)</div>
-                    <div style={{ fontWeight: 'bold', color: 'white' }}>{item.reorder_point}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--primary)' }}>Saran Order</div>
-                    <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>+{item.suggested_qty}</div>
-                  </div>
-                </div>
               </div>
             </div>
           ))}

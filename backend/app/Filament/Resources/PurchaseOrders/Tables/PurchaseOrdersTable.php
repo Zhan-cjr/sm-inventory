@@ -71,7 +71,8 @@ class PurchaseOrdersTable
                 TextColumn::make('total_amount')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('created_by')
+                TextColumn::make('creator.name')
+                    ->label('Dibuat Oleh')
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()

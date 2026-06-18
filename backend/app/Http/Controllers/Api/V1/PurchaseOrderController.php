@@ -68,7 +68,8 @@ class PurchaseOrderController extends Controller
                 if ($product && $product->supplier_id) {
                     $itemsBySupplier[$product->supplier_id][] = [
                         'product' => $product,
-                        'qty' => $item['suggested_qty']
+                        'qty' => $item['suggested_qty'],
+                        'original_qty' => $item['original_qty'] ?? $item['suggested_qty']
                     ];
                 }
             }
@@ -88,7 +89,7 @@ class PurchaseOrderController extends Controller
                     'supplier_id' => $supplierId,
                     'po_number' => 'PO-' . date('YmdHis') . '-' . rand(100, 999),
                     'po_date' => now(),
-                    'status' => 'DRAFT',
+                    'status' => 'APPROVED',
                     'total_amount' => 0,
                     'created_by' => $user->id,
                 ]);
@@ -102,6 +103,7 @@ class PurchaseOrderController extends Controller
                     PurchaseOrderItem::create([
                         'purchase_order_id' => $po->id,
                         'product_id' => $product->id,
+                        'quantity_suggested' => $sItem['original_qty'] ?? $qty,
                         'quantity_ordered' => $qty,
                         'unit_cost' => $product->cost_price,
                         'subtotal' => $subtotal,
