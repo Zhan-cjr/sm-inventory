@@ -75,16 +75,16 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
   }, [authToken, selectedBranch]);
 
   return (
-    <div style={{ height: '100vh', width: '100vw', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '1.5rem', paddingBottom: '100px', backgroundColor: 'var(--bg-main)' }}>
-      <header className="pos-header glassmorphism" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexShrink: 0 }}>
+    <div style={{ height: '100dvh', width: '100vw', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '1rem', paddingTop: 'max(1.5rem, env(safe-area-inset-top, 20px))', paddingBottom: '100px', backgroundColor: 'var(--bg-main)' }}>
+      <header className="pos-header glassmorphism" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexShrink: 0, marginTop: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button onClick={onBack} className="btn-secondary" style={{ padding: '8px', borderRadius: '12px' }}>
             <ArrowLeft size={20} />
           </button>
-          <div style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)', padding: '8px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)', padding: '8px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <BrainCircuit size={24} color="white" />
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 600 }}>
+          <h2 style={{ fontSize: 'clamp(1.1rem, 4vw, 1.5rem)', fontWeight: 600, lineHeight: 1.2 }}>
             AI & Business Intelligence
           </h2>
         </div>
@@ -143,7 +143,7 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
                   </div>
                   <div style={{ color: 'white', fontWeight: 500 }}>{rule.item1}</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Cenderung juga membeli:</div>
-                  <div style={{ color: 'var(--primary)', fontWeight: 600 }}>{rule.item2}</div>
+                  <div style={{ color: '#38bdf8', fontWeight: 600 }}>{rule.item2}</div>
                 </div>
               ))}
             </div>
