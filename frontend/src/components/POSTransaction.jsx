@@ -609,16 +609,17 @@ export const POSTransaction = ({
       });
 
     // Fetch Apriori Rules for AI Upselling
-    fetch('/api/v1/bi/apriori', {
+    fetch(`/api/v1/bi/apriori?branch_id=${branchId}`, {
       headers: { 'Authorization': `Bearer ${authToken}`, 'Accept': 'application/json' }
     })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
+          console.log('[AI Upsell] Rules loaded:', data);
           setAprioriRules(data);
         }
       })
-      .catch(err => console.error('Failed to load apriori rules:', err));
+      .catch(err => console.error('[AI Upsell] Failed to load apriori rules:', err));
 
     fetch('/api/v1/services', {
       headers: { 'Authorization': `Bearer ${authToken}` }
@@ -1241,8 +1242,9 @@ export const POSTransaction = ({
         const alreadyInCart = items.some(i => String(i.productId) === recId) || String(product.id) === recId;
         
         if (!alreadyInCart) {
-          setAlertMsg({ text: `💡 Upsell: Konsumen biasanya juga membeli ${recName} (Peluang ${rule.confidence}).`, type: 'info', persist: true });
-          setTimeout(() => setAlertMsg(null), 6000);
+          console.log('[AI Upsell] Match found! Recommending:', recName);
+          setAlertMsg({ text: `💡 AI Upsell: Konsumen biasanya juga membeli ${recName} (Peluang ${rule.confidence}).`, type: 'info', persist: true });
+          setTimeout(() => setAlertMsg(null), 8000);
         }
       }
     }
