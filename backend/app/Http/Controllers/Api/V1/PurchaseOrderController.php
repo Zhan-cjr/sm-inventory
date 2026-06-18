@@ -19,12 +19,22 @@ class PurchaseOrderController extends Controller
             'suggested_qty' => 'required|numeric|min:0.01',
         ]);
 
+        $branchId = $request->input('branch_id') ?: $request->user()->branch_id;
+        if (!$branchId) {
+            $firstBranch = \App\Models\Branch::where('organization_id', $request->user()->organization_id)->first();
+            if ($firstBranch) {
+                $branchId = $firstBranch->id;
+            } else {
+                return response()->json(['error' => 'No branch available for this organization'], 400);
+            }
+        }
+
         return $this->processBulk($request->user(), [
             [
                 'product_id' => $request->product_id,
                 'suggested_qty' => $request->suggested_qty
             ]
-        ]);
+        ], $branchId);
     }
 
     public function createBulkFromSuggestions(Request $request)
@@ -35,17 +45,27 @@ class PurchaseOrderController extends Controller
             'items.*.suggested_qty' => 'required|numeric|min:0.01',
         ]);
 
-        return $this->processBulk($request->user(), $request->items);
+        $branchId = $request->input('branch_id') ?: $request->user()->branch_id;
+        if (!$branchId) {
+            $firstBranch = \App\Models\Branch::where('organization_id', $request->user()->organization_id)->first();
+            if ($firstBranch) {
+                $branchId = $firstBranch->id;
+            } else {
+                return response()->json(['error' => 'No branch available for this organization'], 400);
+            }
+        }
+
+        return $this->processBulk($request->user(), $request->items, $branchId);
     }
 
-    private function processBulk($user, $items)
+    private function processBulk($user, $items, $branchId)
     {
-        return DB::transaction(function () use ($user, $items) {
+        return DB::transaction(function () use ($user, $items, $branchId) {
             $firstProduct = Product::find($items[0]['product_id']);
             
             $po = PurchaseOrder::create([
                 'organization_id' => $firstProduct->organization_id,
-                'branch_id' => $user->branch_id,
+                'branch_id' => $branchId,
                 'supplier_id' => $firstProduct->supplier_id,
                 'po_number' => 'PO-' . date('YmdHis'),
                 'po_date' => now(),

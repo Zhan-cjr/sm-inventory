@@ -19,7 +19,10 @@ export function MobileSuggestedOrders({ user, authToken }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/v1/suggested-orders', {
+      const branchId = user?.branch_id || localStorage.getItem('pos_device_branch_id');
+      const url = branchId ? `/api/v1/suggested-orders?branch_id=${branchId}` : '/api/v1/suggested-orders';
+      
+      const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       if (!res.ok) throw new Error('Gagal memuat rekomendasi order');
@@ -73,13 +76,17 @@ export function MobileSuggestedOrders({ user, authToken }) {
       }));
       
     try {
+      const branchId = user?.branch_id || localStorage.getItem('pos_device_branch_id');
+      const payload = { items: itemsToOrder };
+      if (branchId) payload.branch_id = branchId;
+
       const res = await fetch('/api/v1/purchase-orders/create-bulk-from-suggestions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({ items: itemsToOrder })
+        body: JSON.stringify(payload)
       });
       
       if (!res.ok) {
