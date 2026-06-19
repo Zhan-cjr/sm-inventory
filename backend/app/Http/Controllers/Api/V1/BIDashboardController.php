@@ -149,8 +149,8 @@ class BIDashboardController extends Controller
         // 4. Calculate Confidence and sort by occurrences
         arsort($pairCounts);
         
-        // Take top 4 pairs
-        $topPairs = array_slice($pairCounts, 0, 4, true);
+        // Take top 20 pairs instead of 4 so it triggers more often
+        $topPairs = array_slice($pairCounts, 0, 20, true);
         
         $rules = [];
         // Need product names mapping

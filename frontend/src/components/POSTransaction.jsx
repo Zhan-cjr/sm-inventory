@@ -1228,18 +1228,18 @@ export const POSTransaction = ({
 
     // AI Upsell Recommendation Logic
     if (aprioriRules && aprioriRules.length > 0) {
-      const addedId = String(product.id);
+      const addedId = String(product.id).toLowerCase();
       // Find a rule involving the added product
-      const rule = aprioriRules.find(r => String(r.product_id_1) === addedId || String(r.product_id_2) === addedId);
+      const rule = aprioriRules.find(r => String(r.product_id_1).toLowerCase() === addedId || String(r.product_id_2).toLowerCase() === addedId);
       
       if (rule) {
-        const recId = String(rule.product_id_1) === addedId ? String(rule.product_id_2) : String(rule.product_id_1);
-        const recName = String(rule.product_id_1) === addedId ? rule.item2 : rule.item1;
+        const recId = String(rule.product_id_1).toLowerCase() === addedId ? String(rule.product_id_2).toLowerCase() : String(rule.product_id_1).toLowerCase();
+        const recName = String(rule.product_id_1).toLowerCase() === addedId ? rule.item2 : rule.item1;
         
         // Check if the recommended product is already in the cart
         // We use the existing 'items' state plus we know 'product.id' is just added.
         // If recId is NOT in the current cart, and recId is NOT the product just added
-        const alreadyInCart = items.some(i => String(i.productId) === recId) || String(product.id) === recId;
+        const alreadyInCart = items.some(i => String(i.productId).toLowerCase() === recId) || addedId === recId;
         
         if (!alreadyInCart) {
           console.log('[AI Upsell] Match found! Recommending:', recName);
