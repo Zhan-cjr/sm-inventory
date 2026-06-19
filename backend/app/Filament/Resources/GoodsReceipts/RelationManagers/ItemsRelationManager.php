@@ -26,7 +26,15 @@ class ItemsRelationManager extends RelationManager
         return $schema
             ->components([
                 Select::make('product_id')
+                    ->label('Produk')
                     ->relationship('product', 'name')
+                    ->searchable()
+                    ->getSearchResultsUsing(fn (string $search): array => \App\Models\Product::search($search)
+                        ->take(50)
+                        ->get()
+                        ->pluck('name', 'id')
+                        ->toArray()
+                    )
                     ->required(),
                 TextInput::make('quantity_ordered')
                     ->label('Qty Pesanan')

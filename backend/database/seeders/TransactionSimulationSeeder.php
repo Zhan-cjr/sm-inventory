@@ -23,7 +23,7 @@ class TransactionSimulationSeeder extends Seeder
             return;
         }
 
-        $branch = Branch::first();
+        $branch = Branch::where('name', 'like', '%pasirhayam%')->first();
         if (!$branch) {
             $this->command->error("Branch not found.");
             return;

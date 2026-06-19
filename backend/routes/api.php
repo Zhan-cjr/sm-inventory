@@ -50,8 +50,6 @@ Route::prefix('v1')->group(function () {
     Route::post('/devices/handshake', [PosDeviceController::class, 'handshake']);
     Route::post('/webhook/digiflazz', [\App\Http\Controllers\Api\DigiflazzWebhookController::class, 'handle']);
 
-
-
     // Protected Routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);

@@ -25,6 +25,7 @@ class ItemsRelationManager extends RelationManager
         return $schema
             ->components([
                 Select::make('product_id')
+                    ->label('Produk')
                     ->relationship(
                         'product', 
                         'name', 
