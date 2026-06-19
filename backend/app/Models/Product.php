@@ -6,10 +6,24 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Laravel\Scout\Searchable;
 
 class Product extends Model
 {
-    use HasUuids, LogsActivity;
+    use HasUuids, LogsActivity, Searchable;
+
+    public function toSearchableArray()
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'sku' => $this->sku,
+            'barcode' => $this->barcode,
+            'category' => $this->category ? $this->category->name : '',
+            'product_type' => $this->product_type,
+            'is_active' => $this->is_active,
+        ];
+    }
 
     public function getActivitylogOptions(): LogOptions
     {

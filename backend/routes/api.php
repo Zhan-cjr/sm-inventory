@@ -124,6 +124,17 @@ Route::prefix('v1')->group(function () {
         // Get Active Promotions
         Route::get('/promotions', [\App\Http\Controllers\Api\V1\PosCatalogController::class, 'getPromotions']);
 
+        // Backoffice Meilisearch Product Search
+        Route::get('/backoffice/products/search', function (Request $request) {
+            $query = $request->query('q', '');
+            if (empty($query)) {
+                return response()->json([]);
+            }
+            // Execute search using Laravel Scout (Meilisearch)
+            $results = \App\Models\Product::search($query)->take(20)->get();
+            return response()->json($results);
+        });
+
         // Get Active Banks
         Route::get('/banks', function () {
             return response()->json(\App\Models\Bank::where('is_active', true)->get());

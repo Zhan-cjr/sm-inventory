@@ -52,14 +52,16 @@ class SyncController extends Controller
         $conflicts = [];
         $ppobData = [];
 
-        DB::transaction(function () use ($validated, $user, &$syncedIds, &$conflicts, &$ppobData) {
-            foreach ($validated['transactions'] as $txData) {
-                try {
-                    $existing = Transaction::where('local_transaction_id', $txData['localId'])->first();
+        foreach ($validated['transactions'] as $txData) {
+            try {
+                DB::transaction(function () use ($txData, $validated, $user, &$syncedIds, &$conflicts, &$ppobData) {
+                    $existing = Transaction::where('local_transaction_id', $txData['localId'])->lockForUpdate()->first();
 
                     if ($existing) {
-                        $syncedIds[] = $txData['localId'];
-                        continue;
+                        if (!in_array($txData['localId'], $syncedIds)) {
+                            $syncedIds[] = $txData['localId'];
+                        }
+                        return; // return from DB::transaction closure, moving to next item
                     }
 
                     $shiftId = $txData['shiftId'] ?? null;
@@ -218,16 +220,15 @@ class SyncController extends Controller
                     $accountingService->recordTransactionJournal($tx);
 
                     $syncedIds[] = $txData['localId'];
-
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error('Sync error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-                    $conflicts[] = [
-                        'localId' => $txData['localId'],
-                        'error' => $e->getMessage()
-                    ];
-                }
+                }); // End of DB::transaction closure
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Sync error for localId ' . $txData['localId'] . ': ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+                $conflicts[] = [
+                    'localId' => $txData['localId'],
+                    'error' => $e->getMessage()
+                ];
             }
-        });
+        }
 
         return response()->json([
             'success' => true,
