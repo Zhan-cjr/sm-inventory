@@ -27,7 +27,6 @@ class ItemsRelationManager extends RelationManager
             ->components([
                 Select::make('product_id')
                     ->label('Produk')
-                    ->relationship('product', 'name')
                     ->searchable()
                     ->getSearchResultsUsing(fn (string $search): array => \App\Models\Product::search($search)
                         ->take(50)
@@ -35,6 +34,7 @@ class ItemsRelationManager extends RelationManager
                         ->pluck('name', 'id')
                         ->toArray()
                     )
+                    ->getOptionLabelUsing(fn ($value): ?string => \App\Models\Product::find($value)?->name)
                     ->required(),
                 TextInput::make('quantity_ordered')
                     ->label('Qty Pesanan')

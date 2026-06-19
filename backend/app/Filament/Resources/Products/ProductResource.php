@@ -71,9 +71,4 @@ class ProductResource extends Resource
             'edit' => EditProduct::route('/{record}/edit'),
         ];
     }
-
-    public static function getGlobalSearchResults(string $search): \Illuminate\Database\Eloquent\Collection
-    {
-        return \App\Models\Product::search($search)->take(20)->get();
-    }
 }
