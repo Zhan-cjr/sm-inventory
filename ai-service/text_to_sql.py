@@ -126,7 +126,7 @@ INSTRUCTIONS:
             pattern = rf"(?:branch_id|id)\s*=\s*['\"]?{branch_id}['\"]?"
             if not re.search(pattern, sql_query, re.IGNORECASE):
                 print(f"SECURITY ALERT: Strict branch filter for '{branch_id}' missing in SQL: {sql_query}")
-                return {"answer": f"Maaf, kueri dibatalkan secara otomatis karena AI terdeteksi mencoba mengakses data di luar batas izin cabang Anda (Cabang ID Anda: {branch_id}).\n\n[DEBUG SQL: {sql_query}]"}
+                return {"answer": "Maaf, kueri dibatalkan secara otomatis karena sistem mendeteksi pencarian data di luar batas izin cabang Anda."}
             
         # Prevent massive cross-joins from hanging the database
         if "LIMIT" not in sql_query.upper():
@@ -162,9 +162,6 @@ Do NOT show the raw SQL query to the user.
 """
         final_chat = model.generate_content(prompt_answer)
         final_answer = final_chat.text.strip()
-        
-        # Tambahkan indikator debug agar kita bisa melihat nilainya di layar UI
-        final_answer += f"\n\n*(Debug System - Branch ID: {branch_id if branch_id else 'ADMIN'})\nSQL: {sql_query}*"
         
         return {
             "answer": final_answer,
