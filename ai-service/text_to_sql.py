@@ -120,12 +120,12 @@ INSTRUCTIONS:
         # Hard restriction to ensure LLM included branch_id filter
         if branch_id:
             import re
-            # Regex to ensure the specific branch_id is present, e.g. branch_id = '1' or branch_id = 1 or branches.id = 1
-            # We match the literal value of branch_id
-            pattern = rf"=\s*['\"]?{branch_id}['\"]?"
+            # Regex to ensure the specific branch_id is present explicitly tied to a column.
+            # This prevents bypasses like `1=1` which would match if branch_id was '1'.
+            pattern = rf"(?:branch_id|id)\s*=\s*['\"]?{branch_id}['\"]?"
             if not re.search(pattern, sql_query, re.IGNORECASE):
                 print(f"SECURITY ALERT: Strict branch filter for '{branch_id}' missing in SQL: {sql_query}")
-                return {"answer": f"Maaf, kueri dibatalkan secara otomatis karena AI terdeteksi mencoba mengakses data di luar batas izin cabang Anda (Cabang ID: {branch_id})."}
+                return {"answer": f"Maaf, kueri dibatalkan secara otomatis karena AI terdeteksi mencoba mengakses data di luar batas izin cabang Anda (Cabang ID Anda: {branch_id}).\n\n[DEBUG SQL: {sql_query}]"}
             
         # Prevent massive cross-joins from hanging the database
         if "LIMIT" not in sql_query.upper():
@@ -157,6 +157,9 @@ Do NOT show the raw SQL query to the user.
 """
         final_chat = model.generate_content(prompt_answer)
         final_answer = final_chat.text.strip()
+        
+        # Tambahkan indikator debug agar kita bisa melihat nilainya di layar UI
+        final_answer += f"\n\n*(Debug System - Branch ID terdeteksi: {branch_id if branch_id else 'TIDAK ADA (ADMIN)'})*"
         
         return {
             "answer": final_answer,
