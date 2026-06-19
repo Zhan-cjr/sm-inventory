@@ -26,15 +26,17 @@ class PosCatalogController extends Controller
             return response()->json([]);
         }
 
-        // Cache key specific to this branch
-        $cacheKey = 'pos_products_json_branch_' . $branchId;
+        // Cache key specific to this branch (now using _gz to indicate gzipped cache)
+        $cacheKey = 'pos_products_json_gz_branch_' . $branchId;
 
-        // Try to get pre-serialized JSON from cache
-        $cachedJson = Cache::get($cacheKey);
+        // Try to get pre-serialized AND gzipped JSON from cache
+        $cachedJsonGz = Cache::get($cacheKey);
 
-        if ($cachedJson) {
-            // Return raw JSON string immediately without database query or serialization
-            return response($cachedJson)->header('Content-Type', 'application/json');
+        if ($cachedJsonGz) {
+            // Return raw GZIPPED string immediately
+            return response($cachedJsonGz)
+                ->header('Content-Type', 'application/json')
+                ->header('Content-Encoding', 'gzip');
         }
 
         // --- MENCEGAH CACHE STAMPEDE ---
@@ -87,11 +89,16 @@ class PosCatalogController extends Controller
 
                 // Serialize to JSON string
                 $jsonString = $products->toJson();
+                
+                // Compress with GZIP (Level 9 - Max Compression)
+                $gzipped = gzencode($jsonString, 9);
 
-                // Store JSON string in cache for 60 seconds (1 minute)
-                Cache::put($cacheKey, $jsonString, 60);
+                // Store GZIPPED string in cache for 60 seconds (1 minute)
+                Cache::put($cacheKey, $gzipped, 60);
 
-                return response($jsonString)->header('Content-Type', 'application/json');
+                return response($gzipped)
+                    ->header('Content-Type', 'application/json')
+                    ->header('Content-Encoding', 'gzip');
             } finally {
                 $lock->release();
             }
@@ -104,9 +111,11 @@ class PosCatalogController extends Controller
                 $waited++;
             }
             
-            $cachedJson = Cache::get($cacheKey);
-            if ($cachedJson) {
-                return response($cachedJson)->header('Content-Type', 'application/json');
+            $cachedJsonGz = Cache::get($cacheKey);
+            if ($cachedJsonGz) {
+                return response($cachedJsonGz)
+                    ->header('Content-Type', 'application/json')
+                    ->header('Content-Encoding', 'gzip');
             }
             
             return response()->json([]); // Fallback jika gagal ekstrem
@@ -123,11 +132,13 @@ class PosCatalogController extends Controller
         $user = $request->user();
         $branchId = $user->branch_id;
         
-        $cacheKey = 'pos_promos_json_branch_' . ($branchId ?: 'all');
-        $cachedJson = Cache::get($cacheKey);
+        $cacheKey = 'pos_promos_json_gz_branch_' . ($branchId ?: 'all');
+        $cachedJsonGz = Cache::get($cacheKey);
 
-        if ($cachedJson) {
-            return response($cachedJson)->header('Content-Type', 'application/json');
+        if ($cachedJsonGz) {
+            return response($cachedJsonGz)
+                ->header('Content-Type', 'application/json')
+                ->header('Content-Encoding', 'gzip');
         }
 
         $lock = Cache::lock('lock_' . $cacheKey, 30);
@@ -147,9 +158,12 @@ class PosCatalogController extends Controller
                     ->get();
 
                 $jsonString = $promotions->toJson();
-                Cache::put($cacheKey, $jsonString, 60);
+                $gzipped = gzencode($jsonString, 9);
+                Cache::put($cacheKey, $gzipped, 60);
 
-                return response($jsonString)->header('Content-Type', 'application/json');
+                return response($gzipped)
+                    ->header('Content-Type', 'application/json')
+                    ->header('Content-Encoding', 'gzip');
             } finally {
                 $lock->release();
             }
@@ -159,9 +173,11 @@ class PosCatalogController extends Controller
                 sleep(1);
                 $waited++;
             }
-            $cachedJson = Cache::get($cacheKey);
-            if ($cachedJson) {
-                return response($cachedJson)->header('Content-Type', 'application/json');
+            $cachedJsonGz = Cache::get($cacheKey);
+            if ($cachedJsonGz) {
+                return response($cachedJsonGz)
+                    ->header('Content-Type', 'application/json')
+                    ->header('Content-Encoding', 'gzip');
             }
             return response()->json([]);
         }
