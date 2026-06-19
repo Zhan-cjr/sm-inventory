@@ -9,71 +9,91 @@ use Carbon\Carbon;
 
 class SuggestedOrderService
 {
-    const LOOKBACK_DAYS = 90;
     const FORECAST_DAYS = 30;
+
+    protected array $aiCache = [];
+
+    protected function fetchFromAI(string $branchId): array
+    {
+        if (isset($this->aiCache[$branchId])) {
+            return $this->aiCache[$branchId];
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(10)->get('http://localhost:8001/api/v1/ai/restock-suggestions', [
+                'branch_id' => $branchId
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json()['data'] ?? [];
+                // Index by product_id for quick lookup
+                $indexed = [];
+                foreach ($data as $item) {
+                    $indexed[$item['product_id']] = $item;
+                }
+                $this->aiCache[$branchId] = $indexed;
+                return $indexed;
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('AI Restock Prediction Error: ' . $e->getMessage());
+        }
+
+        $this->aiCache[$branchId] = [];
+        return [];
+    }
 
     public function calculateForBranch(string $branchId, array $filters = []): array
     {
-        $stocks = Stock::with('product')
-            ->where('branch_id', $branchId)
-            ->when(isset($filters['product_id']), fn($q) => $q->where('product_id', $filters['product_id']))
-            ->when(isset($filters['supplier_id']), function($q) use ($filters) {
-                $q->whereHas('product', fn($pq) => $pq->where('supplier_id', $filters['supplier_id']));
-            })
-            ->get();
+        $aiData = $this->fetchFromAI($branchId);
+        
+        // Convert to array of values
+        $suggestions = array_values($aiData);
 
-        $suggestions = [];
-
-        foreach ($stocks as $stock) {
-            $suggestions[] = $this->calculateForStock($stock);
+        // Apply filters if necessary
+        if (!empty($filters['product_id'])) {
+            $suggestions = array_filter($suggestions, fn($item) => $item['product_id'] === $filters['product_id']);
+        }
+        if (!empty($filters['supplier_id'])) {
+            // Need to match supplier_id. AI returns supplier_name but not ID, let's fetch products
+            $products = Product::where('supplier_id', $filters['supplier_id'])->pluck('id')->toArray();
+            $suggestions = array_filter($suggestions, fn($item) => in_array($item['product_id'], $products));
         }
 
-        return $suggestions;
+        return array_values($suggestions);
     }
 
     public function calculateForStock(Stock $stock): array
     {
-        // Calculate ADS (Average Daily Sales) based on last 90 days
-        $startDate = Carbon::now()->subDays(self::LOOKBACK_DAYS);
+        $aiData = $this->fetchFromAI($stock->branch_id);
         
-        $totalSold = DB::table('transaction_items')
-            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-            ->where('transactions.branch_id', $stock->branch_id)
-            ->where('transaction_items.product_id', $stock->product_id)
-            ->where('transactions.transaction_date', '>=', $startDate)
-            ->sum('transaction_items.quantity');
-
-        $ads = $totalSold / self::LOOKBACK_DAYS;
-        
-        // Use stock-specific settings or defaults
-        $leadTime = $stock->lead_time ?? 3;
-        $safetyStock = $stock->safety_stock ?? 0;
-        $desiredDays = $stock->desired_inventory_days ?? 14;
-
-        // Reorder Point = (ADS * Lead Time) + Safety Stock
-        $reorderPoint = ($ads * $leadTime) + $safetyStock;
-
-        $suggestedQty = 0;
-        $status = 'OK';
-
-        if ($stock->quantity_on_hand <= $reorderPoint) {
-            // Suggest enough to cover desired days plus lead time
-            $targetQty = ($ads * ($desiredDays + $leadTime)) + $safetyStock;
-            $suggestedQty = ceil(max(0, $targetQty - $stock->quantity_on_hand));
-            $status = $stock->quantity_on_hand <= ($ads * 1) ? 'CRITICAL' : 'REORDER';
+        if (isset($aiData[$stock->product_id])) {
+            $aiItem = $aiData[$stock->product_id];
+            return [
+                'product_id' => $stock->product_id,
+                'supplier_id' => $stock->product->supplier_id,
+                'sku' => $stock->product->sku,
+                'name' => $stock->product->name,
+                'current_qty' => $aiItem['current_qty'],
+                'ads' => $aiItem['ads'],
+                'reorder_point' => $aiItem['reorder_point'],
+                'suggested_qty' => $aiItem['suggested_qty'],
+                'status' => $aiItem['status'],
+                'lead_time' => $aiItem['lead_time'],
+            ];
         }
 
+        // Fallback if AI doesn't return data for this stock (e.g. no sales history)
         return [
             'product_id' => $stock->product_id,
             'supplier_id' => $stock->product->supplier_id,
             'sku' => $stock->product->sku,
             'name' => $stock->product->name,
             'current_qty' => (float)$stock->quantity_on_hand,
-            'ads' => round($ads, 2),
-            'reorder_point' => round($reorderPoint, 2),
-            'suggested_qty' => (float)$suggestedQty,
-            'status' => $status,
-            'lead_time' => $leadTime,
+            'ads' => 0,
+            'reorder_point' => 0,
+            'suggested_qty' => 0,
+            'status' => 'OK',
+            'lead_time' => $stock->product->lead_time_days ?? 7,
         ];
     }
 }

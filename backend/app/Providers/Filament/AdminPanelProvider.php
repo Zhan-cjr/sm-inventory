@@ -68,7 +68,7 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 'panels::body.end',
-                fn (): string => \Illuminate\Support\Facades\Blade::render('@livewire("import-progress-bar")'),
+                fn (): string => \Illuminate\Support\Facades\Blade::render('@livewire("import-progress-bar")@livewire("chat-ai-widget")'),
             )
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\Filament\Clusters')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')

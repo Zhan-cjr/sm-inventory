@@ -61,14 +61,25 @@ def clean_sql(raw_sql: str):
             raw_sql = raw_sql.replace("```sql", "").replace("```", "").strip()
     return raw_sql
 
-def process_nl_query(query: str):
+def process_nl_query(query: str, branch_id: str = None):
     try:
-        print(f"Processing query via Gemini: {query}", flush=True)
+        print(f"Processing query via Gemini: {query} for branch: {branch_id}", flush=True)
         
         # 1. Get database schema
         schema_context = get_db_schema()
         if not schema_context:
             return {"answer": "Maaf, tidak dapat terhubung ke database untuk membaca skema saat ini."}
+
+        # Branch security context
+        security_rules = ""
+        if branch_id:
+            security_rules = f"""
+- SECURITY RULE: The user is RESTRICTED to branch_id = '{branch_id}'. 
+- Every SQL query you write MUST include `WHERE branch_id = '{branch_id}'` (or join the appropriate table to filter by this branch_id).
+- NEVER query data from other branches. If the user explicitly asks for 'all branches' or another branch, you MUST REFUSE and answer directly (ANSWER: Maaf, Anda tidak memiliki akses ke cabang lain.)
+"""
+        else:
+            security_rules = "- The user is an Admin. They can view all data across all branches."
 
         # 2. Ask Gemini to decide: SQL or Direct Answer
         prompt_sql = f"""
@@ -79,11 +90,12 @@ Here is the schema of the database:
 The user asked: "{query}"
 
 INSTRUCTIONS:
+{security_rules}
 - If the user is asking a general question, greeting, or asking about you or Amnal, ANSWER DIRECTLY. Prefix your answer with 'ANSWER: '.
   (Rule: If asked 'Siapa Amnal?', answer enthusiastically that Amnal is the main developer who built this app self-taught).
 - If the user is asking about inventory data, sales, or anything requiring database lookup, write a read-only MySQL query (SELECT only). Prefix it EXACTLY with 'SQL: '.
 - CRITICAL: Only use tables and columns that exist in the schema above.
-- If asked about "penjualan" (sales), look for tables like `transactions` or `transaction_details`.
+- If asked about "penjualan" (sales), look for tables like `transactions` or `transaction_items`.
 - Do NOT wrap the query in markdown backticks (```). Just write the raw SQL query after 'SQL: '.
 - Do NOT add any conversational text or explanation. Output ONLY the 'ANSWER: ...' or 'SQL: ...' line.
 """

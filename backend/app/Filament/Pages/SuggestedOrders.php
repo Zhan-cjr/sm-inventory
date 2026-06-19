@@ -10,8 +10,9 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
-
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+use Illuminate\Database\Eloquent\Builder;
+use Filament\Resources\Components\Tab;
 
 class SuggestedOrders extends Page implements HasTable
 {
@@ -19,10 +20,10 @@ class SuggestedOrders extends Page implements HasTable
     use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-presentation-chart-line';
-    protected static ?string $navigationLabel = 'Saran Pemesanan';
-    protected static ?string $title = 'Saran Pemesanan (Forecasting)';
-    protected static string|\UnitEnum|null $navigationGroup = 'PERSEDIAAN';
-    protected static ?int $navigationSort = 4;
+    protected static ?string $navigationLabel = 'Saran Order AI';
+    protected static ?string $title = 'Saran Order AI (Smart Restock)';
+    protected static string|\UnitEnum|null $navigationGroup = 'ANALISA AI';
+    protected static ?int $navigationSort = 20;
 
     protected string $view = 'filament.pages.suggested-orders';
 
@@ -66,6 +67,21 @@ class SuggestedOrders extends Page implements HasTable
                     ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['status']),
             ])
             ->filters([
+                \Filament\Tables\Filters\Filter::make('perlu_kulakan')
+                    ->label('Perlu Kulakan (Saran > 0)')
+                    ->toggle()
+                    ->default(true)
+                    ->query(function (Builder $query) {
+                        $branchId = request('tableFilters.branch_id.value') ?? (auth()->user()->branch_id ?? \App\Models\Branch::first()->id ?? null);
+                        if ($branchId) {
+                            $aiData = app(SuggestedOrderService::class)->calculateForBranch($branchId);
+                            $productIds = collect($aiData)
+                                ->filter(fn($item) => $item['suggested_qty'] > 0 || $item['status'] !== 'OK')
+                                ->pluck('product_id');
+                            return $query->whereIn('product_id', $productIds);
+                        }
+                        return $query;
+                    }),
                 \Filament\Tables\Filters\SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('branch', 'name')

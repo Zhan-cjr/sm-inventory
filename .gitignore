@@ -10,3 +10,13 @@ backend/vendor/
 .env.*
 **/.env
 **/.env.*
+
+# Ignore meilisearch and heavy data
+backend/meilisearch.exe
+backend/data.ms/
+
+# Ignore python cache and env
+**/__pycache__/
+**/*.pyc
+venv/
+env/

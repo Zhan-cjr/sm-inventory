@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import uvicorn
 from text_to_sql import process_nl_query
 from market_basket import run_market_basket_analysis
+from restock_predictor import predict_restock_needs
 
 app = FastAPI(title="Toserba Selamat AI Service", version="1.0.0")
 
@@ -16,8 +17,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from typing import Optional
+
 class QueryRequest(BaseModel):
-    query: str
+    question: str
+    branch_id: Optional[str] = None
 
 @app.get("/")
 def read_root():
@@ -27,8 +31,8 @@ def read_root():
 def ask_ai(request: QueryRequest):
     try:
         # text_to_sql engine converts natural language to sql, runs it, and returns a human readable answer
-        response = process_nl_query(request.query)
-        return {"success": True, "answer": response["answer"], "data": response.get("data", [])}
+        response = process_nl_query(request.question, request.branch_id)
+        return {"response": response["answer"], "data": response.get("data", [])}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -37,6 +41,14 @@ def train_market_basket():
     try:
         rules = run_market_basket_analysis()
         return {"success": True, "message": "Market Basket rules generated successfully", "rules_count": len(rules)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/ai/restock-suggestions")
+def restock_suggestions(days_history: int = 30, target_days_supply: int = 30, branch_id: str = None):
+    try:
+        suggestions = predict_restock_needs(days_history=days_history, target_days_supply=target_days_supply, branch_id=branch_id)
+        return {"success": True, "data": suggestions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
