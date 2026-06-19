@@ -32,4 +32,13 @@ class ListProducts extends ListRecords
                 ->visible(!$isBranchUser),
         ];
     }
+
+    protected function applySearchToTableQuery(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        if (filled($search = $this->getTableSearch())) {
+            $query->whereIn('id', \App\Models\Product::search($search)->take(100)->keys());
+        }
+
+        return $query;
+    }
 }
