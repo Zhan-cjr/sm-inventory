@@ -37,56 +37,80 @@ class PosCatalogController extends Controller
             return response($cachedJson)->header('Content-Type', 'application/json');
         }
 
-        // Cache Miss: Query Database
-        $products = \App\Models\Product::query()
-            ->join('stocks', 'products.id', '=', 'stocks.product_id')
-            ->where('stocks.branch_id', $branchId)
-            ->where('products.is_active', true)
-            ->select([
-                'products.*',
-                'stocks.cost_price as branch_cost_price',
-                'stocks.cost_price_tax as branch_cost_price_tax',
-                'stocks.selling_price as branch_selling_price',
-                'stocks.harga_jual_1 as branch_harga_jual_1',
-                'stocks.qty_min_gol_1 as branch_qty_min_gol_1',
-                'stocks.harga_jual_2 as branch_harga_jual_2',
-                'stocks.qty_min_gol_2 as branch_qty_min_gol_2',
-                'stocks.harga_jual_3 as branch_harga_jual_3',
-                'stocks.qty_min_gol_3 as branch_qty_min_gol_3',
-                'stocks.quantity_on_hand'
-            ])
-            ->get()
-            ->map(function ($product) {
-                // Override with branch specific prices if set
-                if ($product->branch_selling_price !== null && $product->branch_selling_price > 0) {
-                    $product->selling_price = $product->branch_selling_price;
-                }
-                if ($product->branch_cost_price !== null && $product->branch_cost_price > 0) {
-                    $product->cost_price = $product->branch_cost_price;
-                }
-                if ($product->branch_harga_jual_1 !== null && $product->branch_harga_jual_1 > 0) {
-                    $product->harga_jual_1 = $product->branch_harga_jual_1;
-                    $product->qty_min_gol_1 = $product->branch_qty_min_gol_1;
-                }
-                if ($product->branch_harga_jual_2 !== null && $product->branch_harga_jual_2 > 0) {
-                    $product->harga_jual_2 = $product->branch_harga_jual_2;
-                    $product->qty_min_gol_2 = $product->branch_qty_min_gol_2;
-                }
-                if ($product->branch_harga_jual_3 !== null && $product->branch_harga_jual_3 > 0) {
-                    $product->harga_jual_3 = $product->branch_harga_jual_3;
-                    $product->qty_min_gol_3 = $product->branch_qty_min_gol_3;
-                }
-                
-                return $product;
-            });
+        // --- MENCEGAH CACHE STAMPEDE ---
+        // Jika ratusan kasir melakukan request persis di milidetik yang sama saat cache kosong,
+        // kita mengunci (lock) prosesnya agar hanya 1 kasir yang me-load ke database.
+        $lock = Cache::lock('lock_' . $cacheKey, 30);
 
-        // Serialize to JSON string
-        $jsonString = $products->toJson();
+        if ($lock->get()) {
+            try {
+                // Cache Miss & Got Lock: Query Database
+                $products = \App\Models\Product::query()
+                    ->join('stocks', 'products.id', '=', 'stocks.product_id')
+                    ->where('stocks.branch_id', $branchId)
+                    ->where('products.is_active', true)
+                    ->select([
+                        'products.*',
+                        'stocks.cost_price as branch_cost_price',
+                        'stocks.cost_price_tax as branch_cost_price_tax',
+                        'stocks.selling_price as branch_selling_price',
+                        'stocks.harga_jual_1 as branch_harga_jual_1',
+                        'stocks.qty_min_gol_1 as branch_qty_min_gol_1',
+                        'stocks.harga_jual_2 as branch_harga_jual_2',
+                        'stocks.qty_min_gol_2 as branch_qty_min_gol_2',
+                        'stocks.harga_jual_3 as branch_harga_jual_3',
+                        'stocks.qty_min_gol_3 as branch_qty_min_gol_3',
+                        'stocks.quantity_on_hand'
+                    ])
+                    ->get()
+                    ->map(function ($product) {
+                        if ($product->branch_selling_price !== null && $product->branch_selling_price > 0) {
+                            $product->selling_price = $product->branch_selling_price;
+                        }
+                        if ($product->branch_cost_price !== null && $product->branch_cost_price > 0) {
+                            $product->cost_price = $product->branch_cost_price;
+                        }
+                        if ($product->branch_harga_jual_1 !== null && $product->branch_harga_jual_1 > 0) {
+                            $product->harga_jual_1 = $product->branch_harga_jual_1;
+                            $product->qty_min_gol_1 = $product->branch_qty_min_gol_1;
+                        }
+                        if ($product->branch_harga_jual_2 !== null && $product->branch_harga_jual_2 > 0) {
+                            $product->harga_jual_2 = $product->branch_harga_jual_2;
+                            $product->qty_min_gol_2 = $product->branch_qty_min_gol_2;
+                        }
+                        if ($product->branch_harga_jual_3 !== null && $product->branch_harga_jual_3 > 0) {
+                            $product->harga_jual_3 = $product->branch_harga_jual_3;
+                            $product->qty_min_gol_3 = $product->branch_qty_min_gol_3;
+                        }
+                        return $product;
+                    });
 
-        // Store JSON string in cache for 60 seconds (1 minute)
-        Cache::put($cacheKey, $jsonString, 60);
+                // Serialize to JSON string
+                $jsonString = $products->toJson();
 
-        return response($jsonString)->header('Content-Type', 'application/json');
+                // Store JSON string in cache for 60 seconds (1 minute)
+                Cache::put($cacheKey, $jsonString, 60);
+
+                return response($jsonString)->header('Content-Type', 'application/json');
+            } finally {
+                $lock->release();
+            }
+        } else {
+            // Kasir lain yang tidak kebagian Lock (mengantre)
+            // Tunggu maksimal 15 detik sampai kasir pertama selesai membuat Cache
+            $waited = 0;
+            while (!Cache::has($cacheKey) && $waited < 15) {
+                sleep(1);
+                $waited++;
+            }
+            
+            $cachedJson = Cache::get($cacheKey);
+            if ($cachedJson) {
+                return response($cachedJson)->header('Content-Type', 'application/json');
+            }
+            
+            return response()->json([]); // Fallback jika gagal ekstrem
+        }
     }
 
     /**
@@ -106,22 +130,40 @@ class PosCatalogController extends Controller
             return response($cachedJson)->header('Content-Type', 'application/json');
         }
 
-        $promotions = \App\Models\Promotion::where('is_active', true)
-            ->where('valid_from', '<=', $now)
-            ->where('valid_until', '>=', $now)
-            ->where(function ($query) use ($branchId) {
-                $query->whereDoesntHave('branches');
-                if ($branchId) {
-                    $query->orWhereHas('branches', function ($q) use ($branchId) {
-                        $q->where('branches.id', $branchId);
-                    });
-                }
-            })
-            ->get();
+        $lock = Cache::lock('lock_' . $cacheKey, 30);
+        if ($lock->get()) {
+            try {
+                $promotions = \App\Models\Promotion::where('is_active', true)
+                    ->where('valid_from', '<=', $now)
+                    ->where('valid_until', '>=', $now)
+                    ->where(function ($query) use ($branchId) {
+                        $query->whereDoesntHave('branches');
+                        if ($branchId) {
+                            $query->orWhereHas('branches', function ($q) use ($branchId) {
+                                $q->where('branches.id', $branchId);
+                            });
+                        }
+                    })
+                    ->get();
 
-        $jsonString = $promotions->toJson();
-        Cache::put($cacheKey, $jsonString, 60);
+                $jsonString = $promotions->toJson();
+                Cache::put($cacheKey, $jsonString, 60);
 
-        return response($jsonString)->header('Content-Type', 'application/json');
+                return response($jsonString)->header('Content-Type', 'application/json');
+            } finally {
+                $lock->release();
+            }
+        } else {
+            $waited = 0;
+            while (!Cache::has($cacheKey) && $waited < 15) {
+                sleep(1);
+                $waited++;
+            }
+            $cachedJson = Cache::get($cacheKey);
+            if ($cachedJson) {
+                return response($cachedJson)->header('Content-Type', 'application/json');
+            }
+            return response()->json([]);
+        }
     }
 }
