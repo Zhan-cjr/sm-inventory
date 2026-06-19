@@ -118,9 +118,14 @@ INSTRUCTIONS:
             return {"answer": "Maaf, kueri yang dihasilkan tidak valid (bukan SELECT)."}
             
         # Hard restriction to ensure LLM included branch_id filter
-        if branch_id and "branch_id" not in sql_query.lower():
-            print(f"SECURITY ALERT: branch_id filter missing in SQL: {sql_query}")
-            return {"answer": "Maaf, demi alasan keamanan dan privasi, saya membatalkan pencarian ini karena kueri AI tidak secara spesifik memfilter cabang Anda. Silakan coba tanyakan kembali."}
+        if branch_id:
+            import re
+            # Regex to ensure the specific branch_id is present, e.g. branch_id = '1' or branch_id = 1 or branches.id = 1
+            # We match the literal value of branch_id
+            pattern = rf"=\s*['\"]?{branch_id}['\"]?"
+            if not re.search(pattern, sql_query, re.IGNORECASE):
+                print(f"SECURITY ALERT: Strict branch filter for '{branch_id}' missing in SQL: {sql_query}")
+                return {"answer": f"Maaf, kueri dibatalkan secara otomatis karena AI terdeteksi mencoba mengakses data di luar batas izin cabang Anda (Cabang ID: {branch_id})."}
             
         # Prevent massive cross-joins from hanging the database
         if "LIMIT" not in sql_query.upper():
