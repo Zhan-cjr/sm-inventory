@@ -77,9 +77,10 @@ def process_nl_query(query: str, branch_id: str = None):
 !!! CRITICAL SECURITY RULE !!!
 - The user is STRICTLY RESTRICTED to branch_id = '{branch_id}'. 
 - EVERY single SQL query you generate MUST contain a WHERE clause filtering by branch_id (e.g., `WHERE branch_id = '{branch_id}'` or `AND branch_id = '{branch_id}'`).
+- NEVER use an 'OR' condition that could bypass this branch_id filter. 
 - If the queried table does not have a branch_id, you MUST JOIN it with a table that has branch_id to apply this filter.
 - NEVER return data for other branches under ANY circumstances.
-- If the user asks for 'semua cabang' or explicitly requests another branch, REFUSE them immediately with 'ANSWER: Maaf, Anda tidak memiliki akses ke data cabang lain.'
+- If the user asks for 'semua cabang' or explicitly requests another branch by name (e.g. 'cabang pasirhayam'), you MUST REFUSE them immediately with 'ANSWER: Maaf, Anda tidak memiliki akses ke data cabang lain.'
 """
         else:
             security_rules = "- The user is an Admin. They can view all data across all branches."
@@ -159,7 +160,7 @@ Do NOT show the raw SQL query to the user.
         final_answer = final_chat.text.strip()
         
         # Tambahkan indikator debug agar kita bisa melihat nilainya di layar UI
-        final_answer += f"\n\n*(Debug System - Branch ID terdeteksi: {branch_id if branch_id else 'TIDAK ADA (ADMIN)'})*"
+        final_answer += f"\n\n*(Debug System - Branch ID: {branch_id if branch_id else 'ADMIN'})\nSQL: {sql_query}*"
         
         return {
             "answer": final_answer,
