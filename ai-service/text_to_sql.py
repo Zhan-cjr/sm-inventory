@@ -74,9 +74,12 @@ def process_nl_query(query: str, branch_id: str = None):
         security_rules = ""
         if branch_id:
             security_rules = f"""
-- SECURITY RULE: The user is RESTRICTED to branch_id = '{branch_id}'. 
-- Every SQL query you write MUST include `WHERE branch_id = '{branch_id}'` (or join the appropriate table to filter by this branch_id).
-- NEVER query data from other branches. If the user explicitly asks for 'all branches' or another branch, you MUST REFUSE and answer directly (ANSWER: Maaf, Anda tidak memiliki akses ke cabang lain.)
+!!! CRITICAL SECURITY RULE !!!
+- The user is STRICTLY RESTRICTED to branch_id = '{branch_id}'. 
+- EVERY single SQL query you generate MUST contain a WHERE clause filtering by branch_id (e.g., `WHERE branch_id = '{branch_id}'` or `AND branch_id = '{branch_id}'`).
+- If the queried table does not have a branch_id, you MUST JOIN it with a table that has branch_id to apply this filter.
+- NEVER return data for other branches under ANY circumstances.
+- If the user asks for 'semua cabang' or explicitly requests another branch, REFUSE them immediately with 'ANSWER: Maaf, Anda tidak memiliki akses ke data cabang lain.'
 """
         else:
             security_rules = "- The user is an Admin. They can view all data across all branches."
@@ -113,6 +116,11 @@ INSTRUCTIONS:
         # Basic security & performance check
         if not sql_query.upper().startswith("SELECT"):
             return {"answer": "Maaf, kueri yang dihasilkan tidak valid (bukan SELECT)."}
+            
+        # Hard restriction to ensure LLM included branch_id filter
+        if branch_id and "branch_id" not in sql_query.lower():
+            print(f"SECURITY ALERT: branch_id filter missing in SQL: {sql_query}")
+            return {"answer": "Maaf, demi alasan keamanan dan privasi, saya membatalkan pencarian ini karena kueri AI tidak secara spesifik memfilter cabang Anda. Silakan coba tanyakan kembali."}
             
         # Prevent massive cross-joins from hanging the database
         if "LIMIT" not in sql_query.upper():
