@@ -22,7 +22,7 @@ class CPFacilityResource extends Resource
     protected static \UnitEnum|string|null $navigationGroup = 'COMPANY PROFILE';
     protected static ?int $navigationSort = 99;
 
-    protected static ?string $recordTitleAttribute = 'no';
+    protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema
     {

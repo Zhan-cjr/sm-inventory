@@ -129,14 +129,11 @@ class PurchaseReturnForm
                     ->schema([
                         Select::make('product_id')
                             ->label('Produk')
+                            ->relationship('product', 'name')
                             ->searchable()
-                            ->getSearchResultsUsing(fn (string $search): array => \App\Models\Product::search($search)
-                                ->take(50)
-                                ->get()
-                                ->pluck('name', 'id')
-                                ->toArray()
+                            ->getSearchResultsUsing(fn (string $search): \Illuminate\Database\Eloquent\Builder => 
+                                \App\Models\Product::whereIn('id', \App\Models\Product::search($search)->take(50)->keys())
                             )
-                            ->getOptionLabelUsing(fn ($value): ?string => \App\Models\Product::find($value)?->name)
                             ->disabled()
                             ->dehydrated()
                             ->required()
