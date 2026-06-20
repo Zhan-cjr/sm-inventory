@@ -7,7 +7,7 @@
         </x-slot>
     @endif
 
-    <x-filament-panels::form>
+    <form>
         @if ($step === 1)
             <div class="space-y-4">
                 {{-- Step 1: Input Email --}}
@@ -95,7 +95,7 @@
                 </div>
             </div>
         @endif
-    </x-filament-panels::form>
+    </form>
     
     <div class="text-center mt-6">
         <a href="{{ \Filament\Facades\Filament::getCurrentPanel()->getLoginUrl() }}" class="text-sm text-primary-600 hover:text-primary-500 font-medium">
