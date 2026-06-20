@@ -50,8 +50,11 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        // Allow access to the panel, but Filament Shield will handle resource permissions
-        return true;
+        if ($this->hasRole(['superadmin', 'super_admin', 'super-admin'])) {
+            return true;
+        }
+
+        return $this->hasPermissionTo('akses_backend_admin');
     }
 
     public function hasCustomAuthorization(string $action): bool

@@ -30,4 +30,20 @@ class CustomLogin extends BaseLogin
             ->autocomplete('username')
             ->autofocus();
     }
+
+    public function authenticate(): ?\Filament\Http\Responses\Auth\Contracts\LoginResponse
+    {
+        $response = parent::authenticate();
+
+        $user = \Filament\Facades\Filament::auth()->user();
+        if ($user && !$user->canAccessPanel(\Filament\Facades\Filament::getCurrentPanel())) {
+            \Filament\Facades\Filament::auth()->logout();
+            
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.username' => __('Akun Anda tidak memiliki akses ke backend admin.'),
+            ]);
+        }
+
+        return $response;
+    }
 }
