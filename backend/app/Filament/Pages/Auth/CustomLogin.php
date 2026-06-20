@@ -33,17 +33,18 @@ class CustomLogin extends BaseLogin
 
     public function authenticate(): ?\Filament\Auth\Http\Responses\Contracts\LoginResponse
     {
-        $response = parent::authenticate();
+        $data = $this->form->getState();
+        $user = \App\Models\User::where('username', $data['username'] ?? '')->first();
 
-        $user = \Filament\Facades\Filament::auth()->user();
-        if ($user && !$user->canAccessPanel(\Filament\Facades\Filament::getCurrentPanel())) {
-            \Filament\Facades\Filament::auth()->logout();
-            
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'data.username' => __('Akun Anda tidak memiliki akses ke backend admin.'),
-            ]);
+        if ($user) {
+            $panel = \Filament\Facades\Filament::getCurrentPanel() ?? app('filament')->getPanel('admin');
+            if (!$user->canAccessPanel($panel)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'data.username' => __('Akun Anda tidak memiliki akses ke backend admin.'),
+                ]);
+            }
         }
 
-        return $response;
+        return parent::authenticate();
     }
 }
