@@ -54,7 +54,7 @@ class User extends Authenticatable implements FilamentUser
             return true;
         }
 
-        return $this->can('akses_backend_admin');
+        return $this->can('akses_backend_admin') || $this->can('AksesBackendAdmin');
     }
 
     public function hasCustomAuthorization(string $action): bool
