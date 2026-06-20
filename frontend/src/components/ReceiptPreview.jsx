@@ -32,6 +32,22 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
     return ' '.repeat(left) + str + ' '.repeat(right);
   };
 
+  const wrapAndCenter = (str, len) => {
+    const linesToPrint = [];
+    let remaining = String(str).trim();
+    while (remaining.length > 0) {
+      if (remaining.length <= len) {
+        linesToPrint.push(center(remaining, len));
+        break;
+      }
+      let breakPoint = remaining.lastIndexOf(' ', len);
+      if (breakPoint === -1 || breakPoint === 0) breakPoint = len;
+      linesToPrint.push(center(remaining.substring(0, breakPoint).trim(), len));
+      remaining = remaining.substring(breakPoint).trim();
+    }
+    return linesToPrint;
+  };
+
   const formatPlaceholder = (lineText) => {
     if (!lineText) return '';
     let result = lineText
@@ -70,12 +86,12 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
   const headerOutputLines = [];
 
   if (headerLines.length === 0) {
-    headerOutputLines.push(center(orgName || 'TOSERBA SELAMAT', columns));
-    headerOutputLines.push(center(branchName || 'Cabang Utama', columns));
-    headerOutputLines.push(center('THE MOSLEM FAMILY', columns));
+    headerOutputLines.push(...wrapAndCenter(orgName || 'TOSERBA SELAMAT', columns));
+    headerOutputLines.push(...wrapAndCenter(branchName || 'Cabang Utama', columns));
+    headerOutputLines.push(...wrapAndCenter(branchAddress || 'THE MOSLEM FAMILY', columns));
   } else {
     headerLines.forEach(text => {
-      headerOutputLines.push(center(text, columns));
+      headerOutputLines.push(...wrapAndCenter(text, columns));
     });
   }
 
@@ -196,11 +212,10 @@ const generateRawTextReceipt = (transaction, branchSettings, isHeaderBottom, col
   if (footerLines.length === 0) {
     lines.push(center('TERIMA KASIH', columns));
     lines.push(center('SELAMAT BELANJA KEMBALI', columns));
-    lines.push(center('Barang yang sudah dibeli', columns));
-    lines.push(center('tidak dapat ditukar/dikembalikan', columns));
+    lines.push(...wrapAndCenter('Barang yang sudah dibeli tidak dapat ditukar/dikembalikan', columns));
   } else {
     footerLines.forEach(text => {
-      lines.push(center(text, columns));
+      lines.push(...wrapAndCenter(text, columns));
     });
   }
 
