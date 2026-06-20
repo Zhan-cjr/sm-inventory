@@ -31,7 +31,7 @@ class CustomLogin extends BaseLogin
             ->autofocus();
     }
 
-    public function authenticate(): ?\Filament\Http\Responses\Auth\Contracts\LoginResponse
+    public function authenticate(): ?\Filament\Auth\Http\Responses\Contracts\LoginResponse
     {
         $response = parent::authenticate();
 
