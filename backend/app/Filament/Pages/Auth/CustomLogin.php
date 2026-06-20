@@ -31,20 +31,33 @@ class CustomLogin extends BaseLogin
             ->autofocus();
     }
 
+    protected function throwFailureValidationException(): never
+    {
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'data.username' => 'Username atau kata sandi yang Anda masukkan salah.',
+        ]);
+    }
+
     public function authenticate(): ?\Filament\Auth\Http\Responses\Contracts\LoginResponse
     {
         $data = $this->form->getState();
-        $user = \App\Models\User::where('username', $data['username'] ?? '')->first();
 
-        if ($user) {
-            $panel = \Filament\Facades\Filament::getCurrentPanel() ?? app('filament')->getPanel('admin');
-            if (!$user->canAccessPanel($panel)) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'data.username' => __('Akun Anda tidak memiliki akses ke backend admin.'),
-                ]);
-            }
+        if (! \Filament\Facades\Filament::auth()->attempt($this->getCredentialsFromFormData($data), $data['remember'] ?? false)) {
+            $this->throwFailureValidationException();
         }
 
-        return parent::authenticate();
+        $user = \Filament\Facades\Filament::auth()->user();
+        
+        $panel = \Filament\Facades\Filament::getCurrentPanel() ?? app('filament')->getPanel('admin');
+        if ($user && !$user->canAccessPanel($panel)) {
+            \Filament\Facades\Filament::auth()->logout();
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.username' => __('Akun Anda tidak memiliki akses ke backend admin.'),
+            ]);
+        }
+
+        session()->regenerate();
+
+        return app(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class);
     }
 }
