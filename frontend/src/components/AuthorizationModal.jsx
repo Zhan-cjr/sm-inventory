@@ -233,7 +233,7 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
         </div>
         <h2 style={{ textAlign: 'center', color: 'var(--danger)' }}>Otorisasi Diperlukan</h2>
         <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-          Tindakan <strong style={{ color: 'white' }}>{actionName}</strong> membutuhkan otorisasi.
+          Tindakan <strong style={{ color: 'var(--text-main)' }}>{actionName}</strong> membutuhkan otorisasi.
         </p>
 
         {error && (
@@ -293,8 +293,8 @@ export const AuthorizationModal = ({ actionName, authToken, isOnline, onSuccess,
           <div style={{ width: '100%' }}>
             <button 
               type="button" 
-              className="btn-primary" 
-              style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem', background: 'transparent', border: '1px dashed var(--primary)', color: 'var(--primary)' }} 
+              className="btn-secondary" 
+              style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem', border: '1px dashed var(--border-light)' }} 
               onClick={requestRemoteAuth} 
               disabled={isLoading || !isOnline}
             >

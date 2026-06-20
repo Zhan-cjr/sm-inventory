@@ -2588,7 +2588,11 @@ export const POSTransaction = ({
           )}
           <div className="status-indicator">
             {isOnline ? <Wifi size={18} className="text-online" /> : <WifiOff size={18} className="text-offline" />}
-            <span>{isOnline ? 'Online' : 'Offline'}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {!isOnline && <span className="status-dot-offline"></span>}
+              {isOnline && <span className="status-dot-online"></span>}
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
           </div>
           {!window.electronAPI && (
             <button className="btn-icon" onClick={() => setIsPrinterSettingsOpen(true)} title="Pengaturan Printer" style={{ background: 'transparent', padding: '4px', border: 'none' }}>
@@ -3234,7 +3238,7 @@ export const POSTransaction = ({
                   </tr>
                 ) : (
                   items.map((item, index) => (
-                    <tr key={item.productId} className={`cart-row fade-in ${item.productId === lastScannedProductId ? 'highlight-row' : ''}`}>
+                    <tr key={item.productId} className={`cart-row animate-slide-in ${item.productId === lastScannedProductId ? 'highlight-row' : ''}`}>
                       <td>{index + 1}</td>
                       <td>
                         <div className="prod-cell">
@@ -3244,12 +3248,8 @@ export const POSTransaction = ({
                         </div>
                       </td>
                       <td>{formatCurrency(item.unitPrice)}</td>
-                      <td>
-                        <div className="qty-control-modern">
-                          <button onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus size={14} /></button>
-                          <input type="number" value={item.quantity} onChange={(e) => updateQuantity(item.productId, parseInt(e.target.value) || 0)} />
-                          <button onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus size={14} /></button>
-                        </div>
+                      <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{item.quantity}</span>
                       </td>
                       <td className="subtotal-cell">{formatCurrency((item.quantity * item.unitPrice) - (item.quantity * (item.manualDiscount || 0)))}</td>
                       <td>
@@ -3316,7 +3316,7 @@ export const POSTransaction = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '0.25rem' }}>
               <div className="grand-total-box" style={{ border: 'none', padding: 0, marginTop: 0, background: 'transparent' }}>
                 <label style={{ fontSize: '0.75rem', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '2px', display: 'block' }}>GRAND TOTAL</label>
-                <div className="total-amount" style={{ fontSize: '2rem', lineHeight: '1', fontWeight: '800', color: 'var(--primary)' }}>{formatCurrency(finalAmount)}</div>
+                <div className="total-amount" style={{ fontSize: '2.2rem', lineHeight: '1', fontWeight: '800', color: 'var(--accent)', textShadow: '0 2px 10px rgba(157, 195, 26, 0.2)' }}>{formatCurrency(finalAmount)}</div>
               </div>
 
               {isSubtotalMode && (
