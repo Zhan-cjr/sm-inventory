@@ -243,6 +243,7 @@ return [
 
     'custom_permissions' => [
         'access_pos',
+        'akses_backend_admin',
     ],
 
     /*
