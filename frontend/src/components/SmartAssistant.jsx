@@ -40,15 +40,15 @@ export const SmartAssistant = ({ user, authToken }) => {
         })
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error('Gagal menghubungi AI Service');
+        throw new Error(data.message || data.error || 'Gagal menghubungi AI Service');
       }
 
-      const data = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: data.response || data.answer || 'AI memberikan respon kosong' }]);
       
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Maaf, terjadi kesalahan komunikasi dengan server AI: ${error.message}` }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `DEBUG INFO: ${error.message}` }]);
     } finally {
       setIsLoading(false);
     }
