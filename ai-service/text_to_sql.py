@@ -179,6 +179,9 @@ Do NOT show the raw SQL query to the user.
         final_chat = model.generate_content(prompt_answer)
         final_answer = final_chat.text.strip()
         
+        # Tampilkan Branch ID di layar (sementara) agar user bisa tahu apa yang diterima Python
+        final_answer += f"\n\n*(Info Debug: ID Cabang Anda yang terbaca sistem adalah: {branch_id})*"
+        
         return {
             "answer": final_answer,
             "data": data,
