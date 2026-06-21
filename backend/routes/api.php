@@ -226,16 +226,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/bi/apriori', [\App\Http\Controllers\Api\V1\BIDashboardController::class, 'apriori']);
 
         // AI Service Proxy
-        Route::post('/ai/ask', function (\Illuminate\Http\Request $request) {
+        Route::post('/ai-proxy/ask', function (\Illuminate\Http\Request $request) {
             try {
                 // Keamanan Ekstra: Paksa ambil branch_id dari sesi user backend, jangan percaya input dari frontend
                 $user = $request->user();
                 $branchId = $user ? $user->branch_id : null;
-                
-                // DEBUG SEMENTARA: Jika branchId kosong, kita buat error sengaja agar tahu di Frontend
-                if (empty($branchId)) {
-                    throw new \Exception("DEBUG PHP: Sesi PWA gagal terdeteksi atau branch_id benar-benar kosong! User ID terbaca: " . ($user ? $user->id : 'TIDAK ADA USER'));
-                }
                 
                 $response = \Illuminate\Support\Facades\Http::timeout(60)->post('http://localhost:8001/api/v1/ai/ask', [
                     'question' => $request->input('question') ?? $request->input('query'), // Terima 'question' atau 'query' sebagai fallback

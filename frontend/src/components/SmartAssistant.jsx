@@ -28,7 +28,7 @@ export const SmartAssistant = ({ user, authToken }) => {
 
     try {
       // Endpoint to our Python AI Microservice (proxied via Nginx in production)
-      const response = await fetch('/api/v1/ai/ask', {
+      const response = await fetch('/api/v1/ai-proxy/ask', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
