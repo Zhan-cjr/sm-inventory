@@ -42,7 +42,7 @@ export const SmartAssistant = ({ user }) => {
       }
 
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
       
     } catch (error) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Maaf, terjadi kesalahan komunikasi dengan server AI: ${error.message}` }]);
