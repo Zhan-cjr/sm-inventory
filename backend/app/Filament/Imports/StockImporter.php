@@ -28,6 +28,35 @@ class StockImporter extends Importer
 
     public static function getColumns(): array
     {
+        $numericCaster = function (?string $state): ?string {
+            if (blank($state)) return null;
+            $val = trim((string) $state);
+            if (preg_match('/^-?[0-9]+$/', $val)) return $val;
+            
+            $val = preg_replace('/[^0-9\.,-]/', '', $val);
+            if (str_contains($val, ',') && str_contains($val, '.')) {
+                if (strrpos($val, ',') > strrpos($val, '.')) {
+                    $val = str_replace('.', '', $val);
+                    $val = str_replace(',', '.', $val);
+                } else {
+                    $val = str_replace(',', '', $val);
+                }
+            } elseif (str_contains($val, ',')) {
+                $val = str_replace(',', '.', $val);
+            } else {
+                if (preg_match('/^-?[0-9]+\.[0-9]{3}$/', $val)) {
+                    $val = str_replace('.', '', $val);
+                }
+            }
+            return $val;
+        };
+
+        $integerCaster = function (?string $state) use ($numericCaster): ?int {
+            $val = $numericCaster($state);
+            if ($val === null || $val === '') return null;
+            return (int) round((float) $val);
+        };
+
         return [
             ImportColumn::make('branch_id')
                 ->label('Cabang (ID/Kode/Nama)')
@@ -60,85 +89,100 @@ class StockImporter extends Importer
             ImportColumn::make('cost_price')
                 ->label('Harga Modal Cabang')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('25000')
                 ->rules(['nullable', 'numeric']),
 
             ImportColumn::make('cost_price_tax')
                 ->label('Harga Modal + PPN Cabang')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('27750')
                 ->rules(['nullable', 'numeric']),
 
             ImportColumn::make('qty_min_gol_1')
                 ->label('Min Qty Gol 1 Cabang')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('1')
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_1')
                 ->label('Harga Jual Gol 1 Cabang')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('33300')
                 ->rules(['nullable', 'numeric']),
 
             ImportColumn::make('qty_min_gol_2')
                 ->label('Min Qty Gol 2 Cabang')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('12')
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_2')
                 ->label('Harga Jual Gol 2 Cabang')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('31910')
                 ->rules(['nullable', 'numeric']),
 
             ImportColumn::make('qty_min_gol_3')
                 ->label('Min Qty Gol 3 Cabang')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('50')
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_3')
                 ->label('Harga Jual Gol 3 Cabang')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('30520')
                 ->rules(['nullable', 'numeric']),
 
             ImportColumn::make('selling_price')
                 ->label('Harga Jual Cabang (Default)')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('30000')
                 ->rules(['nullable', 'numeric']),
             ImportColumn::make('quantity_on_hand')
                 ->label('Stok Saat Ini')
                 ->requiredMapping()
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('100')
                 ->rules(['required', 'integer']),
             ImportColumn::make('min_qty')
                 ->label('Min Stok')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('10')
                 ->rules(['nullable', 'integer']),
             ImportColumn::make('max_qty')
                 ->label('Max Stok')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('500')
                 ->rules(['nullable', 'integer']),
             ImportColumn::make('lead_time')
                 ->label('Lead Time (Hari)')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('3')
                 ->rules(['nullable', 'integer']),
             ImportColumn::make('safety_stock')
                 ->label('Safety Stock')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('10')
                 ->rules(['nullable', 'integer']),
             ImportColumn::make('desired_inventory_days')
                 ->label('Target Hari Persediaan')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('14')
                 ->rules(['nullable', 'integer']),
             ImportColumn::make('rack')

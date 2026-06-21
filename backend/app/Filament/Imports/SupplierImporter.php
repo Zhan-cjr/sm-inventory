@@ -25,6 +25,43 @@ class SupplierImporter extends Importer
 
     public static function getColumns(): array
     {
+        $numericCaster = function (?string $state): ?string {
+            if (blank($state)) return null;
+            $val = trim((string) $state);
+            if (preg_match('/^-?[0-9]+$/', $val)) return $val;
+            
+            $val = preg_replace('/[^0-9\.,-]/', '', $val);
+            if (str_contains($val, ',') && str_contains($val, '.')) {
+                if (strrpos($val, ',') > strrpos($val, '.')) {
+                    $val = str_replace('.', '', $val);
+                    $val = str_replace(',', '.', $val);
+                } else {
+                    $val = str_replace(',', '', $val);
+                }
+            } elseif (str_contains($val, ',')) {
+                $val = str_replace(',', '.', $val);
+            } else {
+                if (preg_match('/^-?[0-9]+\.[0-9]{3}$/', $val)) {
+                    $val = str_replace('.', '', $val);
+                }
+            }
+            return $val;
+        };
+
+        $integerCaster = function (?string $state) use ($numericCaster): ?int {
+            $val = $numericCaster($state);
+            if ($val === null || $val === '') return null;
+            return (int) round((float) $val);
+        };
+
+        $booleanCaster = function (?string $state): ?bool {
+            if (blank($state)) return null;
+            $val = strtolower(trim($state));
+            if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
+            if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
+            return (bool) $val;
+        };
+
         return [
             ImportColumn::make('organization_id')
                 ->label('ID Organisasi')
@@ -70,12 +107,14 @@ class SupplierImporter extends Importer
             ImportColumn::make('default_due_days')
                 ->label('Jatuh Tempo Default (Hari)')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('14')
                 ->rules(['nullable', 'integer']),
 
             ImportColumn::make('default_po_expired_days')
                 ->label('PO Expired Default (Hari)')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('7')
                 ->rules(['nullable', 'integer']),
 
@@ -87,12 +126,14 @@ class SupplierImporter extends Importer
             ImportColumn::make('is_active')
                 ->label('Aktif (1/0)')
                 ->boolean()
+                ->castStateUsing($booleanCaster)
                 ->example('1')
                 ->rules(['nullable', 'boolean']),
 
             ImportColumn::make('is_consignment')
                 ->label('Konsinyasi (1/0)')
                 ->boolean()
+                ->castStateUsing($booleanCaster)
                 ->example('0')
                 ->rules(['nullable', 'boolean']),
         ];

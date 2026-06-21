@@ -23,6 +23,14 @@ class CategoryImporter extends Importer
 
     public static function getColumns(): array
     {
+        $booleanCaster = function (?string $state): ?bool {
+            if (blank($state)) return null;
+            $val = strtolower(trim($state));
+            if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
+            if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
+            return (bool) $val;
+        };
+
         return [
             ImportColumn::make('organization_id')
                 ->label('ID Organisasi')
@@ -53,6 +61,7 @@ class CategoryImporter extends Importer
             ImportColumn::make('is_active')
                 ->label('Aktif (1/0)')
                 ->boolean()
+                ->castStateUsing($booleanCaster)
                 ->example('1')
                 ->rules(['nullable', 'boolean']),
         ];

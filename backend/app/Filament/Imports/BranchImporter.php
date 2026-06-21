@@ -25,6 +25,37 @@ class BranchImporter extends Importer
 
     public static function getColumns(): array
     {
+        $numericCaster = function (?string $state): ?string {
+            if (blank($state)) return null;
+            $val = trim((string) $state);
+            if (preg_match('/^-?[0-9]+$/', $val)) return $val;
+            
+            $val = preg_replace('/[^0-9\.,-]/', '', $val);
+            if (str_contains($val, ',') && str_contains($val, '.')) {
+                if (strrpos($val, ',') > strrpos($val, '.')) {
+                    $val = str_replace('.', '', $val);
+                    $val = str_replace(',', '.', $val);
+                } else {
+                    $val = str_replace(',', '', $val);
+                }
+            } elseif (str_contains($val, ',')) {
+                $val = str_replace(',', '.', $val);
+            } else {
+                if (preg_match('/^-?[0-9]+\.[0-9]{3}$/', $val)) {
+                    $val = str_replace('.', '', $val);
+                }
+            }
+            return $val;
+        };
+
+        $booleanCaster = function (?string $state): ?bool {
+            if (blank($state)) return null;
+            $val = strtolower(trim($state));
+            if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
+            if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
+            return (bool) $val;
+        };
+
         return [
             ImportColumn::make('organization_id')
                 ->label('ID Organisasi')
@@ -59,17 +90,22 @@ class BranchImporter extends Importer
 
             ImportColumn::make('latitude')
                 ->label('Latitude')
+                ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('-6.6500')
                 ->rules(['nullable', 'numeric']),
 
             ImportColumn::make('longitude')
                 ->label('Longitude')
+                ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('106.8500')
                 ->rules(['nullable', 'numeric']),
 
             ImportColumn::make('is_active')
                 ->label('Aktif (1/0)')
                 ->boolean()
+                ->castStateUsing($booleanCaster)
                 ->example('1')
                 ->rules(['nullable', 'boolean']),
         ];
