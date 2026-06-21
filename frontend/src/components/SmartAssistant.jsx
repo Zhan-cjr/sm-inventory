@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
 
-export const SmartAssistant = () => {
+export const SmartAssistant = ({ user }) => {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'Halo! Saya AI Smart Assistant Anda (dikembangkan oleh Amnal). Ada yang bisa saya bantu terkait laporan penjualan, stok barang, atau rekomendasi produk hari ini?' }
   ]);
@@ -31,7 +31,10 @@ export const SmartAssistant = () => {
       const response = await fetch('/api/v1/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: userMessage })
+        body: JSON.stringify({ 
+          question: userMessage,
+          branch_id: user?.branch_id || null
+        })
       });
 
       if (!response.ok) {
