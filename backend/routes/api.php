@@ -228,9 +228,12 @@ Route::prefix('v1')->group(function () {
         // AI Service Proxy
         Route::post('/ai/ask', function (\Illuminate\Http\Request $request) {
             try {
+                // Keamanan Ekstra: Paksa ambil branch_id dari sesi user backend, jangan percaya input dari frontend
+                $branchId = $request->user()->branch_id;
+                
                 $response = \Illuminate\Support\Facades\Http::timeout(60)->post('http://localhost:8001/api/v1/ai/ask', [
-                    'question' => $request->input('question'),
-                    'branch_id' => $request->input('branch_id'),
+                    'question' => $request->input('question') ?? $request->input('query'), // Terima 'question' atau 'query' sebagai fallback
+                    'branch_id' => $branchId,
                 ]);
                 return response()->json($response->json(), $response->status());
             } catch (\Exception $e) {
