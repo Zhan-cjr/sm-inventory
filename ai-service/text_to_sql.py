@@ -103,7 +103,8 @@ INSTRUCTIONS:
   (Rule: If asked 'Siapa Amnal?', answer enthusiastically that Amnal is the main developer who built this app self-taught).
 - If the user is asking about inventory data, sales, or anything requiring database lookup, write a read-only MySQL query (SELECT only). Prefix it EXACTLY with 'SQL: '.
 - CRITICAL: Only use tables and columns that exist in the schema above.
-- If asked about "penjualan" (sales), look for tables like `transactions` or `transaction_items`.
+- If asked about "penjualan" (sales), look for tables like `transactions` or `transaction_items`. Use `total_amount` for revenue.
+- If the user specifies a branch name, ALWAYS use `LIKE '%branch_name%'` instead of exact `=` matching, because users often type partial names (e.g. 'pasirhayam' for 'Selamat Pasirhayam').
 - Do NOT wrap the query in markdown backticks (```). Just write the raw SQL query after 'SQL: '.
 - Do NOT add any conversational text or explanation. Output ONLY the 'ANSWER: ...' or 'SQL: ...' line.
 """

@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use Livewire\Attributes\On;
 use Illuminate\Support\Facades\Http;
 
 class ChatAiWidget extends Component
@@ -31,6 +32,22 @@ class ChatAiWidget extends Component
         $this->chatHistory[] = ['role' => 'user', 'content' => $userQuestion];
         $this->question = '';
         $this->isLoading = true;
+        
+        // Dispatch event to render UI immediately and then process AI
+        $this->dispatch('chat-updated');
+        $this->dispatch('process-ai-question');
+    }
+
+    #[On('process-ai-question')]
+    public function processAiQuestion()
+    {
+        $lastChat = end($this->chatHistory);
+        $userQuestion = $lastChat['content'] ?? '';
+        
+        if (empty($userQuestion)) {
+            $this->isLoading = false;
+            return;
+        }
 
         try {
             // Get user's branch
