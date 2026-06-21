@@ -84,7 +84,7 @@ export function MobileDashboard({ user, authToken }) {
             <button onClick={() => setShowAI(false)} style={{ background: 'none', border: 'none', color: 'white' }}><X /></button>
           </div>
           <div style={{ flex: 1, padding: '1rem', overflowY: 'auto' }}>
-            <SmartAssistant />
+            <SmartAssistant user={user} authToken={authToken} />
           </div>
         </div>
       ) : null}
