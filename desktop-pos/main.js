@@ -264,7 +264,23 @@ ipcMain.handle('open-cash-drawer', async (event, printerName) => {
       if (targetPrinter.toUpperCase().startsWith('LPT') || targetPrinter.toUpperCase().startsWith('COM')) {
         cmd = `copy /B "${binPath}" ${targetPrinter}:`;
       } else {
-        cmd = `copy /B "${binPath}" "\\\\127.0.0.1\\${targetPrinter}"`;
+        const hostname = os.hostname();
+        const exePath = path.join(app.getPath('userData'), 'RawPrint.exe');
+        
+        // 1. Coba 127.0.0.1 (Default)
+        // 2. Coba localhost
+        // 3. Coba hostname (Biasanya lebih stabil saat LAN offline)
+        cmd = `copy /B "${binPath}" "\\\\127.0.0.1\\${targetPrinter}" || ` +
+              `copy /B "${binPath}" "\\\\localhost\\${targetPrinter}" || ` +
+              `copy /B "${binPath}" "\\\\${hostname}\\${targetPrinter}"`;
+              
+        // 4. Jika copy sharing gagal semua, gunakan RawPrint langsung ke nama printer (Bypass Sharing)
+        if (fs.existsSync(exePath)) {
+            cmd += ` || "${exePath}" "${binPath}" "${targetPrinter}"`;
+            if (printerName && printerName !== targetPrinter) {
+                cmd += ` || "${exePath}" "${binPath}" "${printerName}"`;
+            }
+        }
       }
 
       exec(cmd, (error, stdout, stderr) => {

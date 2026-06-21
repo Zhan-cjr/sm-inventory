@@ -30,6 +30,43 @@ class ProductImporter extends Importer
 
     public static function getColumns(): array
     {
+        $numericCaster = function (?string $state): ?string {
+            if (blank($state)) return null;
+            $val = trim((string) $state);
+            if (preg_match('/^-?[0-9]+$/', $val)) return $val;
+            
+            $val = preg_replace('/[^0-9\.,-]/', '', $val);
+            if (str_contains($val, ',') && str_contains($val, '.')) {
+                if (strrpos($val, ',') > strrpos($val, '.')) {
+                    $val = str_replace('.', '', $val);
+                    $val = str_replace(',', '.', $val);
+                } else {
+                    $val = str_replace(',', '', $val);
+                }
+            } elseif (str_contains($val, ',')) {
+                $val = str_replace(',', '.', $val);
+            } else {
+                if (preg_match('/^-?[0-9]+\.[0-9]{3}$/', $val)) {
+                    $val = str_replace('.', '', $val);
+                }
+            }
+            return $val;
+        };
+
+        $integerCaster = function (?string $state) use ($numericCaster): ?int {
+            $val = $numericCaster($state);
+            if ($val === null || $val === '') return null;
+            return (int) round((float) $val);
+        };
+
+        $booleanCaster = function (?string $state): ?bool {
+            if (blank($state)) return null;
+            $val = strtolower(trim($state));
+            if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
+            if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
+            return (bool) $val;
+        };
+
         return [
             ImportColumn::make('organization_id')
                 ->label('ID Organisasi')
@@ -85,54 +122,63 @@ class ProductImporter extends Importer
                 ->label('Harga Modal (HPP)')
                 ->requiredMapping()
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('2500')
                 ->rules(['required', 'numeric', 'min:0']),
 
             ImportColumn::make('cost_price_tax')
                 ->label('Harga Beli + PPN')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('2775')
                 ->rules(['nullable', 'numeric', 'min:0']),
 
             ImportColumn::make('qty_min_gol_1')
                 ->label('Min Qty Gol 1')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('1')
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_1')
                 ->label('Harga Jual Gol 1')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('3330')
                 ->rules(['nullable', 'numeric', 'min:0']),
 
             ImportColumn::make('qty_min_gol_2')
                 ->label('Min Qty Gol 2')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('12')
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_2')
                 ->label('Harga Jual Gol 2')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('3191')
                 ->rules(['nullable', 'numeric', 'min:0']),
 
             ImportColumn::make('qty_min_gol_3')
                 ->label('Min Qty Gol 3')
                 ->numeric()
+                ->castStateUsing($integerCaster)
                 ->example('50')
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_3')
                 ->label('Harga Jual Gol 3')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('3052')
                 ->rules(['nullable', 'numeric', 'min:0']),
 
             ImportColumn::make('selling_price')
                 ->label('Harga Jual (Default)')
                 ->numeric()
+                ->castStateUsing($numericCaster)
                 ->example('3000')
                 ->rules(['nullable', 'numeric', 'min:0']),
 
@@ -144,36 +190,42 @@ class ProductImporter extends Importer
             ImportColumn::make('reorder_point')
                 ->label('Titik Pesan Ulang')
                 ->integer()
+                ->castStateUsing($integerCaster)
                 ->example('10')
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('reorder_qty')
                 ->label('Jumlah Pesan Ulang')
                 ->integer()
+                ->castStateUsing($integerCaster)
                 ->example('50')
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('lead_time_days')
                 ->label('Lead Time (Hari)')
                 ->integer()
+                ->castStateUsing($integerCaster)
                 ->example('2')
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('is_active')
                 ->label('Aktif (1/0)')
                 ->boolean()
+                ->castStateUsing($booleanCaster)
                 ->example('1')
                 ->rules(['nullable', 'boolean']),
 
             ImportColumn::make('is_taxable')
                 ->label('Kena PPN (1/0)')
                 ->boolean()
+                ->castStateUsing($booleanCaster)
                 ->example('1')
                 ->rules(['nullable', 'boolean']),
 
             ImportColumn::make('is_ecommerce_active')
                 ->label('Tampil di E-Commerce (1/0)')
                 ->boolean()
+                ->castStateUsing($booleanCaster)
                 ->example('0')
                 ->rules(['nullable', 'boolean']),
 
