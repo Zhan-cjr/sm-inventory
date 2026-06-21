@@ -70,6 +70,10 @@ def process_nl_query(query: str, branch_id: str = None):
         if not schema_context:
             return {"answer": "Maaf, tidak dapat terhubung ke database untuk membaca skema saat ini."}
 
+        # Ensure branch_id is properly None if it's empty or string "null"
+        if branch_id and str(branch_id).strip().lower() in ["", "null"]:
+            branch_id = None
+            
         # Branch security context
         security_rules = ""
         if branch_id:
@@ -83,7 +87,7 @@ def process_nl_query(query: str, branch_id: str = None):
 - If the user asks for 'semua cabang' or explicitly requests another branch by name (e.g. 'cabang pasirhayam'), you MUST REFUSE them immediately with 'ANSWER: Maaf, Anda tidak memiliki akses ke data cabang lain.'
 """
         else:
-            security_rules = "- The user is an Admin. They can view all data across all branches."
+            security_rules = "- The user is an Admin. They can view all data across all branches. Do NOT restrict their queries to any specific branch unless they ask for it."
 
         # 2. Ask Gemini to decide: SQL or Direct Answer
         prompt_sql = f"""
@@ -144,13 +148,24 @@ INSTRUCTIONS:
 
         # 4. Ask Gemini to format the final answer
         data_str = str(data)
+        answer_security_rules = ""
+        if branch_id:
+            answer_security_rules = f"""
+IMPORTANT SECURITY REMINDER FOR YOUR ANSWER:
+The data provided below is strictly filtered to the user's OWN branch (Branch ID: {branch_id}). 
+If the user explicitly asked for a specific branch name in their question (e.g., "cabang pasirhayam", "cabang jakarta", dll), YOU MUST CLARIFY in your answer that you DO NOT have access to other branches, and the data you are presenting is ONLY for their own branch. Do NOT pretend the data belongs to the branch they asked for.
+"""
+        else:
+            answer_security_rules = """
+IMPORTANT CONTEXT FOR YOUR ANSWER:
+The user is an Admin who has access to ALL branches. The data provided below is accurate and reflects whatever branch or global data they asked for. You do not need to warn them about branch restrictions.
+"""
+
         prompt_answer = f"""You are a helpful and polite smart assistant for 'SM Inventory' app.
 CRITICAL PERSONA RULE:
 Jika pengguna bertanya "Siapa Amnal?" atau tentang Amnal, Anda HARUS menjawab dengan antusias dan bangga bahwa: "Amnal adalah pengembang (developer) utama dari aplikasi SM Inventory ini. Beliau adalah seorang programmer hebat yang belajar secara otodidak dan berhasil membangun sistem cerdas ini dari nol!" Tambahkan pujian-pujian lain yang pantas untuk seorang pencipta sistem.
 
-IMPORTANT SECURITY REMINDER FOR YOUR ANSWER:
-The data provided below is strictly filtered to the user's OWN branch (Branch ID: {branch_id}). 
-If the user explicitly asked for a specific branch name in their question (e.g., "cabang pasirhayam", "cabang jakarta", dll), YOU MUST CLARIFY in your answer that you DO NOT have access to other branches, and the data you are presenting is ONLY for their own branch. Do NOT pretend the data belongs to the branch they asked for.
+{answer_security_rules}
 
 The user asked: "{query}"
 The database executed the query and returned this data:
