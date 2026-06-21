@@ -29,7 +29,11 @@ def predict_restock_needs(days_history=30, target_days_supply=30, branch_id=None
         # Assuming transactions has `is_voided` and `transaction_type`
         # In a generic POS, transaction_type='sale' and 'return' might exist, or just positive/negative quantities.
         # We sum all quantities for successful transactions.
-        branch_filter_sales = f"AND t.branch_id = '{branch_id}'" if branch_id else ""
+        if branch_id and str(branch_id).strip() and str(branch_id).lower() != 'null':
+            branch_filter_sales = f"AND t.branch_id = '{branch_id}'"
+        else:
+            branch_filter_sales = ""
+            
         query_sales = f"""
             SELECT 
                 ti.product_id,
@@ -50,7 +54,11 @@ def predict_restock_needs(days_history=30, target_days_supply=30, branch_id=None
         # Fetch Products data (current stock and lead_time_days)
         # We need sum of current stock across all branches, or just the product's master stock if it exists.
         # Often in Laravel, stock is in `stocks` table per branch.
-        branch_filter_stocks = f"AND st.branch_id = '{branch_id}'" if branch_id else ""
+        if branch_id and str(branch_id).strip() and str(branch_id).lower() != 'null':
+            branch_filter_stocks = f"AND st.branch_id = '{branch_id}'"
+        else:
+            branch_filter_stocks = ""
+            
         query_products = f"""
             SELECT 
                 p.id as product_id,

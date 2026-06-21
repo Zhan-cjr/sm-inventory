@@ -55,8 +55,11 @@ def run_market_basket_analysis():
             if x <= 0: return 0
             if x >= 1: return 1
             
-        # applymap is deprecated in newer pandas, using map if possible, but applymap is safer for compat
-        basket_sets = basket.applymap(encode_units)
+        # Use map for pandas >= 2.1.0, and applymap for older versions to avoid 500 error
+        if hasattr(basket, 'map'):
+            basket_sets = basket.map(encode_units)
+        else:
+            basket_sets = basket.applymap(encode_units)
         
         # We need at least some transactions to find patterns
         if len(basket_sets) < 2:

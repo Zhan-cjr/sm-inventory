@@ -73,13 +73,24 @@ class SuggestedOrders extends Page implements HasTable
                     ->default(true)
                     ->query(function (Builder $query) {
                         $branchId = request('tableFilters.branch_id.value') ?? (auth()->user()->branch_id ?? \App\Models\Branch::first()->id ?? null);
-                        if ($branchId) {
-                            $aiData = app(SuggestedOrderService::class)->calculateForBranch($branchId);
-                            $productIds = collect($aiData)
-                                ->filter(fn($item) => $item['suggested_qty'] > 0 || $item['status'] !== 'OK')
-                                ->pluck('product_id');
-                            return $query->whereIn('product_id', $productIds);
-                        }
+                        
+                        $query->where(function ($q) use ($branchId) {
+                            // 1. Termasuk dari Fallback Logic (Stok <= 0)
+                            $q->where('quantity_on_hand', '<=', 0);
+                            
+                            // 2. Termasuk dari rekomendasi AI Service
+                            if ($branchId) {
+                                $aiData = app(SuggestedOrderService::class)->calculateForBranch($branchId);
+                                $productIds = collect($aiData)
+                                    ->filter(fn($item) => $item['suggested_qty'] > 0 || $item['status'] !== 'OK')
+                                    ->pluck('product_id');
+                                    
+                                if ($productIds->isNotEmpty()) {
+                                    $q->orWhereIn('product_id', $productIds);
+                                }
+                            }
+                        });
+                        
                         return $query;
                     }),
                 \Filament\Tables\Filters\SelectFilter::make('branch_id')

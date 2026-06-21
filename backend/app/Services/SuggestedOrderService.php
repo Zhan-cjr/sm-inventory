@@ -83,16 +83,27 @@ class SuggestedOrderService
         }
 
         // Fallback if AI doesn't return data for this stock (e.g. no sales history)
+        $current_qty = (float)$stock->quantity_on_hand;
+        $suggested_qty = 0;
+        $status = 'OK';
+        
+        if ($current_qty < 0) {
+            $suggested_qty = abs($current_qty);
+            $status = 'CRITICAL';
+        } else if ($current_qty == 0) {
+            $status = 'REORDER';
+        }
+
         return [
             'product_id' => $stock->product_id,
             'supplier_id' => $stock->product->supplier_id,
             'sku' => $stock->product->sku,
             'name' => $stock->product->name,
-            'current_qty' => (float)$stock->quantity_on_hand,
+            'current_qty' => $current_qty,
             'ads' => 0,
             'reorder_point' => 0,
-            'suggested_qty' => 0,
-            'status' => 'OK',
+            'suggested_qty' => $suggested_qty,
+            'status' => $status,
             'lead_time' => $stock->product->lead_time_days ?? 7,
         ];
     }
