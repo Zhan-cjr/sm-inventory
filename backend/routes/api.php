@@ -225,6 +225,19 @@ Route::prefix('v1')->group(function () {
         Route::get('/bi/heatmap', [\App\Http\Controllers\Api\V1\BIDashboardController::class, 'heatmap']);
         Route::get('/bi/apriori', [\App\Http\Controllers\Api\V1\BIDashboardController::class, 'apriori']);
 
+        // AI Service Proxy
+        Route::post('/ai/ask', function (\Illuminate\Http\Request $request) {
+            try {
+                $response = \Illuminate\Support\Facades\Http::timeout(60)->post('http://localhost:8001/api/v1/ai/ask', [
+                    'question' => $request->input('question'),
+                    'branch_id' => $request->input('branch_id'),
+                ]);
+                return response()->json($response->json(), $response->status());
+            } catch (\Exception $e) {
+                return response()->json(['error' => 'AI Service offline', 'message' => $e->getMessage()], 500);
+            }
+        });
+
         // Mobile Stock Opname
         Route::get('/stock-opname/active', [StockOpnameApiController::class, 'getActiveSessions']);
         Route::post('/stock-opname/scan', [StockOpnameApiController::class, 'scanProduct']);
