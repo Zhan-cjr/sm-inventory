@@ -30,8 +30,8 @@ class ProductImporter extends Importer
 
     public static function getColumns(): array
     {
-        $numericCaster = function (?string $state): ?string {
-            if (blank($state)) return null;
+        $numericCaster = function (?string $state): string {
+            if (blank($state)) return '0';
             $val = trim((string) $state);
             if (preg_match('/^-?[0-9]+$/', $val)) return $val;
             
@@ -53,14 +53,22 @@ class ProductImporter extends Importer
             return $val;
         };
 
-        $integerCaster = function (?string $state) use ($numericCaster): ?int {
+        $integerCaster = function (?string $state) use ($numericCaster): int {
             $val = $numericCaster($state);
-            if ($val === null || $val === '') return null;
+            if ($val === null || $val === '') return 0;
             return (int) round((float) $val);
         };
 
-        $booleanCaster = function (?string $state): ?bool {
-            if (blank($state)) return null;
+        $booleanCaster = function (?string $state): bool {
+            if (blank($state)) return false;
+            $val = strtolower(trim($state));
+            if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
+            if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
+            return (bool) $val;
+        };
+
+        $booleanCasterTrue = function (?string $state): bool {
+            if (blank($state)) return true;
             $val = strtolower(trim($state));
             if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
             if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
@@ -124,7 +132,8 @@ class ProductImporter extends Importer
                 ->numeric()
                 ->castStateUsing($numericCaster)
                 ->example('2500')
-                ->rules(['required', 'numeric', 'min:0']),
+                ->rules(['required', 'numeric', 'min:0'])
+                ->fillRecordUsing(fn ($record, $state) => $record->cost_price = $state ?? 0),
 
             ImportColumn::make('cost_price_tax')
                 ->label('Harga Beli + PPN')
@@ -138,6 +147,7 @@ class ProductImporter extends Importer
                 ->numeric()
                 ->castStateUsing($integerCaster)
                 ->example('1')
+                ->fillRecordUsing(fn ($record, $state) => $record->qty_min_gol_1 = $state ?? 1)
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('harga_jual_1')
@@ -145,6 +155,7 @@ class ProductImporter extends Importer
                 ->numeric()
                 ->castStateUsing($numericCaster)
                 ->example('3330')
+                ->fillRecordUsing(fn ($record, $state) => $record->harga_jual_1 = $state ?? 0)
                 ->rules(['nullable', 'numeric', 'min:0']),
 
             ImportColumn::make('qty_min_gol_2')
@@ -180,6 +191,7 @@ class ProductImporter extends Importer
                 ->numeric()
                 ->castStateUsing($numericCaster)
                 ->example('3000')
+                ->fillRecordUsing(fn ($record, $state) => $record->selling_price = $state ?? 0)
                 ->rules(['nullable', 'numeric', 'min:0']),
 
             ImportColumn::make('unit_of_measure')
@@ -192,6 +204,7 @@ class ProductImporter extends Importer
                 ->integer()
                 ->castStateUsing($integerCaster)
                 ->example('10')
+                ->fillRecordUsing(fn ($record, $state) => $record->reorder_point = $state ?? 10)
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('reorder_qty')
@@ -199,6 +212,7 @@ class ProductImporter extends Importer
                 ->integer()
                 ->castStateUsing($integerCaster)
                 ->example('50')
+                ->fillRecordUsing(fn ($record, $state) => $record->reorder_qty = $state ?? 50)
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('lead_time_days')
@@ -206,28 +220,32 @@ class ProductImporter extends Importer
                 ->integer()
                 ->castStateUsing($integerCaster)
                 ->example('2')
+                ->fillRecordUsing(fn ($record, $state) => $record->lead_time_days = $state ?? 5)
                 ->rules(['nullable', 'integer', 'min:0']),
 
             ImportColumn::make('is_active')
                 ->label('Aktif (1/0)')
                 ->boolean()
-                ->castStateUsing($booleanCaster)
+                ->castStateUsing($booleanCasterTrue)
                 ->example('1')
-                ->rules(['nullable', 'boolean']),
+                ->rules(['nullable', 'boolean'])
+                ->fillRecordUsing(fn ($record, $state) => $record->is_active = $state ?? true),
 
             ImportColumn::make('is_taxable')
                 ->label('Kena PPN (1/0)')
                 ->boolean()
                 ->castStateUsing($booleanCaster)
                 ->example('1')
-                ->rules(['nullable', 'boolean']),
+                ->rules(['nullable', 'boolean'])
+                ->fillRecordUsing(fn ($record, $state) => $record->is_taxable = $state ?? false),
 
             ImportColumn::make('is_ecommerce_active')
                 ->label('Tampil di E-Commerce (1/0)')
                 ->boolean()
                 ->castStateUsing($booleanCaster)
                 ->example('0')
-                ->rules(['nullable', 'boolean']),
+                ->rules(['nullable', 'boolean'])
+                ->fillRecordUsing(fn ($record, $state) => $record->is_ecommerce_active = $state ?? false),
 
             ImportColumn::make('ecommerce_category')
                 ->label('Kategori E-Commerce')

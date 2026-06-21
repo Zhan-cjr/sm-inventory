@@ -25,8 +25,8 @@ class SupplierImporter extends Importer
 
     public static function getColumns(): array
     {
-        $numericCaster = function (?string $state): ?string {
-            if (blank($state)) return null;
+        $numericCaster = function (?string $state): string {
+            if (blank($state)) return '0';
             $val = trim((string) $state);
             if (preg_match('/^-?[0-9]+$/', $val)) return $val;
             
@@ -48,14 +48,22 @@ class SupplierImporter extends Importer
             return $val;
         };
 
-        $integerCaster = function (?string $state) use ($numericCaster): ?int {
+        $integerCaster = function (?string $state) use ($numericCaster): int {
             $val = $numericCaster($state);
-            if ($val === null || $val === '') return null;
+            if ($val === null || $val === '') return 0;
             return (int) round((float) $val);
         };
 
-        $booleanCaster = function (?string $state): ?bool {
-            if (blank($state)) return null;
+        $booleanCaster = function (?string $state): bool {
+            if (blank($state)) return false;
+            $val = strtolower(trim($state));
+            if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
+            if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
+            return (bool) $val;
+        };
+
+        $booleanCasterTrue = function (?string $state): bool {
+            if (blank($state)) return true;
             $val = strtolower(trim($state));
             if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
             if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
@@ -109,14 +117,16 @@ class SupplierImporter extends Importer
                 ->numeric()
                 ->castStateUsing($integerCaster)
                 ->example('14')
-                ->rules(['nullable', 'integer']),
+                ->rules(['nullable', 'integer'])
+                ->fillRecordUsing(fn ($record, $state) => $record->default_due_days = $state ?? 0),
 
             ImportColumn::make('default_po_expired_days')
                 ->label('PO Expired Default (Hari)')
                 ->numeric()
                 ->castStateUsing($integerCaster)
                 ->example('7')
-                ->rules(['nullable', 'integer']),
+                ->rules(['nullable', 'integer'])
+                ->fillRecordUsing(fn ($record, $state) => $record->default_po_expired_days = $state ?? 0),
 
             ImportColumn::make('payment_method')
                 ->label('Cara Pembayaran Default')
@@ -126,16 +136,18 @@ class SupplierImporter extends Importer
             ImportColumn::make('is_active')
                 ->label('Aktif (1/0)')
                 ->boolean()
-                ->castStateUsing($booleanCaster)
+                ->castStateUsing($booleanCasterTrue)
                 ->example('1')
-                ->rules(['nullable', 'boolean']),
+                ->rules(['nullable', 'boolean'])
+                ->fillRecordUsing(fn ($record, $state) => $record->is_active = $state ?? true),
 
             ImportColumn::make('is_consignment')
                 ->label('Konsinyasi (1/0)')
                 ->boolean()
                 ->castStateUsing($booleanCaster)
                 ->example('0')
-                ->rules(['nullable', 'boolean']),
+                ->rules(['nullable', 'boolean'])
+                ->fillRecordUsing(fn ($record, $state) => $record->is_consignment = $state ?? false),
         ];
     }
 

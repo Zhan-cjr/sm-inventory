@@ -28,8 +28,8 @@ class StockImporter extends Importer
 
     public static function getColumns(): array
     {
-        $numericCaster = function (?string $state): ?string {
-            if (blank($state)) return null;
+        $numericCaster = function (?string $state): string {
+            if (blank($state)) return '0';
             $val = trim((string) $state);
             if (preg_match('/^-?[0-9]+$/', $val)) return $val;
             
@@ -51,9 +51,9 @@ class StockImporter extends Importer
             return $val;
         };
 
-        $integerCaster = function (?string $state) use ($numericCaster): ?int {
+        $integerCaster = function (?string $state) use ($numericCaster): int {
             $val = $numericCaster($state);
-            if ($val === null || $val === '') return null;
+            if ($val === null || $val === '') return 0;
             return (int) round((float) $val);
         };
 
@@ -155,18 +155,27 @@ class StockImporter extends Importer
                 ->castStateUsing($integerCaster)
                 ->example('100')
                 ->rules(['required', 'integer']),
+            ImportColumn::make('qty')
+                ->label('Stok Saat Ini')
+                ->numeric()
+                ->castStateUsing($integerCaster)
+                ->example('100')
+                ->rules(['nullable', 'integer'])
+                ->fillRecordUsing(fn ($record, $state) => $record->qty = $state ?? 0),
             ImportColumn::make('min_qty')
                 ->label('Min Stok')
                 ->numeric()
                 ->castStateUsing($integerCaster)
                 ->example('10')
-                ->rules(['nullable', 'integer']),
+                ->rules(['nullable', 'integer'])
+                ->fillRecordUsing(fn ($record, $state) => $record->min_qty = $state ?? 0),
             ImportColumn::make('max_qty')
                 ->label('Max Stok')
                 ->numeric()
                 ->castStateUsing($integerCaster)
                 ->example('500')
-                ->rules(['nullable', 'integer']),
+                ->rules(['nullable', 'integer'])
+                ->fillRecordUsing(fn ($record, $state) => $record->max_qty = $state ?? 0),
             ImportColumn::make('lead_time')
                 ->label('Lead Time (Hari)')
                 ->numeric()

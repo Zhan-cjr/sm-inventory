@@ -25,8 +25,8 @@ class BranchImporter extends Importer
 
     public static function getColumns(): array
     {
-        $numericCaster = function (?string $state): ?string {
-            if (blank($state)) return null;
+        $numericCaster = function (?string $state): string {
+            if (blank($state)) return '0';
             $val = trim((string) $state);
             if (preg_match('/^-?[0-9]+$/', $val)) return $val;
             
@@ -48,8 +48,16 @@ class BranchImporter extends Importer
             return $val;
         };
 
-        $booleanCaster = function (?string $state): ?bool {
-            if (blank($state)) return null;
+        $booleanCaster = function (?string $state): bool {
+            if (blank($state)) return false;
+            $val = strtolower(trim($state));
+            if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
+            if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
+            return (bool) $val;
+        };
+
+        $booleanCasterTrue = function (?string $state): bool {
+            if (blank($state)) return true;
             $val = strtolower(trim($state));
             if (in_array($val, ['1', 'true', 'yes', 'y', 'ya', 'aktif', 'on'])) return true;
             if (in_array($val, ['0', 'false', 'no', 'n', 'tidak', 'nonaktif', 'off', 'non aktif'])) return false;
@@ -102,12 +110,21 @@ class BranchImporter extends Importer
                 ->example('106.8500')
                 ->rules(['nullable', 'numeric']),
 
+            ImportColumn::make('is_warehouse')
+                ->label('Gudang Utama (1/0)')
+                ->boolean()
+                ->castStateUsing($booleanCaster)
+                ->example('0')
+                ->rules(['nullable', 'boolean'])
+                ->fillRecordUsing(fn ($record, $state) => $record->is_warehouse = $state ?? false),
+
             ImportColumn::make('is_active')
                 ->label('Aktif (1/0)')
                 ->boolean()
-                ->castStateUsing($booleanCaster)
+                ->castStateUsing($booleanCasterTrue)
                 ->example('1')
-                ->rules(['nullable', 'boolean']),
+                ->rules(['nullable', 'boolean'])
+                ->fillRecordUsing(fn ($record, $state) => $record->is_active = $state ?? true),
         ];
     }
 
