@@ -544,7 +544,10 @@ class GoodsReceiptPos extends Component
     public function render()
     {
         $purchaseOrdersQuery = PurchaseOrder::where(function ($q) {
-            $q->whereIn('status', ['DRAFT', 'SENT', 'APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
+            $q->whereIn('status', ['APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
+              ->whereHas('warehouseChecks', function ($qc) {
+                  $qc->where('status', 'approved');
+              })
               ->whereHas('items', function ($query) {
                   $query->whereColumn('quantity_received', '<', 'quantity_ordered');
               })

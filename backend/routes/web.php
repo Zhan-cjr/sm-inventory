@@ -6,6 +6,10 @@ Route::get('/', function () {
     return redirect('/admin');
 });
 
+Route::get('/login', function () {
+    return redirect('/admin/login');
+})->name('login');
+
 Route::get('/print/transaction/{transaction}', function (\App\Models\Transaction $transaction) {
     return view('print.transaction-receipt', compact('transaction'));
 })->name('print.transaction')->middleware('web');
@@ -107,6 +111,16 @@ Route::prefix('opname')->name('opname.')->middleware('web')->group(function () {
     //   (Ditempatkan paling bawah agar tidak membayangi route statis seperti /selesai)
     Route::get('/{sessionToken}', [\App\Http\Controllers\OpnamePublicController::class, 'showPortal'])
         ->name('portal');
+});
+
+// ============================================================
+// Pengecekan Penerimaan Gudang (Mobile)
+// ============================================================
+Route::prefix('warehouse/receive')->name('warehouse.receive.')->middleware(['web', 'auth'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\WarehouseCheckController::class, 'index'])->name('index');
+    Route::post('/search', [\App\Http\Controllers\WarehouseCheckController::class, 'search'])->name('search');
+    Route::get('/scan/{po_id}', [\App\Http\Controllers\WarehouseCheckController::class, 'scan'])->name('scan');
+    Route::post('/submit/{po_id}', [\App\Http\Controllers\WarehouseCheckController::class, 'submit'])->name('submit');
 });
 
 Route::get('/admin/logout-get', function () {

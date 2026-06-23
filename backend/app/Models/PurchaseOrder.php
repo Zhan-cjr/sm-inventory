@@ -81,4 +81,21 @@ class PurchaseOrder extends Model
     {
         return $this->hasMany(PurchaseOrderItem::class);
     }
+
+    public function warehouseChecks(): HasMany
+    {
+        return $this->hasMany(WarehouseCheck::class);
+    }
+
+    public function remainingQuantity(): float
+    {
+        $totalOrdered = $this->items()->sum('quantity_ordered');
+        
+        $totalChecked = WarehouseCheckItem::whereHas('warehouseCheck', function ($q) {
+            $q->where('purchase_order_id', $this->id)
+              ->whereIn('status', ['pending', 'pending_approval', 'approved', 'processed']);
+        })->sum('qty_scanned');
+
+        return max(0, $totalOrdered - $totalChecked);
+    }
 }

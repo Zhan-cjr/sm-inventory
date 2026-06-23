@@ -26,6 +26,9 @@ class GoodsReceiptForm
                                     ->where(function ($q) {
                                         $q->whereNull('expired_date')
                                           ->orWhere('expired_date', '>=', now()->toDateString());
+                                    })
+                                    ->whereHas('warehouseChecks', function ($qc) {
+                                        $qc->where('status', 'approved');
                                     });
                             });
 

@@ -91,6 +91,7 @@ class UserForm
                                         'CANCEL_TRANSACTION' => 'Batalkan Transaksi (Arsip)',
                                         'UPDATE_SELLING_PRICE' => 'Update Harga Jual (Penerimaan Barang)',
                                         'APPROVE_PO' => 'Approval Purchase Order (PO)',
+                                        'APPROVE_GR_OVERQUANTITY' => 'Approval Kelebihan Barang (Gudang)',
                                         'APPROVE_STOCK_ADJUSTMENT' => 'Approval Koreksi Stok (SO)',
                                         'PROCESS_ECOMMERCE' => 'Proses Pesanan E-Commerce',
                                         'ACCESS_SMART_ORDER' => 'Akses Menu Order Pintar (Mobile)',

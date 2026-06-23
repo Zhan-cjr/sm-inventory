@@ -13,20 +13,25 @@ class GoodsReceipt extends Model
     use HasUuids;
 
     protected $fillable = [
-        'purchase_order_id', 'supplier_id', 'branch_id', 
+        'warehouse_check_id', 'purchase_order_id', 'supplier_id', 'branch_id', 
         'receipt_number', 'receipt_date', 'received_by', 
         'faktur_supplier', 'total_amount', 'include_tax', 'tax_amount', 'status', 'notes',
         'due_date', 'payment_status', 'paid_amount', 'payment_method'
     ];
 
     protected $casts = [
-        'receipt_date' => 'date',
+        'receipt_date' => 'datetime',
         'due_date' => 'date',
         'total_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'include_tax' => 'boolean',
     ];
+
+    public function warehouseCheck(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseCheck::class);
+    }
 
     public function purchaseOrder(): BelongsTo
     {

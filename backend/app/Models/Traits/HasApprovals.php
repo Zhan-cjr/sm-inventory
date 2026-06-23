@@ -32,19 +32,38 @@ trait HasApprovals
 
         $branchId = $this->branch_id ?? null;
         
-        $requiredAuth = class_basename($this) === 'PurchaseOrder' ? 'APPROVE_PO' : 'APPROVE_STOCK_ADJUSTMENT';
+        $modelClass = class_basename($this);
+        
+        $requiredAuth = 'APPROVE_STOCK_ADJUSTMENT';
+        if ($modelClass === 'PurchaseOrder') {
+            $requiredAuth = 'APPROVE_PO';
+        } elseif ($modelClass === 'WarehouseCheck') {
+            $requiredAuth = 'APPROVE_GR_OVERQUANTITY';
+        }
         
         $supervisors = \App\Models\User::whereNotNull('telegram_chat_id')
             ->whereJsonContains('custom_authorizations', $requiredAuth)
             ->get();
 
         $branchName = $this->branch ? $this->branch->name : 'Pusat';
-        $type = class_basename($this) === 'PurchaseOrder' ? 'Purchase Order' : 'Koreksi Stok';
+        
+        $type = 'Koreksi Stok';
+        if ($modelClass === 'PurchaseOrder') {
+            $type = 'Purchase Order';
+        } elseif ($modelClass === 'WarehouseCheck') {
+            $type = 'Pengecekan Gudang (Kelebihan Barang)';
+        }
+        
         $docNumber = $this->po_number ?? $this->adjustment_number ?? '-';
+        if ($modelClass === 'WarehouseCheck' && $this->purchaseOrder) {
+            $docNumber = 'Cek PO: ' . $this->purchaseOrder->po_number;
+        }
         
         $creatorName = 'System';
-        if (class_basename($this) === 'PurchaseOrder') {
+        if ($modelClass === 'PurchaseOrder') {
             $creatorName = $this->creator?->name ?? 'System';
+        } elseif ($modelClass === 'WarehouseCheck') {
+            $creatorName = $this->checker?->name ?? 'System';
         } else {
             $creatorName = $this->recorder?->name ?? 'System';
         }
