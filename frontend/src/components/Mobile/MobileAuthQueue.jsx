@@ -135,6 +135,81 @@ export function MobileAuthQueue({ authToken, user }) {
       });
   };
 
+  const canApprovePO = user?.custom_authorizations?.includes('APPROVE_PO');
+  const canApproveStock = user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
+  const canApproveGR = user?.custom_authorizations?.includes('APPROVE_GR_OVERQUANTITY');
+
+  const poRequests = docRequests.filter(req => req.type === 'Otorisasi PO');
+  const stockRequests = docRequests.filter(req => req.type === 'Otorisasi Koreksi Stok');
+  const grRequests = docRequests.filter(req => req.type === 'Otorisasi Penerimaan Qty Gudang');
+
+  const renderDocList = (title, list, isLoading) => (
+    <>
+      <h4 style={{ color: 'var(--text-main)', marginTop: '2rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>{title}</h4>
+      {isLoading && list.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '1rem' }}>
+          <div className="spin" style={{ width: '20px', height: '20px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
+        </div>
+      ) : list.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
+          <p>Belum ada dokumen yang perlu disetujui.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {list.map(req => (
+            <div key={req.id} style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: '700', color: '#3b82f6' }}>{req.type} ({req.number})</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {new Date(req.created_at).toLocaleTimeString('id-ID')}
+                </span>
+              </div>
+              <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                Total: <strong style={{ color: 'white' }}>{req.type === 'Otorisasi Penerimaan Qty Gudang' ? req.total + ' item' : 'Rp ' + parseFloat(req.total).toLocaleString('id-ID')}</strong>
+              </p>
+              <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                Dibuat oleh: <strong style={{ color: 'white' }}>{req.created_by}</strong>
+              </p>
+              {req.supplier_name && (
+                <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                  Supplier: <strong style={{ color: 'white' }}>{req.supplier_name}</strong>
+                </p>
+              )}
+              <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                Cabang: <strong style={{ color: 'white' }}>{req.branch_name || 'Pusat'}</strong>
+              </p>
+              {req.notes && (
+                <p style={{ fontSize: '0.85rem', color: '#f59e0b', fontStyle: 'italic', marginBottom: '1rem' }}>
+                  {req.notes}
+                </p>
+              )}
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                <button 
+                  onClick={() => handleRejectClick(req.id)}
+                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', fontWeight: 'bold' }}
+                >
+                  TOLAK
+                </button>
+                <button 
+                  onClick={() => handleReview(req.id)}
+                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #3b82f6', background: 'transparent', color: '#3b82f6', fontWeight: 'bold' }}
+                >
+                  REVIEW
+                </button>
+                <button 
+                  onClick={() => handleDocAction(req.id, 'approve')}
+                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#10b981', color: 'white', fontWeight: 'bold' }}
+                >
+                  SETUJUI
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="mobile-auth-queue">
       <h3 style={{ marginBottom: '1rem', color: 'var(--text-main)' }}>Persetujuan & Otorisasi</h3>
@@ -203,72 +278,9 @@ export function MobileAuthQueue({ authToken, user }) {
         </>
       )}
 
-      {hasDocAuth && (
-        <>
-          <h4 style={{ color: 'var(--text-main)', marginTop: '2rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>Persetujuan Dokumen (PO & Koreksi Stok)</h4>
-          {loadingDocs && docRequests.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '1rem' }}>
-              <div className="spin" style={{ width: '20px', height: '20px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
-            </div>
-          ) : docRequests.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
-              <p>Belum ada dokumen yang perlu disetujui.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {docRequests.map(req => (
-                <div key={req.id} style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ fontWeight: '700', color: '#3b82f6' }}>{req.type} ({req.number})</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {new Date(req.created_at).toLocaleTimeString('id-ID')}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                    Total: <strong style={{ color: 'white' }}>Rp {parseFloat(req.total).toLocaleString('id-ID')}</strong>
-                  </p>
-                  <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                    Dibuat oleh: <strong style={{ color: 'white' }}>{req.created_by}</strong>
-                  </p>
-                  {req.supplier_name && (
-                    <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                      Supplier: <strong style={{ color: 'white' }}>{req.supplier_name}</strong>
-                    </p>
-                  )}
-                  <p style={{ fontSize: '0.9rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                    Cabang: <strong style={{ color: 'white' }}>{req.branch_name || 'Pusat'}</strong>
-                  </p>
-                  {req.notes && (
-                    <p style={{ fontSize: '0.85rem', color: '#f59e0b', fontStyle: 'italic', marginBottom: '1rem' }}>
-                      {req.notes}
-                    </p>
-                  )}
-                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-                    <button 
-                      onClick={() => handleRejectClick(req.id)}
-                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', fontWeight: 'bold' }}
-                    >
-                      TOLAK
-                    </button>
-                    <button 
-                      onClick={() => handleReview(req.id)}
-                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #3b82f6', background: 'transparent', color: '#3b82f6', fontWeight: 'bold' }}
-                    >
-                      REVIEW
-                    </button>
-                    <button 
-                      onClick={() => handleDocAction(req.id, 'approve')}
-                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#10b981', color: 'white', fontWeight: 'bold' }}
-                    >
-                      SETUJUI
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+      {canApprovePO && renderDocList('Persetujuan PO', poRequests, loadingDocs)}
+      {canApproveStock && renderDocList('Persetujuan Koreksi Stok', stockRequests, loadingDocs)}
+      {canApproveGR && renderDocList('Persetujuan Pengecekan Gudang', grRequests, loadingDocs)}
 
       {showModal && (
         <div style={{
