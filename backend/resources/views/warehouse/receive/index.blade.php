@@ -14,9 +14,9 @@
         max-width: 600px;
         margin: 0 auto;
         padding: 20px;
-        background: var(--card-bg);
+        background: var(--bg-color);
         min-height: 100vh;
-        box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        box-sizing: border-box;
     }
     h1 {
         font-size: 1.5rem;

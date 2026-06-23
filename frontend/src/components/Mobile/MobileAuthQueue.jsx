@@ -10,7 +10,7 @@ export function MobileAuthQueue({ authToken, user }) {
   const showBranchSelector = !user?.branch_id || isAdmin;
 
   const hasPosAuth = user?.pos_authorizations && user.pos_authorizations.length > 0;
-  const hasDocAuth = user?.custom_authorizations?.includes('APPROVE_PO') || user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
+  const hasDocAuth = user?.custom_authorizations?.includes('APPROVE_PO') || user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT') || user?.custom_authorizations?.includes('APPROVE_GR_OVERQUANTITY');
 
   useEffect(() => {
     if (showBranchSelector) {
@@ -302,7 +302,7 @@ export function MobileAuthQueue({ authToken, user }) {
                   {modalData.items?.map((item, idx) => (
                     <div key={idx} style={{ background: 'var(--bg-elevated)', padding: '0.75rem', borderRadius: '8px' }}>
                       <p style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold', color: 'white' }}>{item.product_name}</p>
-                      {modalData.type === 'Purchase Order' ? (
+                      {modalData.type === 'Otorisasi PO' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                             <span>{item.qty} x Rp {parseFloat(item.price).toLocaleString('id-ID')}</span>
@@ -315,7 +315,7 @@ export function MobileAuthQueue({ authToken, user }) {
                         </div>
                       ) : (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                          <span>Stok: {item.old_qty} &rarr; {item.new_qty}</span>
+                          <span>{modalData.type === 'Otorisasi Penerimaan Qty Gudang' ? 'Qty: ' + item.old_qty + ' \u2192 ' + item.new_qty : 'Stok: ' + item.old_qty + ' \u2192 ' + item.new_qty}</span>
                           <strong style={{ color: item.diff < 0 ? '#ef4444' : '#10b981' }}>
                             {item.diff > 0 ? '+' : ''}{item.diff}
                           </strong>

@@ -16,9 +16,9 @@
         max-width: 600px;
         margin: 0 auto;
         padding: 15px;
-        background: #fff;
+        background: var(--bg-color);
         min-height: 100vh;
-        box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        box-sizing: border-box;
     }
     .header-card {
         background-color: var(--card-bg);
@@ -75,17 +75,16 @@
         color: var(--header-text);
         border-color: var(--header-bg);
     }
-    .scanner-container {
-        background: #000;
-        border-radius: 8px;
-        overflow: hidden;
-        margin-bottom: 15px;
-        position: relative;
-        height: 250px;
-    }
     #reader {
         width: 100%;
-        height: 100%;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        background: var(--card-bg);
+    }
+    #reader video {
+        object-fit: cover;
     }
     .input-section {
         margin-bottom: 15px;
@@ -109,13 +108,14 @@
         background: var(--card-bg);
         border: 1px solid var(--border-color);
         border-radius: 8px;
-        padding: 12px;
+        padding: 15px;
         margin-bottom: 10px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         transition: background-color 0.2s;
         color: var(--text-color);
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     }
     .item-card.complete {
         background-color: #d1fae5;
@@ -221,7 +221,7 @@
     </div>
 
     <div id="usb-section" style="display: none;" class="input-section">
-        <input type="text" id="manual-barcode" placeholder="Arahkan kursor kesini, lalu scan barcode..." autocomplete="off">
+        <input type="text" id="manual-barcode" class="input-barcode" placeholder="Arahkan kursor kesini, lalu scan barcode..." autocomplete="off">
         <div id="error-msg"></div>
     </div>
 
@@ -233,7 +233,7 @@
         @csrf
         <input type="hidden" name="scanned_items" id="scanned_items_input">
         <div class="input-section">
-            <textarea name="notes" placeholder="Catatan tambahan (opsional)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-family: inherit;"></textarea>
+            <textarea name="notes" placeholder="Catatan tambahan (opsional)" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--card-bg); color: var(--text-color); font-family: inherit; resize: none; box-sizing: border-box; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);" rows="3"></textarea>
         </div>
         <button type="button" class="btn-submit" onclick="submitCheck()">Simpan Pengecekan</button>
     </form>
@@ -382,7 +382,12 @@
         if (!html5QrcodeScanner) {
             html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
                 fps: 10, 
-                qrbox: {width: 250, height: 150},
+                qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+                    let qrboxSize = Math.floor(minEdgeSize * 0.75); // 75% of screen
+                    return { width: qrboxSize, height: qrboxSize };
+                },
+                aspectRatio: 1.0,
                 supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
             }, false);
             html5QrcodeScanner.render(onScanSuccess, onScanFailure);

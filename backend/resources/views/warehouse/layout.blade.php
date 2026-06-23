@@ -83,6 +83,12 @@
             <button id="theme-toggle-btn" class="theme-toggle" onclick="toggleTheme()" title="Ganti Tema">
                 <span id="theme-icon">🌓</span>
             </button>
+            <form action="{{ route('filament.admin.auth.logout') }}" method="POST" style="margin:0; display:inline-flex; align-items:center;">
+                @csrf
+                <button type="submit" class="theme-toggle" style="font-size: 0.9rem; margin-left: 5px; font-weight: bold; background: rgba(255,255,255,0.1); border-radius: 4px; padding: 5px 10px;" title="Logout">
+                    Logout
+                </button>
+            </form>
         </div>
     </div>
     
