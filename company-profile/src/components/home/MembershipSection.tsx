@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Percent, 
-  QrCode, 
-  Ticket, 
-  MapPin, 
-  ShoppingCart, 
-  Newspaper, 
-  Sparkles, 
-  CalendarDays, 
+import {
+  Percent,
+  QrCode,
+  Ticket,
+  MapPin,
+  ShoppingCart,
+  Newspaper,
+  Sparkles,
+  CalendarDays,
   Receipt,
   UserCircle2,
   LogOut,
@@ -104,11 +104,11 @@ export default function MembershipSection() {
       <div className="container mx-auto px-4 flex justify-center">
         {/* Card Container simulating mobile app layout */}
         <div className="w-full max-w-md bg-slate-50/80 backdrop-blur-xl rounded-[2rem] p-4 sm:p-6 shadow-2xl border border-slate-200/60 relative overflow-hidden">
-          
+
           {/* Alert Popup */}
           <AnimatePresence>
             {showAlert && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
@@ -123,19 +123,19 @@ export default function MembershipSection() {
           {/* QR Code Modal for Scan Member */}
           <AnimatePresence>
             {showQRModal && member && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
               >
-                <motion.div 
+                <motion.div
                   initial={{ scale: 0.95, opacity: 0, y: 20 }}
                   animate={{ scale: 1, opacity: 1, y: 0 }}
                   exit={{ scale: 0.95, opacity: 0, y: 20 }}
                   className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full text-center relative border border-slate-100"
                 >
-                  <button 
+                  <button
                     onClick={() => setShowQRModal(false)}
                     className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all"
                   >
@@ -143,15 +143,15 @@ export default function MembershipSection() {
                   </button>
                   <h3 className="text-xl font-extrabold text-slate-800 mb-1 mt-2">Kartu Member Digital</h3>
                   <p className="text-xs text-slate-500 mb-6">Tunjukkan QR Code ini kepada kasir saat transaksi offline.</p>
-                  
+
                   <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl mx-auto inline-block">
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(member.id)}`} 
-                      alt="QR Code Member" 
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(member.id)}`}
+                      alt="QR Code Member"
                       className="w-48 h-48 sm:w-56 sm:h-56 object-contain mix-blend-multiply"
                     />
                   </div>
-                  
+
                   <div className="mt-6 bg-primary/10 rounded-xl py-3 border border-primary/20">
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">ID MEMBER</p>
                     <p className="font-mono text-lg font-black tracking-widest text-primary">{member.id}</p>
@@ -165,13 +165,13 @@ export default function MembershipSection() {
           {/* Logout Confirmation Modal */}
           <AnimatePresence>
             {showLogoutConfirm && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
               >
-                <motion.div 
+                <motion.div
                   initial={{ scale: 0.95, opacity: 0, y: 20 }}
                   animate={{ scale: 1, opacity: 1, y: 0 }}
                   exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -182,15 +182,15 @@ export default function MembershipSection() {
                   </div>
                   <h3 className="text-xl font-extrabold text-slate-800 mb-2">Yakin Ingin Keluar?</h3>
                   <p className="text-sm text-slate-500 mb-6">Anda harus masuk kembali untuk melihat koin dan riwayat transaksi.</p>
-                  
+
                   <div className="flex gap-3">
-                    <button 
+                    <button
                       onClick={() => setShowLogoutConfirm(false)}
                       className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors"
                     >
                       Batal
                     </button>
-                    <button 
+                    <button
                       onClick={handleLogout}
                       className="flex-1 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors shadow-md shadow-red-500/20"
                     >
@@ -246,7 +246,7 @@ export default function MembershipSection() {
                     <p className="text-[11px] text-slate-500 font-medium leading-snug">Masuk untuk nikmati promo</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsModalOpen(true)}
                   className="bg-primary text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-primary/90 transition-colors shadow-sm"
                 >
@@ -269,13 +269,13 @@ export default function MembershipSection() {
                 <div className="w-12 h-12 flex items-center justify-center text-[#F97316] mb-2 group-hover:scale-110 transition-transform mx-auto">
                   <QrCode size={32} strokeWidth={2.5} />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Scan<br/>Member</span>
+                <span className="text-xs font-bold text-slate-700">Scan<br />Member</span>
               </button>
               <button onClick={handleShowComingSoon} className="flex flex-col items-center group text-center bg-transparent border-none p-0 outline-none">
                 <div className="w-12 h-12 flex items-center justify-center text-[#F97316] mb-2 group-hover:scale-110 transition-transform mx-auto">
                   <Ticket size={32} strokeWidth={2.5} />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Redeem All<br/>Voucher</span>
+                <span className="text-xs font-bold text-slate-700">Redeem All<br />Voucher</span>
               </button>
             </div>
           </div>
@@ -289,14 +289,14 @@ export default function MembershipSection() {
                 </div>
                 <span className="text-[11px] leading-tight font-medium text-slate-600">Cabang</span>
               </Link>
-              
+
               <a href="https://shopping.toserbaselamat.id" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center group text-center">
                 <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3 group-hover:bg-amber-100 transition-colors">
                   <ShoppingCart size={24} strokeWidth={2} />
                 </div>
-                <span className="text-[11px] leading-tight font-medium text-slate-600">Belanja<br/>Online</span>
+                <span className="text-[11px] leading-tight font-medium text-slate-600">Belanja<br />Online</span>
               </a>
-              
+
               <Link href="/news" className="flex flex-col items-center group text-center">
                 <div className="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center text-teal-500 mb-3 group-hover:bg-teal-100 transition-colors">
                   <Newspaper size={24} strokeWidth={2} />
@@ -311,35 +311,35 @@ export default function MembershipSection() {
                 <span className="text-[11px] leading-tight font-medium text-slate-600">Fasilitas</span>
               </Link>
 
-              <a href="https://padel.admselamat.my.id" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center group text-center">
+              <a href="https://padel.toserbaselamat.id" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center group text-center">
                 <div className="w-14 h-14 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 mb-3 group-hover:bg-rose-100 transition-colors">
                   <CalendarDays size={24} strokeWidth={2} />
                 </div>
-                <span className="text-[11px] leading-tight font-medium text-slate-600">Booking<br/>Lapangan</span>
+                <span className="text-[11px] leading-tight font-medium text-slate-600">Booking<br />Lapangan</span>
               </a>
 
-              <button 
-                onClick={() => handleRequiresAuth(() => setShowHistoryModal(true))} 
+              <button
+                onClick={() => handleRequiresAuth(() => setShowHistoryModal(true))}
                 className="flex flex-col items-center group text-center bg-transparent border-none p-0 outline-none"
               >
                 <div className="w-14 h-14 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 mb-3 group-hover:bg-purple-100 transition-colors mx-auto">
                   <Receipt size={24} strokeWidth={2} />
                 </div>
-                <span className="text-[11px] leading-tight font-medium text-slate-600">Riwayat<br/>Transaksi</span>
+                <span className="text-[11px] leading-tight font-medium text-slate-600">Riwayat<br />Transaksi</span>
               </button>
             </div>
           </div>
 
         </div>
       </div>
-      
-      <MembershipModal 
+
+      <MembershipModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleModalSuccess}
       />
-      
-      <TransactionHistoryModal 
+
+      <TransactionHistoryModal
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         member={member}
