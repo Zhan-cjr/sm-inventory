@@ -311,7 +311,10 @@ export function MobileAuthQueue({ authToken, user }) {
                 
                 <h4 style={{ marginTop: '1.5rem', marginBottom: '0.75rem', color: 'var(--text-main)', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>Rincian Barang</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {modalData.items?.map((item, idx) => (
+                  {(modalData.type === 'Otorisasi Penerimaan Qty Gudang' 
+                    ? modalData.items?.filter(item => item.diff > 0) 
+                    : modalData.items
+                  )?.map((item, idx) => (
                     <div key={idx} style={{ background: 'var(--bg-elevated)', padding: '0.75rem', borderRadius: '8px' }}>
                       <p style={{ margin: '0 0 0.25rem 0', fontWeight: 'bold', color: 'white' }}>{item.product_name}</p>
                       {modalData.type === 'Otorisasi PO' ? (
