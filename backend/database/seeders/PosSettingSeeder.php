@@ -24,6 +24,7 @@ class PosSettingSeeder extends Seeder
             ['key_name' => 'btn_close_shift', 'display_name' => 'Tutup Shift', 'shortcut_key' => 'F8'],
             ['key_name' => 'btn_reprint_last', 'display_name' => 'Reprint Terakhir', 'shortcut_key' => 'F11'],
             ['key_name' => 'btn_reprint_old', 'display_name' => 'Reprint Lama', 'shortcut_key' => 'F12'],
+            ['key_name' => 'btn_ppob_menu', 'display_name' => 'Menu PPOB', 'shortcut_key' => 'F10'],
             ['key_name' => 'btn_member', 'display_name' => 'Member', 'shortcut_key' => 'Home'],
             ['key_name' => 'btn_retur', 'display_name' => 'Retur', 'shortcut_key' => 'End'],
             ['key_name' => 'btn_hold', 'display_name' => 'Hold', 'shortcut_key' => 'PageUp'],
@@ -31,6 +32,10 @@ class PosSettingSeeder extends Seeder
             ['key_name' => 'btn_clear', 'display_name' => 'Clear', 'shortcut_key' => 'Insert'],
             ['key_name' => 'btn_void_item', 'display_name' => 'Void Item', 'shortcut_key' => 'Delete'],
             ['key_name' => 'btn_void_all', 'display_name' => 'Void All', 'shortcut_key' => 'Escape'],
+            ['key_name' => 'btn_voucher', 'display_name' => 'Voucher', 'shortcut_key' => ''],
+            ['key_name' => 'btn_multi_pay', 'display_name' => 'Multi Pay', 'shortcut_key' => ''],
+            ['key_name' => 'btn_open_price', 'display_name' => 'Open Price', 'shortcut_key' => ''],
+            ['key_name' => 'btn_kas', 'display_name' => 'Kas Keluar/Masuk', 'shortcut_key' => ''],
         ];
 
         \App\Models\PosSetting::where('key_name', 'btn_pay')->delete();

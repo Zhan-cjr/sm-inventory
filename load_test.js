@@ -28,7 +28,7 @@ const BASE_URL = 'http://100.114.176.71';
 
 // [PENTING]: Ganti dengan Token Auth dari salah satu akun kasir Anda yang valid
 // Cara dapatnya: Login ke POS Kasir, buka Inspect Element (F12) -> Application -> Local Storage -> cari 'pos_user' -> copy token-nya.
-const TOKEN = '275|9qG0kNpt4T7DzciDUH8J7FKv1fvZNW6lLubtXayRc3b6a45e';
+const TOKEN = '323|XJnf80wayOqOeImr0wz34elBauVnur9jTgH1YUWhac3791e3';
 
 // =========================================================================
 // SIMULASI PERILAKU KASIR
@@ -36,9 +36,10 @@ const TOKEN = '275|9qG0kNpt4T7DzciDUH8J7FKv1fvZNW6lLubtXayRc3b6a45e';
 export default function () {
     const params = {
         headers: {
+            'Host': 'admin.toserbaselamat.id',
             'Authorization': `Bearer ${TOKEN}`,
             'Accept': 'application/json',
-            'X-Device-UUID': 'd0d4d8c9-acc5-480e-a327-6ddadf9cd24d',
+            'X-Device-UUID': '4f6d26b9-5ee6-4ef1-9c5b-ae25c4086583',
         },
     };
 
