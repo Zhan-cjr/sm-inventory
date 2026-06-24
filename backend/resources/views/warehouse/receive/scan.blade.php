@@ -4,6 +4,7 @@
 
 @section('content')
 <script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
     .container {
@@ -452,10 +453,31 @@
     }
 
     function submitCheck() {
-        if (confirm('Yakin ingin menyimpan hasil pengecekan gudang ini?')) {
-            document.getElementById('scanned_items_input').value = JSON.stringify(scannedState);
-            document.getElementById('submit-form').submit();
-        }
+        Swal.fire({
+            title: 'Simpan Pengecekan?',
+            text: "Pastikan semua kuantitas barang sudah sesuai dengan fisik di gudang.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#059669',
+            cancelButtonColor: '#dc2626',
+            confirmButtonText: 'Ya, Simpan!',
+            cancelButtonText: 'Batal',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: 'Menyimpan...',
+                    text: 'Mohon tunggu sebentar',
+                    allowOutsideClick: false,
+                    showConfirmButton: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+                document.getElementById('scanned_items_input').value = JSON.stringify(scannedState);
+                document.getElementById('submit-form').submit();
+            }
+        });
     }
 
     // Init
