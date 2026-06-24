@@ -78,6 +78,7 @@ trait HasApprovals
         $message .= "<b>Dibuat oleh:</b> {$creatorName}\n\n";
         $message .= "Tautan: " . $link;
 
+        // 1. Send to individuals (Supervisors)
         foreach ($supervisors as $spv) {
             \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
                 'chat_id' => $spv->telegram_chat_id,
@@ -85,6 +86,31 @@ trait HasApprovals
                 'parse_mode' => 'HTML',
                 'disable_web_page_preview' => true,
             ]);
+        }
+
+        // 2. Send to Specific Telegram Group
+        $organizationId = $this->organization_id ?? $this->branch?->organization_id ?? \App\Models\Organization::first()?->id;
+        if ($organizationId) {
+            $org = \App\Models\Organization::find($organizationId);
+            if ($org) {
+                $groupId = null;
+                if ($modelClass === 'PurchaseOrder') {
+                    $groupId = $org->telegram_group_po_approval;
+                } elseif ($modelClass === 'WarehouseCheck') {
+                    $groupId = $org->telegram_group_warehouse_check;
+                } else {
+                    $groupId = $org->telegram_group_stock_correction;
+                }
+
+                if ($groupId) {
+                    \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+                        'chat_id' => $groupId,
+                        'text' => "👥 <b>Pemberitahuan Grup</b>\n\n" . $message,
+                        'parse_mode' => 'HTML',
+                        'disable_web_page_preview' => true,
+                    ]);
+                }
+            }
         }
     }
 

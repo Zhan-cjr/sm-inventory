@@ -120,6 +120,28 @@ class OrganizationForm
                                 ->helperText('Jika total nilai nominal koreksi melebihi batas ini, koreksi stok wajib di-approve sebelum memotong/menambah stok riil. Kosongkan jika tidak ada batas.')
                                 ->columnSpanFull(),
                         ])
+                    ]),
+                Section::make('Notifikasi Grup Telegram (Opsional)')
+                    ->description('Masukkan Chat ID dari Grup Telegram untuk mengirim notifikasi persetujuan ke dalam grup secara spesifik. Kosongkan jika hanya ingin mengirim notifikasi ke personal chat supervisor.')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            TextInput::make('telegram_group_po_approval')
+                                ->label('Chat ID Grup Approval PO')
+                                ->placeholder('Contoh: -100123456789')
+                                ->helperText('Notifikasi persetujuan Purchase Order akan dikirim ke grup ini.')
+                                ->nullable(),
+                            TextInput::make('telegram_group_stock_correction')
+                                ->label('Chat ID Grup Approval Koreksi Stok')
+                                ->placeholder('Contoh: -100123456789')
+                                ->helperText('Notifikasi persetujuan Koreksi Stok akan dikirim ke grup ini.')
+                                ->nullable(),
+                            TextInput::make('telegram_group_warehouse_check')
+                                ->label('Chat ID Grup Approval Pengecekan Gudang')
+                                ->placeholder('Contoh: -100123456789')
+                                ->helperText('Notifikasi persetujuan Pengecekan Gudang akan dikirim ke grup ini.')
+                                ->nullable()
+                                ->columnSpanFull(),
+                        ])
                     ])
             ]);
     }
