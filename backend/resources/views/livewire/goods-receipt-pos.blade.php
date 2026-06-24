@@ -400,21 +400,21 @@
                         @endif
                         @if(in_array('unit_price', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" step="any" id="price-{{ $index }}" class="pos-input" style="text-align: right;" 
-                                   wire:model.lazy="cart.{{ $index }}.unit_price"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.space.prevent="openCalc($event)"
-                                   x-on:keydown.enter.prevent="document.getElementById('dis1-{{ $index }}').focus()">
+                            <div x-data="{ raw: @entangle('cart.' . $index . '.unit_price'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="price-{{ $index }}" class="pos-input" style="text-align: right;" 
+                                       x-on:keydown.space.prevent="openCalc($event)"
+                                       x-on:keydown.enter.prevent="document.getElementById('dis1-{{ $index }}').focus()">
+                            </div>
                         </td>
                         @endif
 
                         @if(in_array('harga_jual_1', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
                             @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
-                                <input onfocus="this.select()" type="number" step="any" class="pos-input" style="text-align: right;" 
-                                       wire:model.lazy="cart.{{ $index }}.harga_jual_1"
-                                       wire:change="recalculateRow({{ $index }})"
-                                       x-on:keydown.space.prevent="openCalc($event)">
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_1'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                    <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input" style="text-align: right;" 
+                                           x-on:keydown.space.prevent="openCalc($event)">
+                                </div>
                             @else
                                 <div style="text-align: right; padding: 0.375rem 0.5rem; color: #6b7280;" class="dark:text-gray-400">{{ number_format($item['harga_jual_1'], 2) }}</div>
                             @endif
@@ -461,9 +461,10 @@
                         @endif
                         <td class="pos-grid-td" style="text-align: right; font-weight: 600; color: #111827;" class="dark:text-gray-100">
                             @if($enable_edit_total)
-                                <input onfocus="this.select()" type="number" step="any" class="pos-input font-bold" style="text-align: right;" 
-                                       wire:model.lazy="cart.{{ $index }}.subtotal"
-                                       x-on:keydown.space.prevent="openCalc($event)">
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.subtotal'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); } }">
+                                    <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input font-bold" style="text-align: right;" 
+                                           x-on:keydown.space.prevent="openCalc($event)">
+                                </div>
                             @else
                                 {{ number_format($item['subtotal'], 2) }}
                             @endif

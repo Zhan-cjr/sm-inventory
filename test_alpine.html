@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body>
+    <div x-data="{ 
+        raw: 31000, 
+        focused: false, 
+        get display() { 
+            if (this.focused) return this.raw; 
+            if (!this.raw && this.raw !== 0) return ''; 
+            let num = parseFloat(this.raw.toString().replace(/,/g, '')); 
+            return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); 
+        }, 
+        set display(val) { 
+            this.raw = val.toString().replace(/,/g, ''); 
+        } 
+    }">
+        <input type="text" x-model.lazy="display" @focus="focused = true; $el.select()" @blur="focused = false">
+        <span x-text="raw"></span>
+    </div>
+</body>
+</html>

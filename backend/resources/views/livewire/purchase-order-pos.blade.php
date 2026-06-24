@@ -322,10 +322,10 @@
                         @endif
                         @if(in_array('unit_cost', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" id="cost-{{ $index }}" class="pos-input" style="text-align: right;" 
-                                   wire:model.lazy="cart.{{ $index }}.unit_cost"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.enter.prevent="document.getElementById('dis1-{{ $index }}').focus()">
+                            <div x-data="{ raw: @entangle('cart.' . $index . '.unit_cost'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="cost-{{ $index }}" class="pos-input" style="text-align: right;" 
+                                       x-on:keydown.enter.prevent="document.getElementById('dis1-{{ $index }}').focus()">
+                            </div>
                         </td>
                         @endif
                         @if(in_array('discount_1', $visibleColumns))
