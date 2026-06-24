@@ -27,10 +27,29 @@ class SuggestedOrders extends Page implements HasTable
 
     protected string $view = 'filament.pages.suggested-orders';
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\Action::make('faq')
+                ->label('Cara Membaca Saran AI')
+                ->icon('heroicon-o-information-circle')
+                ->color('info')
+                ->modalHeading('Panduan Membaca Saran Order AI')
+                ->modalContent(view('filament.components.saran-order-faq'))
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('Tutup'),
+        ];
+    }
+
     public function table(Table $table): Table
     {
         return $table
-            ->query(\App\Models\Stock::query()->with(['product', 'branch']))
+            ->query(
+                \App\Models\Stock::query()
+                    ->where('is_active', true)
+                    ->whereHas('product', fn($q) => $q->where('is_active', true))
+                    ->with(['product', 'branch'])
+            )
             ->columns([
                 TextColumn::make('product.sku')
                     ->label('SKU')
@@ -50,6 +69,9 @@ class SuggestedOrders extends Page implements HasTable
                 TextColumn::make('reorder_point')
                     ->label('Titik Pesan (ROP)')
                     ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['reorder_point']),
+                TextColumn::make('target_days')
+                    ->label('Target Stok (Hari)')
+                    ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['target_days']),
                 TextColumn::make('suggested_qty')
                     ->label('Saran Pesan')
                     ->weight('bold')

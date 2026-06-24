@@ -167,6 +167,9 @@ class StocksRelationManager extends RelationManager
                     ->numeric()
                     ->default(14)
                     ->suffix('Hari'),
+                \Filament\Forms\Components\Toggle::make('is_active')
+                    ->label('Aktif di Cabang Ini')
+                    ->default(true),
             ]);
     }
 
@@ -225,6 +228,9 @@ class StocksRelationManager extends RelationManager
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                \Filament\Tables\Columns\ToggleColumn::make('is_active')
+                    ->label('Status Cabang')
+                    ->sortable(),
             ])
             ->filters([
                 //

@@ -5,6 +5,7 @@ import uvicorn
 from text_to_sql import process_nl_query
 from market_basket import run_market_basket_analysis
 from restock_predictor import predict_restock_needs
+from pricing_engine import suggest_dynamic_pricing
 
 app = FastAPI(title="Toserba Selamat AI Service", version="1.0.0")
 
@@ -48,6 +49,14 @@ def train_market_basket():
 def restock_suggestions(days_history: int = 30, target_days_supply: int = 30, branch_id: str = None):
     try:
         suggestions = predict_restock_needs(days_history=days_history, target_days_supply=target_days_supply, branch_id=branch_id)
+        return {"success": True, "data": suggestions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/ai/dynamic-pricing")
+def dynamic_pricing(days_history: int = 30):
+    try:
+        suggestions = suggest_dynamic_pricing(days_history=days_history)
         return {"success": True, "data": suggestions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

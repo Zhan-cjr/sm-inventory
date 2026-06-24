@@ -24,7 +24,7 @@ class Stock extends Model
         'margin_gol_3', 'harga_jual_3', 'qty_min_gol_3',
         'quantity_on_hand', 
         'quantity_reserved', 'last_count_date', 'min_qty', 
-        'max_qty', 'lead_time', 'safety_stock', 'desired_inventory_days', 'version'
+        'max_qty', 'lead_time', 'safety_stock', 'desired_inventory_days', 'version', 'is_active'
     ];
 
     protected $casts = [
@@ -43,6 +43,7 @@ class Stock extends Model
         'lead_time' => 'integer',
         'safety_stock' => 'integer',
         'desired_inventory_days' => 'integer',
+        'is_active' => 'boolean',
     ];
 
     public function branch()
@@ -58,5 +59,10 @@ class Stock extends Model
     public function racks(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(StockOpnameRack::class, 'stock_stock_opname_rack', 'stock_id', 'rack_id');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

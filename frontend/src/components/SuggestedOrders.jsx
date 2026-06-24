@@ -18,6 +18,7 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [selectedItems, setSelectedItems] = useState([]);
+  const [showFaq, setShowFaq] = useState(false);
 
   const toggleSelect = (productId) => {
     setSelectedItems(prev => 
@@ -177,6 +178,9 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button onClick={() => setShowFaq(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+            <AlertTriangle size={16} /> Cara Membaca
+          </button>
           {selectedItems.length > 0 && (
             <button 
               onClick={handleBulkCreatePO} 
@@ -260,6 +264,7 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
                 <th style={{ padding: '1rem' }}>Stok Saat Ini</th>
                 <th style={{ padding: '1rem' }}>ADS (Sales/Hr)</th>
                 <th style={{ padding: '1rem' }}>Titik Pesan (ROP)</th>
+                <th style={{ padding: '1rem' }}>Target Stok</th>
                 <th style={{ padding: '1rem' }}>Saran Pesan</th>
                 <th style={{ padding: '1rem' }}>Status</th>
                 <th style={{ padding: '1rem' }}>Aksi</th>
@@ -287,6 +292,7 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
                     </div>
                   </td>
                   <td style={{ padding: '1rem' }}>{item.reorder_point} unit</td>
+                  <td style={{ padding: '1rem' }}>{item.target_days || 30} hari</td>
                   <td style={{ padding: '1rem' }}>
                     {item.suggested_qty > 0 ? (
                       <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.1rem' }}>
@@ -330,7 +336,31 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
             </tbody>
           </table>
         </div>
-      </div>
+      {showFaq && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-panel" style={{ maxWidth: '600px', width: '90%', padding: '2rem', borderRadius: '16px', position: 'relative' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertTriangle color="#60a5fa" /> Panduan Membaca Saran Order AI
+            </h3>
+            <div style={{ color: 'var(--text-muted)', lineHeight: '1.6', fontSize: '0.95rem' }}>
+              <p style={{ marginBottom: '1rem' }}>AI memprediksi kebutuhan restock dengan mempelajari riwayat kecepatan penjualan (velocity) setiap produk. Berikut adalah penjelasan setiap kolom:</p>
+              <ul style={{ paddingLeft: '1.5rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <li><strong>Stok Saat Ini:</strong> Sisa stok aktual di gudang cabang saat ini.</li>
+                <li><strong>ADS (Average Daily Sales):</strong> Rata-rata barang terjual per hari (dihitung dari total penjualan dibagi riwayat hari).</li>
+                <li><strong>Titik Pesan (ROP):</strong> Titik batas aman terendah (ADS × Waktu Kirim). Jika stok turun di bawah angka ini, Anda berisiko kehabisan barang.</li>
+                <li><strong>Target Stok (Hari):</strong> Diambil dari settingan <em>Target Inventori</em> pada menu stok cabang. Ini menentukan seberapa lama Anda ingin stok ini bertahan di gudang sebelum restock berikutnya.</li>
+                <li><strong>Saran Pesan:</strong> Jumlah ideal yang harus dipesan hari ini untuk memenuhi target hari penjualan ke depan. <br/><span style={{fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)'}}>Rumus: ((ADS × Target Stok) + Titik Pesan) - Stok Saat Ini</span></li>
+              </ul>
+              <div style={{ background: 'rgba(59, 130, 246, 0.1)', borderLeft: '4px solid #3b82f6', padding: '1rem', borderRadius: '4px', color: '#93c5fd' }}>
+                <strong>💡 Tips:</strong> Anda dapat mengubah "Target Stok (Hari)" per produk di dashboard admin (Daftar Stok Cabang). AI akan otomatis menyesuaikan hitungannya esok hari!
+              </div>
+            </div>
+            <button onClick={() => setShowFaq(false)} className="btn-secondary" style={{ marginTop: '1.5rem', width: '100%' }}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -8,8 +8,8 @@ export function MobileSuggestedOrders({ user, authToken }) {
   const [processing, setProcessing] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
   
-  // Selection state for bulk PO
   const [selectedItems, setSelectedItems] = useState(new Set());
+  const [showFaq, setShowFaq] = useState(false);
   
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
@@ -169,9 +169,14 @@ export function MobileSuggestedOrders({ user, authToken }) {
             <TrendingDown size={20} color="var(--primary)" />
             Order Pintar
           </h2>
-          <button onClick={fetchSuggestions} className="btn-secondary" style={{ padding: '0.5rem' }}>
-            Refresh
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button onClick={() => setShowFaq(true)} className="btn-icon-only" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '0.5rem', borderRadius: '8px' }}>
+              <AlertCircle size={18} />
+            </button>
+            <button onClick={() => fetchSuggestions()} className="btn-secondary" style={{ padding: '0.5rem' }}>
+              Refresh
+            </button>
+          </div>
         </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
           Rekomendasi pesanan berdasarkan Average Daily Sales (ADS) 90 hari terakhir.
@@ -295,6 +300,10 @@ export function MobileSuggestedOrders({ user, authToken }) {
                       <strong>{item.reorder_point}</strong>
                     </div>
                     <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Target Stok:</span> <br />
+                      <strong>{item.target_days || 30} hari</strong>
+                    </div>
+                    <div>
                       <span style={{ color: 'var(--text-muted)' }}>Saran Order:</span> <br />
                       <strong style={{ color: 'var(--primary)', fontSize: '1rem' }}>+{item.suggested_qty}</strong>
                     </div>
@@ -361,6 +370,30 @@ export function MobileSuggestedOrders({ user, authToken }) {
               </>
             )}
           </button>
+        </div>
+      {showFaq && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', padding: '1.5rem', borderRadius: '16px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '1rem', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertCircle color="#60a5fa" /> Cara Membaca Saran AI
+            </h3>
+            <div style={{ color: 'var(--text-muted)', lineHeight: '1.5', fontSize: '0.9rem' }}>
+              <p style={{ marginBottom: '1rem' }}>AI memprediksi kebutuhan restock dengan mempelajari riwayat kecepatan penjualan setiap produk.</p>
+              <ul style={{ paddingLeft: '1rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <li><strong>Stok Saat Ini:</strong> Sisa stok aktual di gudang cabang.</li>
+                <li><strong>Jual/Hari (ADS):</strong> Rata-rata barang terjual per hari.</li>
+                <li><strong>Batas Aman (ROP):</strong> Titik batas terendah. Jika stok di bawah ini, segera order.</li>
+                <li><strong>Target Stok:</strong> Lama hari stok ini akan bertahan di gudang (default 30 hari).</li>
+                <li><strong>Saran Order:</strong> Jumlah pemesanan ideal untuk memenuhi target hari penjualan ke depan.</li>
+              </ul>
+              <div style={{ background: 'rgba(59, 130, 246, 0.1)', borderLeft: '4px solid #3b82f6', padding: '0.75rem', borderRadius: '4px', color: '#93c5fd', fontSize: '0.85rem' }}>
+                <strong>💡 Tips:</strong> Anda dapat mengubah "Target Stok" per produk melalui dashboard admin.
+              </div>
+            </div>
+            <button onClick={() => setShowFaq(false)} className="btn-secondary" style={{ marginTop: '1.5rem', width: '100%', padding: '0.75rem' }}>
+              Tutup
+            </button>
+          </div>
         </div>
       )}
     </div>

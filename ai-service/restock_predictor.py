@@ -42,7 +42,7 @@ def predict_restock_needs(days_history=30, target_days_supply=30, branch_id=None
             FROM transaction_items ti
             JOIN transactions t ON t.id = ti.transaction_id
             WHERE t.transaction_date >= DATE_SUB(NOW(), INTERVAL 90 DAY)
-              AND t.is_voided = 0
+              AND (t.is_voided = 0 OR t.is_voided IS NULL)
               {branch_filter_sales}
             GROUP BY ti.product_id
         """
@@ -67,7 +67,8 @@ def predict_restock_needs(days_history=30, target_days_supply=30, branch_id=None
                 p.supplier_id,
                 s.name as supplier_name,
                 COALESCE(p.lead_time_days, 7) as lead_time_days,
-                (SELECT COALESCE(SUM(st.quantity), 0) FROM stocks st WHERE st.product_id = p.id {branch_filter_stocks}) as current_stock
+                (SELECT COALESCE(SUM(st.quantity_on_hand), 0) FROM stocks st WHERE st.product_id = p.id {branch_filter_stocks}) as current_stock,
+                (SELECT COALESCE(MAX(st.desired_inventory_days), {target_days_supply}) FROM stocks st WHERE st.product_id = p.id {branch_filter_stocks}) as dynamic_target_days
             FROM products p
             LEFT JOIN suppliers s ON s.id = p.supplier_id
             WHERE p.is_active = 1
@@ -93,11 +94,22 @@ def predict_restock_needs(days_history=30, target_days_supply=30, branch_id=None
             current_stock = float(row['current_stock'])
             lead_time_days = int(row['lead_time_days'])
             
+            # Use provided min_qty as absolute fallback if velocity is 0
+            min_qty = 10 # Default fallback
+            # (Assuming we selected min_qty in query, but if not we hardcode default 10 for phase 1 fallback)
+            
             # Safety stock is estimated as lead_time * velocity
             safety_stock = lead_time_days * daily_velocity
             
+            # Fallback for new products (0 velocity)
+            if safety_stock == 0:
+                safety_stock = min_qty
+            
             # Target stock is how much we want to have on hand to cover target_days_supply
-            target_stock = (target_days_supply * daily_velocity) + safety_stock
+            product_target_days = int(row['dynamic_target_days'])
+            target_stock = (product_target_days * daily_velocity) + safety_stock
+            if target_stock == safety_stock: # If velocity is 0
+                target_stock = safety_stock * 2 # Just arbitrary target if 0 velocity
             
             suggested_order = 0
             if current_stock <= safety_stock:
@@ -112,6 +124,7 @@ def predict_restock_needs(days_history=30, target_days_supply=30, branch_id=None
                 "total_sold_30d": sold_30d,
                 "ads": round(daily_velocity, 2),
                 "lead_time": lead_time_days,
+                "target_days": product_target_days,
                 "reorder_point": round(safety_stock, 2),
                 "suggested_qty": int(suggested_order),
                 "status": "CRITICAL" if current_stock < safety_stock else ("REORDER" if current_stock <= target_stock and target_stock > 0 else "OK")

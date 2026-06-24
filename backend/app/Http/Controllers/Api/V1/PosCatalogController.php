@@ -51,6 +51,7 @@ class PosCatalogController extends Controller
                     ->join('stocks', 'products.id', '=', 'stocks.product_id')
                     ->where('stocks.branch_id', $branchId)
                     ->where('products.is_active', true)
+                    ->where('stocks.is_active', true)
                     ->select([
                         'products.*',
                         'stocks.cost_price as branch_cost_price',
