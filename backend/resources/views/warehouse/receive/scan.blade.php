@@ -342,15 +342,35 @@
         const item = itemsData.find(i => i.barcode === barcode);
         if (item) {
             isItemVisible[item.product_id] = true;
+            
+            // Auto increment quantity on scan
+            let currentVal = scannedState[item.product_id] || 0;
+            scannedState[item.product_id] = currentVal + 1;
+            
+            const inputField = document.getElementById('input-' + item.product_id);
+            if (inputField) {
+                inputField.value = scannedState[item.product_id];
+            }
+
             updateItemUI(item.product_id);
+            
+            // Move item to the top of the list so the latest scan is always visible
+            const li = document.getElementById('item-' + item.product_id);
+            if (li) {
+                li.parentNode.prepend(li);
+            }
+
             beepOk.play().catch(e => {});
 
-            setTimeout(() => {
-                const inputField = document.getElementById('input-' + item.product_id);
-                if (inputField) {
-                    inputField.focus();
-                }
-            }, 50);
+            // Jika mode USB/BT, pastikan fokus kembali ke kotak pencarian barcode, BUKAN ke input qty
+            if (document.getElementById('btn-usb').classList.contains('active')) {
+                setTimeout(() => {
+                    const manualInput = document.getElementById('manual-barcode');
+                    if (manualInput) {
+                        manualInput.focus();
+                    }
+                }, 50);
+            }
         } else {
             document.getElementById('error-msg').innerText = 'Barcode tidak ditemukan di PO ini!';
             beepErr.play().catch(e => {});
