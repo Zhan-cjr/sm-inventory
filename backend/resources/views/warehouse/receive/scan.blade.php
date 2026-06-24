@@ -267,8 +267,8 @@
             
             let inputAttrs = '';
             if (rejectedCheck) {
-                // If rejected, lock items that did not exceed PO qty
-                if (item.qty_scanned <= target) {
+                // Jika reject, kunci hanya item yang SUDAH SESUAI (lolos)
+                if (item.qty_scanned === target && target > 0) {
                     inputAttrs = 'readonly style="background-color: #f3f4f6; cursor: not-allowed; width: 60px; padding: 5px; border-radius: 4px; border: 1px solid #ccc; text-align: right;"';
                 } else {
                     inputAttrs = 'style="width: 60px; padding: 5px; border-radius: 4px; border: 1px solid #ccc; text-align: right;"';
@@ -382,6 +382,15 @@
         // Find item
         const item = itemsData.find(i => i.barcode === barcode);
         if (item) {
+            if (rejectedCheck && item.qty_scanned === item.qty_po && item.qty_po > 0) {
+                document.getElementById('error-msg').innerText = 'Barang ini sudah sesuai pada pengecekan sebelumnya dan tidak perlu discan lagi!';
+                beepErr.play().catch(e => {});
+                setTimeout(() => {
+                    document.getElementById('error-msg').innerText = '';
+                }, 3000);
+                return;
+            }
+
             isItemVisible[item.product_id] = true;
             
             // Move item to the top of the list so the latest scan is always visible
