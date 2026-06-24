@@ -216,7 +216,7 @@
 
     <div id="usb-section" style="display: none;" class="input-section">
         <form onsubmit="event.preventDefault(); submitBarcode();" style="margin:0;">
-            <input type="text" id="manual-barcode" class="input-barcode" placeholder="Arahkan kursor kesini, lalu scan barcode..." autocomplete="off">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="manual-barcode" class="input-barcode" placeholder="Arahkan kursor kesini, lalu scan barcode..." autocomplete="off">
         </form>
         <div id="error-msg"></div>
     </div>
@@ -282,7 +282,9 @@
                     <div class="item-barcode">${item.barcode || '-'}</div>
                 </div>
                 <div class="item-qty" style="display: flex; align-items: center; gap: 8px;">
-                    <input type="number" id="input-${item.product_id}" value="${item.qty_scanned > 0 ? item.qty_scanned : ''}" placeholder="0" min="0" ${inputAttrs} onchange="handleManualInput('${item.product_id}', this.value)" onkeydown="handleInputKeydown(event, '${item.product_id}')">
+                    <form onsubmit="event.preventDefault(); returnQtyToBarcode('${item.product_id}');" style="margin:0; display:flex;">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="input-${item.product_id}" value="${item.qty_scanned > 0 ? item.qty_scanned : ''}" placeholder="0" min="0" ${inputAttrs} onchange="handleManualInput('${item.product_id}', this.value)" onkeydown="handleInputKeydown(event, '${item.product_id}')">
+                    </form>
                     <span style="font-size: 0.9rem; color: #6b7280; font-weight: bold;">/ ${target}</span>
                 </div>
             `;
@@ -295,15 +297,19 @@
         }
     }
 
+    function returnQtyToBarcode(productId) {
+        const inputField = document.getElementById('input-' + productId);
+        if (inputField) inputField.blur();
+
+        if (document.getElementById('btn-usb').classList.contains('active')) {
+            document.getElementById('manual-barcode').focus();
+        }
+    }
+
     function handleInputKeydown(event, productId) {
         if (event.key === 'Enter' || event.keyCode === 13) {
             event.preventDefault();
-            const inputField = document.getElementById('input-' + productId);
-            if (inputField) inputField.blur();
-
-            if (document.getElementById('btn-usb').classList.contains('active')) {
-                document.getElementById('manual-barcode').focus();
-            }
+            returnQtyToBarcode(productId);
         }
     }
 
