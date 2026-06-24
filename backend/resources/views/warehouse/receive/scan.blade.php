@@ -284,7 +284,7 @@
                 </div>
                 <div class="item-qty" style="display: flex; align-items: center; gap: 8px;">
                     <form onsubmit="event.preventDefault(); returnQtyToBarcode('${item.product_id}');" style="margin:0; display:flex;">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="input-${item.product_id}" value="${item.qty_scanned > 0 ? item.qty_scanned : ''}" placeholder="0" min="0" ${inputAttrs} onchange="handleManualInput('${item.product_id}', this.value)" onkeydown="handleInputKeydown(event, '${item.product_id}')">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="input-${item.product_id}" value="${item.qty_scanned > 0 ? item.qty_scanned : ''}" placeholder="0" min="0" ${inputAttrs} oninput="handleManualInput('${item.product_id}', this.value)" onkeydown="handleInputKeydown(event, '${item.product_id}')">
                     </form>
                     <span style="font-size: 0.9rem; color: #6b7280; font-weight: bold;">/ ${target}</span>
                 </div>
