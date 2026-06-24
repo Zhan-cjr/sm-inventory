@@ -185,6 +185,12 @@ class WarehouseCheckResource extends Resource
 
                         return redirect()->to(\App\Filament\Resources\GoodsReceipts\GoodsReceiptResource::getUrl('edit', ['record' => $gr]));
                     }),
+
+                \Filament\Tables\Actions\DeleteAction::make()
+                    ->label('Hapus')
+                    ->modalHeading('Hapus Pengecekan Gudang')
+                    ->modalDescription('Apakah Anda yakin ingin menghapus hasil pengecekan ini? Data yang sudah dihapus tidak dapat dikembalikan.')
+                    ->modalSubmitActionLabel('Ya, Hapus'),
             ])
             ->toolbarActions([]);
     }
