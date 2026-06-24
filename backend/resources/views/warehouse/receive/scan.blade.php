@@ -215,7 +215,9 @@
     </div>
 
     <div id="usb-section" style="display: none;" class="input-section">
-        <input type="text" id="manual-barcode" class="input-barcode" placeholder="Arahkan kursor kesini, lalu scan barcode..." autocomplete="off">
+        <form onsubmit="event.preventDefault(); submitBarcode();" style="margin:0;">
+            <input type="text" id="manual-barcode" class="input-barcode" placeholder="Arahkan kursor kesini, lalu scan barcode..." autocomplete="off">
+        </form>
         <div id="error-msg"></div>
     </div>
 
@@ -294,7 +296,7 @@
     }
 
     function handleInputKeydown(event, productId) {
-        if (event.key === 'Enter') {
+        if (event.key === 'Enter' || event.keyCode === 13) {
             event.preventDefault();
             const inputField = document.getElementById('input-' + productId);
             if (inputField) inputField.blur();
@@ -370,12 +372,18 @@
     }
 
     // USB Scanner Mode
+    function submitBarcode() {
+        const manualInput = document.getElementById('manual-barcode');
+        handleScan(manualInput.value);
+        manualInput.value = '';
+    }
+    
     const manualInput = document.getElementById('manual-barcode');
+    // Fallback keydown just in case (e.g. some scanners send Enter without triggering submit)
     manualInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' || e.keyCode === 13) {
             e.preventDefault();
-            handleScan(this.value);
-            this.value = '';
+            submitBarcode();
         }
     });
 
