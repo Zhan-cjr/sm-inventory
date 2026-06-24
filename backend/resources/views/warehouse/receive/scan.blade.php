@@ -287,6 +287,11 @@
                         <input type="text" inputmode="numeric" pattern="[0-9]*" id="input-${item.product_id}" value="${item.qty_scanned > 0 ? item.qty_scanned : ''}" placeholder="0" min="0" ${inputAttrs} oninput="handleManualInput('${item.product_id}', this.value)" onkeydown="handleInputKeydown(event, '${item.product_id}')">
                     </form>
                     <span style="font-size: 0.9rem; color: #6b7280; font-weight: bold;">/ ${target}</span>
+                    <button type="button" onclick="confirmDeleteItem('${item.product_id}')" style="background: none; border: none; cursor: pointer; padding: 4px; margin-left: 4px; color: #ef4444;" title="Hapus Item">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
                 </div>
             `;
             list.appendChild(li);
@@ -320,6 +325,33 @@
         scannedState[productId] = val;
         updateItemUI(productId);
     }
+
+    window.confirmDeleteItem = function(productId) {
+        Swal.fire({
+            title: 'Hapus Item?',
+            text: "Anda yakin ingin menghapus item ini dari hasil scan?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                scannedState[productId] = 0;
+                isItemVisible[productId] = false;
+                
+                const inputField = document.getElementById('input-' + productId);
+                if (inputField) inputField.value = '';
+                
+                updateItemUI(productId);
+                
+                if (document.getElementById('btn-usb').classList.contains('active')) {
+                    document.getElementById('manual-barcode').focus();
+                }
+            }
+        });
+    };
 
     function updateItemUI(productId) {
         const item = itemsData.find(i => i.product_id === productId);

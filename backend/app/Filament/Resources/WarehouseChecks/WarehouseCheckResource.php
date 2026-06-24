@@ -80,6 +80,7 @@ class WarehouseCheckResource extends Resource
                     }),
             ])
             ->filters([
+                \App\Filament\Filters\DateFilterHelper::make('created_at', 'filter_tanggal'),
                 \Filament\Tables\Filters\SelectFilter::make('branch_id')
                     ->relationship('branch', 'name')
                     ->label('Cabang')
@@ -185,12 +186,6 @@ class WarehouseCheckResource extends Resource
 
                         return redirect()->to(\App\Filament\Resources\GoodsReceipts\GoodsReceiptResource::getUrl('edit', ['record' => $gr]));
                     }),
-
-                \Filament\Actions\DeleteAction::make()
-                    ->label('Hapus')
-                    ->modalHeading('Hapus Pengecekan Gudang')
-                    ->modalDescription('Apakah Anda yakin ingin menghapus hasil pengecekan ini? Data yang sudah dihapus tidak dapat dikembalikan.')
-                    ->modalSubmitActionLabel('Ya, Hapus'),
             ])
             ->toolbarActions([]);
     }
