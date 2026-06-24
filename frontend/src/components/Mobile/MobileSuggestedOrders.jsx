@@ -371,6 +371,7 @@ export function MobileSuggestedOrders({ user, authToken }) {
             )}
           </button>
         </div>
+      )}
       {showFaq && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div className="glass-panel" style={{ width: '100%', padding: '1.5rem', borderRadius: '16px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
