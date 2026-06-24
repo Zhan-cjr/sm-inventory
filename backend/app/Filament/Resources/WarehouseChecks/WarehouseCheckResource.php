@@ -129,6 +129,14 @@ class WarehouseCheckResource extends Resource
                         // Create Draft GR
                         $po = $record->purchaseOrder;
                         
+                        $due_days = 0;
+                        if ($po->supplier_id) {
+                            $supplier = \App\Models\Supplier::find($po->supplier_id);
+                            if ($supplier) {
+                                $due_days = $supplier->default_due_days ?? 0;
+                            }
+                        }
+                        
                         $gr = \App\Models\GoodsReceipt::create([
                             'warehouse_check_id' => $record->id,
                             'purchase_order_id' => $po->id,
@@ -136,6 +144,7 @@ class WarehouseCheckResource extends Resource
                             'branch_id' => $record->branch_id,
                             'receipt_number' => 'GR-' . date('YmdHis'), // temporary, can be edited
                             'receipt_date' => now(),
+                            'due_date' => now()->addDays($due_days),
                             'received_by' => $record->checker->name,
                             'status' => 'DRAFT',
                             'total_amount' => 0, // will be calculated

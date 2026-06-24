@@ -6,12 +6,6 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
-    body {
-        font-family: 'Inter', sans-serif;
-        background-color: #f3f4f6;
-        margin: 0;
-        padding: 0;
-    }
     .container {
         max-width: 600px;
         margin: 0 auto;

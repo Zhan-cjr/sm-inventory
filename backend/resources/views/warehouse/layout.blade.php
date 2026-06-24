@@ -8,19 +8,17 @@
         :root {
             --bg-color: #f3f4f6;
             --text-color: #111827;
-            --header-bg: #1e3a8a;
-            --header-text: #fff;
-            --card-bg: #fff;
+            --card-bg: #ffffff;
             --border-color: #d1d5db;
+            --primary-color: #d97706; /* Filament warning/primary */
         }
 
         html.dark {
-            --bg-color: #1f2937;
-            --text-color: #f3f4f6;
-            --header-bg: #111827;
-            --header-text: #e5e7eb;
-            --card-bg: #374151;
-            --border-color: #4b5563;
+            --bg-color: #020617; /* Slate 950 (Filament default bg) */
+            --text-color: #f8fafc; /* Slate 50 */
+            --card-bg: #0f172a; /* Slate 900 (Filament default card) */
+            --border-color: #1e293b; /* Slate 800 */
+            --primary-color: #fbbf24;
         }
 
         body {
@@ -31,44 +29,32 @@
             padding: 0;
             transition: background-color 0.3s, color 0.3s;
         }
-        .app-header {
-            background-color: var(--header-bg);
-            color: var(--header-text);
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
+        
+        .back-btn {
+            display: inline-flex;
             align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .app-header h1 {
-            margin: 0;
-            font-size: 1.2rem;
-            color: var(--header-text);
-        }
-        .user-info {
+            gap: 8px;
+            padding: 8px 16px;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
             font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 15px;
+            transition: all 0.2s;
+            margin-top: 20px;
         }
-        .theme-toggle {
-            background: none;
-            border: none;
-            color: var(--header-text);
-            cursor: pointer;
-            font-size: 1.2rem;
-            padding: 5px;
-            border-radius: 50%;
-            transition: background-color 0.2s;
-        }
-        .theme-toggle:hover {
-            background-color: rgba(255,255,255,0.1);
+        .back-btn:hover {
+            background-color: var(--bg-color);
+            border-color: var(--primary-color);
+            color: var(--primary-color);
         }
     </style>
     @stack('styles')
     <script>
-        // Check local storage for theme
-        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        // Check local storage for theme (matches Filament)
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark')
         } else {
             document.documentElement.classList.remove('dark')
@@ -76,35 +62,17 @@
     </script>
 </head>
 <body>
-    <div class="app-header">
-        <h1>SM INVENTORY - GUDANG</h1>
-        <div class="user-info">
-            {{ auth()->user()->name ?? 'Guest' }}
-            <button id="theme-toggle-btn" class="theme-toggle" onclick="toggleTheme()" title="Ganti Tema">
-                <span id="theme-icon">🌓</span>
-            </button>
-            <form action="{{ route('filament.admin.auth.logout') }}" method="POST" style="margin:0; display:inline-flex; align-items:center;">
-                @csrf
-                <button type="submit" class="theme-toggle" style="font-size: 0.9rem; margin-left: 5px; font-weight: bold; background: rgba(255,255,255,0.1); border-radius: 4px; padding: 5px 10px;" title="Logout">
-                    Logout
-                </button>
-            </form>
-        </div>
+    <div style="max-width: 600px; margin: 0 auto; padding: 0 20px;">
+        <a href="{{ url('/admin/warehouse-checks') }}" class="back-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+            </svg>
+            Kembali
+        </a>
     </div>
     
     @yield('content')
 
-    <script>
-        function toggleTheme() {
-            if (document.documentElement.classList.contains('dark')) {
-                document.documentElement.classList.remove('dark');
-                localStorage.theme = 'light';
-            } else {
-                document.documentElement.classList.add('dark');
-                localStorage.theme = 'dark';
-            }
-        }
-    </script>
     @stack('scripts')
 </body>
 </html>

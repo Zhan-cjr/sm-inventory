@@ -13,7 +13,9 @@ class ManageWarehouseChecks extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            \Filament\Actions\Action::make('create')
+                ->label('Buat Pengecekan Gudang')
+                ->url(url('/warehouse/receive')),
         ];
     }
 }
