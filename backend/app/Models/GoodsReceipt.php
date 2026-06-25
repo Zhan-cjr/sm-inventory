@@ -14,7 +14,7 @@ class GoodsReceipt extends Model
 
     protected $fillable = [
         'warehouse_check_id', 'purchase_order_id', 'supplier_id', 'branch_id', 
-        'receipt_number', 'receipt_date', 'received_by', 
+        'receipt_number', 'receipt_date', 'received_by', 'faktur_image',
         'faktur_supplier', 'total_amount', 'include_tax', 'tax_amount', 'status', 'notes',
         'due_date', 'payment_status', 'paid_amount', 'payment_method'
     ];
@@ -26,6 +26,7 @@ class GoodsReceipt extends Model
         'tax_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'include_tax' => 'boolean',
+        'faktur_image' => 'array',
     ];
 
     public function warehouseCheck(): BelongsTo

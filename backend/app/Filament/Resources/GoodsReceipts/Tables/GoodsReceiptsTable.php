@@ -12,6 +12,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Actions\Action;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class GoodsReceiptsTable
 {
@@ -74,6 +75,17 @@ class GoodsReceiptsTable
                     ->hidden(fn () => Auth::user()->branch_id !== null),
             ])
             ->recordActions([
+                \Filament\Actions\Action::make('lihat_bukti')
+                    ->label('Lihat Bukti')
+                    ->icon('heroicon-o-photo')
+                    ->color('success')
+                    ->modalHeading('Bukti Faktur')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup')
+                    ->modalContent(fn (\App\Models\GoodsReceipt $record) => view('components.faktur-images', [
+                        'images' => is_array($record->faktur_image) ? $record->faktur_image : [$record->faktur_image]
+                    ]))
+                    ->visible(fn (\App\Models\GoodsReceipt $record) => !empty($record->faktur_image)),
                 \Filament\Actions\Action::make('cetak_nota')
                     ->label('Cetak Nota')
                     ->icon('heroicon-o-printer')

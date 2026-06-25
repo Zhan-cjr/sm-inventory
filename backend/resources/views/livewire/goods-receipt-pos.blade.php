@@ -169,6 +169,20 @@
                         <td><input onfocus="this.select()" type="text" class="pos-input" wire:model="faktur_supplier" placeholder="Masukkan No Surat Jalan / Faktur..."></td>
                     </tr>
                     <tr>
+                        <td class="pos-label">Upload Bukti Faktur</td>
+                        <td>
+                            <input type="file" class="pos-input" wire:model="faktur_image" accept="image/jpeg, image/png, application/pdf" multiple style="padding-top: 0.25rem;">
+                            <div style="font-size: 0.7rem; color: #6b7280; margin-top: 0.25rem;">Bisa pilih >1 file. Maks 10MB/file. Gambar dikompres otomatis.</div>
+                            @error('faktur_image.*') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            <div wire:loading wire:target="faktur_image" class="text-xs text-blue-500 mt-1">Mengupload...</div>
+                            @if($faktur_image && is_array($faktur_image) && count($faktur_image) > 0 && !is_string($faktur_image[0]))
+                                <div class="mt-2 text-sm text-green-600 dark:text-green-400 font-medium">{{ count($faktur_image) }} file terpilih siap disimpan.</div>
+                            @elseif($goodsReceipt && is_array($goodsReceipt->faktur_image) && count($goodsReceipt->faktur_image) > 0)
+                                <div class="mt-2 text-sm text-blue-600 dark:text-blue-400 font-medium">{{ count($goodsReceipt->faktur_image) }} file sudah tersimpan.</div>
+                            @endif
+                        </td>
+                    </tr>
+                    <tr>
                         <td class="pos-label">Lokasi Cabang</td>
                         <td>
                             <select class="pos-input" wire:model="branch_id" @if(auth()->user()->branch_id) disabled @endif>

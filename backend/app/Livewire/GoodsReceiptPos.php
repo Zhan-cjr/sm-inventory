@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\Branch;
@@ -17,10 +18,13 @@ use Illuminate\Support\Facades\DB;
 
 class GoodsReceiptPos extends Component
 {
+    use WithFileUploads;
+
     public $receipt_number;
     public $receipt_date;
     public $due_date;
     public $faktur_supplier;
+    public $faktur_image = [];
     public $branch_id;
     public $notes;
     public $supplier_id;
@@ -62,6 +66,7 @@ class GoodsReceiptPos extends Component
             $this->purchase_order_id = $goodsReceipt->purchase_order_id;
             $this->include_tax = $goodsReceipt->include_tax;
             $this->tax_amount = $goodsReceipt->tax_amount;
+            $this->faktur_image = is_array($goodsReceipt->faktur_image) ? $goodsReceipt->faktur_image : [];
 
             foreach ($goodsReceipt->items as $item) {
                 $stock = null;
@@ -424,6 +429,7 @@ class GoodsReceiptPos extends Component
             'branch_id' => 'nullable',
             'receipt_date' => 'required|date',
             'receipt_number' => 'required|unique:goods_receipts,receipt_number,' . ($this->goodsReceipt ? $this->goodsReceipt->id : 'NULL'),
+            'faktur_image.*' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:10240',
         ]);
 
         if (empty($this->cart)) {
@@ -431,8 +437,39 @@ class GoodsReceiptPos extends Component
             return;
         }
 
+        $imagePaths = [];
+        if ($this->faktur_image && is_array($this->faktur_image) && count($this->faktur_image) > 0 && !is_string($this->faktur_image[0])) {
+            foreach ($this->faktur_image as $file) {
+                if ($file && !is_string($file)) {
+                    $extension = strtolower($file->getClientOriginalExtension());
+                    if (in_array($extension, ['jpg', 'jpeg', 'png'])) {
+                        $manager = new \Intervention\Image\ImageManager(new \Intervention\Image\Drivers\Gd\Driver());
+                        $image = $manager->decode($file->getRealPath());
+                        
+                        if ($image->width() > 1200) {
+                            $image->scaleDown(width: 1200);
+                        }
+                        
+                        $filename = 'faktur_receipts/' . uniqid() . '.jpg';
+                        $fullPath = storage_path('app/public/' . $filename);
+                        
+                        if (!file_exists(storage_path('app/public/faktur_receipts'))) {
+                            mkdir(storage_path('app/public/faktur_receipts'), 0755, true);
+                        }
+
+                        $image->encode(new \Intervention\Image\Encoders\JpegEncoder(75))->save($fullPath);
+                        $imagePaths[] = $filename;
+                    } else {
+                        $imagePaths[] = $file->store('faktur_receipts', 'public');
+                    }
+                }
+            }
+        } elseif ($this->goodsReceipt && $this->goodsReceipt->faktur_image) {
+            $imagePaths = is_array($this->goodsReceipt->faktur_image) ? $this->goodsReceipt->faktur_image : [$this->goodsReceipt->faktur_image];
+        }
+
         $gr = null;
-        DB::transaction(function () use (&$gr) {
+        DB::transaction(function () use (&$gr, $imagePaths) {
             $data = [
                 'purchase_order_id' => $this->purchase_order_id,
                 'supplier_id' => $this->supplier_id,
@@ -442,6 +479,7 @@ class GoodsReceiptPos extends Component
                 'due_date' => $this->due_date,
                 'received_by' => auth()->user()->name,
                 'faktur_supplier' => $this->faktur_supplier,
+                'faktur_image' => empty($imagePaths) ? null : $imagePaths,
                 'total_amount' => $this->grandTotal,
                 'include_tax' => $this->include_tax,
                 'tax_amount' => $this->tax_amount,

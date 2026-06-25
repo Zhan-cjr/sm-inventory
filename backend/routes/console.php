@@ -14,3 +14,6 @@ Schedule::command('inventory:auto-discontinue')->dailyAt('00:00');
 
 // Menjalankan pengecekan dan pembuatan draft promo otomatis setiap jam 1 dini hari
 Schedule::command('inventory:auto-pricing')->dailyAt('01:00');
+
+// Membersihkan bukti faktur penerimaan barang yang berumur > 3 bulan
+Schedule::command('app:cleanup-faktur-images')->dailyAt('01:30');

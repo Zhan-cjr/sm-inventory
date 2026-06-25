@@ -84,6 +84,12 @@ class GoodsReceiptForm
                 TextInput::make('received_by')
                     ->required(),
                 TextInput::make('faktur_supplier'),
+                \Filament\Forms\Components\FileUpload::make('faktur_image')
+                    ->label('Bukti Faktur (Max 1MB)')
+                    ->maxSize(1024)
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'application/pdf'])
+                    ->directory('faktur_receipts')
+                    ->columnSpanFull(),
                 TextInput::make('total_amount')
                     ->required()
                     ->rupiah(),
