@@ -175,10 +175,39 @@
                             <div style="font-size: 0.7rem; color: #6b7280; margin-top: 0.25rem;">Bisa pilih >1 file. Maks 10MB/file. Gambar dikompres otomatis.</div>
                             @error('faktur_image.*') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                             <div wire:loading wire:target="faktur_image" class="text-xs text-blue-500 mt-1">Mengupload...</div>
-                            @if($faktur_image && is_array($faktur_image) && count($faktur_image) > 0 && !is_string($faktur_image[0]))
-                                <div class="mt-2 text-sm text-green-600 dark:text-green-400 font-medium">{{ count($faktur_image) }} file terpilih siap disimpan.</div>
-                            @elseif($goodsReceipt && is_array($goodsReceipt->faktur_image) && count($goodsReceipt->faktur_image) > 0)
-                                <div class="mt-2 text-sm text-blue-600 dark:text-blue-400 font-medium">{{ count($goodsReceipt->faktur_image) }} file sudah tersimpan.</div>
+                            
+                            <!-- Daftar Foto Lama (Jika sedang Edit) -->
+                            @if(count($existing_faktur_image) > 0)
+                                <div class="mt-2 text-sm text-gray-700 dark:text-gray-300 font-medium border-t border-gray-200 dark:border-gray-700 pt-2">
+                                    File Tersimpan:
+                                    <ul class="mt-1 space-y-1">
+                                        @foreach($existing_faktur_image as $index => $path)
+                                            <li class="flex items-center justify-between bg-blue-50 dark:bg-gray-800 p-1 px-2 rounded border border-blue-100 dark:border-gray-700">
+                                                <span class="text-xs truncate" style="max-width: 200px;" title="{{ $path }}">File {{ $index + 1 }}</span>
+                                                <button type="button" wire:click="removeExistingImage({{ $index }})" class="text-red-500 hover:text-red-700" title="Hapus file ini">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+                                                </button>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+
+                            <!-- Daftar Foto Baru -->
+                            @if($faktur_image && is_array($faktur_image) && count($faktur_image) > 0)
+                                <div class="mt-2 text-sm text-gray-700 dark:text-gray-300 font-medium border-t border-gray-200 dark:border-gray-700 pt-2">
+                                    Pilihan Baru:
+                                    <ul class="mt-1 space-y-1">
+                                        @foreach($faktur_image as $index => $file)
+                                            <li class="flex items-center justify-between bg-green-50 dark:bg-gray-800 p-1 px-2 rounded border border-green-100 dark:border-gray-700">
+                                                <span class="text-xs truncate text-green-700 dark:text-green-400" style="max-width: 200px;">{{ is_string($file) ? $file : $file->getClientOriginalName() }}</span>
+                                                <button type="button" wire:click="removeNewImage({{ $index }})" class="text-red-500 hover:text-red-700" title="Batal upload file ini">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+                                                </button>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
                             @endif
                         </td>
                     </tr>

@@ -25,6 +25,7 @@ class GoodsReceiptPos extends Component
     public $due_date;
     public $faktur_supplier;
     public $faktur_image = [];
+    public $existing_faktur_image = [];
     public $branch_id;
     public $notes;
     public $supplier_id;
@@ -66,7 +67,8 @@ class GoodsReceiptPos extends Component
             $this->purchase_order_id = $goodsReceipt->purchase_order_id;
             $this->include_tax = $goodsReceipt->include_tax;
             $this->tax_amount = $goodsReceipt->tax_amount;
-            $this->faktur_image = is_array($goodsReceipt->faktur_image) ? $goodsReceipt->faktur_image : [];
+            $this->existing_faktur_image = is_array($goodsReceipt->faktur_image) ? $goodsReceipt->faktur_image : ($goodsReceipt->faktur_image ? [$goodsReceipt->faktur_image] : []);
+            $this->faktur_image = [];
 
             foreach ($goodsReceipt->items as $item) {
                 $stock = null;
@@ -268,6 +270,22 @@ class GoodsReceiptPos extends Component
 
     public $enable_edit_total = false;
 
+    public function removeExistingImage($index)
+    {
+        if (isset($this->existing_faktur_image[$index])) {
+            unset($this->existing_faktur_image[$index]);
+            $this->existing_faktur_image = array_values($this->existing_faktur_image);
+        }
+    }
+
+    public function removeNewImage($index)
+    {
+        if (is_array($this->faktur_image) && isset($this->faktur_image[$index])) {
+            unset($this->faktur_image[$index]);
+            $this->faktur_image = array_values($this->faktur_image);
+        }
+    }
+
     public function updatedCart($value, $name)
     {
         $name = (string) $name;
@@ -437,8 +455,9 @@ class GoodsReceiptPos extends Component
             return;
         }
 
-        $imagePaths = [];
-        if ($this->faktur_image && is_array($this->faktur_image) && count($this->faktur_image) > 0 && !is_string($this->faktur_image[0])) {
+        $imagePaths = $this->existing_faktur_image;
+
+        if ($this->faktur_image && is_array($this->faktur_image) && count($this->faktur_image) > 0) {
             foreach ($this->faktur_image as $file) {
                 if ($file && !is_string($file)) {
                     $extension = strtolower($file->getClientOriginalExtension());
@@ -464,8 +483,6 @@ class GoodsReceiptPos extends Component
                     }
                 }
             }
-        } elseif ($this->goodsReceipt && $this->goodsReceipt->faktur_image) {
-            $imagePaths = is_array($this->goodsReceipt->faktur_image) ? $this->goodsReceipt->faktur_image : [$this->goodsReceipt->faktur_image];
         }
 
         $gr = null;
