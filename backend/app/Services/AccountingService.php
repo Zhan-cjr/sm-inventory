@@ -225,6 +225,27 @@ class AccountingService
                     'credit'           => $taxAmount,
                 ]);
             }
+
+            // OTOMATISASI: Buat record di Manajemen Pajak (Tax Invoices)
+            $dppTaxable = round($taxAmount / ($taxRate / 100), 2);
+            $customerName = null;
+            if ($transaction->customer_id) {
+                $customerName = \App\Models\Customer::find($transaction->customer_id)?->name;
+            }
+
+            \App\Models\TaxInvoice::create([
+                'organization_id' => $transaction->organization_id,
+                'type' => 'keluaran',
+                'nomor_faktur' => 'FK-' . $transaction->receipt_number,
+                'tanggal_faktur' => $transaction->transaction_date,
+                'masa_pajak' => \Carbon\Carbon::parse($transaction->transaction_date)->format('m-Y'),
+                'nama_lawan' => $customerName ?? 'Pelanggan POS',
+                'dpp' => $dppTaxable,
+                'ppn' => $taxAmount,
+                'status' => 'draft',
+                'reference_id' => $transaction->id,
+                'reference_type' => Transaction::class,
+            ]);
         }
 
         // ── 8. Diskon (self-balancing memo, tidak ganggu balance) ────────────
@@ -357,6 +378,31 @@ class AccountingService
                 'debit' => $taxAmount,
                 'credit' => 0,
             ]);
+
+            // OTOMATISASI: Buat record di Manajemen Pajak (Tax Invoices)
+            $supplierName = null;
+            $supplierNpwp = null;
+            if ($receipt->supplier_id) {
+                $supplier = \App\Models\Supplier::find($receipt->supplier_id);
+                $supplierName = $supplier?->name;
+                $supplierNpwp = $supplier?->npwp; // Assuming NPWP might exist, else null
+            }
+
+            \App\Models\TaxInvoice::create([
+                'organization_id' => $organizationId,
+                'type' => 'masukan',
+                'nomor_faktur' => 'FM-' . $receipt->receipt_number,
+                'tanggal_faktur' => $receipt->receipt_date ?? now(),
+                'masa_pajak' => \Carbon\Carbon::parse($receipt->receipt_date ?? now())->format('m-Y'),
+                'nama_lawan' => $supplierName ?? 'Supplier PO',
+                'npwp_lawan' => $supplierNpwp,
+                'dpp' => $inventoryAmount,
+                'ppn' => $taxAmount,
+                'status' => 'draft',
+                'reference_id' => $receipt->id,
+                'reference_type' => \App\Models\GoodsReceipt::class,
+            ]);
+
         } elseif ($taxAmount > 0) {
             // Jika akun pajak tidak ada, tambahkan kembali ke Persediaan
             $line = JournalEntryLine::where('journal_entry_id', $journal->id)
