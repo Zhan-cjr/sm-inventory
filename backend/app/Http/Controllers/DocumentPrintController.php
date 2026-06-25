@@ -73,6 +73,12 @@ class DocumentPrintController extends Controller
                 $viewName = 'print.documents.expense';
                 $title = 'Bukti Pengeluaran Kas';
                 break;
+            case 'tax-invoice':
+                $documents = \App\Models\TaxInvoice::with(['organization'])
+                    ->whereIn('id', $ids)->get();
+                $viewName = 'print.documents.tax-invoice';
+                $title = 'Faktur Pajak';
+                break;
             default:
                 abort(404, 'Tipe dokumen tidak didukung');
         }
