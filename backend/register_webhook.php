@@ -6,7 +6,7 @@ $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 $token = env('TELEGRAM_BOT_TOKEN');
 if ($token) {
     $response = Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/setWebhook", [
-        'url' => 'https://admin.toserbaselamat.id/api/telegram/webhook'
+        'url' => 'https://admin.toserbaselamat.id/api/v1/webhook/telegram'
     ]);
     echo "Response: " . $response->body() . "\n";
 } else {

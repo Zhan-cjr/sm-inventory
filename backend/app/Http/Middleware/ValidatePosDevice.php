@@ -19,6 +19,7 @@ class ValidatePosDevice
             '*api/v1/devices/handshake',
             '*api/v1/login',
             '*api/v1/ecommerce/*', // E-Commerce public endpoints
+            '*api/v1/webhook/*', // Bypass untuk Webhook Pihak Ketiga (Telegram/Payment)
             '*print/transaction/*',
             '*print/report/*',
             '*up' // Health check
