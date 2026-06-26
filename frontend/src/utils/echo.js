@@ -15,7 +15,7 @@ export const initEcho = (token) => {
         wsPort: 8080,
         wssPort: isHttps ? 443 : 8080, // Production HTTPS biasanya menggunakan port 443 (diproxy Nginx)
         forceTLS: isHttps,
-        enabledTransports: isHttps ? ['wss'] : ['ws'],
+        enabledTransports: ['ws', 'wss'],
         authEndpoint: '/api/v1/broadcasting/auth', // Sanctum auth endpoint inside api.php
         auth: {
             headers: {
