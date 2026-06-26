@@ -610,6 +610,8 @@ class EcommerceController extends Controller
                 'payment_status' => $paymentStatus,
                 'notes' => $request->notes,
             ]);
+            
+            $finalAmountWithShipping = $finalAmount + $request->input('shipping_cost', 0);
 
             $orderIdShort = strtoupper(substr($order->id, 0, 8));
 
@@ -678,13 +680,13 @@ class EcommerceController extends Controller
             }
 
             // Generate Midtrans Snap Token if payment method is MIDTRANS or NON_CASH
-            if (in_array($paymentMethod, ['MIDTRANS', 'QRIS', 'TRANSFER']) && $finalAmount > 0) {
+            if (in_array($paymentMethod, ['MIDTRANS', 'QRIS', 'TRANSFER']) && $finalAmountWithShipping > 0) {
                 $this->_configureMidtrans();
 
                 $params = [
                     'transaction_details' => [
                         'order_id' => $order->id,
-                        'gross_amount' => (int)$finalAmount,
+                        'gross_amount' => (int)$finalAmountWithShipping,
                     ],
                     'customer_details' => [
                         'first_name' => $request->customer_name,
