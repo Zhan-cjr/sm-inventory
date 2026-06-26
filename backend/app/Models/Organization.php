@@ -15,7 +15,7 @@ class Organization extends Model
         'ecommerce_banner_image', 'ecommerce_banner_images', 'ecommerce_banner_cta_text', 'ecommerce_announcement', 'ecommerce_categories',
         'wa_gateway_type', 'wa_gateway_token', 'wa_gateway_domain', 'wa_gateway_sender',
         'allow_minus_stock', 'po_approval_limit', 'po_approval_max_qty_enabled', 'stock_adjustment_approval_amount_limit',
-        'telegram_group_po_approval', 'telegram_group_stock_correction', 'telegram_group_warehouse_check',
+        'telegram_group_po_approval', 'telegram_group_stock_correction', 'telegram_group_warehouse_check', 'telegram_group_daily_report',
         'scale_barcode_enabled', 'scale_barcode_prefix', 'scale_barcode_item_code_length', 'scale_barcode_weight_length', 'scale_barcode_weight_decimal_places'
     ];
 
@@ -60,6 +60,10 @@ class Organization extends Model
             foreach ($settings as $setting) {
                 $organization->posSettings()->create($setting);
             }
+        });
+
+        static::saved(function ($organization) {
+            \Illuminate\Support\Facades\Cache::forget('ecommerce_settings');
         });
     }
 

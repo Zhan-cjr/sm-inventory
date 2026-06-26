@@ -40,6 +40,20 @@ class Promotion extends Model
                 $promotion->applicable_to = 'ALL';
             }
         });
+
+        static::saved(function ($promotion) {
+            \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+            foreach (\App\Models\Branch::pluck('id') as $branchId) {
+                \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+            }
+        });
+
+        static::deleted(function ($promotion) {
+            \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+            foreach (\App\Models\Branch::pluck('id') as $branchId) {
+                \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+            }
+        });
     }
 
     public function organization(): \Illuminate\Database\Eloquent\Relations\BelongsTo

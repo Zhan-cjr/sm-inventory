@@ -20,3 +20,12 @@ backend/data.ms/
 **/*.pyc
 venv/
 env/
+
+# Temporary Development and Test Files
+redis-win/
+start_redis.bat
+backend/public/test_echo.html
+backend/test_broadcast.php
+backend/test_broadcast_stock.php
+backend/test_redis.php
+frontend/test_ws.cjs

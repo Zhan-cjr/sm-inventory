@@ -5,6 +5,7 @@ import { AuthorizationModal } from './AuthorizationModal';
 import { ReturnItemModal } from './ReturnItemModal';
 import { ReceiptPreview } from './ReceiptPreview';
 import { EODReportPreview } from './EODReportPreview';
+import { initEcho } from '../utils/echo';
 import {
   LogOut,
   ShoppingCart,
@@ -438,6 +439,96 @@ export const POSTransaction = ({
 
   const [dbProducts, setDbProducts] = useState([]);
   const [dbPromos, setDbPromos] = useState([]);
+
+  // --- Real-time WebSockets Integration (Laravel Reverb) ---
+  useEffect(() => {
+    if (branchId && authToken) {
+      let echoInstance = null;
+      try {
+        echoInstance = initEcho(authToken);
+        
+        // Listen for Stock Updates
+        echoInstance.private(`branch.${branchId}.stock`)
+          .listen('.stock.updated', (e) => {
+            console.log('[WebSockets] StockUpdated received:', e);
+            setDbProducts(prev => {
+              const updated = prev.map(p => {
+                if (p.id === e.product_id) {
+                  const updatedStockData = { ...p, stock: e.quantity_on_hand };
+                  // If stock table overrides the price for this branch, apply it
+                  if (e.selling_price !== null && e.selling_price !== undefined && parseFloat(e.selling_price) > 0) {
+                      updatedStockData.selling_price = e.selling_price;
+                  }
+                  return updatedStockData;
+                }
+                return p;
+              });
+              
+              idbCache.set('pos_cached_products', updated).catch(() => {});
+              return updated;
+            });
+            
+            // Perbarui juga harga keranjang jika dipengaruhi harga cabang (stock override)
+            if (e.selling_price !== null && e.selling_price !== undefined && parseFloat(e.selling_price) > 0) {
+              setItems(prevItems => prevItems.map(item => {
+                if (item.productId === e.product_id) {
+                    return { ...item, unitPrice: parseFloat(e.selling_price) };
+                }
+                return item;
+              }));
+            }
+          });
+
+        // Listen for Transaction Creations (Other Terminals)
+        echoInstance.private(`branch.${branchId}.transactions`)
+          .listen('.transaction.created', (e) => {
+            console.log('[WebSockets] TransactionCreated received from another terminal:', e);
+            // Example: We can trigger a UI refresh, sync, or just show a tiny toast
+            // For now, let's just log it.
+          });
+
+        // Listen for Global Catalog Updates (e.g. price change)
+        echoInstance.channel(`catalog`)
+          .listen('.product.updated', (e) => {
+            console.log('[WebSockets] ProductUpdated received (Price/Details change):', e);
+            if (e.product) {
+              setDbProducts(prev => {
+                const updated = prev.map(p => {
+                  if (p.id === e.product.id) {
+                    // Update all product details (especially selling_price), but preserve local stock if any
+                    return { ...p, ...e.product, stock: p.stock };
+                  }
+                  return p;
+                });
+                idbCache.set('pos_cached_products', updated).catch(() => {});
+                return updated;
+              });
+              
+              // Jika produk tersebut ada di keranjang, perbarui harganya di keranjang
+              setItems(prevItems => prevItems.map(item => {
+                if (item.productId === e.product.id) {
+                    return { ...item, unitPrice: parseFloat(e.product.selling_price) };
+                }
+                return item;
+              }));
+            }
+          });
+
+      } catch (err) {
+        console.warn('Failed to initialize WebSockets connection:', err);
+      }
+
+      return () => {
+        if (echoInstance) {
+          echoInstance.leave(`branch.${branchId}.stock`);
+          echoInstance.leave(`branch.${branchId}.transactions`);
+          echoInstance.leave(`catalog`);
+          echoInstance.disconnect();
+        }
+      };
+    }
+  }, [branchId, authToken]);
+  // ---------------------------------------------------------
 
   useEffect(() => {
     fetch('/api/v1/server-time', {

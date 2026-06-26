@@ -53,6 +53,8 @@ Route::prefix('v1')->group(function () {
 
     // Protected Routes
     Route::middleware('auth:sanctum')->group(function () {
+        \Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['auth:sanctum']]);
+        
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         

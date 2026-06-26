@@ -60,27 +60,31 @@ class EcommerceController extends Controller
      */
     public function getSettings()
     {
-        $organization = \App\Models\Organization::first();
-        return response()->json([
-            'logo_url' => $organization && $organization->logo_path 
-                ? asset('storage/' . $organization->logo_path) 
-                : null,
-            'name' => $organization ? $organization->name : 'Toserba Selamat',
-            'address' => $organization ? $organization->address : null,
-            'phone' => $organization ? $organization->phone : null,
-            'email' => $organization ? $organization->email : null,
-            'ecommerce_categories' => $organization?->ecommerce_categories ?? [],
-            'ecommerce_banner_title' => $organization?->ecommerce_banner_title ?? 'Belanja Untung, Murah, Manfaat',
-            'ecommerce_banner_subtitle' => $organization?->ecommerce_banner_subtitle ?? 'Dan InsyaAllah Berkah. Temukan berbagai kebutuhan keluarga muslim dengan harga terbaik dari cabang Toserba Selamat terdekat Anda.',
-            'ecommerce_banner_images_urls' => $organization && is_array($organization->ecommerce_banner_images) 
-                ? array_map(fn($path) => asset('storage/' . $path), $organization->ecommerce_banner_images) 
-                : [],
-            'ecommerce_banner_cta_text' => $organization?->ecommerce_banner_cta_text ?? 'Mulai Belanja',
-            'ecommerce_announcement' => $organization?->ecommerce_announcement ?? 'Selamat datang di toko online resmi kami! Nikmati promo menarik dan poin di setiap transaksi.',
-            'point_redemption_value' => (float)($organization?->point_redemption_value ?? 1.00),
-            'minimum_points_to_redeem' => (int)($organization?->minimum_points_to_redeem ?? 100),
-            'point_redemption_enabled' => (bool)($organization?->point_redemption_enabled ?? true),
-        ]);
+        $data = \Illuminate\Support\Facades\Cache::remember('ecommerce_settings', 86400, function () {
+            $organization = \App\Models\Organization::first();
+            return [
+                'logo_url' => $organization && $organization->logo_path 
+                    ? asset('storage/' . $organization->logo_path) 
+                    : null,
+                'name' => $organization ? $organization->name : 'Toserba Selamat',
+                'address' => $organization ? $organization->address : null,
+                'phone' => $organization ? $organization->phone : null,
+                'email' => $organization ? $organization->email : null,
+                'ecommerce_categories' => $organization?->ecommerce_categories ?? [],
+                'ecommerce_banner_title' => $organization?->ecommerce_banner_title ?? 'Belanja Untung, Murah, Manfaat',
+                'ecommerce_banner_subtitle' => $organization?->ecommerce_banner_subtitle ?? 'Dan InsyaAllah Berkah. Temukan berbagai kebutuhan keluarga muslim dengan harga terbaik dari cabang Toserba Selamat terdekat Anda.',
+                'ecommerce_banner_images_urls' => $organization && is_array($organization->ecommerce_banner_images) 
+                    ? array_map(fn($path) => asset('storage/' . $path), $organization->ecommerce_banner_images) 
+                    : [],
+                'ecommerce_banner_cta_text' => $organization?->ecommerce_banner_cta_text ?? 'Mulai Belanja',
+                'ecommerce_announcement' => $organization?->ecommerce_announcement ?? 'Selamat datang di toko online resmi kami! Nikmati promo menarik dan poin di setiap transaksi.',
+                'point_redemption_value' => (float)($organization?->point_redemption_value ?? 1.00),
+                'minimum_points_to_redeem' => (int)($organization?->minimum_points_to_redeem ?? 100),
+                'point_redemption_enabled' => (bool)($organization?->point_redemption_enabled ?? true),
+            ];
+        });
+
+        return response()->json($data);
     }
 
     /**
@@ -89,143 +93,147 @@ class EcommerceController extends Controller
     public function getProducts(Request $request)
     {
         $branchId = $request->query('branch_id'); // Optional branch filter for pricing
-        $now = now();
+        $cacheKey = 'ecommerce_products_' . ($branchId ?: 'all');
 
-        $promotions = \App\Models\Promotion::where('is_active', true)
-            ->where('valid_from', '<=', $now)
-            ->where('valid_until', '>=', $now)
-            ->where(function ($query) use ($branchId) {
-                $query->whereDoesntHave('branches');
-                if ($branchId) {
-                    $query->orWhereHas('branches', function ($q) use ($branchId) {
-                        $q->where('branches.id', $branchId);
-                    });
-                }
-            })
-            ->get();
+        $products = \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($branchId) {
+            $now = now();
 
-        $promoProductIds = [];
-        $promoCategoryIds = [];
-        $promoAll = null;
-        $promoDetails = [];
+            $promotions = \App\Models\Promotion::where('is_active', true)
+                ->where('valid_from', '<=', $now)
+                ->where('valid_until', '>=', $now)
+                ->where(function ($query) use ($branchId) {
+                    $query->whereDoesntHave('branches');
+                    if ($branchId) {
+                        $query->orWhereHas('branches', function ($q) use ($branchId) {
+                            $q->where('branches.id', $branchId);
+                        });
+                    }
+                })
+                ->get();
 
-        foreach ($promotions as $promo) {
-            if ($promo->applicable_to === 'ALL') {
-                if (!$promoAll) {
-                    $promoAll = $promo;
-                }
-            } elseif ($promo->applicable_to === 'CATEGORY') {
-                if (is_array($promo->target_ids)) {
-                    foreach ($promo->target_ids as $cid) {
-                        $promoCategoryIds[] = $cid;
-                        if (!isset($promoDetails['cat_'.$cid])) {
-                            $promoDetails['cat_'.$cid] = $promo;
+            $promoProductIds = [];
+            $promoCategoryIds = [];
+            $promoAll = null;
+            $promoDetails = [];
+
+            foreach ($promotions as $promo) {
+                if ($promo->applicable_to === 'ALL') {
+                    if (!$promoAll) {
+                        $promoAll = $promo;
+                    }
+                } elseif ($promo->applicable_to === 'CATEGORY') {
+                    if (is_array($promo->target_ids)) {
+                        foreach ($promo->target_ids as $cid) {
+                            $promoCategoryIds[] = $cid;
+                            if (!isset($promoDetails['cat_'.$cid])) {
+                                $promoDetails['cat_'.$cid] = $promo;
+                            }
+                        }
+                    }
+                } elseif ($promo->applicable_to === 'PRODUCT') {
+                    if (is_array($promo->target_ids)) {
+                        foreach ($promo->target_ids as $pid) {
+                            $promoProductIds[] = $pid;
+                            if (!isset($promoDetails['prod_'.$pid])) {
+                                $promoDetails['prod_'.$pid] = $promo;
+                            }
                         }
                     }
                 }
-            } elseif ($promo->applicable_to === 'PRODUCT') {
-                if (is_array($promo->target_ids)) {
-                    foreach ($promo->target_ids as $pid) {
-                        $promoProductIds[] = $pid;
-                        if (!isset($promoDetails['prod_'.$pid])) {
-                            $promoDetails['prod_'.$pid] = $promo;
-                        }
+            }
+            $promoProductIds = array_unique($promoProductIds);
+            $promoCategoryIds = array_unique($promoCategoryIds);
+
+            $query = \App\Models\Product::query()
+                ->with('category')
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($promoProductIds, $promoCategoryIds, $promoAll) {
+                    $q->where('products.is_ecommerce_active', true);
+                    if (!empty($promoProductIds)) {
+                        $q->orWhereIn('products.id', $promoProductIds);
                     }
-                }
-            }
-        }
-        $promoProductIds = array_unique($promoProductIds);
-        $promoCategoryIds = array_unique($promoCategoryIds);
-
-        $query = \App\Models\Product::query()
-            ->with('category')
-            ->where('products.is_active', true)
-            ->where(function ($q) use ($promoProductIds, $promoCategoryIds, $promoAll) {
-                $q->where('products.is_ecommerce_active', true);
-                if (!empty($promoProductIds)) {
-                    $q->orWhereIn('products.id', $promoProductIds);
-                }
-                if (!empty($promoCategoryIds)) {
-                    $q->orWhereIn('products.category_id', $promoCategoryIds);
-                }
-            });
-
-        // Jika branch_id diberikan, ambil harga dan stok dari branch tersebut menggunakan leftJoin
-        if ($branchId) {
-            $query->leftJoin('stocks', function($join) use ($branchId) {
-                $join->on('products.id', '=', 'stocks.product_id')
-                     ->where('stocks.branch_id', '=', $branchId);
-            })
-            ->select([
-                'products.*',
-                'stocks.selling_price as branch_selling_price',
-                'stocks.quantity_on_hand as stock'
-            ]);
-        } else {
-            // Jika tidak ada branch_id, hitung total stok di seluruh cabang
-            $query->withSum('stocks as stock', 'quantity_on_hand');
-        }
-
-        $products = $query->get()->map(function ($product) use ($promoProductIds, $promoCategoryIds, $promoAll, $promoDetails) {
-            if (isset($product->branch_selling_price) && $product->branch_selling_price !== null) {
-                $product->selling_price = $product->branch_selling_price;
-            }
-            
-            $appliedPromo = null;
-            if (in_array($product->id, $promoProductIds) && isset($promoDetails['prod_'.$product->id])) {
-                $appliedPromo = $promoDetails['prod_'.$product->id];
-            } elseif (in_array($product->category_id, $promoCategoryIds) && isset($promoDetails['cat_'.$product->category_id])) {
-                $appliedPromo = $promoDetails['cat_'.$product->category_id];
-            } elseif ($promoAll) {
-                $appliedPromo = $promoAll;
-            }
-
-            if ($appliedPromo) {
-                $product->is_promo = true;
-                $promo = $appliedPromo;
-                $product->original_price = $product->selling_price;
-                
-                // Sembunyikan data internal yang tidak perlu sebelum dikirim ke frontend
-                $cleanPromo = [
-                    'name' => $promo->name,
-                    'promo_type' => $promo->promo_type,
-                    'discount_value' => $promo->discount_value,
-                    'min_purchase_amount' => $promo->min_purchase_amount,
-                    'max_discount_per_transaction' => $promo->max_discount_per_transaction,
-                    'promo_config' => is_string($promo->promo_config) ? json_decode($promo->promo_config, true) : $promo->promo_config,
-                    'valid_until' => $promo->valid_until,
-                ];
-                $product->applied_promo = $cleanPromo;
-                
-                $discount = 0;
-                if ($promo->promo_type === 'PERCENTAGE' || $promo->promo_type === 'FLASH_SALE') {
-                    $discount = ($product->selling_price * $promo->discount_value) / 100;
-                    if ($promo->max_discount_per_transaction > 0 && $discount > $promo->max_discount_per_transaction) {
-                        $discount = $promo->max_discount_per_transaction;
+                    if (!empty($promoCategoryIds)) {
+                        $q->orWhereIn('products.category_id', $promoCategoryIds);
                     }
-                } elseif ($promo->promo_type === 'FIXED') {
-                    $discount = $promo->discount_value;
-                }
-                
-                // Only set original price if there is an actual discount on unit price
-                if ($discount > 0) {
-                    $product->selling_price = max(0, $product->selling_price - $discount);
-                } else {
-                    $product->original_price = null; // No strikethrough if no direct unit discount (e.g. Bundling)
-                }
+                });
+
+            // Jika branch_id diberikan, ambil harga dan stok dari branch tersebut menggunakan leftJoin
+            if ($branchId) {
+                $query->leftJoin('stocks', function($join) use ($branchId) {
+                    $join->on('products.id', '=', 'stocks.product_id')
+                         ->where('stocks.branch_id', '=', $branchId);
+                })
+                ->select([
+                    'products.*',
+                    'stocks.selling_price as branch_selling_price',
+                    'stocks.quantity_on_hand as stock'
+                ]);
             } else {
-                $product->is_promo = false;
+                // Jika tidak ada branch_id, hitung total stok di seluruh cabang
+                $query->withSum('stocks as stock', 'quantity_on_hand');
             }
-            
-            // Format image url
-            $product->image_url = $product->image_path 
-                ? asset('storage/' . $product->image_path)
-                : null;
+
+            return $query->get()->map(function ($product) use ($promoProductIds, $promoCategoryIds, $promoAll, $promoDetails) {
+                if (isset($product->branch_selling_price) && $product->branch_selling_price !== null) {
+                    $product->selling_price = $product->branch_selling_price;
+                }
                 
-            // Format stock
-            $product->stock = (int)($product->stock ?? 0);
+                $appliedPromo = null;
+                if (in_array($product->id, $promoProductIds) && isset($promoDetails['prod_'.$product->id])) {
+                    $appliedPromo = $promoDetails['prod_'.$product->id];
+                } elseif (in_array($product->category_id, $promoCategoryIds) && isset($promoDetails['cat_'.$product->category_id])) {
+                    $appliedPromo = $promoDetails['cat_'.$product->category_id];
+                } elseif ($promoAll) {
+                    $appliedPromo = $promoAll;
+                }
+
+                if ($appliedPromo) {
+                    $product->is_promo = true;
+                    $promo = $appliedPromo;
+                    $product->original_price = $product->selling_price;
+                    
+                    // Sembunyikan data internal yang tidak perlu sebelum dikirim ke frontend
+                    $cleanPromo = [
+                        'name' => $promo->name,
+                        'promo_type' => $promo->promo_type,
+                        'discount_value' => $promo->discount_value,
+                        'min_purchase_amount' => $promo->min_purchase_amount,
+                        'max_discount_per_transaction' => $promo->max_discount_per_transaction,
+                        'promo_config' => is_string($promo->promo_config) ? json_decode($promo->promo_config, true) : $promo->promo_config,
+                        'valid_until' => $promo->valid_until,
+                    ];
+                    $product->applied_promo = $cleanPromo;
+                    
+                    $discount = 0;
+                    if ($promo->promo_type === 'PERCENTAGE' || $promo->promo_type === 'FLASH_SALE') {
+                        $discount = ($product->selling_price * $promo->discount_value) / 100;
+                        if ($promo->max_discount_per_transaction > 0 && $discount > $promo->max_discount_per_transaction) {
+                            $discount = $promo->max_discount_per_transaction;
+                        }
+                    } elseif ($promo->promo_type === 'FIXED') {
+                        $discount = $promo->discount_value;
+                    }
+                    
+                    // Only set original price if there is an actual discount on unit price
+                    if ($discount > 0) {
+                        $product->selling_price = max(0, $product->selling_price - $discount);
+                    } else {
+                        $product->original_price = null; // No strikethrough if no direct unit discount (e.g. Bundling)
+                    }
+                } else {
+                    $product->is_promo = false;
+                }
                 
-            return $product;
+                // Format image url
+                $product->image_url = $product->image_path 
+                    ? asset('storage/' . $product->image_path)
+                    : null;
+                    
+                // Format stock
+                $product->stock = (int)($product->stock ?? 0);
+                    
+                return $product;
+            })->toArray();
         });
 
         return response()->json($products);
@@ -236,7 +244,9 @@ class EcommerceController extends Controller
      */
     public function getBranches()
     {
-        $branches = Branch::where('is_active', true)->get();
+        $branches = \Illuminate\Support\Facades\Cache::remember('ecommerce_branches', 86400, function () {
+            return Branch::where('is_active', true)->get()->toArray();
+        });
         return response()->json($branches);
     }
 

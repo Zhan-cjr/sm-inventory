@@ -17,3 +17,9 @@ Schedule::command('inventory:auto-pricing')->dailyAt('01:00');
 
 // Membersihkan bukti faktur penerimaan barang yang berumur > 3 bulan
 Schedule::command('app:cleanup-faktur-images')->dailyAt('01:30');
+
+// Mengirim laporan penjualan harian per cabang setiap jam 9 malam
+Schedule::command('app:send-daily-report')->dailyAt('21:00');
+
+// Mengirim peringatan PO pending (lebih dari 2 hari) setiap jam 8 pagi
+Schedule::command('app:remind-pending-po')->dailyAt('08:00');

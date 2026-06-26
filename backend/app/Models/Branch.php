@@ -9,6 +9,17 @@ class Branch extends Model
 {
     use HasUuids;
 
+    protected static function booted()
+    {
+        static::saved(function ($branch) {
+            \Illuminate\Support\Facades\Cache::forget('ecommerce_branches');
+        });
+
+        static::deleted(function ($branch) {
+            \Illuminate\Support\Facades\Cache::forget('ecommerce_branches');
+        });
+    }
+
     protected $fillable = [
         'organization_id', 'name', 'code', 'address', 
         'phone', 'manager_id', 'is_active', 'latitude', 'longitude', 'sort_order',

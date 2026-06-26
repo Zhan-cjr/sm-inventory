@@ -258,6 +258,15 @@ class TransactionController extends Controller
                 Cache::tags(['inventory', "branch:{$user->branch_id}"])->flush();
             });
 
+            // Broadcast the new transaction to the branch channel
+            event(new \App\Events\TransactionCreated($transaction->branch_id, [
+                'id' => $transaction->id,
+                'receipt_number' => $transaction->receipt_number,
+                'transaction_date' => $transaction->transaction_date,
+                'total_amount' => $transaction->total_amount,
+                'final_amount' => $transaction->final_amount,
+            ]));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Transaction created successfully',

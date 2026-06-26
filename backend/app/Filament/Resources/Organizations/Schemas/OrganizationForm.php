@@ -139,6 +139,11 @@ class OrganizationForm
                                 ->label('Chat ID Grup Approval Pengecekan Gudang')
                                 ->placeholder('Contoh: -100123456789')
                                 ->helperText('Notifikasi persetujuan Pengecekan Gudang akan dikirim ke grup ini.')
+                                ->nullable(),
+                            TextInput::make('telegram_group_daily_report')
+                                ->label('Chat ID Grup Laporan Harian')
+                                ->placeholder('Contoh: -100123456789')
+                                ->helperText('Notifikasi laporan harian akan dikirim ke grup ini.')
                                 ->nullable()
                                 ->columnSpanFull(),
                         ])

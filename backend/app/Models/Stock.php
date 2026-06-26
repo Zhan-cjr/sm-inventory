@@ -8,6 +8,30 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 class Stock extends Model
 {
     use HasUuids;
+
+    protected static function booted()
+    {
+        static::saved(function ($stock) {
+            \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+            if ($stock->branch_id) {
+                \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $stock->branch_id);
+                
+                // Broadcast stock update
+                event(new \App\Events\StockUpdated($stock));
+            }
+        });
+
+        static::deleted(function ($stock) {
+            \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+            if ($stock->branch_id) {
+                \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $stock->branch_id);
+                
+                // Broadcast stock update (as 0)
+                $stock->quantity_on_hand = 0;
+                event(new \App\Events\StockUpdated($stock));
+            }
+        });
+    }
     
     public $log_type;
     public $reason_code;

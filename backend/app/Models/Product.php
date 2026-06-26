@@ -45,6 +45,23 @@ class Product extends Model
                 throw new \Exception("Produk '{$product->name}' tidak dapat dihapus karena sudah memiliki histori transaksi. Silakan non-aktifkan saja.");
             }
         });
+
+        static::saved(function ($product) {
+            \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+            foreach (\App\Models\Branch::pluck('id') as $branchId) {
+                \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+            }
+            
+            // Broadcast the product update to the POS catalog channel
+            event(new \App\Events\ProductUpdated($product));
+        });
+
+        static::deleted(function ($product) {
+            \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+            foreach (\App\Models\Branch::pluck('id') as $branchId) {
+                \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+            }
+        });
     }
 
     protected $fillable = [
