@@ -47,7 +47,6 @@ export const CheckoutModal: React.FC = () => {
 
   // Shipping
   const [destLat, setDestLat] = useState<number | null>(null);
-  const [destLon, setDestLon] = useState<number | null>(null);
   const [shippingRates, setShippingRates] = useState<any[]>([]);
   const [selectedCourier, setSelectedCourier] = useState<any | null>(null);
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
@@ -174,10 +173,9 @@ export const CheckoutModal: React.FC = () => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setDestLat(position.coords.latitude);
-          setDestLon(position.coords.longitude);
           calculateShippingRates(position.coords.latitude, position.coords.longitude);
         },
-        (error) => {
+        () => {
           alert('Gagal mendapatkan lokasi GPS. Pastikan izin lokasi diberikan.');
         }
       );
