@@ -31,6 +31,7 @@ Route::prefix('v1/ecommerce')->group(function () {
     Route::get('nearest-branch', [EcommerceController::class, 'findNearestBranch']);
     Route::get('branches', [EcommerceController::class, 'getBranches']);
     Route::post('orders', [EcommerceController::class, 'createOrder']);
+    Route::post('shipping-rates', [EcommerceController::class, 'getShippingRates']);
     Route::post('orders/{id}/refresh-payment', [EcommerceController::class, 'refreshPaymentToken']);
     Route::post('payment/notification', [EcommerceController::class, 'paymentNotification']);
     Route::post('members', [EcommerceController::class, 'registerMember']);
@@ -41,6 +42,13 @@ Route::prefix('v1/ecommerce')->group(function () {
     Route::get('members/debug-otp', [EcommerceController::class, 'debugLastOtp']);
     Route::post('members/reset-password', [EcommerceController::class, 'resetPassword']);
     Route::put('customer/profile', [EcommerceController::class, 'updateMemberProfile']);
+    
+    // Address Book & Logistics
+    Route::get('areas/search', [EcommerceController::class, 'searchShippingAreas']);
+    Route::get('customers/addresses', [EcommerceController::class, 'getCustomerAddresses']);
+    Route::post('customers/addresses', [EcommerceController::class, 'addCustomerAddress']);
+    Route::put('customers/addresses/{id}/set-primary', [EcommerceController::class, 'setPrimaryCustomerAddress']);
+    Route::delete('customers/addresses/{id}', [EcommerceController::class, 'deleteCustomerAddress']);
 });
 
 Route::prefix('v1')->group(function () {

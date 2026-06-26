@@ -112,6 +112,33 @@ class EcommerceSettingForm
                                 ->required(fn ($get) => $get('wa_gateway_type') !== null)
                                 ->columnSpanFull(),
                         ])
+                    ]),
+                Section::make('Pengaturan Logistik & Pengiriman (Biteship)')
+                    ->description('Integrasi API Cek Ongkir dan Request Pickup otomatis menggunakan layanan Biteship.')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            TextInput::make('biteship_api_key')
+                                ->label('API Key Biteship')
+                                ->placeholder('biteship_live_xxxxxxxxxxxx')
+                                ->password()
+                                ->helperText('Dapatkan API Key ini dari menu Settings > API Keys di dashboard Biteship Anda.')
+                                ->columnSpanFull(),
+                            Select::make('logistics_markup_type')
+                                ->label('Tipe Markup Ongkos Kirim')
+                                ->options([
+                                    'NONE' => 'Tidak Ada Markup (Harga Asli)',
+                                    'FIXED' => 'Nominal Tetap (Rp)',
+                                    'PERCENTAGE' => 'Persentase (%)',
+                                ])
+                                ->default('NONE')
+                                ->helperText('Markup ini ditambahkan secara diam-diam ke ongkir yang dilihat oleh pelanggan.'),
+                            TextInput::make('logistics_markup_value')
+                                ->label('Nilai Markup')
+                                ->numeric()
+                                ->default(0)
+                                ->placeholder('Contoh: 2000 (untuk Rp) atau 10 (untuk %)')
+                                ->helperText('Masukkan nilai markup tanpa simbol (misal: 2000 untuk Rp 2.000 atau 10 untuk 10%).'),
+                        ])
                     ])
             ]);
     }

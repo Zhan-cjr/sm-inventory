@@ -13,6 +13,7 @@ class Organization extends Model
         'name', 'code', 'timezone', 'currency_code', 'tax_rate', 'logo_path', 'address', 'phone', 'email', 
         'point_conversion_rate', 'point_redemption_value', 'minimum_points_to_redeem', 'ecommerce_banner_title', 'ecommerce_banner_subtitle', 
         'ecommerce_banner_image', 'ecommerce_banner_images', 'ecommerce_banner_cta_text', 'ecommerce_announcement', 'ecommerce_categories',
+        'biteship_api_key', 'logistics_markup_type', 'logistics_markup_value',
         'wa_gateway_type', 'wa_gateway_token', 'wa_gateway_domain', 'wa_gateway_sender',
         'allow_minus_stock', 'po_approval_limit', 'po_approval_max_qty_enabled', 'stock_adjustment_approval_amount_limit',
         'telegram_group_po_approval', 'telegram_group_stock_correction', 'telegram_group_warehouse_check', 'telegram_group_daily_report',

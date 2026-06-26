@@ -250,6 +250,167 @@ class EcommerceController extends Controller
         return response()->json($branches);
     }
 
+    /**
+     * Cek ongkos kirim ke Biteship dengan markup
+     */
+    public function getShippingRates(Request $request)
+    {
+        $request->validate([
+            'branch_id' => 'required|exists:branches,id',
+            'destination_latitude' => 'nullable|numeric',
+            'destination_longitude' => 'nullable|numeric',
+            'destination_area_id' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        if (!$request->destination_area_id && (!$request->destination_latitude || !$request->destination_longitude)) {
+            return response()->json(['message' => 'Harus menyertakan destination_area_id atau koordinat latitude/longitude.'], 400);
+        }
+
+        $branch = \App\Models\Branch::find($request->branch_id);
+        if (!$branch || !$branch->latitude || !$branch->longitude) {
+            return response()->json(['message' => 'Cabang tidak valid atau koordinat lokasi cabang belum diatur.'], 400);
+        }
+
+        $totalWeight = 0;
+        foreach ($request->items as $item) {
+            $product = \App\Models\Product::find($item['product_id']);
+            $weight = $product->weight_in_grams ?? 100; // Default 100g jika tidak diisi
+            $totalWeight += ($weight * $item['quantity']);
+        }
+
+        $biteship = new \App\Services\BiteshipService();
+        $result = $biteship->getRates(
+            $branch->latitude, 
+            $branch->longitude, 
+            $request->destination_latitude ?? 0, 
+            $request->destination_longitude ?? 0, 
+            $totalWeight,
+            $request->destination_area_id
+        );
+
+        if ($result['success']) {
+            return response()->json(['rates' => $result['rates']]);
+        }
+
+        return response()->json(['message' => $result['message']], 500);
+    }
+
+    /**
+     * Cari Area dari Biteship (Kecamatan/Kelurahan)
+     */
+    public function searchShippingAreas(Request $request)
+    {
+        $request->validate([
+            'query' => 'required|string|min:3'
+        ]);
+
+        $biteship = new \App\Services\BiteshipService();
+        $result = $biteship->searchArea($request->input('query'));
+
+        if ($result['success']) {
+            return response()->json(['areas' => $result['areas']]);
+        }
+
+        return response()->json(['message' => $result['message']], 500);
+    }
+
+    /**
+     * Ambil daftar alamat customer yang sedang login
+     */
+    public function getCustomerAddresses(Request $request)
+    {
+        // This endpoint will be protected by sanctum/customer auth
+        // Assuming we pass customer token, but Ecommerce member login might be custom.
+        // The frontend passes member id or we use auth guard.
+        // Wait, the current E-commerce member login returns a token or just saves it?
+        // Let's check `memberLogin`.
+        
+        $memberId = $request->header('X-Member-ID') ?? $request->input('member_id');
+        if (!$memberId) {
+            return response()->json(['message' => 'Unauthorized. Harap sertakan member_id'], 401);
+        }
+
+        $addresses = \App\Models\CustomerAddress::where('customer_id', $memberId)
+            ->orderBy('is_primary', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($addresses);
+    }
+
+    public function addCustomerAddress(Request $request)
+    {
+        $memberId = $request->header('X-Member-ID') ?? $request->input('member_id');
+        if (!$memberId) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $request->validate([
+            'label' => 'required|string|max:50',
+            'recipient_name' => 'required|string|max:100',
+            'recipient_phone' => 'required|string|max:20',
+            'full_address' => 'required|string',
+            'biteship_area_id' => 'required|string', // mandatory based on our plan
+        ]);
+
+        // If it's the first address, make it primary
+        $isPrimary = \App\Models\CustomerAddress::where('customer_id', $memberId)->count() === 0;
+
+        $address = \App\Models\CustomerAddress::create([
+            'customer_id' => $memberId,
+            'label' => $request->label,
+            'recipient_name' => $request->recipient_name,
+            'recipient_phone' => $request->recipient_phone,
+            'full_address' => $request->full_address,
+            'biteship_area_id' => $request->biteship_area_id,
+            'is_primary' => $request->input('is_primary', $isPrimary),
+        ]);
+
+        if ($address->is_primary && !$isPrimary) {
+            // Unset others
+            \App\Models\CustomerAddress::where('customer_id', $memberId)
+                ->where('id', '!=', $address->id)
+                ->update(['is_primary' => false]);
+        }
+
+        return response()->json(['message' => 'Alamat berhasil ditambahkan', 'address' => $address]);
+    }
+
+    public function setPrimaryCustomerAddress(Request $request, $id)
+    {
+        $memberId = $request->header('X-Member-ID') ?? $request->input('member_id');
+        if (!$memberId) return response()->json(['message' => 'Unauthorized'], 401);
+
+        $address = \App\Models\CustomerAddress::where('customer_id', $memberId)->findOrFail($id);
+        
+        \App\Models\CustomerAddress::where('customer_id', $memberId)->update(['is_primary' => false]);
+        $address->update(['is_primary' => true]);
+
+        return response()->json(['message' => 'Alamat utama berhasil diubah']);
+    }
+
+    public function deleteCustomerAddress(Request $request, $id)
+    {
+        $memberId = $request->header('X-Member-ID') ?? $request->input('member_id');
+        if (!$memberId) return response()->json(['message' => 'Unauthorized'], 401);
+
+        $address = \App\Models\CustomerAddress::where('customer_id', $memberId)->findOrFail($id);
+        $wasPrimary = $address->is_primary;
+        $address->delete();
+
+        if ($wasPrimary) {
+            $nextAddress = \App\Models\CustomerAddress::where('customer_id', $memberId)->first();
+            if ($nextAddress) {
+                $nextAddress->update(['is_primary' => true]);
+            }
+        }
+
+        return response()->json(['message' => 'Alamat berhasil dihapus']);
+    }
+
     private function _configureMidtrans()
     {
         Config::$serverKey = env('MIDTRANS_SERVER_KEY');
@@ -431,7 +592,6 @@ class EcommerceController extends Controller
             $paymentMethod = $request->input('payment_method', 'CASH');
             $paymentStatus = $paymentMethod === 'CASH' ? 'UNPAID' : 'UNPAID'; // Both start UNPAID, but non-cash will use Midtrans
 
-            // Create Order
             $order = EcommerceOrder::create([
                 'organization_id' => $orgId,
                 'branch_id' => $request->branch_id,
@@ -439,8 +599,11 @@ class EcommerceController extends Controller
                 'customer_phone' => $request->customer_phone,
                 'delivery_method' => $request->delivery_method,
                 'delivery_address' => $request->delivery_method === 'DELIVERY' ? $request->delivery_address : null,
+                'shipping_cost' => $request->input('shipping_cost', 0),
+                'courier_name' => $request->input('courier_name', null),
+                'courier_service' => $request->input('courier_service', null),
                 'status' => 'PENDING',
-                'total_amount' => $finalAmount,
+                'total_amount' => $finalAmount + $request->input('shipping_cost', 0),
                 'points_redeemed' => $actualPointsToRedeem,
                 'points_redeemed_discount' => $pointsRedeemedDiscount,
                 'payment_method' => $paymentMethod,

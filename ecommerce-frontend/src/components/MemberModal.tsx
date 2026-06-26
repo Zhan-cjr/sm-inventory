@@ -7,6 +7,7 @@ import {
 import { useEcom } from '../context/EcomContext';
 import axios from 'axios';
 import { getImageUrl } from '../utils/api';
+import AddressBookTab from './AddressBookTab';
 
 const MemberModal = () => {
   const { 
@@ -18,9 +19,9 @@ const MemberModal = () => {
     syncMemberPoints
   } = useEcom();
 
-  // Tab State: 'login' | 'register' (when logged out) or 'profile' | 'history' (when logged in)
+  // Tab State: 'login' | 'register' (when logged out) or 'profile' | 'history' | 'address' (when logged in)
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'forgot'>('login');
-  const [memberTab, setMemberTab] = useState<'profile' | 'history'>('profile');
+  const [memberTab, setMemberTab] = useState<'profile' | 'history' | 'address'>('profile');
 
   // Form states
   const [loginPhone, setLoginPhone] = useState('');
@@ -691,7 +692,18 @@ const MemberModal = () => {
                   }`}
                 >
                   <User size={14} />
-                  Profil & Poin
+                  Profil
+                </button>
+                <button
+                  onClick={() => setMemberTab('address')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    memberTab === 'address' 
+                      ? 'bg-white text-brand-blue shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <MapPin size={14} />
+                  Alamat
                 </button>
                 <button
                   onClick={() => setMemberTab('history')}
@@ -702,7 +714,7 @@ const MemberModal = () => {
                   }`}
                 >
                   <History size={14} />
-                  Riwayat Belanja
+                  Riwayat
                 </button>
               </div>
 
@@ -827,6 +839,8 @@ const MemberModal = () => {
                     Keluar Akun Member
                   </button>
                 </div>
+              ) : memberTab === 'address' ? (
+                <AddressBookTab />
               ) : (
                 /* History Tab */
                 <div className="space-y-3">

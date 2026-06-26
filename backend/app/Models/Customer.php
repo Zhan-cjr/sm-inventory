@@ -64,6 +64,11 @@ class Customer extends Model
         return $this->belongsTo(Organization::class);
     }
 
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(CustomerAddress::class);
+    }
+
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);

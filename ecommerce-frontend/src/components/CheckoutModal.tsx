@@ -45,6 +45,17 @@ export const CheckoutModal: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Shipping
+  const [destLat, setDestLat] = useState<number | null>(null);
+  const [destLon, setDestLon] = useState<number | null>(null);
+  const [shippingRates, setShippingRates] = useState<any[]>([]);
+  const [selectedCourier, setSelectedCourier] = useState<any | null>(null);
+  const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
+
+  // Member Addresses
+  const [memberAddresses, setMemberAddresses] = useState<any[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<any | null>(null);
+
   useEffect(() => {
     if (member) {
       setName(member.name);
@@ -52,8 +63,59 @@ export const CheckoutModal: React.FC = () => {
       if (member.address) {
         setAddress(member.address);
       }
+      fetchAddresses();
     }
   }, [member, isCheckoutModalOpen]);
+
+  const fetchAddresses = async () => {
+    if (!member) return;
+    try {
+      const res = await axios.get('/ecommerce/customers/addresses', {
+        headers: { 'X-Member-ID': member.id }
+      });
+      setMemberAddresses(res.data);
+      if (res.data.length > 0) {
+        const primary = res.data.find((a: any) => a.is_primary) || res.data[0];
+        handleSelectSavedAddress(primary);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSelectSavedAddress = (addr: any) => {
+    setSelectedAddress(addr);
+    setName(addr.recipient_name);
+    setPhone(addr.recipient_phone);
+    setAddress(addr.full_address);
+    if (addr.biteship_area_id) {
+      calculateShippingRatesByArea(addr.biteship_area_id);
+    } else if (addr.latitude && addr.longitude) {
+      calculateShippingRates(addr.latitude, addr.longitude);
+    }
+  };
+
+  const calculateShippingRatesByArea = async (areaId: string) => {
+    if (!branchId || cart.length === 0) return;
+    setIsCalculatingShipping(true);
+    try {
+      const payload = {
+        branch_id: branchId,
+        destination_area_id: areaId,
+        items: cart.map(i => ({ product_id: i.product.id, quantity: i.quantity }))
+      };
+      const res = await axios.post('/ecommerce/shipping-rates', payload);
+      setShippingRates(res.data.rates || []);
+      if (res.data.rates && res.data.rates.length > 0) {
+        setSelectedCourier(res.data.rates[0]);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Gagal menghitung ongkos kirim ke area tersebut');
+    } finally {
+      setIsCalculatingShipping(false);
+    }
+  };
 
   useEffect(() => {
     if (!isCheckoutModalOpen) {
@@ -104,16 +166,63 @@ export const CheckoutModal: React.FC = () => {
   );
 
   const discountAmount = usePoints ? pointsToRedeem * (settings?.point_redemption_value || 0) : 0;
-  const finalPaymentAmount = Math.max(0, totalAmount - discountAmount);
+  const shippingCost = selectedCourier ? selectedCourier.price : 0;
+  const finalPaymentAmount = Math.max(0, totalAmount + shippingCost - discountAmount);
+
+  const handleGetLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setDestLat(position.coords.latitude);
+          setDestLon(position.coords.longitude);
+          calculateShippingRates(position.coords.latitude, position.coords.longitude);
+        },
+        (error) => {
+          alert('Gagal mendapatkan lokasi GPS. Pastikan izin lokasi diberikan.');
+        }
+      );
+    } else {
+      alert('Browser Anda tidak mendukung Geolocation.');
+    }
+  };
+
+  const calculateShippingRates = async (lat: number, lon: number) => {
+    if (!branchId || cart.length === 0) return;
+    setIsCalculatingShipping(true);
+    try {
+      const payload = {
+        branch_id: branchId,
+        destination_latitude: lat,
+        destination_longitude: lon,
+        items: cart.map(i => ({ product_id: i.product.id, quantity: i.quantity }))
+      };
+      const res = await axios.post('/ecommerce/shipping-rates', payload);
+      setShippingRates(res.data.rates || []);
+      if (res.data.rates && res.data.rates.length > 0) {
+        setSelectedCourier(res.data.rates[0]);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Gagal menghitung ongkos kirim');
+    } finally {
+      setIsCalculatingShipping(false);
+    }
+  };
 
   const handleNextStep = () => {
     if (!name || !phone) {
       setError('Nama dan Nomor Telepon wajib diisi.');
       return;
     }
-    if (deliveryMethod === 'DELIVERY' && !address) {
-      setError('Alamat Pengiriman wajib diisi.');
-      return;
+    if (deliveryMethod === 'DELIVERY') {
+      if (!address) {
+        setError('Alamat Pengiriman wajib diisi.');
+        return;
+      }
+      if (!selectedCourier) {
+        setError('Pilihan kurir wajib dipilih jika menggunakan metode pengiriman.');
+        return;
+      }
     }
     setError(null);
     setStep(2);
@@ -138,6 +247,9 @@ export const CheckoutModal: React.FC = () => {
       })),
       points_to_redeem: usePoints ? pointsToRedeem : 0,
       payment_method: paymentMethod,
+      shipping_cost: deliveryMethod === 'DELIVERY' && selectedCourier ? selectedCourier.price : 0,
+      courier_name: deliveryMethod === 'DELIVERY' && selectedCourier ? selectedCourier.company : null,
+      courier_service: deliveryMethod === 'DELIVERY' && selectedCourier ? selectedCourier.type : null,
     };
 
     try {
@@ -478,17 +590,115 @@ export const CheckoutModal: React.FC = () => {
 
                   {deliveryMethod === 'DELIVERY' && (
                     <div className="flex flex-col gap-1.5 mt-2 animate-in fade-in duration-300">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                        Alamat Lengkap Pengiriman
-                      </label>
-                      <textarea
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        required
-                        rows={3}
-                        placeholder="Masukkan detail alamat (jalan, nomor, RT/RW, dsb)"
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:border-brand-blue outline-none transition-all resize-none bg-slate-50 focus:bg-white"
-                      />
+                      
+                      {member && memberAddresses.length > 0 ? (
+                        <div className="mb-3">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
+                            Pilih Alamat Pengiriman
+                          </label>
+                          <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-1">
+                            {memberAddresses.map((addr: any) => (
+                              <label 
+                                key={addr.id} 
+                                className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-all ${selectedAddress?.id === addr.id ? 'border-brand-blue bg-brand-blue/5' : 'border-slate-200 hover:border-slate-300'}`}
+                              >
+                                <input 
+                                  type="radio" 
+                                  name="saved_address" 
+                                  checked={selectedAddress?.id === addr.id}
+                                  onChange={() => handleSelectSavedAddress(addr)}
+                                  className="w-4 h-4 mt-0.5 text-brand-blue"
+                                />
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-slate-800">{addr.label}</span>
+                                    {addr.is_primary && <span className="text-[9px] bg-brand-blue text-white px-1.5 rounded font-bold">UTAMA</span>}
+                                  </div>
+                                  <span className="text-xs text-slate-600 font-medium">{addr.recipient_name} - {addr.recipient_phone}</span>
+                                  <span className="text-[11px] text-slate-500 mt-1 line-clamp-2">{addr.full_address}</span>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="mt-2 text-right">
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setIsCheckoutModalOpen(false);
+                                document.dispatchEvent(new CustomEvent('openMemberProfile'));
+                              }}
+                              className="text-[10px] text-brand-blue font-bold hover:underline"
+                            >
+                              + Tambah Alamat di Profil
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                              Alamat Lengkap Pengiriman
+                            </label>
+                            <button 
+                              type="button"
+                              onClick={handleGetLocation}
+                              className="text-[10px] bg-brand-green/10 text-brand-green font-bold px-2 py-1 rounded flex items-center gap-1 hover:bg-brand-green hover:text-white transition-colors"
+                            >
+                              <MapPin size={10} /> Titik GPS & Cek Ongkir
+                            </button>
+                          </div>
+                          <textarea
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            required
+                            rows={3}
+                            placeholder="Masukkan detail alamat (jalan, nomor, RT/RW, dsb)"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:border-brand-blue outline-none transition-all resize-none bg-slate-50 focus:bg-white"
+                          />
+                        </>
+                      )}
+
+                      {/* Courier Selection */}
+                      {isCalculatingShipping ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-500 py-3 justify-center">
+                          <Loader2 className="animate-spin" size={14} /> Menghitung ongkir terbaik...
+                        </div>
+                      ) : shippingRates.length > 0 ? (
+                        <div className="mt-3">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
+                            Pilih Layanan Kurir (Biteship)
+                          </label>
+                          <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                            {shippingRates.map((rate, idx) => (
+                              <label 
+                                key={idx} 
+                                className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all ${selectedCourier?.company === rate.company && selectedCourier?.type === rate.type ? 'border-brand-blue bg-brand-blue/5' : 'border-slate-200 hover:border-slate-300'}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <input 
+                                    type="radio" 
+                                    name="courier" 
+                                    checked={selectedCourier?.company === rate.company && selectedCourier?.type === rate.type}
+                                    onChange={() => setSelectedCourier(rate)}
+                                    className="w-4 h-4 text-brand-blue"
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-sm text-slate-800 uppercase">{rate.company} - {rate.type}</span>
+                                    <span className="text-xs text-slate-500">Estimasi tiba: {rate.shipment_duration_range} {rate.shipment_duration_unit}</span>
+                                  </div>
+                                </div>
+                                <span className="font-bold text-brand-blue text-sm">
+                                  Rp {rate.price.toLocaleString('id-ID')}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (selectedAddress || destLat) && !isCalculatingShipping && (
+                        <div className="text-xs text-red-500 mt-2 p-2 bg-red-50 rounded">
+                          Kurir tidak tersedia ke alamat ini atau API Key belum diatur admin.
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -522,6 +732,14 @@ export const CheckoutModal: React.FC = () => {
                         </span>
                       </div>
                     ))}
+                    {deliveryMethod === 'DELIVERY' && selectedCourier && (
+                      <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100 mt-1">
+                        <span className="text-slate-600">Ongkos Kirim ({selectedCourier.company})</span>
+                        <span className="font-semibold text-slate-800 whitespace-nowrap">
+                          Rp {selectedCourier.price.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
