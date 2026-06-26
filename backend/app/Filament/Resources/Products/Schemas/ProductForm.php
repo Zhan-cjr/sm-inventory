@@ -75,6 +75,12 @@ class ProductForm
                     ->searchable()
                     ->preload()
                     ->disabled($isBranchUser),
+                TextInput::make('weight_in_grams')
+                    ->label('Berat (Gram)')
+                    ->numeric()
+                    ->default(1000)
+                    ->helperText('Berat produk dalam satuan gram (Contoh: 1000 untuk 1 Kg). Digunakan untuk menghitung ongkos kirim.')
+                    ->disabled($isBranchUser),
                 \Filament\Schemas\Components\Section::make('Harga Bertingkat & Margin')
                     ->columns(1)
                     ->columnSpanFull()
