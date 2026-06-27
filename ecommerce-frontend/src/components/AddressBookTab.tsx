@@ -25,7 +25,6 @@ const AddressBookTab = () => {
   // Geolocation
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
-  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   useEffect(() => {
     if (member) {
@@ -65,28 +64,6 @@ const AddressBookTab = () => {
     } finally {
       setIsSearchingArea(false);
     }
-  };
-
-  const getLocation = () => {
-    setIsGettingLocation(true);
-    if (!navigator.geolocation) {
-      alert('Geolocation tidak didukung oleh browser Anda.');
-      setIsGettingLocation(false);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLatitude(position.coords.latitude);
-        setLongitude(position.coords.longitude);
-        setIsGettingLocation(false);
-        alert('Koordinat berhasil didapatkan!');
-      },
-      () => {
-        alert('Gagal mendapatkan lokasi. Pastikan izin lokasi diberikan.');
-        setIsGettingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
   };
 
   const handleSaveAddress = async (e: React.FormEvent) => {
