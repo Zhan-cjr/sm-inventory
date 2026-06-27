@@ -50,6 +50,10 @@ Route::prefix('v1/ecommerce')->group(function () {
     Route::post('customers/addresses', [EcommerceController::class, 'addCustomerAddress']);
     Route::put('customers/addresses/{id}/set-primary', [EcommerceController::class, 'setPrimaryCustomerAddress']);
     Route::delete('customers/addresses/{id}', [EcommerceController::class, 'deleteCustomerAddress']);
+    
+    // PPOB Digital Products
+    Route::get('ppob/products', [\App\Http\Controllers\Api\V1\EcommercePpobController::class, 'getProducts']);
+    Route::post('ppob/orders', [\App\Http\Controllers\Api\V1\EcommercePpobController::class, 'createOrder']);
 });
 
 Route::prefix('v1')->group(function () {

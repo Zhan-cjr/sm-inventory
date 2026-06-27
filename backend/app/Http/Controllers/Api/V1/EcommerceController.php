@@ -1196,6 +1196,26 @@ class EcommerceController extends Controller
                 }
             } else if ($transaction == 'settlement') {
                 $order->update(['payment_status' => 'PAID']);
+                
+                // If it's a PPOB/DIGITAL order, automatically process it via Digiflazz
+                if ($order->delivery_method === 'DIGITAL') {
+                    $item = \App\Models\EcommerceOrderItem::where('ecommerce_order_id', $order->id)->first();
+                    if ($item) {
+                        $product = \App\Models\Product::find($item->product_id);
+                        if ($product && $product->ppob_sku) {
+                            try {
+                                $digiflazz = new \App\Services\DigiflazzService();
+                                // delivery_address stores the target number
+                                $res = $digiflazz->topup($product->ppob_sku, $order->delivery_address, $order->id);
+                                \Log::info('PPOB Digiflazz Topup Triggered from Ecommerce: ' . json_encode($res));
+                                $order->update(['status' => 'COMPLETED']);
+                            } catch (\Exception $e) {
+                                \Log::error('PPOB Digiflazz Topup Failed: ' . $e->getMessage());
+                                // Leave it PAID but PENDING so admin can handle it
+                            }
+                        }
+                    }
+                }
             } else if ($transaction == 'pending') {
                 if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
                     $order->update(['payment_status' => 'PENDING']);

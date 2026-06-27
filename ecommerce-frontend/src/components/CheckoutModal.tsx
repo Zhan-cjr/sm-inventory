@@ -418,7 +418,7 @@ export const CheckoutModal: React.FC = () => {
                 <h2 className="text-2xl font-bold text-brand-blue tracking-wide">TOSERBA SELAMAT</h2>
                 <p className="text-[0.65rem] text-slate-400 mt-2 font-mono">ORDER ID: {order.id}</p>
                 <div className="mt-2 inline-block px-2 py-1 rounded bg-slate-200 text-[0.65rem] font-bold text-slate-700">
-                  {order.payment_method === 'CASH' ? 'BAYAR DI TOKO (CASH)' : 'NON-TUNAI (MIDTRANS)'} 
+                  {order.payment_method === 'CASH' ? 'BAYAR DI TOKO (CASH)' : 'NON-TUNAI (ONLINE)'} 
                   {' '} - {order.payment_status}
                 </div>
               </div>
@@ -680,7 +680,7 @@ export const CheckoutModal: React.FC = () => {
                       ) : shippingRates.length > 0 ? (
                         <div className="mt-3">
                           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                            Pilih Layanan Kurir (Biteship)
+                            Pilih Layanan Kurir
                           </label>
                           <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                             {shippingRates.map((rate, idx) => (
@@ -838,7 +838,7 @@ export const CheckoutModal: React.FC = () => {
                         </div>
                         <div className="flex flex-col">
                           <span className="font-bold text-sm text-slate-800">Transfer Bank / QRIS</span>
-                          <span className="text-xs text-slate-500">Otomatis diverifikasi (Midtrans)</span>
+                          <span className="text-xs text-slate-500">Otomatis diverifikasi oleh sistem</span>
                         </div>
                       </div>
                       <input 

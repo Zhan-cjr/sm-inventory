@@ -1,8 +1,9 @@
 
-import PromoCarousel from '../components/PromoCarousel';
+import DiscountedProductsCarousel from '../components/DiscountedProductsCarousel';
 import CategoryIcons from '../components/CategoryIcons';
 import ProductGrid from '../components/ProductGrid';
 import MemberWidget from '../components/MemberWidget';
+import PpobWidget from '../components/PpobWidget';
 import { Truck, ShieldCheck, CreditCard, RotateCcw } from 'lucide-react';
 import { useEcom } from '../context/EcomContext';
 
@@ -12,7 +13,8 @@ const Home = () => {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <MemberWidget />
-      <PromoCarousel />
+      <DiscountedProductsCarousel />
+      <PpobWidget />
       <CategoryIcons />
       
       {/* Value Propositions / Features */}

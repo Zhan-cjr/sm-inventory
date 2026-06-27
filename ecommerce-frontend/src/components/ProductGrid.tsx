@@ -5,7 +5,7 @@ import { useEcom, Product } from '../context/EcomContext';
 import axios from 'axios';
 import { getImageUrl } from '../utils/api';
 
-const ProductCard = ({ product }: { product: Product }) => {
+export const ProductCard = ({ product }: { product: Product }) => {
   const { addToCart, selectedBranch, cart, member, setIsMemberModalOpen, setSelectedProductForModal, setIsProductModalOpen } = useEcom();
   const [isAdded, setIsAdded] = useState(false);
   const [showPlusOne, setShowPlusOne] = useState(false);
@@ -346,6 +346,25 @@ const ProductGrid = () => {
             })}
           </div>
         )}
+
+        {/* Premium Header */}
+        <div className="flex items-center justify-between mb-6 mt-4 pb-4 border-b border-slate-200/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue shadow-sm">
+              <PackageOpen size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-extrabold text-slate-800 tracking-tight">Katalog Produk</h3>
+              <p className="text-[11px] text-slate-500 font-medium">Temukan barang berkualitas</p>
+            </div>
+          </div>
+          {!loading && (
+            <div className="hidden sm:flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
+              <span className="text-xs font-bold text-slate-500">Total Produk:</span>
+              <span className="text-sm font-black text-brand-blue">{filteredProducts.length}</span>
+            </div>
+          )}
+        </div>
 
         {loading ? (
           <div className="flex justify-center items-center py-20">

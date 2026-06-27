@@ -46,29 +46,6 @@ class EcommerceSettingForm
                                 ->helperText('Kategori khusus untuk tampilan e-commerce (misalnya: Sembako, Makanan & Minuman, Perlengkapan Ibadah, Kesehatan & Herbal, dll). Ketik nama kategori lalu tekan Enter.')
                                 ->columnSpanFull(),
 
-                            // E-Commerce Banner & Custom Content
-                            TextInput::make('ecommerce_banner_title')
-                                ->label('Judul Banner Utama (Hero Title)')
-                                ->placeholder('Contoh: Belanja Untung, Murah, Manfaat')
-                                ->default('Belanja Untung, Murah, Manfaat')
-                                ->columnSpanFull(),
-                            Textarea::make('ecommerce_banner_subtitle')
-                                ->label('Subjudul Banner Utama')
-                                ->placeholder('Contoh: Dan InsyaAllah Berkah. Temukan berbagai kebutuhan keluarga muslim...')
-                                ->default('Dan InsyaAllah Berkah. Temukan berbagai kebutuhan keluarga muslim dengan harga terbaik dari cabang Toserba Selamat terdekat Anda.')
-                                ->columnSpanFull(),
-                            FileUpload::make('ecommerce_banner_images')
-                                ->label('Gambar Banner Promo Carousel (Multiple)')
-                                ->image()
-                                ->multiple()
-                                ->disk('public')
-                                ->directory('ecommerce_banners')
-                                ->helperText('Unggah satu atau banyak gambar (rekomendasi: 1200x400px) untuk ditampilkan sebagai Promo Carousel yang bergeser. Fitur banner tunggal lama sudah diabaikan.')
-                                ->columnSpanFull(),
-                            TextInput::make('ecommerce_banner_cta_text')
-                                ->label('Teks Tombol CTA')
-                                ->placeholder('Contoh: Mulai Belanja')
-                                ->default('Mulai Belanja'),
                             TextInput::make('ecommerce_announcement')
                                 ->label('Pengumuman Berjalan (Running Announcement)')
                                 ->placeholder('Contoh: Nikmati diskon promo khusus member baru dan kumpulkan poin belanja!')

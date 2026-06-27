@@ -46,6 +46,24 @@ const AddressBookTab = () => {
     }
   };
 
+  const geocodeAddress = async (searchQuery: string) => {
+    try {
+      const res = await axios.get('https://nominatim.openstreetmap.org/search', {
+        params: {
+          q: searchQuery,
+          format: 'json',
+          limit: 1
+        }
+      });
+      if (res.data && res.data.length > 0) {
+        setLatitude(parseFloat(res.data[0].lat));
+        setLongitude(parseFloat(res.data[0].lon));
+      }
+    } catch (err) {
+      console.error('Geocoding failed:', err);
+    }
+  };
+
   const searchArea = async (query: string) => {
     setAreaQuery(query);
     if (query.length < 3) {
@@ -172,7 +190,7 @@ const AddressBookTab = () => {
           </div>
           
           <div className="relative">
-            <label className="block text-[10px] font-bold text-slate-500 mb-1">KECAMATAN / KELURAHAN (BITESHIP)</label>
+            <label className="block text-[10px] font-bold text-slate-500 mb-1">KECAMATAN / KELURAHAN</label>
             <div className="relative">
               <input
                 type="text" required
@@ -198,7 +216,11 @@ const AddressBookTab = () => {
                 {areaResults.map((area: any) => (
                   <button
                     key={area.id} type="button"
-                    onClick={() => { setSelectedArea(area); setAreaResults([]); }}
+                    onClick={() => { 
+                      setSelectedArea(area); 
+                      setAreaResults([]); 
+                      geocodeAddress(`${area.name}, ${area.administrative_division_level_2_name}, Indonesia`);
+                    }}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 border-b border-slate-50 last:border-0"
                   >
                     <span className="font-bold text-slate-700 block">{area.name}</span>

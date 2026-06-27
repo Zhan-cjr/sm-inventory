@@ -32,6 +32,8 @@ export const ProductImage: React.FC<ProductImageProps> = ({ src, alt, className 
     <img 
       src={finalSrc} 
       alt={alt} 
+      title={alt}
+      loading="lazy"
       className={className}
       onError={() => setHasError(true)}
     />

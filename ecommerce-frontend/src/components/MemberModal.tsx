@@ -87,6 +87,24 @@ const MemberModal = () => {
     }
   }, [isMemberModalOpen]);
 
+  const geocodeRegAddress = async (searchQuery: string) => {
+    try {
+      const res = await axios.get('https://nominatim.openstreetmap.org/search', {
+        params: {
+          q: searchQuery,
+          format: 'json',
+          limit: 1
+        }
+      });
+      if (res.data && res.data.length > 0) {
+        setRegLatitude(parseFloat(res.data[0].lat));
+        setRegLongitude(parseFloat(res.data[0].lon));
+      }
+    } catch (err) {
+      console.error('Geocoding failed:', err);
+    }
+  };
+
   const searchRegArea = async (query: string) => {
     setRegAreaQuery(query);
     if (query.length < 3) {
@@ -467,7 +485,7 @@ const MemberModal = () => {
                       </div>
 
                       <div className="relative">
-                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Kecamatan / Kelurahan (Biteship)</label>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Kecamatan / Kelurahan</label>
                         <div className="relative">
                           <input
                             type="text"
@@ -492,7 +510,11 @@ const MemberModal = () => {
                             {regAreaResults.map((area: any) => (
                               <button
                                 key={area.id} type="button"
-                                onClick={() => { setRegSelectedArea(area); setRegAreaResults([]); }}
+                                onClick={() => { 
+                                  setRegSelectedArea(area); 
+                                  setRegAreaResults([]); 
+                                  geocodeRegAddress(`${area.name}, ${area.administrative_division_level_2_name}, Indonesia`);
+                                }}
                                 className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 border-b border-slate-100 last:border-0"
                               >
                                 <span className="font-bold text-slate-700 block">{area.name}</span>
@@ -949,9 +971,15 @@ const MemberModal = () => {
                                 <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
                                   item.type === 'STORE' 
                                     ? 'bg-amber-50 text-amber-700 border border-amber-100' 
+                                    : item.delivery_method === 'DIGITAL'
+                                    ? 'bg-brand-red/10 text-brand-red border border-brand-red/20'
                                     : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
                                 }`}>
-                                  {item.type === 'STORE' ? 'TOKO (POS)' : 'ONLINE'}
+                                  {item.type === 'STORE' 
+                                    ? 'TOKO (POS)' 
+                                    : item.delivery_method === 'DIGITAL'
+                                    ? 'PPOB / DIGITAL'
+                                    : 'ONLINE'}
                                 </span>
                                 <span className="text-[10px] font-mono text-slate-400">{item.invoice_number}</span>
                               </div>
