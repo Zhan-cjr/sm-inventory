@@ -6,6 +6,7 @@ import { CheckoutModal } from './CheckoutModal';
 import { BranchModal } from './BranchModal';
 import MemberModal from './MemberModal';
 import ProductDetailModal from './ProductDetailModal';
+import BottomNav from './BottomNav';
 
 export const MainLayout = () => {
   const location = useLocation();
@@ -20,12 +21,15 @@ export const MainLayout = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans">
+    <div className="min-h-screen flex flex-col font-sans pb-14 md:pb-0 bg-slate-50">
       <Navbar />
-      <main className="flex-grow pt-36 md:pt-32">
+      <main className="flex-grow pt-24 md:pt-28">
         <Outlet />
       </main>
-      <Footer />
+      <div className="hidden md:block">
+        <Footer />
+      </div>
+      <BottomNav />
       
       {/* Global UI Elements */}
       <CartDrawer />

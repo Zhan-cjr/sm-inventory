@@ -309,68 +309,41 @@ const ProductGrid = () => {
   });
 
   return (
-    <div id="catalog-section" className="bg-slate-50 py-16 scroll-mt-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900">Katalog Produk</h2>
-            <p className="text-slate-500 mt-2">
-              {selectedBranch 
-                ? `Menampilkan produk terbaik dari cabang ${selectedBranch.name}` 
-                : 'Belanja hemat dan penuh berkah di Toserba Selamat.'}
-            </p>
-          </div>
-        </div>
-
-        {/* Category Slider */}
+    <div id="catalog-section" className="bg-white scroll-mt-24">
+      <div className="w-full">
+        {/* Category Tabs (Text Style) */}
         {!loading && products.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide scroll-smooth">
-            {categories.map((cat) => {
-              const isCatSelected = selectedCategory === cat.id || 
-                (selectedCategory.toLowerCase() === cat.name.toLowerCase()) ||
-                (cat.name.toLowerCase().includes(selectedCategory.toLowerCase()) && selectedCategory !== 'all' && cat.id !== 'all');
-                
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all duration-300 ${
-                    isCatSelected
-                      ? 'bg-brand-blue text-white shadow-[0_8px_20px_rgba(36,42,122,0.3)] hover:-translate-y-0.5'
-                      : 'bg-white/80 backdrop-blur-md text-slate-600 border border-slate-200/60 hover:border-slate-300 hover:bg-white hover:-translate-y-0.5 shadow-sm'
-                  }`}
-                >
-                  {cat.name}
-                </button>
-              );
-            })}
+          <div className="bg-white">
+            <div className="flex items-center gap-6 px-4 overflow-x-auto no-scrollbar border-b border-slate-100 pb-0">
+              {categories.map((cat) => {
+                const isCatSelected = selectedCategory === cat.id || 
+                  (selectedCategory.toLowerCase() === cat.name.toLowerCase()) ||
+                  (cat.name.toLowerCase().includes(selectedCategory.toLowerCase()) && selectedCategory !== 'all' && cat.id !== 'all');
+                  
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`py-3 whitespace-nowrap text-sm flex-shrink-0 transition-colors ${
+                      isCatSelected
+                        ? 'text-brand-green font-bold border-b-2 border-brand-green'
+                        : 'text-slate-500 font-semibold border-b-2 border-transparent hover:text-brand-green'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {/* Premium Header */}
-        <div className="flex items-center justify-between mb-6 mt-4 pb-4 border-b border-slate-200/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue shadow-sm">
-              <PackageOpen size={20} />
+        <div className="bg-slate-50 p-4 min-h-[50vh]">
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-green"></div>
             </div>
-            <div>
-              <h3 className="text-lg font-extrabold text-slate-800 tracking-tight">Katalog Produk</h3>
-              <p className="text-[11px] text-slate-500 font-medium">Temukan barang berkualitas</p>
-            </div>
-          </div>
-          {!loading && (
-            <div className="hidden sm:flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
-              <span className="text-xs font-bold text-slate-500">Total Produk:</span>
-              <span className="text-sm font-black text-brand-blue">{filteredProducts.length}</span>
-            </div>
-          )}
-        </div>
-
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue"></div>
-          </div>
-        ) : filteredProducts.length > 0 ? (
+          ) : filteredProducts.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {filteredProducts.map((product) => (
               <ProductCard key={product.id} product={product} />
@@ -391,6 +364,7 @@ const ProductGrid = () => {
             </p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

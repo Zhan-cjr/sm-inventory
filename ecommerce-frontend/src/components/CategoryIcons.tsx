@@ -49,10 +49,10 @@ const CategoryIcons = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 sm:mt-8 mb-4">
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-x-2 gap-y-6 sm:gap-4">
+    <div className="w-full pl-4 pr-0 sm:px-6 lg:px-8 mt-2 mb-2 overflow-hidden">
+      <div className="flex overflow-x-auto no-scrollbar pb-2 pt-1 gap-4 pr-4 snap-x">
         {availableCategories.length === 0 ? (
-          <div className="col-span-4 sm:col-span-5 md:col-span-10 text-center py-4 text-xs text-slate-400">
+          <div className="text-center py-4 text-xs text-slate-400 w-full">
             Memuat kategori...
           </div>
         ) : (
@@ -62,12 +62,12 @@ const CategoryIcons = () => {
               <button
                 key={cat.id}
                 onClick={() => handleCategoryClick(cat.id, cat.name)}
-                className="flex flex-col items-center justify-start gap-2 group cursor-pointer"
+                className="flex flex-col items-center justify-start gap-1.5 group cursor-pointer w-[60px] sm:w-[70px] shrink-0 snap-start"
               >
-                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-[1.25rem] flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-active:scale-95 shadow-[0_4px_15px_rgba(0,0,0,0.03)] group-hover:shadow-lg border border-white/50 ${visual.color}`}>
+                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 active:scale-95 shadow-sm border border-slate-100 ${visual.color}`}>
                   {visual.icon}
                 </div>
-                <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-[60px] sm:max-w-[70px]">
+                <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-full">
                   {cat.name}
                 </span>
               </button>

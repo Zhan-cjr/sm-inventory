@@ -19,7 +19,6 @@ const Navbar = () => {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState<string | null>(null);
   const [isCartBouncing, setIsCartBouncing] = useState(false);
 
   useEffect(() => {
@@ -46,9 +45,6 @@ const Navbar = () => {
         if (response.data.logo_url) {
           setLogoUrl(getImageUrl(response.data.logo_url));
         }
-        if (response.data.ecommerce_announcement) {
-          setAnnouncement(response.data.ecommerce_announcement);
-        }
       } catch (error) {
         console.error('Error fetching settings:', error);
       }
@@ -60,17 +56,7 @@ const Navbar = () => {
 
   return (
     <>
-      {announcement && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-brand-blue to-indigo-900 text-white text-xs py-1.5 px-4 shadow-sm flex items-center gap-2 overflow-hidden select-none">
-          <span className="inline-block animate-pulse bg-gradient-to-r from-brand-blue to-indigo-900 z-10 pr-2 flex-shrink-0">📢</span>
-          <div className="w-full overflow-hidden relative">
-            <span className="animate-marquee font-semibold cursor-pointer">
-              {announcement}
-            </span>
-          </div>
-        </div>
-      )}
-      <nav className={`fixed left-0 right-0 z-50 transition-all duration-300 ${announcement ? 'top-8' : 'top-0'} ${isScrolled ? 'glass-panel-dark py-2 md:py-3' : 'bg-white/80 backdrop-blur-md py-3.5 md:py-5'}`}>
+      <nav className={`fixed left-0 right-0 z-50 transition-all duration-300 top-0 ${isScrolled ? 'glass-panel-dark py-2 md:py-3' : 'bg-white/80 backdrop-blur-md py-3.5 md:py-5'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Desktop Navbar */}
@@ -143,67 +129,42 @@ const Navbar = () => {
 
           {/* Mobile Navbar */}
           <div className="md:hidden flex flex-col gap-2.5">
-            {/* Top Row */}
-            <div className="flex justify-between items-center">
-              {/* Logo */}
-              <Link to="/" className="flex items-center gap-1.5">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="h-9 w-auto rounded-lg object-contain" />
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-8 h-8 rounded-lg bg-brand-red text-white flex items-center justify-center font-bold text-lg shadow-sm">
-                      S
-                    </div>
-                    <span className="text-sm font-bold text-brand-blue tracking-tight">Toserba <span className="text-brand-red">Selamat</span></span>
-                  </div>
-                )}
-              </Link>
+            <div className="flex items-center gap-3">
+              {/* Search Bar */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari di Toserba Selamat" 
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-brand-blue focus:border-brand-blue transition-all"
+                />
+              </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3">
-                {/* Branch Selection pill */}
-                <button 
-                  onClick={() => setIsBranchModalOpen(true)}
-                  className="flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors px-2.5 py-1.5 rounded-full max-w-[120px] truncate"
-                >
-                  <MapPin size={11} className="text-brand-red flex-shrink-0" />
-                  <span className="truncate">{selectedBranch ? selectedBranch.name : 'Pilih Cabang'}</span>
+              {/* Action Icons */}
+              <div className="flex items-center gap-3 text-slate-600">
+                <button className="hover:text-brand-blue transition-colors">
+                  {/* Fake Mail Icon for UI/UX */}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                 </button>
-
-                {/* Cart Icon */}
+                <button className="hover:text-brand-blue transition-colors">
+                  {/* Fake Bell Icon for UI/UX */}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                </button>
                 <button 
                   id="navbar-cart-button-mobile"
                   onClick={() => setIsCartOpen(true)}
-                  className={`relative text-slate-600 p-1 hover:text-brand-blue transition-colors ${isCartBouncing ? 'animate-cart-bounce' : ''}`}
+                  className={`relative hover:text-brand-blue transition-colors ${isCartBouncing ? 'animate-cart-bounce' : ''}`}
                 >
-                  <ShoppingCart size={22} />
+                  <ShoppingCart size={20} />
                   {totalCartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-brand-red text-white text-[8px] font-bold w-4 h-4 rounded-full flex-items-center justify-center">
+                    <span className="absolute -top-1.5 -right-1.5 bg-brand-red text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white">
                       {totalCartCount}
                     </span>
                   )}
                 </button>
-
-                {/* User / Member Icon */}
-                <button 
-                  onClick={() => setIsMemberModalOpen(true)}
-                  className="text-slate-600 p-1 hover:text-brand-blue transition-colors"
-                >
-                  <User size={22} />
-                </button>
               </div>
-            </div>
-
-            {/* Bottom Search Row */}
-            <div className="relative w-full">
-              <input 
-                type="text" 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari produk halal..." 
-                className="w-full pl-3 pr-9 py-2 bg-slate-50/50 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:bg-white transition-all shadow-inner"
-              />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
             </div>
           </div>
 
