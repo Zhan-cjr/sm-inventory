@@ -969,6 +969,12 @@ const MemberModal = () => {
                                   </button>
                                 </div>
                               )}
+                              {item.payment_status === 'PAID' && (
+                                <span className="px-2 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 font-bold rounded-lg text-[10px] flex items-center gap-1">
+                                  <CheckCircle size={12} />
+                                  Lunas
+                                </span>
+                              )}
                               <button
                                 onClick={() => setSelectedReceipt(item)}
                                 className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-all text-[10px] flex items-center gap-1"
