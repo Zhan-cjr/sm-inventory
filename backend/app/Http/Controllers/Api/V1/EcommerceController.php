@@ -436,6 +436,10 @@ class EcommerceController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'points_to_redeem' => 'nullable|integer|min:0',
             'payment_method' => 'nullable|string',
+            'destination_latitude' => 'nullable|numeric',
+            'destination_longitude' => 'nullable|numeric',
+            'destination_area_id' => 'nullable|string',
+            'destination_postal_code' => 'nullable|string',
         ]);
 
         $organization = \App\Models\Organization::first();
@@ -602,6 +606,10 @@ class EcommerceController extends Controller
                 'shipping_cost' => $request->input('shipping_cost', 0),
                 'courier_name' => $request->input('courier_name', null),
                 'courier_service' => $request->input('courier_service', null),
+                'destination_latitude' => $request->input('destination_latitude', null),
+                'destination_longitude' => $request->input('destination_longitude', null),
+                'destination_area_id' => $request->input('destination_area_id', null),
+                'destination_postal_code' => $request->input('destination_postal_code', null),
                 'status' => 'PENDING',
                 'total_amount' => $finalAmount + $request->input('shipping_cost', 0),
                 'points_redeemed' => $actualPointsToRedeem,
@@ -693,6 +701,8 @@ class EcommerceController extends Controller
                         'phone' => $request->customer_phone,
                     ],
                 ];
+
+                // We no longer restrict enabled_payments so Midtrans can show all automatically.
 
                 try {
                     $snapToken = Snap::getSnapToken($params);

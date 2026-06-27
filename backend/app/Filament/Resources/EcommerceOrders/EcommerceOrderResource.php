@@ -10,6 +10,9 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Tables\Actions\Action;
+use Filament\Notifications\Notification;
+use App\Services\BiteshipService;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Select;
@@ -274,9 +277,83 @@ class EcommerceOrderResource extends Resource
                 //
             ])
             ->recordActions([
-                ViewAction::make(),
-                EditAction::make(),
-                DeleteAction::make(),
+                \Filament\Actions\Action::make('request_pickup')
+                    ->label('Proses & Request Pickup')
+                    ->icon('heroicon-o-truck')
+                    ->color('success')
+                    ->visible(fn (EcommerceOrder $record) => 
+                        $record->delivery_method === 'DELIVERY' &&
+                        empty($record->biteship_order_id) &&
+                        !empty($record->courier_name)
+                    )
+                    ->requiresConfirmation()
+                    ->modalHeading('Request Pickup via Biteship')
+                    ->modalDescription('Apakah Anda yakin ingin memanggil kurir untuk pesanan ini?')
+                    ->action(function (EcommerceOrder $record) {
+                        $biteship = new BiteshipService();
+                        $branch = $record->branch ?? \App\Models\Branch::first();
+                        $org = \App\Models\Organization::first();
+                        
+                        $items = $record->items->map(function($item) {
+                            return [
+                                'name' => $item->product->name ?? 'Produk',
+                                'value' => (int) $item->price,
+                                'quantity' => (int) $item->quantity,
+                                'weight' => (int) ($item->product->weight_in_grams ?? 500)
+                            ];
+                        })->toArray();
+
+                        $isInstant = in_array(strtolower($record->courier_name), ['gojek', 'grab']);
+                        
+                        $payload = [
+                            'shipper_contact_name' => $branch->name ?? $org->name ?? 'Toserba',
+                            'shipper_contact_phone' => $branch->phone ?? $org->phone ?? '081234567890',
+                            'origin_contact_name' => $branch->name ?? $org->name ?? 'Toserba',
+                            'origin_contact_phone' => $branch->phone ?? $org->phone ?? '081234567890',
+                            'origin_address' => $branch->address ?? $org->address ?? 'Alamat Toko',
+                            'origin_coordinate' => [
+                                'latitude' => (float) ($branch->latitude ?? 0),
+                                'longitude' => (float) ($branch->longitude ?? 0),
+                            ],
+                            'destination_contact_name' => $record->customer_name,
+                            'destination_contact_phone' => $record->customer_phone,
+                            'destination_address' => $record->delivery_address,
+                            'destination_coordinate' => [
+                                'latitude' => (float) ($record->destination_latitude ?? 0),
+                                'longitude' => (float) ($record->destination_longitude ?? 0),
+                            ],
+                            'destination_postal_code' => $record->destination_postal_code ?? '12345',
+                            'courier_company' => strtolower($record->courier_name),
+                            'courier_type' => strtolower($record->courier_service),
+                            'delivery_type' => $isInstant ? 'now' : 'later',
+                            'items' => $items
+                        ];
+
+                        $result = $biteship->createOrder($payload);
+
+                        if ($result['success']) {
+                            $record->update([
+                                'biteship_order_id' => $result['order']['id'] ?? null,
+                                'awb_number' => $result['order']['courier']['waybill_id'] ?? null,
+                                'status' => 'PROCESSING'
+                            ]);
+
+                            Notification::make()
+                                ->title('Pickup Berhasil Direquest')
+                                ->body('Kurir segera menjemput pesanan.')
+                                ->success()
+                                ->send();
+                        } else {
+                            Notification::make()
+                                ->title('Gagal Request Pickup')
+                                ->body($result['message'])
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                \Filament\Actions\ViewAction::make(),
+                \Filament\Actions\EditAction::make(),
+                \Filament\Actions\DeleteAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

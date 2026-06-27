@@ -118,4 +118,28 @@ class BiteshipService
             return ['success' => false, 'message' => 'Terjadi kesalahan sistem saat menghubungi Biteship.'];
         }
     }
+    public function createOrder($payload)
+    {
+        if (!$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Biteship API Key belum dikonfigurasi.'];
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $this->apiKey,
+                'Content-Type'  => 'application/json'
+            ])->post($this->baseUrl . '/orders', $payload);
+
+            if ($response->successful()) {
+                return ['success' => true, 'order' => $response->json()];
+            }
+
+            Log::error('Biteship Create Order Error: ' . $response->body());
+            return ['success' => false, 'message' => 'Gagal membuat pesanan (pickup) di Biteship.'];
+
+        } catch (\Exception $e) {
+            Log::error('Biteship Create Order Exception: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Terjadi kesalahan sistem saat menghubungi Biteship.'];
+        }
+    }
 }

@@ -260,7 +260,7 @@ export const CheckoutModal: React.FC = () => {
       clearCart();
       setIsCheckoutModalOpen(false);
 
-      if (order.payment_method === 'MIDTRANS' && order.snap_token) {
+      if (['MIDTRANS', 'QRIS', 'TRANSFER'].includes(order.payment_method) && order.snap_token) {
         if (window.snap) {
           window.snap.pay(order.snap_token, {
             onSuccess: function() {
