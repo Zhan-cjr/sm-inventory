@@ -25,16 +25,23 @@ class BiteshipTestOrders extends Command
         $org = Organization::first();
         $apiKey = $org->biteship_api_key;
 
-        $payload = [
-            'shipper_contact_name' => 'Toserba Selamat',
-            'shipper_contact_phone' => '081234567890',
-            'origin_contact_name' => 'Toserba Selamat',
-            'origin_contact_phone' => '081234567890',
-            'origin_address' => 'Jl. Kebon Sirih',
-            'origin_coordinate' => [
+        $originPayload = [
+            'contact_name' => 'Toserba Selamat',
+            'contact_phone' => '081234567890',
+            'address' => 'Jl. Kebon Sirih',
+            'postal_code' => '10110',
+            'coordinate' => [
                 'latitude' => -6.182084,
                 'longitude' => 106.831518,
             ],
+            'collection_method' => 'drop_off',
+        ];
+
+        $payload = [
+            'shipper_contact_name' => 'Toserba Selamat',
+            'shipper_contact_phone' => '081234567890',
+            'shipper_contact_email' => 'homepc.zhan@gmail.com',
+            'origin' => $originPayload,
             'destination_contact_name' => 'Amnal Test',
             'destination_contact_phone' => '085861094485',
             'destination_address' => 'Jl. Sudirman',
@@ -42,10 +49,12 @@ class BiteshipTestOrders extends Command
                 'latitude' => -6.221469,
                 'longitude' => 106.804961,
             ],
-            'destination_postal_code' => '12190',
-            'courier_company' => 'gojek',
-            'courier_type' => 'instant',
-            'delivery_type' => 'now',
+            'destination_postal_code' => '10270',
+            'courier_company' => 'biteship',
+            'courier_type' => 'test',
+            'delivery_type' => 'later',
+            'delivery_date' => date('Y-m-d'),
+            'delivery_time' => date('H:i', strtotime('+1 hour')),
             'items' => [
                 [
                     'name' => 'Test Item',
