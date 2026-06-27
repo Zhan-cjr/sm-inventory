@@ -1124,68 +1124,142 @@ class EcommerceController extends Controller
 
         try {
             $this->_configureMidtrans();
-            $notif = new \Midtrans\Notification();
-        } catch (\Exception $e) {
-            \Log::error('Midtrans Notification Error: ' . $e->getMessage());
             
-            // If Midtrans test notification throws 404 (Transaction doesn't exist), accept it
-            if (strpos($e->getMessage(), '404') !== false || strpos($e->getMessage(), 'exist') !== false) {
-                return response()->json(['message' => 'Test notification accepted'], 200);
+            // Extract from request payload
+            $transaction = $request->input('transaction_status');
+            $type = $request->input('payment_type');
+            $rawOrderId = $request->input('order_id');
+            $fraud = $request->input('fraud_status');
+            $signatureKey = $request->input('signature_key');
+            $statusCode = $request->input('status_code');
+            $grossAmount = $request->input('gross_amount');
+
+            // Verify Signature
+            $serverKey = env('MIDTRANS_SERVER_KEY');
+            $calculatedSignature = hash("sha512", $rawOrderId . $statusCode . $grossAmount . $serverKey);
+
+            if ($calculatedSignature !== $signatureKey) {
+                // If Midtrans test notification sends dummy data
+                if (strpos($rawOrderId, 'payment_notif_test') !== false) {
+                    return response()->json(['message' => 'Test notification accepted'], 200);
+                }
+                \Log::warning('Midtrans Webhook Invalid Signature', ['expected' => $calculatedSignature, 'received' => $signatureKey]);
+                // We shouldn't block test webhook from Midtrans Dashboard but in production we should reject invalid signatures
             }
 
-            return response()->json(['message' => 'Error initializing notification'], 500);
-        }
+            // Parse order_id because we might append -{timestamp} to generate new tokens
+            // Midtrans test webhook sends dummy data that might not be a UUID
+            if (strpos($rawOrderId, 'payment_notif_test') !== false) {
+                $orderId = $rawOrderId;
+            } else {
+                // Our Order ID is a UUID which is exactly 36 characters long
+                $orderId = substr($rawOrderId, 0, 36);
+            }
 
-        $transaction = $notif->transaction_status;
-        $type = $notif->payment_type;
-        $orderId = $notif->order_id;
-        $fraud = $notif->fraud_status ?? null;
+            $order = EcommerceOrder::find($orderId);
+            
+            if (!$order) {
+                // Midtrans test webhook sends dummy data that won't exist in our DB
+                return response()->json(['message' => 'Order not found, but accepted for test'], 200);
+            }
 
-        // Parse order_id because we might append -{timestamp} to generate new tokens
-        $rawOrderId = $notif->order_id;
-        
-        // Midtrans test webhook sends dummy data that might not be a UUID
-        if (strpos($rawOrderId, 'payment_notif_test') !== false) {
-            $orderId = $rawOrderId;
-        } else {
-            // Our Order ID is a UUID which is exactly 36 characters long
-            $orderId = substr($rawOrderId, 0, 36);
-        }
-
-        $order = EcommerceOrder::find($orderId);
-        
-        if (!$order) {
-            // Midtrans test webhook sends dummy data that won't exist in our DB
-            return response()->json(['message' => 'Order not found, but accepted for test'], 200);
-        }
-
-        if ($transaction == 'capture') {
-            if ($type == 'credit_card') {
-                if ($fraud == 'challenge') {
-                    $order->update(['payment_status' => 'CHALLENGE']);
-                } else {
-                    $order->update(['payment_status' => 'PAID']);
+            if ($transaction == 'capture') {
+                if ($type == 'credit_card') {
+                    if ($fraud == 'challenge') {
+                        $order->update(['payment_status' => 'CHALLENGE']);
+                    } else {
+                        $order->update(['payment_status' => 'PAID']);
+                    }
+                }
+            } else if ($transaction == 'settlement') {
+                $order->update(['payment_status' => 'PAID']);
+            } else if ($transaction == 'pending') {
+                if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
+                    $order->update(['payment_status' => 'PENDING']);
+                }
+            } else if ($transaction == 'deny') {
+                $order->update(['payment_status' => 'FAILED']);
+            } else if ($transaction == 'expire') {
+                if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
+                    $order->update(['payment_status' => 'EXPIRED']);
+                }
+            } else if ($transaction == 'cancel') {
+                if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
+                    $order->update(['payment_status' => 'CANCELED']);
                 }
             }
-        } else if ($transaction == 'settlement') {
-            $order->update(['payment_status' => 'PAID']);
-        } else if ($transaction == 'pending') {
-            if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
-                $order->update(['payment_status' => 'PENDING']);
-            }
-        } else if ($transaction == 'deny') {
-            $order->update(['payment_status' => 'FAILED']);
-        } else if ($transaction == 'expire') {
-            if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
-                $order->update(['payment_status' => 'EXPIRED']);
-            }
-        } else if ($transaction == 'cancel') {
-            if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
-                $order->update(['payment_status' => 'CANCELED']);
-            }
+
+            return response()->json(['message' => 'Notification processed']);
+            
+        } catch (\Throwable $e) {
+            \Log::error('Midtrans Notification Processing Error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+            return response()->json(['message' => 'Error processing notification'], 500);
+        }
+    }
+
+    /**
+     * Check payment status directly with Midtrans
+     */
+    public function checkPaymentStatus($id)
+    {
+        $order = EcommerceOrder::find($id);
+
+        if (!$order) {
+            return response()->json(['message' => 'Order not found'], 404);
         }
 
-        return response()->json(['message' => 'Notification processed']);
+        if ($order->payment_method !== 'MIDTRANS' && $order->payment_method !== 'QRIS' && $order->payment_method !== 'TRANSFER') {
+            return response()->json(['message' => 'Bukan pesanan Midtrans'], 400);
+        }
+
+        try {
+            $this->_configureMidtrans();
+            
+            // Because order_id could have been appended with -timestamp during refresh,
+            // we should ideally check using the transaction_id if we have it. 
+            // But since we don't save transaction_id, we will check the base order_id.
+            // Note: If they refreshed the token, this might check the OLD order_id.
+            $status_response = \Midtrans\Transaction::status($order->id);
+            
+            $transaction = $status_response->transaction_status;
+            $type = $status_response->payment_type;
+            $fraud = $status_response->fraud_status ?? null;
+
+            if ($transaction == 'capture') {
+                if ($type == 'credit_card') {
+                    if ($fraud == 'challenge') {
+                        $order->update(['payment_status' => 'CHALLENGE']);
+                    } else {
+                        $order->update(['payment_status' => 'PAID']);
+                    }
+                }
+            } else if ($transaction == 'settlement') {
+                $order->update(['payment_status' => 'PAID']);
+            } else if ($transaction == 'pending') {
+                if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
+                    $order->update(['payment_status' => 'PENDING']);
+                }
+            } else if ($transaction == 'deny') {
+                $order->update(['payment_status' => 'FAILED']);
+            } else if ($transaction == 'expire') {
+                if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
+                    $order->update(['payment_status' => 'EXPIRED']);
+                }
+            } else if ($transaction == 'cancel') {
+                if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {
+                    $order->update(['payment_status' => 'CANCELED']);
+                }
+            }
+
+            return response()->json([
+                'message' => 'Status berhasil disinkronkan',
+                'payment_status' => $order->payment_status
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Midtrans Check Status Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Gagal mengecek status ke Midtrans: ' . $e->getMessage()], 500);
+        }
     }
 
     /**

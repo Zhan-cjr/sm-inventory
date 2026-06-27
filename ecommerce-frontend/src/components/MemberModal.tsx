@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, CheckCircle, Award, Phone, Mail, MapPin, User, 
   History, LogOut, Receipt, ArrowRight, 
-  ShoppingBag, Loader2, Printer, Lock, CreditCard
+  ShoppingBag, Loader2, Printer, Lock, CreditCard, RefreshCw
 } from 'lucide-react';
 import { useEcom } from '../context/EcomContext';
 import axios from 'axios';
@@ -946,6 +946,26 @@ const MemberModal = () => {
                                     title="Ganti Metode Bayar"
                                   >
                                     Ganti Metode
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await axios.post(`/ecommerce/orders/${item.id}/check-status`);
+                                        if (res.data.payment_status === 'PAID') {
+                                          alert('Status berhasil disinkronkan menjadi PAID!');
+                                        } else {
+                                          alert(`Status saat ini: ${res.data.payment_status}`);
+                                        }
+                                        fetchHistory();
+                                      } catch (err) {
+                                        alert('Gagal menyinkronkan status.');
+                                      }
+                                    }}
+                                    className="px-2 py-1.5 bg-white text-emerald-600 border border-emerald-500 font-bold rounded-lg transition-all text-[10px] hover:bg-emerald-50"
+                                    title="Cek Status Pembayaran"
+                                  >
+                                    <RefreshCw size={12} className="inline mr-1" />
+                                    Cek Status
                                   </button>
                                 </div>
                               )}
