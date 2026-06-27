@@ -23,7 +23,7 @@ const DEFAULT_CENTER = [-6.2088, 106.8456]; // Jakarta Default
 
 const LocationMarker = ({ position, setPosition, onLocationSelect }: any) => {
   const map = useMapEvents({
-    click(e) {
+    click(e: L.LeafletMouseEvent) {
       setPosition(e.latlng);
       onLocationSelect(e.latlng.lat, e.latlng.lng);
       map.flyTo(e.latlng, map.getZoom());
