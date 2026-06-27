@@ -8,6 +8,8 @@ import { useEcom } from '../context/EcomContext';
 import axios from 'axios';
 import { getImageUrl } from '../utils/api';
 import AddressBookTab from './AddressBookTab';
+import MapPicker from './MapPicker';
+import { Search } from 'lucide-react';
 
 const MemberModal = () => {
   const { 
@@ -35,6 +37,14 @@ const MemberModal = () => {
   const [forgotOtp, setForgotOtp] = useState('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
   const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+
+  // Biteship Area Search & Map for Registration
+  const [regAreaQuery, setRegAreaQuery] = useState('');
+  const [regAreaResults, setRegAreaResults] = useState<any[]>([]);
+  const [isSearchingRegArea, setIsSearchingRegArea] = useState(false);
+  const [regSelectedArea, setRegSelectedArea] = useState<any | null>(null);
+  const [regLatitude, setRegLatitude] = useState<number | null>(null);
+  const [regLongitude, setRegLongitude] = useState<number | null>(null);
 
   // Profile Edit states
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -76,6 +86,26 @@ const MemberModal = () => {
       syncMemberPoints();
     }
   }, [isMemberModalOpen]);
+
+  const searchRegArea = async (query: string) => {
+    setRegAreaQuery(query);
+    if (query.length < 3) {
+      setRegAreaResults([]);
+      return;
+    }
+    
+    setIsSearchingRegArea(true);
+    try {
+      const res = await axios.get('/ecommerce/areas/search', {
+        params: { query }
+      });
+      setRegAreaResults(res.data.areas || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSearchingRegArea(false);
+    }
+  };
 
   // Fetch history when member changes or history tab is selected
   useEffect(() => {
@@ -182,6 +212,9 @@ const MemberModal = () => {
         phone: regPhone,
         email: regEmail || null,
         address: regAddress || null,
+        biteship_area_id: regSelectedArea ? regSelectedArea.id : null,
+        latitude: regLatitude,
+        longitude: regLongitude,
         password: regPassword,
       });
 
@@ -433,18 +466,66 @@ const MemberModal = () => {
                         </div>
                       </div>
 
+                      <div className="relative">
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Kecamatan / Kelurahan (Biteship)</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={regSelectedArea ? regSelectedArea.name : regAreaQuery}
+                            onChange={e => {
+                              setRegSelectedArea(null);
+                              searchRegArea(e.target.value);
+                            }}
+                            placeholder="Ketik nama kecamatan..."
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800"
+                          />
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
+                        
+                        {isSearchingRegArea && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-sm text-center text-slate-500">
+                            Mencari...
+                          </div>
+                        )}
+                        {!regSelectedArea && regAreaResults.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                            {regAreaResults.map((area: any) => (
+                              <button
+                                key={area.id} type="button"
+                                onClick={() => { setRegSelectedArea(area); setRegAreaResults([]); }}
+                                className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                              >
+                                <span className="font-bold text-slate-700 block">{area.name}</span>
+                                <span className="text-xs text-slate-400">{area.administrative_division_level_2_name}, {area.administrative_division_level_1_name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Alamat Lengkap (Opsional)</label>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Detail Alamat Lengkap</label>
                         <div className="relative">
                           <textarea
                             value={regAddress}
                             onChange={(e) => setRegAddress(e.target.value)}
-                            placeholder="Alamat lengkap untuk pengiriman e-commerce"
+                            placeholder="Nama jalan, nomor rumah, RT/RW..."
                             rows={2}
                             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-sm text-slate-800 resize-none"
                           />
                           <MapPin className="absolute left-3.5 top-4 text-slate-400" size={16} />
                         </div>
+                      </div>
+
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <MapPicker 
+                          initialLat={regLatitude} 
+                          initialLng={regLongitude} 
+                          onLocationSelect={(lat, lng) => {
+                            setRegLatitude(lat);
+                            setRegLongitude(lng);
+                          }}
+                        />
                       </div>
 
                       <div>

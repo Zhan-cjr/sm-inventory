@@ -47,6 +47,7 @@ export const CheckoutModal: React.FC = () => {
 
   // Shipping
   const [destLat, setDestLat] = useState<number | null>(null);
+  const [destLon, setDestLon] = useState<number | null>(null);
   const [shippingRates, setShippingRates] = useState<any[]>([]);
   const [selectedCourier, setSelectedCourier] = useState<any | null>(null);
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
@@ -88,21 +89,25 @@ export const CheckoutModal: React.FC = () => {
     setPhone(addr.recipient_phone);
     setAddress(addr.full_address);
     if (addr.biteship_area_id) {
-      calculateShippingRatesByArea(addr.biteship_area_id);
+      calculateShippingRatesByArea(addr.biteship_area_id, addr.latitude, addr.longitude);
     } else if (addr.latitude && addr.longitude) {
       calculateShippingRates(addr.latitude, addr.longitude);
     }
   };
 
-  const calculateShippingRatesByArea = async (areaId: string) => {
+  const calculateShippingRatesByArea = async (areaId: string, lat?: number, lon?: number) => {
     if (!branchId || cart.length === 0) return;
     setIsCalculatingShipping(true);
     try {
-      const payload = {
+      const payload: any = {
         branch_id: branchId,
         destination_area_id: areaId,
         items: cart.map(i => ({ product_id: i.product.id, quantity: i.quantity }))
       };
+      if (lat && lon) {
+        payload.destination_latitude = parseFloat(lat.toString());
+        payload.destination_longitude = parseFloat(lon.toString());
+      }
       const res = await axios.post('/ecommerce/shipping-rates', payload);
       setShippingRates(res.data.rates || []);
       if (res.data.rates && res.data.rates.length > 0) {
@@ -173,6 +178,7 @@ export const CheckoutModal: React.FC = () => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setDestLat(position.coords.latitude);
+          setDestLon(position.coords.longitude);
           calculateShippingRates(position.coords.latitude, position.coords.longitude);
         },
         () => {
@@ -232,7 +238,7 @@ export const CheckoutModal: React.FC = () => {
     setSubmitting(true);
     setError(null);
 
-    const payload = {
+    const payload: any = {
       customer_name: name,
       customer_phone: phone,
       delivery_method: deliveryMethod,
@@ -249,6 +255,16 @@ export const CheckoutModal: React.FC = () => {
       courier_name: deliveryMethod === 'DELIVERY' && selectedCourier ? selectedCourier.company : null,
       courier_service: deliveryMethod === 'DELIVERY' && selectedCourier ? selectedCourier.type : null,
     };
+
+    if (deliveryMethod === 'DELIVERY') {
+      if (selectedAddress) {
+        payload.destination_latitude = selectedAddress.latitude;
+        payload.destination_longitude = selectedAddress.longitude;
+      } else {
+        payload.destination_latitude = destLat;
+        payload.destination_longitude = destLon;
+      }
+    }
 
     try {
       const res = await axios.post('/ecommerce/orders', payload);

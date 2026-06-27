@@ -43,12 +43,15 @@ class BiteshipService
                 ]
             ];
 
-            // If area ID is provided, use it. Otherwise fallback to lat/lon
-            if ($destAreaId) {
-                $payload['destination_area_id'] = $destAreaId;
-            } else {
+            // Selalu kirim koordinat jika ada, karena kurir instan (Gojek/Grab) mewajibkannya
+            if ($destLat && $destLon) {
                 $payload['destination_latitude'] = (float) $destLat;
                 $payload['destination_longitude'] = (float) $destLon;
+            }
+            
+            // Area ID opsional, berguna untuk kurir reguler
+            if ($destAreaId) {
+                $payload['destination_area_id'] = $destAreaId;
             }
 
             $response = Http::withHeaders([

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { MapPin, Plus, Loader2, Search } from 'lucide-react';
 import { useEcom } from '../context/EcomContext';
+import MapPicker from './MapPicker';
 
 const AddressBookTab = () => {
   const { member } = useEcom();
@@ -20,6 +21,11 @@ const AddressBookTab = () => {
   const [areaResults, setAreaResults] = useState<any[]>([]);
   const [isSearchingArea, setIsSearchingArea] = useState(false);
   const [selectedArea, setSelectedArea] = useState<any | null>(null);
+
+  // Geolocation
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   useEffect(() => {
     if (member) {
@@ -61,11 +67,39 @@ const AddressBookTab = () => {
     }
   };
 
+  const getLocation = () => {
+    setIsGettingLocation(true);
+    if (!navigator.geolocation) {
+      alert('Geolocation tidak didukung oleh browser Anda.');
+      setIsGettingLocation(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(position.coords.latitude);
+        setLongitude(position.coords.longitude);
+        setIsGettingLocation(false);
+        alert('Koordinat berhasil didapatkan!');
+      },
+      () => {
+        alert('Gagal mendapatkan lokasi. Pastikan izin lokasi diberikan.');
+        setIsGettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   const handleSaveAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedArea) {
       alert('Pilih kecamatan/kelurahan dari daftar yang muncul!');
       return;
+    }
+    
+    // Kurir instan mewajibkan koordinat
+    if (!latitude || !longitude) {
+      const confirmProceed = window.confirm('Anda belum menentukan Koordinat Peta (GPS). Tanpa koordinat, Anda TIDAK BISA menggunakan kurir Instan (Gojek/Grab). Lanjutkan menyimpan tanpa koordinat?');
+      if (!confirmProceed) return;
     }
 
     setIsLoading(true);
@@ -75,7 +109,9 @@ const AddressBookTab = () => {
         recipient_name: recipientName,
         recipient_phone: recipientPhone,
         full_address: fullAddress,
-        biteship_area_id: selectedArea.id
+        biteship_area_id: selectedArea.id,
+        latitude,
+        longitude
       }, {
         headers: { 'X-Member-ID': member?.id }
       });
@@ -85,6 +121,8 @@ const AddressBookTab = () => {
       setFullAddress('');
       setAreaQuery('');
       setSelectedArea(null);
+      setLatitude(null);
+      setLongitude(null);
       fetchAddresses();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Gagal menyimpan alamat');
@@ -200,6 +238,17 @@ const AddressBookTab = () => {
               required value={fullAddress} onChange={e => setFullAddress(e.target.value)}
               rows={2} placeholder="Nama jalan, nomor rumah, detail blok..."
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm resize-none"
+            />
+          </div>
+
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <MapPicker 
+              initialLat={latitude} 
+              initialLng={longitude} 
+              onLocationSelect={(lat, lng) => {
+                setLatitude(lat);
+                setLongitude(lng);
+              }}
             />
           </div>
 

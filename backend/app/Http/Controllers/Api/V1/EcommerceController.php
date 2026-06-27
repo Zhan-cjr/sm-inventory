@@ -354,6 +354,8 @@ class EcommerceController extends Controller
             'recipient_phone' => 'required|string|max:20',
             'full_address' => 'required|string',
             'biteship_area_id' => 'required|string', // mandatory based on our plan
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         // If it's the first address, make it primary
@@ -366,6 +368,8 @@ class EcommerceController extends Controller
             'recipient_phone' => $request->recipient_phone,
             'full_address' => $request->full_address,
             'biteship_area_id' => $request->biteship_area_id,
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
             'is_primary' => $request->input('is_primary', $isPrimary),
         ]);
 
@@ -776,6 +780,9 @@ class EcommerceController extends Controller
             'phone' => 'required|string|max:50',
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|string',
+            'biteship_area_id' => 'nullable|string',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
             'password' => 'required|string|min:6',
         ]);
 
@@ -784,6 +791,9 @@ class EcommerceController extends Controller
 
         // Periksa apakah nomor telepon member sudah terdaftar
         $existing = \App\Models\Customer::where('phone', $request->phone)->first();
+        
+        $customer = $existing;
+
         if ($existing) {
             if ($existing->password) {
                 return response()->json([
@@ -798,29 +808,42 @@ class EcommerceController extends Controller
                 'email' => $request->email ?? $existing->email,
                 'address' => $request->address ?? $existing->address,
             ]);
-
-            return response()->json([
-                'message' => 'Pendaftaran online berhasil! Akun toko fisik Anda kini terhubung.',
-                'member' => $existing,
-            ], 200);
+        } else {
+            $customer = \App\Models\Customer::create([
+                'organization_id' => $orgId,
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'address' => $request->address,
+                'password' => bcrypt($request->password),
+                'member_tier' => 'BRONZE',
+                'points' => 0,
+                'is_active' => true,
+            ]);
         }
 
-        $customer = \App\Models\Customer::create([
-            'organization_id' => $orgId,
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'address' => $request->address,
-            'password' => bcrypt($request->password),
-            'member_tier' => 'BRONZE',
-            'points' => 0,
-            'is_active' => true,
-        ]);
+        // Jika user mengisi biteship_area_id saat pendaftaran, otomatis buatkan AddressBook
+        if ($request->biteship_area_id) {
+            $hasPrimary = \App\Models\CustomerAddress::where('customer_id', $customer->id)
+                            ->where('is_primary', true)->exists();
+                            
+            \App\Models\CustomerAddress::create([
+                'customer_id' => $customer->id,
+                'label' => 'Utama',
+                'recipient_name' => $customer->name,
+                'recipient_phone' => $customer->phone,
+                'full_address' => $request->address ?? 'Alamat belum diatur',
+                'biteship_area_id' => $request->biteship_area_id,
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+                'is_primary' => !$hasPrimary,
+            ]);
+        }
 
         return response()->json([
-            'message' => 'Pendaftaran member berhasil!',
+            'message' => $existing ? 'Pendaftaran online berhasil! Akun toko fisik Anda kini terhubung.' : 'Pendaftaran member berhasil!',
             'member' => $customer,
-        ], 201);
+        ], $existing ? 200 : 201);
     }
 
     /**
