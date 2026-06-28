@@ -67,6 +67,16 @@ export const CheckoutModal: React.FC = () => {
     }
   }, [member, isCheckoutModalOpen]);
 
+  useEffect(() => {
+    if (deliveryMethod === 'DELIVERY' && selectedAddress && shippingRates.length === 0) {
+      if (selectedAddress.biteship_area_id) {
+        calculateShippingRatesByArea(selectedAddress.biteship_area_id, selectedAddress.latitude, selectedAddress.longitude);
+      } else if (selectedAddress.latitude && selectedAddress.longitude) {
+        calculateShippingRates(selectedAddress.latitude, selectedAddress.longitude);
+      }
+    }
+  }, [deliveryMethod, selectedAddress, shippingRates.length]);
+
   const fetchAddresses = async () => {
     if (!member) return;
     try {
@@ -88,10 +98,12 @@ export const CheckoutModal: React.FC = () => {
     setName(addr.recipient_name);
     setPhone(addr.recipient_phone);
     setAddress(addr.full_address);
-    if (addr.biteship_area_id) {
-      calculateShippingRatesByArea(addr.biteship_area_id, addr.latitude, addr.longitude);
-    } else if (addr.latitude && addr.longitude) {
-      calculateShippingRates(addr.latitude, addr.longitude);
+    if (deliveryMethod === 'DELIVERY') {
+      if (addr.biteship_area_id) {
+        calculateShippingRatesByArea(addr.biteship_area_id, addr.latitude, addr.longitude);
+      } else if (addr.latitude && addr.longitude) {
+        calculateShippingRates(addr.latitude, addr.longitude);
+      }
     }
   };
 
@@ -170,7 +182,7 @@ export const CheckoutModal: React.FC = () => {
   );
 
   const discountAmount = usePoints ? pointsToRedeem * (settings?.point_redemption_value || 0) : 0;
-  const shippingCost = selectedCourier ? selectedCourier.price : 0;
+  const shippingCost = (deliveryMethod === 'DELIVERY' && selectedCourier) ? selectedCourier.price : 0;
   const finalPaymentAmount = Math.max(0, totalAmount + shippingCost - discountAmount);
 
   const handleGetLocation = () => {
