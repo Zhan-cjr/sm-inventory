@@ -678,17 +678,19 @@ class ReportPrintController extends Controller
 
     private function printLaporanBarangDijual($filters)
     {
-        $query = \App\Models\TransactionItem::query()->whereHas('transaction', function($q) use ($filters) { 
-            $q->where('is_voided', false);
-            
-            if (auth()->user()->branch_id !== null) {
-                $q->where('branch_id', auth()->user()->branch_id);
-            } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
-                $q->where('branch_id', $filters['branch_id']['value']);
-            }
+        $query = \App\Models\AllSalesItem::query()->whereNotNull('product_id');
+        
+        if (auth()->user()->branch_id !== null) {
+            $query->where('branch_id', auth()->user()->branch_id);
+        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $query->where('branch_id', $filters['branch_id']['value']);
+        }
+        
+        if (isset($filters['source']['value']) && !empty($filters['source']['value'])) {
+            $query->where('source', $filters['source']['value']);
+        }
 
-            $q = $this->applyDateFilters($q, $filters, 'transaction_date', 'transaction_date');
-        })->whereNotNull('product_id');
+        $query = $this->applyDateFilters($query, $filters, 'transaction_date', 'transaction_date');
         
         if (isset($filters['supplier_id']['value']) && !empty($filters['supplier_id']['value'])) {
             $query->whereHas('product', function($q) use ($filters) {
@@ -696,7 +698,7 @@ class ReportPrintController extends Controller
             });
         }
         
-        $query->with(['product', 'transaction']);
+        $query->with(['product', 'branch']);
         
         $items = $query->get();
         $period = $this->getPeriodString($filters);
@@ -709,7 +711,7 @@ class ReportPrintController extends Controller
             $product_id = $i->product_id;
             
             $cost_price = 0;
-            $branch_id = $i->transaction ? $i->transaction->branch_id : null;
+            $branch_id = $i->branch_id;
             if ($branch_id) {
                 $stock = \App\Models\Stock::where('product_id', $i->product_id)->where('branch_id', $branch_id)->first();
                 $cost_price = ($stock && $stock->cost_price > 0) ? $stock->cost_price : ($i->product ? $i->product->cost_price : 0);
