@@ -147,6 +147,7 @@ class EcommerceController extends Controller
             $query = \App\Models\Product::query()
                 ->with('category')
                 ->where('products.is_active', true)
+                ->where('products.product_type', '!=', 'digital') // Sembunyikan produk digital dari katalog
                 ->where(function ($q) use ($promoProductIds, $promoCategoryIds, $promoAll) {
                     $q->where('products.is_ecommerce_active', true);
                     if (!empty($promoProductIds)) {
