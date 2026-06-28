@@ -109,7 +109,7 @@ class EcommercePpobController extends Controller
         try {
             // Create E-commerce Order specifically for PPOB
             $order = EcommerceOrder::create([
-                'organization_id' => $product->organization_id ?? 1,
+                'organization_id' => $product->organization_id ?? \App\Models\Organization::first()->id,
                 'branch_id' => $request->branch_id,
                 'customer_name' => $request->customer_name,
                 'customer_phone' => $request->customer_phone,
@@ -119,14 +119,12 @@ class EcommercePpobController extends Controller
                 'status' => 'PENDING',
                 'total_amount' => $product->selling_price,
                 'payment_method' => 'MIDTRANS',
-                'payment_status' => 'UNPAID',
-                'device_id' => null
+                'payment_status' => 'UNPAID'
             ]);
 
             EcommerceOrderItem::create([
                 'ecommerce_order_id' => $order->id,
                 'product_id' => $product->id,
-                'product_name' => $product->name,
                 'quantity' => 1,
                 'price' => $product->selling_price,
                 'subtotal' => $product->selling_price,

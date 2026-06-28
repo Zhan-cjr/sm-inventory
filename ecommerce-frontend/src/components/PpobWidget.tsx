@@ -84,9 +84,10 @@ const PpobWidget = () => {
           navigate('/pesanan');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('Terjadi kesalahan saat membuat pesanan PPOB');
+      const backendMsg = error.response?.data?.message || 'Terjadi kesalahan saat membuat pesanan PPOB';
+      alert(backendMsg);
     } finally {
       setPurchasing(null);
     }
