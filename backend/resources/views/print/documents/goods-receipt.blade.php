@@ -105,7 +105,7 @@
                 </td>
                 <td>
                     <div class="signature-line"></div>
-                    Pengirim / Sopir<br>
+                    Supervisor<br>
                     (............................)
                 </td>
             </tr>
