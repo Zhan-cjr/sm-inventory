@@ -5,7 +5,7 @@ import {
   Baby, Home, Heart, PackageOpen, Tag,
   ShoppingBag, Shirt, MonitorSmartphone, Scissors, Utensils,
   Croissant, Fish, IceCream, SprayCan, Pencil, Gamepad2, Bath, Flame,
-  Smartphone, Zap
+  Smartphone, Zap, Wallet
 } from 'lucide-react';
 
 const CategoryIcons = () => {
@@ -48,54 +48,83 @@ const CategoryIcons = () => {
   return (
     <div className="w-full pl-4 pr-0 sm:px-6 lg:px-8 mt-2 mb-2 overflow-hidden">
       <div className="flex overflow-x-auto no-scrollbar pb-2 pt-1 gap-4 pr-4 snap-x">
-        
-        {/* PPOB Static Categories */}
-        <button
-          onClick={() => { setIsPpobModalOpen(true); setActivePpobTab('PULSA'); }}
-          className="flex flex-col items-center justify-start gap-1.5 group cursor-pointer w-[60px] sm:w-[70px] shrink-0 snap-start"
-        >
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 active:scale-95 shadow-sm border border-slate-100 bg-brand-blue/10 text-brand-blue">
-            <Smartphone size={24} />
-          </div>
-          <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-full">
-            Pulsa/Data
-          </span>
-        </button>
-
-        <button
-          onClick={() => { setIsPpobModalOpen(true); setActivePpobTab('PLN'); }}
-          className="flex flex-col items-center justify-start gap-1.5 group cursor-pointer w-[60px] sm:w-[70px] shrink-0 snap-start"
-        >
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 active:scale-95 shadow-sm border border-slate-100 bg-amber-50 text-amber-500">
-            <Zap size={24} />
-          </div>
-          <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-full">
-            Listrik PLN
-          </span>
-        </button>
-
         {availableCategories.length === 0 ? (
           <div className="text-center py-4 text-xs text-slate-400 w-full">
             Memuat kategori...
           </div>
         ) : (
-          availableCategories.map((cat) => {
-            const visual = getCategoryVisuals(cat.id, cat.name);
-            return (
+          <>
+            {/* Render "Semua Kategori" first if it exists */}
+            {availableCategories.find(cat => cat.id === 'all') && (
               <button
-                key={cat.id}
-                onClick={() => handleCategoryClick(cat.id, cat.name)}
+                onClick={() => handleCategoryClick('all', 'Semua Kategori')}
                 className="flex flex-col items-center justify-start gap-1.5 group cursor-pointer w-[60px] sm:w-[70px] shrink-0 snap-start"
               >
-                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 active:scale-95 shadow-sm border border-slate-100 ${visual.color}`}>
-                  {visual.icon}
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 active:scale-95 shadow-sm border border-slate-100 bg-slate-100 text-slate-600">
+                  <PackageOpen size={24} />
                 </div>
                 <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-full">
-                  {cat.name}
+                  Semua Kategori
                 </span>
               </button>
-            );
-          })
+            )}
+
+            {/* PPOB Static Categories */}
+            <button
+              onClick={() => { setIsPpobModalOpen(true); setActivePpobTab('PULSA'); }}
+              className="flex flex-col items-center justify-start gap-1.5 group cursor-pointer w-[60px] sm:w-[70px] shrink-0 snap-start"
+            >
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 active:scale-95 shadow-sm border border-slate-100 bg-brand-blue/10 text-brand-blue">
+                <Smartphone size={24} />
+              </div>
+              <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-full">
+                Pulsa/Data
+              </span>
+            </button>
+
+            <button
+              onClick={() => { setIsPpobModalOpen(true); setActivePpobTab('PLN'); }}
+              className="flex flex-col items-center justify-start gap-1.5 group cursor-pointer w-[60px] sm:w-[70px] shrink-0 snap-start"
+            >
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 active:scale-95 shadow-sm border border-slate-100 bg-amber-50 text-amber-500">
+                <Zap size={24} />
+              </div>
+              <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-full">
+                Listrik PLN
+              </span>
+            </button>
+
+            <button
+              onClick={() => { setIsPpobModalOpen(true); setActivePpobTab('EWALLET'); }}
+              className="flex flex-col items-center justify-start gap-1.5 group cursor-pointer w-[60px] sm:w-[70px] shrink-0 snap-start"
+            >
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 active:scale-95 shadow-sm border border-slate-100 bg-emerald-50 text-emerald-500">
+                <Wallet size={24} />
+              </div>
+              <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-full">
+                E-Wallet
+              </span>
+            </button>
+
+            {/* Render the rest of the categories */}
+            {availableCategories.filter(cat => cat.id !== 'all').map((cat) => {
+              const visual = getCategoryVisuals(cat.id, cat.name);
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => handleCategoryClick(cat.id, cat.name)}
+                  className="flex flex-col items-center justify-start gap-1.5 group cursor-pointer w-[60px] sm:w-[70px] shrink-0 snap-start"
+                >
+                  <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-105 active:scale-95 shadow-sm border border-slate-100 ${visual.color}`}>
+                    {visual.icon}
+                  </div>
+                  <span className="text-[10px] sm:text-xs text-center font-medium text-slate-700 leading-tight group-hover:text-brand-blue transition-colors max-w-full">
+                    {cat.name}
+                  </span>
+                </button>
+              );
+            })}
+          </>
         )}
       </div>
     </div>

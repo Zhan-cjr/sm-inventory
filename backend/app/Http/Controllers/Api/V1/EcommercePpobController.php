@@ -24,13 +24,28 @@ class EcommercePpobController extends Controller
             $query->where(function($q) {
                 $q->where('name', 'like', '%PLN%')->orWhere('name', 'like', '%TOKEN%');
             });
+        } elseif ($type === 'EWALLET') {
+            $query->where(function($q) {
+                $q->where('name', 'like', '%DANA%')
+                  ->orWhere('name', 'like', '%GOPAY%')
+                  ->orWhere('name', 'like', '%OVO%')
+                  ->orWhere('name', 'like', '%SHOPEEPAY%')
+                  ->orWhere('name', 'like', '%LINKAJA%');
+            });
         } elseif ($type === 'PULSA' || $type === 'DATA') {
             // Simplified logic: If we had a provider map, we would filter by provider.
             // For now, return products matching the keyword
             if ($type === 'DATA') {
                 $query->where('name', 'like', '%DATA%');
             } else {
-                $query->where('name', 'not like', '%DATA%')->where('name', 'not like', '%PLN%')->where('name', 'not like', '%TOKEN%');
+                $query->where('name', 'not like', '%DATA%')
+                      ->where('name', 'not like', '%PLN%')
+                      ->where('name', 'not like', '%TOKEN%')
+                      ->where('name', 'not like', '%DANA%')
+                      ->where('name', 'not like', '%GOPAY%')
+                      ->where('name', 'not like', '%OVO%')
+                      ->where('name', 'not like', '%SHOPEEPAY%')
+                      ->where('name', 'not like', '%LINKAJA%');
             }
         }
 

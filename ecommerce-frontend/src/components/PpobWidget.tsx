@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Smartphone, Zap, Wifi, Loader2, X, ChevronRight, History } from 'lucide-react';
+import { Smartphone, Zap, Wifi, Loader2, X, ChevronRight, History, Wallet } from 'lucide-react';
 import axios from 'axios';
 import { useEcom } from '../context/EcomContext';
 import { useNavigate } from 'react-router-dom';
@@ -120,46 +120,57 @@ const PpobWidget = () => {
         <div className="flex-1 overflow-y-auto bg-slate-50/50">
           <div className="p-5">
             {/* Tabs */}
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6 flex-wrap sm:flex-nowrap gap-1 sm:gap-0">
               <button
                 onClick={() => { setActivePpobTab('PULSA'); setPhoneNumber(''); }}
-                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 min-w-[45%] sm:min-w-0 py-2.5 text-[10px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
                   activePpobTab === 'PULSA' 
                     ? 'bg-white text-brand-blue shadow-sm' 
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Smartphone size={16} />
+                <Smartphone size={14} className="sm:w-4 sm:h-4" />
                 Pulsa
               </button>
               <button
                 onClick={() => { setActivePpobTab('DATA'); setPhoneNumber(''); }}
-                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 min-w-[45%] sm:min-w-0 py-2.5 text-[10px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
                   activePpobTab === 'DATA' 
                     ? 'bg-white text-brand-blue shadow-sm' 
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Wifi size={16} />
+                <Wifi size={14} className="sm:w-4 sm:h-4" />
                 Paket Data
               </button>
               <button
                 onClick={() => { setActivePpobTab('PLN'); setPhoneNumber(''); }}
-                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 min-w-[45%] sm:min-w-0 py-2.5 text-[10px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
                   activePpobTab === 'PLN' 
                     ? 'bg-white text-brand-blue shadow-sm' 
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Zap size={16} />
+                <Zap size={14} className="sm:w-4 sm:h-4" />
                 Token PLN
+              </button>
+              <button
+                onClick={() => { setActivePpobTab('EWALLET'); setPhoneNumber(''); }}
+                className={`flex-1 min-w-[45%] sm:min-w-0 py-2.5 text-[10px] sm:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 ${
+                  activePpobTab === 'EWALLET' 
+                    ? 'bg-white text-brand-blue shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Wallet size={14} className="sm:w-4 sm:h-4" />
+                E-Wallet
               </button>
             </div>
 
             {/* Input */}
             <div className="mb-6 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
               <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
-                {activePpobTab === 'PLN' ? 'Nomor Meter / ID Pelanggan' : 'Nomor Handphone'}
+                {activePpobTab === 'PLN' ? 'Nomor Meter / ID Pelanggan' : activePpobTab === 'EWALLET' ? 'Nomor Handphone (DANA/GoPay/dll)' : 'Nomor Handphone'}
               </label>
               <div className="relative">
                 <input 

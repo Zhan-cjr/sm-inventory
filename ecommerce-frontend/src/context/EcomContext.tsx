@@ -80,8 +80,8 @@ interface EcomContextType {
   setAvailableCategories: (categories: {id: string, name: string}[]) => void;
   isPpobModalOpen: boolean;
   setIsPpobModalOpen: (open: boolean) => void;
-  activePpobTab: 'PULSA' | 'DATA' | 'PLN';
-  setActivePpobTab: (tab: 'PULSA' | 'DATA' | 'PLN') => void;
+  activePpobTab: 'PULSA' | 'DATA' | 'PLN' | 'EWALLET';
+  setActivePpobTab: (tab: 'PULSA' | 'DATA' | 'PLN' | 'EWALLET') => void;
 }
 
 const EcomContext = createContext<EcomContextType | undefined>(undefined);
@@ -120,7 +120,7 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<{id: string, name: string}[]>([]);
   const [isPpobModalOpen, setIsPpobModalOpen] = useState(false);
-  const [activePpobTab, setActivePpobTab] = useState<'PULSA' | 'DATA' | 'PLN'>('PULSA');
+  const [activePpobTab, setActivePpobTab] = useState<'PULSA' | 'DATA' | 'PLN' | 'EWALLET'>('PULSA');
 
   useEffect(() => {
     localStorage.setItem('ecom_cart', JSON.stringify(cart));
