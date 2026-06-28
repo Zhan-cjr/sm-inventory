@@ -888,6 +888,55 @@ class EcommerceController extends Controller
         ]);
     }
 
+    public function getNotifications(Request $request)
+    {
+        $request->validate(['phone' => 'required|string']);
+        $customer = \App\Models\Customer::where('phone', $request->phone)->first();
+        if (!$customer) return response()->json(['message' => 'Member not found'], 404);
+
+        $notifications = \App\Models\EcommerceNotification::where('customer_id', $customer->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get();
+            
+        $unreadCount = $notifications->where('is_read', false)->count();
+
+        return response()->json([
+            'notifications' => $notifications,
+            'unread_count' => $unreadCount
+        ]);
+    }
+
+    public function markNotificationRead(Request $request, $id)
+    {
+        $request->validate(['phone' => 'required|string']);
+        $customer = \App\Models\Customer::where('phone', $request->phone)->first();
+        if (!$customer) return response()->json(['message' => 'Member not found'], 404);
+
+        $notification = \App\Models\EcommerceNotification::where('customer_id', $customer->id)
+            ->where('id', $id)
+            ->first();
+            
+        if ($notification) {
+            $notification->update(['is_read' => true]);
+        }
+        
+        return response()->json(['success' => true]);
+    }
+
+    public function markAllNotificationsRead(Request $request)
+    {
+        $request->validate(['phone' => 'required|string']);
+        $customer = \App\Models\Customer::where('phone', $request->phone)->first();
+        if (!$customer) return response()->json(['message' => 'Member not found'], 404);
+
+        \App\Models\EcommerceNotification::where('customer_id', $customer->id)
+            ->where('is_read', false)
+            ->update(['is_read' => true]);
+            
+        return response()->json(['success' => true]);
+    }
+
     /**
      * Ambil histori belanja member (dari POS dan E-Commerce)
      */
@@ -1249,6 +1298,15 @@ class EcommerceController extends Controller
                                     $msg .= "Total Pembayaran: Rp " . number_format($order->total_amount, 0, ',', '.') . "\n";
                                     $msg .= "Terima kasih telah berbelanja!";
 
+                                    // Push Notification to App
+                                    \App\Models\EcommerceNotification::create([
+                                        'customer_id' => $member->id,
+                                        'title' => 'Transaksi PPOB ' . $status,
+                                        'body' => $msg,
+                                        'type' => 'ORDER',
+                                        'reference_id' => $order->id
+                                    ]);
+
                                     // Email notification
                                     if ($member->email) {
                                         try {
@@ -1273,17 +1331,29 @@ class EcommerceController extends Controller
                 } else {
                     // Send notification for physical orders
                     $member = \App\Models\Customer::where('phone', $order->customer_phone)->first();
-                    if ($member && $member->email) {
-                        try {
-                            $msg = "Pesanan Anda dengan ID {$order->id} telah Lunas dan sedang diproses!\n";
-                            $msg .= "Total Pembayaran: Rp " . number_format($order->total_amount, 0, ',', '.') . "\n";
-                            $msg .= "Silakan tunggu update pengiriman dari kami.";
-                            \Mail::raw($msg, function ($message) use ($member, $order) {
-                                $message->to($member->email)
-                                        ->subject('Pesanan Lunas - ' . $order->id);
-                            });
-                        } catch (\Exception $e) {
-                            \Log::error('Failed to send payment success email: ' . $e->getMessage());
+                    if ($member) {
+                        $msg = "Pesanan Anda dengan ID {$order->id} telah Lunas dan sedang diproses!\n";
+                        $msg .= "Total Pembayaran: Rp " . number_format($order->total_amount, 0, ',', '.') . "\n";
+                        $msg .= "Silakan tunggu update pengiriman dari kami.";
+                        
+                        // Push Notification to App
+                        \App\Models\EcommerceNotification::create([
+                            'customer_id' => $member->id,
+                            'title' => 'Pembayaran Berhasil',
+                            'body' => $msg,
+                            'type' => 'ORDER',
+                            'reference_id' => $order->id
+                        ]);
+
+                        if ($member->email) {
+                            try {
+                                \Mail::raw($msg, function ($message) use ($member, $order) {
+                                    $message->to($member->email)
+                                            ->subject('Pesanan Lunas - ' . $order->id);
+                                });
+                            } catch (\Exception $e) {
+                                \Log::error('Failed to send payment success email: ' . $e->getMessage());
+                            }
                         }
                     }
                 }
@@ -1498,12 +1568,42 @@ class EcommerceController extends Controller
                 'status' => 'PROCESSING',
                 'processed_by' => $user->id
             ]);
+            $customer = \App\Models\Customer::where('phone', $order->customer_phone)->first();
+            if ($customer) {
+                \App\Models\EcommerceNotification::create([
+                    'customer_id' => $customer->id,
+                    'title' => 'Pesanan Diproses',
+                    'body' => "Pesanan Anda #{$order->id} telah diterima dan sedang diproses.",
+                    'type' => 'ORDER',
+                    'reference_id' => $order->id
+                ]);
+            }
             return response()->json(['message' => 'Pesanan diterima dan sedang diproses', 'data' => $order]);
         } elseif ($action === 'reject' && in_array($order->status, ['PENDING', 'PROCESSING'])) {
             $order->update(['status' => 'CANCELLED']); // EcommerceOrderObserver will handle stock & points rollback
+            $customer = \App\Models\Customer::where('phone', $order->customer_phone)->first();
+            if ($customer) {
+                \App\Models\EcommerceNotification::create([
+                    'customer_id' => $customer->id,
+                    'title' => 'Pesanan Dibatalkan',
+                    'body' => "Mohon maaf, pesanan Anda #{$order->id} telah dibatalkan.",
+                    'type' => 'ORDER',
+                    'reference_id' => $order->id
+                ]);
+            }
             return response()->json(['message' => 'Pesanan dibatalkan. Stok dikembalikan.', 'data' => $order]);
         } elseif ($action === 'complete' && $order->status === 'PROCESSING') {
             $order->update(['status' => 'COMPLETED']);
+            $customer = \App\Models\Customer::where('phone', $order->customer_phone)->first();
+            if ($customer) {
+                \App\Models\EcommerceNotification::create([
+                    'customer_id' => $customer->id,
+                    'title' => 'Pesanan Selesai',
+                    'body' => "Pesanan Anda #{$order->id} telah selesai. Terima kasih!",
+                    'type' => 'ORDER',
+                    'reference_id' => $order->id
+                ]);
+            }
             return response()->json(['message' => 'Pesanan telah selesai.', 'data' => $order]);
         }
 

@@ -42,6 +42,9 @@ Route::prefix('v1/ecommerce')->group(function () {
     Route::post('members/forgot-password', [EcommerceController::class, 'forgotPassword']);
     Route::get('members/debug-otp', [EcommerceController::class, 'debugLastOtp']);
     Route::post('members/reset-password', [EcommerceController::class, 'resetPassword']);
+    Route::get('members/notifications', [EcommerceController::class, 'getNotifications']);
+    Route::post('members/notifications/{id}/read', [EcommerceController::class, 'markNotificationRead']);
+    Route::post('members/notifications/read-all', [EcommerceController::class, 'markAllNotificationsRead']);
     Route::put('customer/profile', [EcommerceController::class, 'updateMemberProfile']);
     
     // Address Book & Logistics

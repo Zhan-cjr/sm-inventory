@@ -78,10 +78,25 @@ interface EcomContextType {
   setIsProductModalOpen: (open: boolean) => void;
   availableCategories: {id: string, name: string}[];
   setAvailableCategories: (categories: {id: string, name: string}[]) => void;
+export interface EcommerceNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  is_read: boolean;
+  reference_id: string | null;
+  created_at: string;
+}
+
   isPpobModalOpen: boolean;
   setIsPpobModalOpen: (open: boolean) => void;
   activePpobTab: 'PULSA' | 'DATA' | 'PLN' | 'EWALLET';
   setActivePpobTab: (tab: 'PULSA' | 'DATA' | 'PLN' | 'EWALLET') => void;
+  notifications: EcommerceNotification[];
+  unreadNotificationCount: number;
+  fetchNotifications: () => Promise<void>;
+  markNotificationAsRead: (id: string) => Promise<void>;
+  markAllNotificationsAsRead: () => Promise<void>;
 }
 
 const EcomContext = createContext<EcomContextType | undefined>(undefined);
@@ -121,6 +136,54 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [availableCategories, setAvailableCategories] = useState<{id: string, name: string}[]>([]);
   const [isPpobModalOpen, setIsPpobModalOpen] = useState(false);
   const [activePpobTab, setActivePpobTab] = useState<'PULSA' | 'DATA' | 'PLN' | 'EWALLET'>('PULSA');
+
+  const [notifications, setNotifications] = useState<EcommerceNotification[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  const fetchNotifications = async () => {
+    if (member && member.phone) {
+      try {
+        const res = await axios.get('/ecommerce/members/notifications', { params: { phone: member.phone } });
+        setNotifications(res.data.notifications);
+        setUnreadNotificationCount(res.data.unread_count);
+      } catch (err) {
+        console.error('Failed to fetch notifications', err);
+      }
+    }
+  };
+
+  const markNotificationAsRead = async (id: string) => {
+    if (member && member.phone) {
+      try {
+        await axios.post(`/ecommerce/members/notifications/${id}/read`, { phone: member.phone });
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+        setUnreadNotificationCount(prev => Math.max(0, prev - 1));
+      } catch (err) {
+        console.error('Failed to mark notification read', err);
+      }
+    }
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    if (member && member.phone) {
+      try {
+        await axios.post('/ecommerce/members/notifications/read-all', { phone: member.phone });
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setUnreadNotificationCount(0);
+      } catch (err) {
+        console.error('Failed to mark all notifications read', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll every 30 seconds
+    const interval = setInterval(() => {
+      fetchNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [member]);
 
   useEffect(() => {
     localStorage.setItem('ecom_cart', JSON.stringify(cart));
@@ -297,6 +360,11 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsPpobModalOpen,
         activePpobTab,
         setActivePpobTab,
+        notifications,
+        unreadNotificationCount,
+        fetchNotifications,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
       }}
     >
       {children}

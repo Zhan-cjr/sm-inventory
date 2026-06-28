@@ -15,11 +15,16 @@ const Navbar = () => {
     setIsBranchModalOpen,
     setIsMemberModalOpen,
     member,
+    notifications,
+    unreadNotificationCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
   } = useEcom();
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isCartBouncing, setIsCartBouncing] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -144,11 +149,25 @@ const Navbar = () => {
 
               {/* Action Icons */}
               <div className="flex items-center gap-3 text-slate-600">
-                <button onClick={() => alert('Belum ada pesan masuk.')} className="hover:text-brand-blue transition-colors">
+                <button onClick={() => alert('Fitur Kotak Masuk akan segera hadir.')} className="hover:text-brand-blue transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
                 </button>
-                <button onClick={() => alert('Belum ada notifikasi baru.')} className="hover:text-brand-blue transition-colors">
+                <button 
+                  onClick={() => {
+                    if (member) {
+                      setIsNotificationsOpen(!isNotificationsOpen);
+                    } else {
+                      setIsMemberModalOpen(true);
+                    }
+                  }} 
+                  className="relative hover:text-brand-blue transition-colors"
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                  {unreadNotificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-brand-red text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white">
+                      {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                    </span>
+                  )}
                 </button>
                 <button 
                   id="navbar-cart-button-mobile"
@@ -168,6 +187,64 @@ const Navbar = () => {
 
         </div>
       </nav>
+      {/* Notifications Dropdown/Modal */}
+      {isNotificationsOpen && member && (
+        <>
+          <div 
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[105]" 
+            onClick={() => setIsNotificationsOpen(false)}
+          />
+          <div className="fixed top-16 right-4 md:right-24 md:top-20 w-[90vw] max-w-sm bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl z-[110] border border-slate-100 flex flex-col overflow-hidden animate-scale-up">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-extrabold text-slate-800">Notifikasi</h3>
+              {unreadNotificationCount > 0 && (
+                <button 
+                  onClick={markAllNotificationsAsRead}
+                  className="text-[11px] font-bold text-brand-blue hover:text-brand-blue/80 transition-colors"
+                >
+                  Tandai Semua Dibaca
+                </button>
+              )}
+            </div>
+            
+            <div className="max-h-[60vh] overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="p-8 text-center flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-300 mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-500">Belum ada notifikasi</p>
+                  <p className="text-xs text-slate-400 mt-1">Notifikasi pesanan dan promo akan muncul di sini.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-50">
+                  {notifications.map((notif) => (
+                    <div 
+                      key={notif.id} 
+                      onClick={() => !notif.is_read && markNotificationAsRead(notif.id)}
+                      className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer flex gap-3 ${!notif.is_read ? 'bg-brand-blue/5' : ''}`}
+                    >
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!notif.is_read ? 'bg-brand-blue' : 'bg-transparent'}`} />
+                      <div>
+                        <h4 className={`text-sm ${!notif.is_read ? 'font-bold text-slate-800' : 'font-semibold text-slate-600'}`}>
+                          {notif.title}
+                        </h4>
+                        <p className={`text-xs mt-1 leading-relaxed ${!notif.is_read ? 'text-slate-600' : 'text-slate-500'}`}>
+                          {notif.body}
+                        </p>
+                        <span className="text-[10px] text-slate-400 mt-2 block">
+                          {new Date(notif.created_at).toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
     </>
   );
 };
