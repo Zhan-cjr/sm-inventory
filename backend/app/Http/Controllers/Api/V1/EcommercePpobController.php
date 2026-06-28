@@ -16,9 +16,32 @@ class EcommercePpobController extends Controller
     public function getProducts(Request $request)
     {
         $prefix = $request->query('prefix'); // e.g. 0812
-        $type = $request->query('type'); // PULSA, DATA, PLN
+        $type = $request->query('type'); // PULSA, DATA, PLN, EWALLET
 
         $query = Product::where('product_type', 'digital')->where('is_active', true);
+
+        // Identifikasi Provider berdasarkan prefix
+        $provider = null;
+        if ($prefix && strlen($prefix) >= 4) {
+            $prefix4 = substr($prefix, 0, 4);
+            $telkomsel = ['0811', '0812', '0813', '0821', '0822', '0823', '0852', '0853', '0851'];
+            $indosat = ['0814', '0815', '0816', '0855', '0856', '0857', '0858'];
+            $xl = ['0817', '0818', '0819', '0859', '0877', '0878', '0831', '0832', '0833', '0838'];
+            $tri = ['0895', '0896', '0897', '0898', '0899'];
+            $smartfren = ['0881', '0882', '0883', '0884', '0885', '0886', '0887', '0888', '0889'];
+
+            if (in_array($prefix4, $telkomsel)) {
+                $provider = 'TELKOMSEL';
+            } elseif (in_array($prefix4, $indosat)) {
+                $provider = 'INDOSAT';
+            } elseif (in_array($prefix4, $xl)) {
+                $provider = ['XL', 'AXIS'];
+            } elseif (in_array($prefix4, $tri)) {
+                $provider = ['TRI', 'THREE'];
+            } elseif (in_array($prefix4, $smartfren)) {
+                $provider = 'SMARTFREN';
+            }
+        }
 
         if ($type === 'PLN') {
             $query->where(function($q) {
@@ -29,12 +52,10 @@ class EcommercePpobController extends Controller
                 $q->where('name', 'like', '%DANA%')
                   ->orWhere('name', 'like', '%GOPAY%')
                   ->orWhere('name', 'like', '%OVO%')
-                  ->orWhere('name', 'like', '%SHOPEEPAY%')
+                  ->orWhere('name', 'like', '%SHOPEE%')
                   ->orWhere('name', 'like', '%LINKAJA%');
             });
         } elseif ($type === 'PULSA' || $type === 'DATA') {
-            // Simplified logic: If we had a provider map, we would filter by provider.
-            // For now, return products matching the keyword
             if ($type === 'DATA') {
                 $query->where('name', 'like', '%DATA%');
             } else {
@@ -44,8 +65,20 @@ class EcommercePpobController extends Controller
                       ->where('name', 'not like', '%DANA%')
                       ->where('name', 'not like', '%GOPAY%')
                       ->where('name', 'not like', '%OVO%')
-                      ->where('name', 'not like', '%SHOPEEPAY%')
+                      ->where('name', 'not like', '%SHOPEE%')
                       ->where('name', 'not like', '%LINKAJA%');
+            }
+
+            if ($provider) {
+                if (is_array($provider)) {
+                    $query->where(function($q) use ($provider) {
+                        foreach ($provider as $prov) {
+                            $q->orWhere('name', 'like', "%{$prov}%");
+                        }
+                    });
+                } else {
+                    $query->where('name', 'like', "%{$provider}%");
+                }
             }
         }
 
