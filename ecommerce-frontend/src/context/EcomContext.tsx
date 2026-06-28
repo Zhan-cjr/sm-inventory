@@ -46,6 +46,16 @@ export interface CartItem {
   quantity: number;
 }
 
+export interface EcommerceNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  is_read: boolean;
+  reference_id: string | null;
+  created_at: string;
+}
+
 interface EcomContextType {
   cart: CartItem[];
   addToCart: (product: Product) => void;
@@ -78,16 +88,6 @@ interface EcomContextType {
   setIsProductModalOpen: (open: boolean) => void;
   availableCategories: {id: string, name: string}[];
   setAvailableCategories: (categories: {id: string, name: string}[]) => void;
-export interface EcommerceNotification {
-  id: string;
-  title: string;
-  body: string;
-  type: string;
-  is_read: boolean;
-  reference_id: string | null;
-  created_at: string;
-}
-
   isPpobModalOpen: boolean;
   setIsPpobModalOpen: (open: boolean) => void;
   activePpobTab: 'PULSA' | 'DATA' | 'PLN' | 'EWALLET';
