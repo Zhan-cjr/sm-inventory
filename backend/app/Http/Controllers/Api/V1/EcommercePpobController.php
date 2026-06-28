@@ -18,7 +18,9 @@ class EcommercePpobController extends Controller
         $prefix = $request->query('prefix'); // e.g. 0812
         $type = $request->query('type'); // PULSA, DATA, PLN, EWALLET
 
-        $query = Product::where('product_type', 'digital')->where('is_active', true);
+        $query = Product::where('product_type', 'digital')
+                        ->where('is_active', true)
+                        ->where('is_ecommerce_active', true);
 
         // Identifikasi Provider berdasarkan prefix
         $provider = null;
