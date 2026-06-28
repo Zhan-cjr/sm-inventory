@@ -99,6 +99,12 @@ class ProductImporter extends Importer
                 ->example('899123456789')
                 ->rules(['nullable', 'string', 'max:100']),
 
+            ImportColumn::make('product_type')
+                ->label('Tipe Produk (physical/digital/service)')
+                ->example('digital')
+                ->rules(['nullable', 'string', 'in:physical,digital,service,assembly'])
+                ->fillRecordUsing(fn ($record, $state) => $record->product_type = $state ?? 'physical'),
+
             ImportColumn::make('name')
                 ->label('Nama Produk')
                 ->requiredMapping()
