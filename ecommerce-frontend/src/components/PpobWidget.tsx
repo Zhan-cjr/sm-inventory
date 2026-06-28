@@ -45,55 +45,94 @@ const PpobWidget = () => {
       return;
     }
 
-    if (!selectedBranch) {
-      alert("Memuat data cabang, silakan tunggu sebentar.");
-      return;
-    }
-
-    if (!phoneNumber || phoneNumber.length < 10) {
-      alert("Masukkan nomor tujuan yang valid.");
-      return;
-    }
-
+    if (!phoneNumber) return;
     setPurchasing(product.id);
+    // TODO: hit API to buy
     try {
-      const response = await axios.post('/ecommerce/ppob/orders', {
-        customer_name: member.name,
-        customer_phone: member.phone,
-        target_number: phoneNumber,
+      const response = await axios.post('/ecommerce/ppob/order', {
         product_id: product.id,
-        branch_id: selectedBranch.id
+        target_number: phoneNumber,
+        customer_name: member?.name || 'Tamu',
+        customer_phone: member?.phone || '0000000000',
+        branch_id: selectedBranch?.id
       });
-      
-      const snapToken = response.data.order.snap_token;
-      if (snapToken && (window as any).snap) {
-        (window as any).snap.pay(snapToken, {
-          onSuccess: function () {
-            alert('Pembayaran sukses! Pesanan Anda sedang diproses.');
-            setPhoneNumber('');
-            setIsPpobModalOpen(false);
-            navigate('/pesanan');
-          },
-          onPending: function () {
-            alert('Menunggu pembayaran Anda!');
-            setIsPpobModalOpen(false);
-            navigate('/pesanan');
-          },
-          onError: function () {
-            alert('Pembayaran gagal!');
-          },
-          onClose: function () {
-            alert('Anda menutup popup tanpa menyelesaikan pembayaran');
+      if (response.data && response.data.order) {
+        if (response.data.order.snap_token) {
+          if ((window as any).snap) {
+            (window as any).snap.pay(response.data.order.snap_token, {
+              onSuccess: function () {
+                setIsPpobModalOpen(false);
+                navigate('/pesanan');
+              },
+              onPending: function () {
+                setIsPpobModalOpen(false);
+                navigate('/pesanan');
+              },
+              onError: function () {
+                alert('Pembayaran gagal');
+              },
+              onClose: function () {
+                setIsPpobModalOpen(false);
+                navigate('/pesanan');
+              }
+            });
+          } else {
+            alert('Sistem pembayaran belum siap.');
           }
-        });
-      } else {
-        alert("Sistem pembayaran belum siap.");
+        } else {
+          setIsPpobModalOpen(false);
+          navigate('/pesanan');
+        }
       }
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Gagal membuat pesanan');
+    } catch (error) {
+      console.error(error);
+      alert('Terjadi kesalahan saat membuat pesanan PPOB');
     } finally {
       setPurchasing(null);
     }
+  };
+
+  const renderProviderBadge = () => {
+    if (activePpobTab === 'PLN' || activePpobTab === 'EWALLET' || phoneNumber.length < 4) return null;
+    
+    const prefix = phoneNumber.substring(0, 4);
+    let providerName = '';
+    let bgColor = 'bg-slate-100';
+    let textColor = 'text-slate-600';
+
+    if (['0811', '0812', '0813', '0821', '0822', '0823', '0852', '0853', '0851'].includes(prefix)) {
+      providerName = 'Telkomsel';
+      bgColor = 'bg-red-100';
+      textColor = 'text-red-700';
+    } else if (['0814', '0815', '0816', '0855', '0856', '0857', '0858'].includes(prefix)) {
+      providerName = 'Indosat';
+      bgColor = 'bg-yellow-100';
+      textColor = 'text-yellow-700';
+    } else if (['0817', '0818', '0819', '0859', '0877', '0878', '0831', '0832', '0833', '0838'].includes(prefix)) {
+      providerName = 'XL/Axis';
+      bgColor = 'bg-blue-100';
+      textColor = 'text-blue-700';
+    } else if (['0895', '0896', '0897', '0898', '0899'].includes(prefix)) {
+      providerName = 'Tri';
+      bgColor = 'bg-purple-100';
+      textColor = 'text-purple-700';
+    } else if (['0881', '0882', '0883', '0884', '0885', '0886', '0887', '0888', '0889'].includes(prefix)) {
+      providerName = 'Smartfren';
+      bgColor = 'bg-pink-100';
+      textColor = 'text-pink-700';
+    }
+
+    if (!providerName) return (
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
+        <Smartphone size={14} className="text-slate-400" />
+      </div>
+    );
+
+    return (
+      <div className={`absolute right-4 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg ${bgColor} border border-white/50 shadow-sm flex items-center`}>
+        <span className={`text-[10px] font-black ${textColor} uppercase tracking-wider`}>{providerName}</span>
+      </div>
+    );
   };
 
   if (!isPpobModalOpen) return null;
@@ -180,11 +219,7 @@ const PpobWidget = () => {
                   placeholder={activePpobTab === 'PLN' ? 'Contoh: 12345678901' : 'Contoh: 08123456789'}
                   className="w-full pl-4 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all text-lg font-bold text-slate-800 tracking-wider shadow-inner"
                 />
-                {phoneNumber.length >= 4 && activePpobTab !== 'PLN' && (
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-brand-red/10 flex items-center justify-center border border-brand-red/20">
-                    <Smartphone size={14} className="text-brand-red" />
-                  </div>
-                )}
+                {renderProviderBadge()}
               </div>
             </div>
 
