@@ -41,7 +41,7 @@ return new class extends Migration
                 eoi.product_id,
                 eoi.quantity as quantity,
                 eoi.price as unit_price,
-                0 as discount_per_item,
+                IF(eoi.quantity > 0, ((eoi.price * eoi.quantity) - eoi.subtotal) / eoi.quantity, 0) as discount_per_item,
                 eoi.subtotal as subtotal,
                 eoi.created_at as created_at
             FROM ecommerce_order_items eoi
