@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, CheckCircle, Award, Phone, Mail, MapPin, User, 
-  History, LogOut, Receipt, ArrowRight, 
-  ShoppingBag, Loader2, Printer, Lock, CreditCard, RefreshCw
+  LogOut, ArrowRight, 
+  Loader2, Lock 
 } from 'lucide-react';
 import { useEcom } from '../context/EcomContext';
 import axios from 'axios';
@@ -907,6 +907,7 @@ const MemberModal = () => {
             </div>
           )}
         </div>
+      </div>
     </div>
   );
 };
