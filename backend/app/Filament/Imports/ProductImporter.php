@@ -257,6 +257,12 @@ class ProductImporter extends Importer
                 ->label('Kategori E-Commerce')
                 ->example('Minuman')
                 ->rules(['nullable', 'string', 'max:255']),
+
+            ImportColumn::make('ppob_sku')
+                ->label('SKU PPOB (Digiflazz)')
+                ->example('TELKOMSEL50')
+                ->rules(['nullable', 'string', 'max:255'])
+                ->fillRecordUsing(fn ($record, $state) => $record->ppob_sku = $state),
         ];
     }
 
@@ -362,6 +368,11 @@ class ProductImporter extends Importer
 
         if (empty($this->record->selling_price) && $this->record->harga_jual_1 > 0) {
             $this->record->selling_price = $this->record->harga_jual_1;
+        }
+
+        // Auto-fill ppob_sku with sku if product_type is digital
+        if ($this->record->product_type === 'digital' && empty($this->record->ppob_sku)) {
+            $this->record->ppob_sku = $this->record->sku;
         }
     }
 
