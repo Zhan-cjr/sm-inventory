@@ -49,7 +49,7 @@ const PpobWidget = () => {
     setPurchasing(product.id);
     // TODO: hit API to buy
     try {
-      const response = await axios.post('/ecommerce/ppob/order', {
+      const response = await axios.post('/ecommerce/ppob/orders', {
         product_id: product.id,
         target_number: phoneNumber,
         customer_name: member?.name || 'Tamu',
