@@ -145,4 +145,46 @@ class BiteshipService
             return ['success' => false, 'message' => 'Terjadi kesalahan sistem saat menghubungi Biteship.'];
         }
     }
+
+    public function trackOrder($trackingId)
+    {
+        if (!$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Biteship API Key belum dikonfigurasi.'];
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $this->apiKey,
+            ])->get($this->baseUrl . '/trackings/' . $trackingId);
+
+            if ($response->successful()) {
+                return ['success' => true, 'tracking' => $response->json()];
+            }
+
+            return ['success' => false, 'message' => 'Gagal mendapatkan data pelacakan dari Biteship.'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => 'Terjadi kesalahan sistem saat menghubungi Biteship.'];
+        }
+    }
+
+    public function trackOrderPublic($waybillId, $courierCode)
+    {
+        if (!$this->isConfigured()) {
+            return ['success' => false, 'message' => 'Biteship API Key belum dikonfigurasi.'];
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $this->apiKey,
+            ])->get($this->baseUrl . '/trackings/' . $waybillId . '/couriers/' . $courierCode);
+
+            if ($response->successful()) {
+                return ['success' => true, 'tracking' => $response->json()];
+            }
+
+            return ['success' => false, 'message' => 'Gagal mendapatkan data pelacakan publik dari Biteship.'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => 'Terjadi kesalahan sistem saat menghubungi Biteship.'];
+        }
+    }
 }

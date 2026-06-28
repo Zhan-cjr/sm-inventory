@@ -351,6 +351,50 @@ class EcommerceOrderResource extends Resource
                                 ->send();
                         }
                     }),
+                \Filament\Actions\Action::make('mark_pickup_completed')
+                    ->label('Pesanan Diambil')
+                    ->icon('heroicon-o-check-badge')
+                    ->color('success')
+                    ->visible(fn (EcommerceOrder $record) => $record->delivery_method === 'PICKUP' && $record->status === 'PROCESSING')
+                    ->requiresConfirmation()
+                    ->modalHeading('Tandai Selesai')
+                    ->modalDescription('Apakah pesanan ini sudah diambil oleh pelanggan?')
+                    ->action(function (EcommerceOrder $record) {
+                        $record->update(['status' => 'COMPLETED']);
+                        Notification::make()->title('Pesanan Selesai')->success()->send();
+                    }),
+                \Filament\Actions\Action::make('input_resi_manual')
+                    ->label('Input Resi Manual')
+                    ->icon('heroicon-o-pencil-square')
+                    ->color('info')
+                    ->visible(fn (EcommerceOrder $record) => $record->delivery_method === 'DELIVERY' && $record->status === 'PROCESSING' && empty($record->biteship_order_id) && empty($record->awb_number))
+                    ->form([
+                        \Filament\Forms\Components\TextInput::make('courier_name')
+                            ->label('Nama Kurir')
+                            ->required(),
+                        \Filament\Forms\Components\TextInput::make('awb_number')
+                            ->label('Nomor Resi (AWB)')
+                            ->required(),
+                    ])
+                    ->action(function (EcommerceOrder $record, array $data) {
+                        $record->update([
+                            'courier_name' => $data['courier_name'],
+                            'awb_number' => $data['awb_number'],
+                        ]);
+                        Notification::make()->title('Resi Berhasil Disimpan')->success()->send();
+                    }),
+                \Filament\Actions\Action::make('mark_delivery_completed')
+                    ->label('Pesanan Diterima')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->visible(fn (EcommerceOrder $record) => $record->delivery_method === 'DELIVERY' && $record->status === 'PROCESSING' && (!empty($record->biteship_order_id) || !empty($record->awb_number)))
+                    ->requiresConfirmation()
+                    ->modalHeading('Tandai Diterima')
+                    ->modalDescription('Apakah pesanan ini sudah diterima oleh pelanggan?')
+                    ->action(function (EcommerceOrder $record) {
+                        $record->update(['status' => 'COMPLETED']);
+                        Notification::make()->title('Pesanan Selesai')->success()->send();
+                    }),
                 \Filament\Actions\ViewAction::make(),
                 \Filament\Actions\EditAction::make(),
                 \Filament\Actions\DeleteAction::make(),

@@ -34,6 +34,7 @@ Route::prefix('v1/ecommerce')->group(function () {
     Route::post('shipping-rates', [EcommerceController::class, 'getShippingRates']);
     Route::post('orders/{id}/refresh-payment', [EcommerceController::class, 'refreshPaymentToken']);
     Route::post('orders/{id}/check-status', [EcommerceController::class, 'checkPaymentStatus']);
+    Route::get('orders/{id}/tracking', [EcommerceController::class, 'trackOrder']);
     Route::post('payment/notification', [EcommerceController::class, 'paymentNotification']);
     Route::post('members', [EcommerceController::class, 'registerMember']);
     Route::post('members/login', [EcommerceController::class, 'memberLogin']);

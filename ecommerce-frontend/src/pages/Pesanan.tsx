@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, Loader2, ShoppingBag, CreditCard, RefreshCw, CheckCircle, Receipt, X, Printer } from 'lucide-react';
+import { ClipboardList, Loader2, ShoppingBag, CreditCard, RefreshCw, CheckCircle, Receipt, X, Printer, Truck, MapPin, Copy } from 'lucide-react';
 import { useEcom } from '../context/EcomContext';
 import axios from 'axios';
 
@@ -8,6 +8,25 @@ const Pesanan = () => {
   const [history, setHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+  
+  const [trackingData, setTrackingData] = useState<any>(null);
+  const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
+  const [isLoadingTracking, setIsLoadingTracking] = useState(false);
+
+  const handleTrackOrder = async (orderId: string) => {
+    setIsTrackingModalOpen(true);
+    setIsLoadingTracking(true);
+    setTrackingData(null);
+    try {
+      const res = await axios.get(`/ecommerce/orders/${orderId}/tracking`);
+      setTrackingData(res.data.tracking);
+    } catch (err: any) {
+      console.error(err);
+      setTrackingData({ error: err.response?.data?.message || 'Gagal melacak pesanan.' });
+    } finally {
+      setIsLoadingTracking(false);
+    }
+  };
 
   const fetchHistory = async () => {
     if (!member) return;
@@ -192,6 +211,15 @@ const Pesanan = () => {
                             <Receipt size={14} />
                             Lihat Struk
                           </button>
+                          {item.type === 'ONLINE' && item.delivery_method === 'DELIVERY' && item.status !== 'PENDING' && item.status !== 'CANCELLED' && (
+                            <button
+                              onClick={() => handleTrackOrder(item.id)}
+                              className="px-3 py-1.5 bg-brand-blue hover:bg-brand-blue/90 text-white font-bold rounded-lg transition-all text-xs flex items-center gap-1.5 shadow-sm"
+                            >
+                              <Truck size={14} />
+                              Lacak
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -354,6 +382,96 @@ const Pesanan = () => {
           </div>
         )}
       </div>
+      
+        {/* ================= TRACKING MODAL ================= */}
+        {isTrackingModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden max-h-[90vh] border border-slate-100 animate-scale-up">
+              
+              {/* Tracking Header */}
+              <div className="bg-slate-50 px-5 py-4 border-b border-slate-200 flex justify-between items-center">
+                <span className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                  <Truck size={18} className="text-brand-blue" />
+                  Lacak Pengiriman
+                </span>
+                <button 
+                  onClick={() => setIsTrackingModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-all shadow-sm"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Tracking Content */}
+              <div className="p-5 overflow-y-auto flex-grow bg-white">
+                {isLoadingTracking ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
+                    <Loader2 className="animate-spin text-brand-blue" size={32} />
+                    <span className="text-sm">Menarik data pelacakan...</span>
+                  </div>
+                ) : trackingData?.error ? (
+                  <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+                    <MapPin size={40} className="text-slate-300" />
+                    <p className="text-sm font-semibold text-slate-700">{trackingData.error}</p>
+                    <p className="text-xs text-slate-500">Coba cek kembali nanti atau hubungi Admin.</p>
+                  </div>
+                ) : trackingData ? (
+                  <div className="flex flex-col gap-6">
+                    
+                    {/* AWB & Courier Info */}
+                    <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Kurir & Resi</p>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-brand-blue uppercase">{trackingData.courier?.company || 'KURIR'}</span>
+                          <span className="text-sm font-mono font-bold text-slate-800">{trackingData.courier?.waybill_id || '-'}</span>
+                        </div>
+                      </div>
+                      {trackingData.courier?.waybill_id && (
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(trackingData.courier.waybill_id);
+                            alert('Nomor Resi disalin!');
+                          }}
+                          className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition-all text-slate-600"
+                        >
+                          <Copy size={16} />
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Timeline Status */}
+                    <div className="bg-white px-2">
+                      <p className="text-xs font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Riwayat Perjalanan</p>
+                      <div className="relative border-l-2 border-slate-200 ml-3 space-y-6 pb-4">
+                        {trackingData.history && trackingData.history.length > 0 ? (
+                          trackingData.history.map((hist: any, idx: number) => (
+                            <div key={idx} className="relative pl-6">
+                              <span className={`absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-white ${idx === 0 ? 'bg-brand-blue ring-4 ring-brand-blue/20' : 'bg-slate-300'}`} />
+                              <div className="flex flex-col">
+                                <span className={`text-sm font-bold ${idx === 0 ? 'text-slate-800' : 'text-slate-600'}`}>{hist.note}</span>
+                                <span className="text-[11px] font-medium text-slate-400 mt-0.5">
+                                  {new Date(hist.updated_at).toLocaleString('id-ID', {
+                                    day: '2-digit', month: 'short', year: 'numeric',
+                                    hour: '2-digit', minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-slate-500 pl-4">Belum ada riwayat perjalanan.</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                  </div>
+                ) : null}
+              </div>
+
+            </div>
+          </div>
+        )}
     </div>
   );
 };
