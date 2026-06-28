@@ -5,14 +5,14 @@ import { useEcom } from '../context/EcomContext';
 const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { setSelectedCategory } = useEcom();
+  const { setSelectedCategory, setIsMemberModalOpen } = useEcom();
 
   const navItems = [
     { path: '/', icon: <Home size={24} />, label: 'Home' },
     { path: '#promo', icon: <Tag size={24} />, label: 'Promo', isAction: true },
     { path: '#kategori', icon: <Grid size={24} />, label: 'Kategori', isAction: true },
     { path: '/pesanan', icon: <ClipboardList size={24} />, label: 'Pesanan' },
-    { path: '/akun', icon: <User size={24} />, label: 'Akun' },
+    { path: '#akun', icon: <User size={24} />, label: 'Akun', isAction: true },
   ];
 
   const handleNavClick = (item: any) => {
@@ -36,6 +36,8 @@ const BottomNav = () => {
         } else {
           document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
         }
+      } else if (item.path === '#akun') {
+        setIsMemberModalOpen(true);
       }
     } else {
       navigate(item.path);
@@ -43,7 +45,7 @@ const BottomNav = () => {
   };
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 px-1 pb-safe">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 px-1 pb-safe">
       <div className="flex justify-around items-center h-14">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path || (item.isAction && location.hash === item.path);

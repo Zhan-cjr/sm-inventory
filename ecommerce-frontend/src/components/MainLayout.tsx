@@ -7,6 +7,7 @@ import { BranchModal } from './BranchModal';
 import MemberModal from './MemberModal';
 import ProductDetailModal from './ProductDetailModal';
 import BottomNav from './BottomNav';
+import PpobWidget from './PpobWidget';
 
 export const MainLayout = () => {
   const location = useLocation();
@@ -37,6 +38,7 @@ export const MainLayout = () => {
       <BranchModal />
       <MemberModal />
       <ProductDetailModal />
+      <PpobWidget />
     </div>
   );
 };
