@@ -31,6 +31,129 @@
                 if(el) { el.focus(); el.select(); }
             }, 50);
         },
+        handleGridNav(event) {
+            let current = event.target;
+            if (!current.classList.contains('pos-grid-input')) return;
+            
+            let key = event.key;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(key)) {
+                let tr = current.closest('tr');
+                let tbody = tr.closest('tbody');
+                if (!tr || !tbody) return;
+                
+                let rowInputs = Array.from(tr.querySelectorAll('.pos-grid-input:not([disabled])'));
+                let colIndex = rowInputs.indexOf(current);
+                if (colIndex === -1) return;
+                
+                let rows = Array.from(tbody.querySelectorAll('tr'));
+                let rowIndex = rows.indexOf(tr);
+                
+                let target = null;
+                
+                if (key === 'ArrowRight' || key === 'Enter') {
+                    event.preventDefault();
+                    if (colIndex < rowInputs.length - 1) {
+                        target = rowInputs[colIndex + 1];
+                    } else if (key === 'Enter' && rowIndex < rows.length - 1) {
+                        let nextRowInputs = Array.from(rows[rowIndex + 1].querySelectorAll('.pos-grid-input:not([disabled])'));
+                        if (nextRowInputs.length > 0) target = nextRowInputs[0];
+                    }
+                } else if (key === 'ArrowLeft') {
+                    event.preventDefault();
+                    if (colIndex > 0) {
+                        target = rowInputs[colIndex - 1];
+                    }
+                } else if (key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (rowIndex > 0) {
+                        let prevRowInputs = Array.from(rows[rowIndex - 1].querySelectorAll('.pos-grid-input:not([disabled])'));
+                        if (prevRowInputs.length > colIndex) target = prevRowInputs[colIndex];
+                    }
+                } else if (key === 'ArrowDown') {
+                    event.preventDefault();
+                    if (rowIndex < rows.length - 1) {
+                        let nextRowInputs = Array.from(rows[rowIndex + 1].querySelectorAll('.pos-grid-input:not([disabled])'));
+                        if (nextRowInputs.length > colIndex) target = nextRowInputs[colIndex];
+                    }
+                }
+                
+                if (target) {
+                    target.focus();
+                    if (typeof target.select === 'function') target.select();
+                }
+            }
+        },
+        closeCalc() {
+            this.calcOpen = false;
+            if (this.calcTarget) {
+                this.calcTarget.focus();
+                // Select the input if possible
+                if (typeof this.calcTarget.select === 'function') {
+                    this.calcTarget.select();
+                }
+            }
+        },
+        applyCalc() {
+            try {
+                let sanitized = String(this.calcValue).replace(/[^-()\d/*+.]/g, '');
+                if (sanitized) {
+                    let result = new Function('return ' + sanitized)();
+                    if (!isNaN(result)) {
+                        this.calcTarget.value = result;
+                        this.calcTarget.dispatchEvent(new Event('input', { bubbles: true }));
+                        this.calcTarget.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+            } catch(e) { console.error('Calc error:', e); }
+            this.closeCalc();
+        }
+     }"
+     @item-added.window="focusRowQty($event.detail.index)">
+
+    <!-- Mini Calculator Popup -->
+    <div x-show="calcOpen" @click.away="closeCalc()" 
+         style="display: none; position: fixed; z-index: 9999; width: 232px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border-radius: 8px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #4a4a4a; border: 1px solid #333;" 
+         :style="{ top: calcTop + 'px', left: calcLeft + 'px' }" x-transition>
+        
+        <div style="background-color: #4a4a4a; padding: 16px 16px 8px 16px; text-align: right; border-bottom: 1px solid #333;">
+            <input type="text" id="mini-calc-input" x-model="calcValue" @keydown.enter.prevent="applyCalc()" @keydown.escape.prevent="closeCalc()" style="background: transparent; border: none; color: white; width: 100%; text-align: right; outline: none; font-size: 32px; font-weight: 300; padding: 0;" autocomplete="off">
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background-color: #333;">
+            <button type="button" @click="calcValue = ''" style="background-color: #646464; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 14px;">AC</button>
+            <button type="button" @click="calcValue = calcValue ? (String(calcValue).startsWith('-') ? String(calcValue).substring(1) : '-' + calcValue) : '-'" style="background-color: #646464; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 14px;">+/-</button>
+            <button type="button" @click="calcValue = calcValue + '/100'" style="background-color: #646464; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 14px;">%</button>
+            <button type="button" @click="calcValue = calcValue + '/'" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">÷</button>
+
+            <button type="button" @click="calcValue = calcValue + '7'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">7</button>
+            <button type="button" @click="calcValue = calcValue + '8'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">8</button>
+            <button type="button" @click="calcValue = calcValue + '9'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">9</button>
+            <button type="button" @click="calcValue = calcValue + '*'" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">×</button>
+
+            <button type="button" @click="calcValue = calcValue + '4'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">4</button>
+            <button type="button" @click="calcValue = calcValue + '5'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">5</button>
+            <button type="button" @click="calcValue = calcValue + '6'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">6</button>
+            <button type="button" @click="calcValue = calcValue + '-'" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">−</button>
+
+            <button type="button" @click="calcValue = calcValue + '1'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">1</button>
+            <button type="button" @click="calcValue = calcValue + '2'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">2</button>
+            <button type="button" @click="calcValue = calcValue + '3'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">3</button>
+            <button type="button" @click="calcValue = calcValue + '+'" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">+</button>
+
+            <button type="button" @click="calcValue = calcValue + '0'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500; grid-column: span 2; text-align: left; padding-left: 20px;">0</button>
+            <button type="button" @click="calcValue = calcValue + '.'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">.</button>
+            <button type="button" @click="applyCalc()" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">=</button>
+        </div>
+    </div>
+    <style>
+        .pos-input { padding: 0.375rem 0.5rem; border: 1px solid #d1d5db; width: 100%; border-radius: 0.375rem; background-color: #f9fafb; font-size: 0.875rem; }
+        .pos-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
+        .pos-label { font-weight: 500; color: #4b5563; font-size: 0.875rem; padding-right: 0.5rem; }
+        .pos-grid-th { background-color: #f3f4f6; border-bottom: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; font-weight: 600; color: #374151; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;}
+        .pos-grid-td { border-bottom: 1px solid #f3f4f6; padding: 0.5rem; background-color: white; font-size: 0.875rem; color: #1f2937; }
+        
+        .dark .pos-input { background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important; }
+        .dark .pos-input:focus { border-color: #60a5fa !important; box-shadow: 0 0 0 1px #60a5fa !important; }
         closeCalc() {
             this.calcOpen = false;
             if (this.calcTarget) {
@@ -111,6 +234,16 @@
         .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .flex-between { display: flex; justify-content: space-between; align-items: center; }
         .flex-end { display: flex; justify-content: flex-end; align-items: center; }
+
+        /* Hide number spin buttons */
+        input[type=number].pos-input::-webkit-outer-spin-button,
+        input[type=number].pos-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number].pos-input {
+            -moz-appearance: textfield;
+        }
 
         .search-result-item { border-left: 4px solid transparent; transition: all 0.1s ease-in-out; }
         .highlighted-item { background-color: #dbeafe !important; border-left: 4px solid #2563eb !important; }
@@ -411,8 +544,8 @@
                     @if(in_array('sku', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">SKU</th> @endif
                     @if(in_array('barcode', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">Barcode</th> @endif
                     @if(in_array('name', $visibleColumns)) <th class="pos-grid-th">Nama Produk</th> @endif
-                    @if(in_array('qty_ordered', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right;">Qty PO</th> @endif
-                    @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right;">Qty Terima</th> @endif
+                    @if(in_array('qty_ordered', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Qty PO</th> @endif
+                    @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Qty Terima</th> @endif
                     @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Satuan</th> @endif
 
                     @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual</th> @endif
@@ -424,87 +557,18 @@
                     <th class="pos-grid-th" style="width: 3rem; text-align: center;"></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody @keydown="handleGridNav($event)">
                 @forelse($cart as $index => $item)
                     <tr>
                         <td class="pos-grid-td" style="text-align: center;">{{ $loop->iteration }}</td>
                         @if(in_array('sku', $visibleColumns)) <td class="pos-grid-td">{{ $item['sku'] }}</td> @endif
                         @if(in_array('barcode', $visibleColumns)) <td class="pos-grid-td">{{ $item['barcode'] }}</td> @endif
-                        @if(in_array('name', $visibleColumns)) <td class="pos-grid-td" style="font-weight: 500;">{{ $item['name'] }}</td> @endif
-                        @if(in_array('qty_ordered', $visibleColumns)) <td class="pos-grid-td dark:text-gray-400" style="text-align: right; color: #6b7280;">{{ $item['qty_ordered'] > 0 ? number_format($item['qty_ordered'], 0) : '-' }}</td> @endif
-                        @if(in_array('qty_received', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
-                                   wire:model.lazy="cart.{{ $index }}.qty_received"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.space.prevent="openCalc($event)"
-                                   x-on:keydown.enter.prevent="document.getElementById('price-{{ $index }}').focus()">
-                        </td>
-                        @endif
-                        @if(in_array('unit_price', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <div x-data="{ raw: @entangle('cart.' . $index . '.unit_price'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
-                                <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="price-{{ $index }}" class="pos-input" style="text-align: right;" 
-                                       x-on:keydown.space.prevent="openCalc($event)"
-                                       x-on:keydown.enter.prevent="document.getElementById('dis1-{{ $index }}').focus()">
-                            </div>
-                        </td>
-                        @endif
-
-                        @if(in_array('harga_jual_1', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
-                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_1'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
-                                    <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input" style="text-align: right;" 
-                                           x-on:keydown.space.prevent="openCalc($event)">
+                        @if(in_array('name', $visibleColumns)) 
+                            <td class="pos-grid-td" style="font-weight: 500;">
+                                <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2;">
+                                    {{ $item['name'] }}
                                 </div>
-                            @else
-                                <div style="text-align: right; padding: 0.375rem 0.5rem; color: #6b7280;" class="dark:text-gray-400">{{ number_format($item['harga_jual_1'], 2) }}</div>
-                            @endif
-                        </td>
-                        @endif
-                        @if(in_array('margin_gol_1', $visibleColumns))
-                        <td class="pos-grid-td dark:bg-gray-800" style="padding: 0.25rem; background-color: #f9fafb;">
-                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
-                                <input type="number" step="any" class="pos-input {{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
-                                       wire:model.lazy="cart.{{ $index }}.margin_gol_1"
-                                       wire:change="recalculateRow({{ $index }})"
-                                       x-on:keydown.space.prevent="openCalc($event)">
-                            @else
-                                <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_1'], 2) }}</div>
-                            @endif
-                        </td>
-                        @endif
-                        @if(in_array('discount_1', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" id="dis1-{{ $index }}" class="pos-input" style="text-align: right;" 
-                                   wire:model.lazy="cart.{{ $index }}.discount_1"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.space.prevent="openCalc($event)"
-                                   x-on:keydown.enter.prevent="document.getElementById('dis2-{{ $index }}').focus()">
-                        </td>
-                        @endif
-                        @if(in_array('discount_2', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" id="dis2-{{ $index }}" class="pos-input" style="text-align: right;" 
-                                   wire:model.lazy="cart.{{ $index }}.discount_2"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.space.prevent="openCalc($event)"
-                                   x-on:keydown.enter.prevent="document.getElementById('dis3-{{ $index }}').focus()">
-                        </td>
-                        @endif
-                        @if(in_array('discount_3', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" step="any" id="dis3-{{ $index }}" class="pos-input" style="text-align: right;" 
-                                   wire:model.lazy="cart.{{ $index }}.discount_3"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.space.prevent="openCalc($event)"
-                                   x-on:keydown.enter.prevent="document.getElementById('search-input').focus()">
-                        </td>
-                        @endif
-                        <td class="pos-grid-td" style="text-align: right; font-weight: 600; color: #111827;" class="dark:text-gray-100">
-                            @if($enable_edit_total)
-                                <div x-data="{ raw: @entangle('cart.' . $index . '.subtotal'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); } }">
+                            </td> 
                                     <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input font-bold" style="text-align: right;" 
                                            x-on:keydown.space.prevent="openCalc($event)">
                                 </div>
