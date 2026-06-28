@@ -55,4 +55,9 @@ class EcommerceOrder extends Model
     {
         return $this->hasMany(EcommerceOrderItem::class, 'ecommerce_order_id');
     }
+
+    public function ppobTransaction()
+    {
+        return $this->hasOne(PpobTransaction::class, 'ecommerce_order_id');
+    }
 }

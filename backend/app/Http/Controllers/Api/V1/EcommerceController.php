@@ -907,7 +907,7 @@ class EcommerceController extends Controller
         }
 
         // 1. Ambil pesanan E-Commerce
-        $ecommerceOrders = \App\Models\EcommerceOrder::with(['items.product', 'branch'])
+        $ecommerceOrders = \App\Models\EcommerceOrder::with(['items.product', 'branch', 'ppobTransaction'])
             ->where('customer_phone', $phone)
             ->orderBy('created_at', 'desc')
             ->get()
@@ -918,6 +918,7 @@ class EcommerceController extends Controller
                 return [
                     'id' => $order->id,
                     'type' => 'ONLINE',
+                    'ppob_transaction' => $order->ppobTransaction,
                     'transaction_id' => $order->id,
                     'invoice_number' => 'ECOM-' . substr($order->id, 0, 8),
                     'date' => $order->created_at,
@@ -1210,13 +1211,79 @@ class EcommerceController extends Controller
                             try {
                                 $digiflazz = new \App\Services\DigiflazzService();
                                 // delivery_address stores the target number
-                                $res = $digiflazz->topup($product->ppob_sku, $order->delivery_address, $order->id);
+                                $refId = $order->id . '-' . strtoupper(substr(uniqid(), -4));
+                                $res = $digiflazz->topup($product->ppob_sku, $order->delivery_address, $refId);
                                 \Log::info('PPOB Digiflazz Topup Triggered from Ecommerce: ' . json_encode($res));
+                                
+                                $status = 'Pending';
+                                if (isset($res['data']['status'])) {
+                                    $status = $res['data']['status'];
+                                }
+                                
+                                \App\Models\PpobTransaction::create([
+                                    'ecommerce_order_id' => $order->id,
+                                    'ref_id' => $refId,
+                                    'customer_no' => $order->delivery_address,
+                                    'customer_name' => $order->customer_name,
+                                    'buyer_sku_code' => $product->ppob_sku,
+                                    'price' => $res['data']['price'] ?? 0,
+                                    'status' => $status,
+                                    'rc' => $res['data']['rc'] ?? null,
+                                    'sn' => $res['data']['sn'] ?? null,
+                                    'message' => $res['data']['message'] ?? null,
+                                    'raw_response' => $res
+                                ]);
+
                                 $order->update(['status' => 'COMPLETED']);
+                                
+                                // Specific notification for PPOB / Digital
+                                $member = \App\Models\Customer::where('phone', $order->customer_phone)->first();
+                                if ($member) {
+                                    $msg = "Pesanan PPOB/Digital Berhasil!\n";
+                                    $msg .= "Produk: " . $product->name . "\n";
+                                    $msg .= "Nomor Tujuan: " . $order->delivery_address . "\n";
+                                    $msg .= "Status: " . $status . "\n";
+                                    if (isset($res['data']['sn']) && $res['data']['sn']) {
+                                        $msg .= "SN/Token: " . $res['data']['sn'] . "\n";
+                                    }
+                                    $msg .= "Total Pembayaran: Rp " . number_format($order->total_amount, 0, ',', '.') . "\n";
+                                    $msg .= "Terima kasih telah berbelanja!";
+
+                                    // Email notification
+                                    if ($member->email) {
+                                        try {
+                                            \Mail::raw($msg, function ($message) use ($member, $order) {
+                                                $message->to($member->email)
+                                                        ->subject('Pesanan PPOB Berhasil - ' . $order->id);
+                                            });
+                                        } catch (\Exception $e) {
+                                            \Log::error('Failed to send PPOB email notification: ' . $e->getMessage());
+                                        }
+                                    }
+
+                                    // WA/Telegram Webhook could be triggered here if configured
+                                }
+
                             } catch (\Exception $e) {
                                 \Log::error('PPOB Digiflazz Topup Failed: ' . $e->getMessage());
                                 // Leave it PAID but PENDING so admin can handle it
                             }
+                        }
+                    }
+                } else {
+                    // Send notification for physical orders
+                    $member = \App\Models\Customer::where('phone', $order->customer_phone)->first();
+                    if ($member && $member->email) {
+                        try {
+                            $msg = "Pesanan Anda dengan ID {$order->id} telah Lunas dan sedang diproses!\n";
+                            $msg .= "Total Pembayaran: Rp " . number_format($order->total_amount, 0, ',', '.') . "\n";
+                            $msg .= "Silakan tunggu update pengiriman dari kami.";
+                            \Mail::raw($msg, function ($message) use ($member, $order) {
+                                $message->to($member->email)
+                                        ->subject('Pesanan Lunas - ' . $order->id);
+                            });
+                        } catch (\Exception $e) {
+                            \Log::error('Failed to send payment success email: ' . $e->getMessage());
                         }
                     }
                 }

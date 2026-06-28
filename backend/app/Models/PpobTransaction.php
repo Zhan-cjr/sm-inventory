@@ -11,7 +11,7 @@ class PpobTransaction extends Model
     use HasUuids;
 
     protected $fillable = [
-        'transaction_id', 'ref_id', 'customer_no', 'customer_name', 'buyer_sku_code',
+        'transaction_id', 'ecommerce_order_id', 'ref_id', 'customer_no', 'customer_name', 'buyer_sku_code',
         'price', 'status', 'rc', 'sn', 'message', 'raw_response'
     ];
 
@@ -23,5 +23,10 @@ class PpobTransaction extends Model
     public function transaction()
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    public function ecommerceOrder()
+    {
+        return $this->belongsTo(EcommerceOrder::class, 'ecommerce_order_id');
     }
 }

@@ -262,6 +262,34 @@ const Pesanan = () => {
                         <span>Metode:</span>
                         <span>{selectedReceipt.payment_method}</span>
                       </div>
+                      
+                      {/* PPOB Specific Info */}
+                      {selectedReceipt.ppob_transaction && (
+                        <>
+                          <div className="flex justify-between mt-2 pt-2 border-t border-dashed border-slate-200">
+                            <span>No Tujuan:</span>
+                            <span className="font-bold text-slate-900">{selectedReceipt.ppob_transaction.customer_no}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Status:</span>
+                            <span className={`font-bold ${
+                              selectedReceipt.ppob_transaction.status === 'Sukses' ? 'text-green-600' :
+                              selectedReceipt.ppob_transaction.status === 'Gagal' ? 'text-red-600' : 'text-amber-600'
+                            }`}>
+                              {selectedReceipt.ppob_transaction.status}
+                            </span>
+                          </div>
+                          {selectedReceipt.ppob_transaction.sn && (
+                            <div className="flex flex-col mt-1">
+                              <span>SN / Token:</span>
+                              <span className="font-bold text-slate-900 text-[10px] break-all">
+                                {selectedReceipt.ppob_transaction.sn}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
                       {selectedReceipt.is_voided && (
                         <div className="bg-red-50 text-red-600 font-bold py-1.5 text-center rounded border border-red-100 text-[11px] mt-2">
                           TRANSAKSI DIBATALKAN (VOID)
