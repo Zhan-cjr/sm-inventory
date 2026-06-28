@@ -25,7 +25,9 @@ const Home = () => {
             <h3 className="text-sm font-bold text-slate-800">
               Hai, {member ? member.name.split(' ')[0] : 'Sahabat'}!
             </h3>
-            <p className="text-[11px] text-slate-500">Akses semua fitur, yuk~</p>
+            <p className="text-[11px] text-slate-500">
+              {member ? 'Selamat berbelanja kembali~' : 'Akses semua fitur, yuk~'}
+            </p>
           </div>
         </div>
         {!member && (

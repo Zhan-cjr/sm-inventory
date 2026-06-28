@@ -1,26 +1,56 @@
-import { Home, Tag, ClipboardList, User } from 'lucide-react';
+import { Home, Grid, ClipboardList, User, Tag } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useEcom } from '../context/EcomContext';
 
 const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { setSelectedCategory } = useEcom();
 
   const navItems = [
     { path: '/', icon: <Home size={24} />, label: 'Home' },
-    { path: '/promo', icon: <Tag size={24} />, label: 'Promo' },
+    { path: '#promo', icon: <Tag size={24} />, label: 'Promo', isAction: true },
+    { path: '#kategori', icon: <Grid size={24} />, label: 'Kategori', isAction: true },
     { path: '/pesanan', icon: <ClipboardList size={24} />, label: 'Pesanan' },
     { path: '/akun', icon: <User size={24} />, label: 'Akun' },
   ];
 
+  const handleNavClick = (item: any) => {
+    if (item.isAction) {
+      if (item.path === '#kategori') {
+        if (location.pathname !== '/') {
+          navigate('/');
+          setTimeout(() => {
+            document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        } else {
+          document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
+        }
+      } else if (item.path === '#promo') {
+        setSelectedCategory('promo');
+        if (location.pathname !== '/') {
+          navigate('/');
+          setTimeout(() => {
+            document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        } else {
+          document.getElementById('catalog-section')?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    } else {
+      navigate(item.path);
+    }
+  };
+
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 px-2 pb-safe">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 px-1 pb-safe">
       <div className="flex justify-around items-center h-14">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = location.pathname === item.path || (item.isAction && location.hash === item.path);
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNavClick(item)}
               className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${
                 isActive ? 'text-brand-blue font-semibold' : 'text-slate-500 hover:text-brand-blue'
               }`}
@@ -28,7 +58,7 @@ const BottomNav = () => {
               <div className={`${isActive ? 'scale-110 transition-transform' : ''}`}>
                 {item.icon}
               </div>
-              <span className="text-[10px]">{item.label}</span>
+              <span className="text-[9px]">{item.label}</span>
             </button>
           );
         })}
