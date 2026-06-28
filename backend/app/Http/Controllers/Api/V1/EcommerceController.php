@@ -736,6 +736,7 @@ class EcommerceController extends Controller
 
                 // Filter manually for roles that can manage (to avoid complex spatie queries in closure)
                 $supervisors = $supervisors->filter(function($u) {
+                    if ($u->hasCustomAuthorization('PROCESS_ECOMMERCE')) return true;
                     $role = strtoupper($u->role ?? 'CASHIER');
                     if (in_array($role, ['MANAGER', 'SUPERVISOR', 'ADMIN', 'SUPER_ADMIN'])) return true;
                     if ($u->hasRole(['superadmin', 'admin', 'manager'])) return true;
