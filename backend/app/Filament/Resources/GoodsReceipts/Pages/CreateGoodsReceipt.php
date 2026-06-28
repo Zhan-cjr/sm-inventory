@@ -10,9 +10,4 @@ class CreateGoodsReceipt extends CreateRecord
     protected static string $resource = GoodsReceiptResource::class;
 
     protected string $view = 'filament.resources.goods-receipt.pages.pos-view';
-
-    public function getMaxContentWidth(): \Filament\Support\Enums\Width | string | null
-    {
-        return \Filament\Support\Enums\Width::Full;
-    }
 }

@@ -118,7 +118,7 @@ class AccountingService
         // 3. Koreksi rounding pada item terakhir & koreksi akhir PPN
 
         $org           = \App\Models\Organization::find($transaction->organization_id);
-        $taxRate       = $org->tax_rate ?? 11;
+        $taxRate       = $org->tax_rate ?? \App\Models\Organization::first()->id1;
         $taxMultiplier = 1 + ($taxRate / 100);
         $totalDiscount = max(0, (float)$transaction->total_amount - (float)$transaction->final_amount);
 
@@ -309,7 +309,7 @@ class AccountingService
     public function recordGoodsReceiptJournal(\App\Models\GoodsReceipt $receipt)
     {
         // 1. Dapatkan COA yang sesuai
-        $organizationId = $receipt->branch->organization_id ?? 1;
+        $organizationId = $receipt->branch->organization_id ?? \App\Models\Organization::first()->id;
 
         $persediaanAccount = Account::where('organization_id', $organizationId)
             ->where('account_code', '1140')->first();
@@ -354,7 +354,7 @@ class AccountingService
             'entry_date' => $receipt->receipt_date ?? now(),
             'description' => 'Penerimaan Barang: ' . $receipt->receipt_number,
             'status' => 'posted',
-            'created_by' => auth()->check() ? auth()->id() : 1,
+            'created_by' => auth()->check() ? auth()->id() : null,
             'journalable_id' => $receipt->id,
             'journalable_type' => \App\Models\GoodsReceipt::class,
         ]);
@@ -452,7 +452,7 @@ class AccountingService
     public function recordPurchaseReturnJournal(\App\Models\PurchaseReturn $return)
     {
         // 1. Dapatkan COA yang sesuai
-        $organizationId = $return->branch->organization_id ?? 1;
+        $organizationId = $return->branch->organization_id ?? \App\Models\Organization::first()->id;
         
         $persediaanAccount = Account::where('organization_id', $organizationId)
             ->where('account_code', '1140')->first();
@@ -483,7 +483,7 @@ class AccountingService
             'entry_date' => $return->return_date ?? now(),
             'description' => 'Retur Pembelian: ' . $return->return_number,
             'status' => 'posted',
-            'created_by' => $return->created_by ?? (auth()->check() ? auth()->id() : 1),
+            'created_by' => $return->created_by ?? (auth()->check() ? auth()->id() : null),
             'journalable_id' => $return->id,
             'journalable_type' => \App\Models\PurchaseReturn::class,
         ]);
@@ -492,7 +492,7 @@ class AccountingService
         $taxAmount = 0;
         $gr = $return->goodsReceipt;
         if ($gr && $gr->include_tax) {
-            $taxRate = \App\Models\Organization::find($organizationId)->tax_rate ?? 11;
+            $taxRate = \App\Models\Organization::find($organizationId)->tax_rate ?? \App\Models\Organization::first()->id1;
             $taxMultiplier = 1 + ($taxRate / 100);
             
             $dpp = round($return->total_amount / $taxMultiplier, 2);
@@ -548,7 +548,7 @@ class AccountingService
     public function recordEcommerceOrderJournal(\App\Models\EcommerceOrder $order)
     {
         // 1. Dapatkan COA yang sesuai
-        $organizationId = $order->organization_id ?? 1;
+        $organizationId = $order->organization_id ?? \App\Models\Organization::first()->id;
 
         $kasAccount = Account::where('organization_id', $organizationId)->where('account_code', '1110')->first();
         $pendapatanAccount = Account::where('organization_id', $organizationId)->where('account_code', '4110')->first();
@@ -579,7 +579,7 @@ class AccountingService
             'entry_date' => $order->updated_at ?? now(),
             'description' => 'Penjualan E-Commerce: ' . strtoupper(substr($order->id, 0, 8)),
             'status' => 'posted',
-            'created_by' => $order->processed_by ?? 1,
+            'created_by' => $order->processed_by ?? null,
             'journalable_id' => $order->id,
             'journalable_type' => \App\Models\EcommerceOrder::class,
         ]);
@@ -607,7 +607,7 @@ class AccountingService
         }
 
         // Kalkulasi PPN Keluaran berdasarkan item
-        $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
+        $taxRate = \App\Models\Organization::first()->tax_rate ?? \App\Models\Organization::first()->id1;
         $taxMultiplier = 1 + ($taxRate / 100);
         $taxAmount = 0;
         $revenueAmount = 0;
@@ -690,7 +690,7 @@ class AccountingService
      */
     public function recordStockAdjustmentJournal(\App\Models\StockAdjustment $adjustment)
     {
-        $organizationId = $adjustment->branch->organization_id ?? 1;
+        $organizationId = $adjustment->branch->organization_id ?? \App\Models\Organization::first()->id;
 
         $persediaanAccount = Account::where('organization_id', $organizationId)
             ->where('account_code', '1140')->first();
@@ -756,7 +756,7 @@ class AccountingService
             'entry_date' => $adjustment->adjustment_date ?? now(),
             'description' => 'Penyesuaian Stok: ' . $adjustment->adjustment_number,
             'status' => 'posted',
-            'created_by' => $adjustment->recorded_by ?? (auth()->check() ? auth()->id() : 1),
+            'created_by' => $adjustment->recorded_by ?? (auth()->check() ? auth()->id() : null),
             'journalable_id' => $adjustment->id,
             'journalable_type' => \App\Models\StockAdjustment::class,
         ]);
@@ -811,7 +811,7 @@ class AccountingService
      */
     public function recordStockOpnameJournal(\App\Models\StockOpnameSession $session)
     {
-        $organizationId = $session->branch->organization_id ?? 1;
+        $organizationId = $session->branch->organization_id ?? \App\Models\Organization::first()->id;
 
         $persediaanAccount = Account::where('organization_id', $organizationId)
             ->where('account_code', '1140')->first();
@@ -883,7 +883,7 @@ class AccountingService
             'entry_date' => $session->opname_date ?? now(),
             'description' => 'Stok Opname: ' . $session->session_number,
             'status' => 'posted',
-            'created_by' => $session->approved_by ?? (auth()->check() ? auth()->id() : 1),
+            'created_by' => $session->approved_by ?? (auth()->check() ? auth()->id() : null),
             'journalable_id' => $session->id,
             'journalable_type' => \App\Models\StockOpnameSession::class,
         ]);
@@ -937,7 +937,7 @@ class AccountingService
             return false;
         }
 
-        $organizationId = $transfer->fromBranch->organization_id ?? 1;
+        $organizationId = $transfer->fromBranch->organization_id ?? \App\Models\Organization::first()->id;
 
         $persediaanAccount = Account::where('organization_id', $organizationId)
             ->where('account_code', '1140')->first();
@@ -984,7 +984,7 @@ class AccountingService
                 'entry_date' => $transfer->received_date ?? now(),
                 'description' => 'Transfer Keluar Stok ke Cabang Tujuan: ' . $transfer->reference_number,
                 'status' => 'posted',
-                'created_by' => $transfer->received_by ?? (auth()->check() ? auth()->id() : 1),
+                'created_by' => $transfer->received_by ?? (auth()->check() ? auth()->id() : null),
                 'journalable_id' => $transfer->id,
                 'journalable_type' => \App\Models\StockTransfer::class,
             ]);
@@ -1024,7 +1024,7 @@ class AccountingService
                 'entry_date' => $transfer->received_date ?? now(),
                 'description' => 'Transfer Masuk Stok dari Cabang Asal: ' . $transfer->reference_number,
                 'status' => 'posted',
-                'created_by' => $transfer->received_by ?? (auth()->check() ? auth()->id() : 1),
+                'created_by' => $transfer->received_by ?? (auth()->check() ? auth()->id() : null),
                 'journalable_id' => $transfer->id,
                 'journalable_type' => \App\Models\StockTransfer::class,
             ]);
@@ -1056,7 +1056,7 @@ class AccountingService
      */
     public function recordExpenseJournal(\App\Models\Expense $expense)
     {
-        $organizationId = $expense->organization_id ?? 1;
+        $organizationId = $expense->organization_id ?? \App\Models\Organization::first()->id;
 
         $existingJournal = JournalEntry::where('journalable_id', $expense->id)
             ->where('journalable_type', \App\Models\Expense::class)
@@ -1073,7 +1073,7 @@ class AccountingService
             'entry_date' => $expense->expense_date ?? now(),
             'description' => 'Pengeluaran/Expense: ' . ($expense->description ?? $expense->reference_number),
             'status' => 'posted',
-            'created_by' => $expense->created_by ?? (auth()->check() ? auth()->id() : 1),
+            'created_by' => $expense->created_by ?? (auth()->check() ? auth()->id() : null),
             'journalable_id' => $expense->id,
             'journalable_type' => \App\Models\Expense::class,
         ]);

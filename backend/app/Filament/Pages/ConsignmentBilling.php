@@ -146,6 +146,17 @@ class ConsignmentBilling extends Page implements HasForms
                 ->where('transactions.is_voided', false)
                 ->where('transactions.transaction_date', '<=', $this->end_date . ' 23:59:59')
                 ->sum('transaction_items.quantity');
+                
+            $unbilledEcommerceSold = \App\Models\EcommerceOrderItem::join('ecommerce_orders', 'ecommerce_order_items.ecommerce_order_id', '=', 'ecommerce_orders.id')
+                ->where('ecommerce_order_items.product_id', $product->id)
+                ->where('ecommerce_orders.branch_id', $this->branch_id)
+                ->whereNull('ecommerce_order_items.kontrabon_id')
+                ->where('ecommerce_orders.status', 'COMPLETED')
+                ->where('ecommerce_orders.created_at', '<=', $this->end_date . ' 23:59:59')
+                ->sum('ecommerce_order_items.quantity');
+                
+            $soldQty += $unbilledEcommerceSold; // Add to display total sold
+            $unbilledSold += $unbilledEcommerceSold; // Add to unbilled calculation
 
             // Tagihan dihitung berdasarkan HPP
             $amountOwed = $unbilledSold * $product->cost_price;
@@ -204,6 +215,14 @@ class ConsignmentBilling extends Page implements HasForms
                 ->where('transactions.is_voided', false)
                 ->where('transactions.transaction_date', '<=', $this->end_date . ' 23:59:59')
                 ->update(['transaction_items.kontrabon_id' => $kontrabon->id]);
+                
+            \App\Models\EcommerceOrderItem::join('ecommerce_orders', 'ecommerce_order_items.ecommerce_order_id', '=', 'ecommerce_orders.id')
+                ->whereIn('ecommerce_order_items.product_id', $productIds)
+                ->where('ecommerce_orders.branch_id', $this->branch_id)
+                ->whereNull('ecommerce_order_items.kontrabon_id')
+                ->where('ecommerce_orders.status', 'COMPLETED')
+                ->where('ecommerce_orders.created_at', '<=', $this->end_date . ' 23:59:59')
+                ->update(['ecommerce_order_items.kontrabon_id' => $kontrabon->id]);
 
             DB::commit();
 

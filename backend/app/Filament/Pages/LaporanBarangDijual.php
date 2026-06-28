@@ -2,12 +2,13 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\TransactionItem;
+use App\Models\AllSalesItem;
 use Filament\Pages\Page;
 use Filament\Tables\Table;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Forms\Components\DatePicker;
@@ -35,25 +36,29 @@ class LaporanBarangDijual extends Page implements HasTable
     {
         return $table
             ->query(
-                TransactionItem::query()
-                    ->whereHas('transaction', function (Builder $query) {
-                        $query->where('is_voided', false);
-                        if (Auth::user()->branch_id !== null) {
-                            $query->where('branch_id', Auth::user()->branch_id);
-                        }
+                AllSalesItem::query()
+                    ->when(Auth::user()->branch_id !== null, function (Builder $query) {
+                        $query->where('branch_id', Auth::user()->branch_id);
                     })
-                    ->whereNotNull('product_id')
-                    ->with(['transaction', 'transaction.branch', 'product'])
+                    ->with(['branch', 'product'])
             )
             ->columns([
-                TextColumn::make('transaction.transaction_date')
+                TextColumn::make('source')
+                    ->label('Sumber')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'POS' => 'success',
+                        'ECOMMERCE' => 'warning',
+                        default => 'gray',
+                    }),
+                TextColumn::make('transaction_date')
                     ->label('Tanggal')
                     ->dateTime('d M Y H:i')
                     ->sortable(),
-                TextColumn::make('transaction.local_transaction_id')
+                TextColumn::make('transaction_number')
                     ->label('No Transaksi')
                     ->searchable(),
-                TextColumn::make('transaction.branch.name')
+                TextColumn::make('branch.name')
                     ->label('Cabang')
                     ->hidden(fn () => Auth::user()->branch_id !== null),
                 TextColumn::make('product.sku')
@@ -64,19 +69,19 @@ class LaporanBarangDijual extends Page implements HasTable
                     ->searchable(),
                 TextColumn::make('qty_terjual')
                     ->label('Qty Terjual')
-                    ->state(fn (TransactionItem $record) => $record->quantity > 0 ? $record->quantity : 0)
+                    ->state(fn (AllSalesItem $record) => $record->quantity > 0 ? $record->quantity : 0)
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('qty_retur')
                     ->label('Qty Retur')
-                    ->state(fn (TransactionItem $record) => $record->quantity < 0 ? abs($record->quantity) : 0)
+                    ->state(fn (AllSalesItem $record) => $record->quantity < 0 ? abs($record->quantity) : 0)
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('cost_price')
                     ->label('Harga Beli + PPN')
                     ->money('IDR', true)
-                    ->state(function (TransactionItem $record) {
-                        $branch_id = $record->transaction?->branch_id;
+                    ->state(function (AllSalesItem $record) {
+                        $branch_id = $record->branch_id;
                         $stock = \App\Models\Stock::where('product_id', $record->product_id)
                                 ->where('branch_id', $branch_id)
                                 ->first();
@@ -99,20 +104,25 @@ class LaporanBarangDijual extends Page implements HasTable
                 TextColumn::make('subtotal')
                     ->label('Subtotal (Net)')
                     ->money('IDR', true)
-                    ->state(fn (TransactionItem $record): float => ($record->unit_price - $record->discount_per_item) * $record->quantity)
                     ->sortable(),
             ])
             ->filters([
-                \App\Filament\Filters\DateFilterHelper::make('transaction.transaction_date', 'transaction_date'),
+                \App\Filament\Filters\DateFilterHelper::make('transaction_date', 'transaction_date'),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
-                    ->relationship('transaction.branch', 'name')
+                    ->relationship('branch', 'name')
                     ->hidden(fn () => Auth::user()->branch_id !== null),
                 SelectFilter::make('supplier_id')
                     ->label('Supplier')
                     ->relationship('product.supplier', 'name')
                     ->searchable()
                     ->preload(),
+                SelectFilter::make('source')
+                    ->label('Sumber')
+                    ->options([
+                        'POS' => 'POS Offline',
+                        'ECOMMERCE' => 'E-Commerce (Online)'
+                    ])
             ])
             ->headerActions([
                 \Filament\Actions\Action::make('cetak')
@@ -122,18 +132,7 @@ class LaporanBarangDijual extends Page implements HasTable
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-barang-dijual',
                         'tableFilters' => $livewire->tableFilters
-                    ]), true),
-                ExportAction::make()
-                    ->exporter(TransactionItemExporter::class)
-                    ->label('Export CSV')
-                    ->color('success')
-                    ->icon('heroicon-o-arrow-down-tray')
+                    ]), true)
             ]);
     }
 }
-
-
-
-
-
-
