@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use App\Models\EcommerceOrder;
 
 #[Signature('app:send-daily-report')]
 #[Description('Send daily sales report to Telegram per branch')]
@@ -39,32 +40,61 @@ class SendDailyReport extends Command
         $grandTotalTransactions = 0;
         
         foreach ($branches as $branch) {
+            // 1. OFFLINE (POS)
             $transactions = Transaction::where('branch_id', $branch->id)
                 ->whereDate('transaction_date', $today)
                 ->where('is_voided', false)
                 ->with('items.product') // Eager load for cogs calculation
                 ->get();
 
-            $totalTransactions = $transactions->count();
+            $offlineTransactions = $transactions->count();
+            $offlineSales = $transactions->sum('final_amount');
+            $offlineProfit = $transactions->sum(function($trx) {
+                return $trx->gross_profit;
+            });
+
+            // 2. ONLINE (E-Commerce)
+            $ecommerceOrders = EcommerceOrder::where('branch_id', $branch->id)
+                ->whereDate('created_at', $today)
+                ->where('status', 'COMPLETED')
+                ->with('items.product')
+                ->get();
+
+            $onlineTransactions = $ecommerceOrders->count();
+            $onlineSales = $ecommerceOrders->sum('total_amount');
+            $onlineProfit = $ecommerceOrders->sum(function($order) {
+                $cogs = $order->items->sum(function($item) {
+                    return $item->product ? ($item->product->cost_price * $item->quantity) : 0;
+                });
+                return $order->total_amount - $cogs;
+            });
+            
+            $totalTransactions = $offlineTransactions + $onlineTransactions;
             
             if ($totalTransactions == 0) {
                 continue; // Skip branches with no transactions today
             }
-
-            $totalSales = $transactions->sum('final_amount');
             
-            $totalProfit = $transactions->sum(function($trx) {
-                return $trx->gross_profit;
-            });
+            $totalSales = $offlineSales + $onlineSales;
+            $totalProfit = $offlineProfit + $onlineProfit;
 
             $grandTotalSales += $totalSales;
             $grandTotalProfit += $totalProfit;
             $grandTotalTransactions += $totalTransactions;
 
             $message .= "🏪 *Cabang: {$branch->name}*\n";
-            $message .= "Trx: " . number_format($totalTransactions, 0, ',', '.') . "\n";
-            $message .= "Omset: Rp " . number_format($totalSales, 0, ',', '.') . "\n";
-            $message .= "Laba Kotor: Rp " . number_format($totalProfit, 0, ',', '.') . "\n";
+            $message .= "🛒 *Offline (POS)*\n";
+            $message .= "  - Trx: " . number_format($offlineTransactions, 0, ',', '.') . "\n";
+            $message .= "  - Omset: Rp " . number_format($offlineSales, 0, ',', '.') . "\n";
+            $message .= "  - Laba Kotor: Rp " . number_format($offlineProfit, 0, ',', '.') . "\n";
+            
+            if ($onlineTransactions > 0) {
+                $message .= "🌐 *Online (E-Commerce)*\n";
+                $message .= "  - Trx: " . number_format($onlineTransactions, 0, ',', '.') . "\n";
+                $message .= "  - Omset: Rp " . number_format($onlineSales, 0, ',', '.') . "\n";
+                $message .= "  - Laba Kotor: Rp " . number_format($onlineProfit, 0, ',', '.') . "\n";
+            }
+            
             $message .= "---------------------------\n";
         }
 
