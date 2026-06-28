@@ -56,7 +56,7 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className={`fixed left-0 right-0 z-50 transition-all duration-300 top-0 ${isScrolled ? 'glass-panel-dark py-2 md:py-3' : 'bg-white/80 backdrop-blur-md py-3.5 md:py-5'}`}>
+      <nav className={`fixed left-0 right-0 z-[100] transition-all duration-300 top-0 ${isScrolled ? 'glass-panel-dark py-2 md:py-3' : 'bg-white/80 backdrop-blur-md py-3.5 md:py-5'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Desktop Navbar */}
