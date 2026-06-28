@@ -153,77 +153,6 @@
         
         .dark .pos-input { background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important; }
         .dark .pos-input:focus { border-color: #60a5fa !important; box-shadow: 0 0 0 1px #60a5fa !important; }
-        closeCalc() {
-            this.calcOpen = false;
-            if (this.calcTarget) {
-                this.calcTarget.focus();
-                // Select the input if possible
-                if (typeof this.calcTarget.select === 'function') {
-                    this.calcTarget.select();
-                }
-            }
-        },
-        applyCalc() {
-            try {
-                let sanitized = String(this.calcValue).replace(/[^-()\d/*+.]/g, '');
-                if (sanitized) {
-                    let result = new Function('return ' + sanitized)();
-                    if (!isNaN(result)) {
-                        this.calcTarget.value = result;
-                        this.calcTarget.dispatchEvent(new Event('input', { bubbles: true }));
-                        this.calcTarget.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }
-            } catch(e) { console.error('Calc error:', e); }
-            this.closeCalc();
-        }
-     }"
-     @item-added.window="focusRowQty($event.detail.index)">
-
-    <!-- Mini Calculator Popup -->
-    <div x-show="calcOpen" @click.away="closeCalc()" 
-         style="display: none; position: fixed; z-index: 9999; width: 232px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border-radius: 8px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #4a4a4a; border: 1px solid #333;" 
-         :style="{ top: calcTop + 'px', left: calcLeft + 'px' }" x-transition>
-        
-        <div style="background-color: #4a4a4a; padding: 16px 16px 8px 16px; text-align: right; border-bottom: 1px solid #333;">
-            <input type="text" id="mini-calc-input" x-model="calcValue" @keydown.enter.prevent="applyCalc()" @keydown.escape.prevent="closeCalc()" style="background: transparent; border: none; color: white; width: 100%; text-align: right; outline: none; font-size: 32px; font-weight: 300; padding: 0;" autocomplete="off">
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background-color: #333;">
-            <button type="button" @click="calcValue = ''" style="background-color: #646464; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 14px;">AC</button>
-            <button type="button" @click="calcValue = calcValue ? (String(calcValue).startsWith('-') ? String(calcValue).substring(1) : '-' + calcValue) : '-'" style="background-color: #646464; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 14px;">+/-</button>
-            <button type="button" @click="calcValue = calcValue + '/100'" style="background-color: #646464; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 14px;">%</button>
-            <button type="button" @click="calcValue = calcValue + '/'" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">÷</button>
-
-            <button type="button" @click="calcValue = calcValue + '7'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">7</button>
-            <button type="button" @click="calcValue = calcValue + '8'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">8</button>
-            <button type="button" @click="calcValue = calcValue + '9'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">9</button>
-            <button type="button" @click="calcValue = calcValue + '*'" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">×</button>
-
-            <button type="button" @click="calcValue = calcValue + '4'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">4</button>
-            <button type="button" @click="calcValue = calcValue + '5'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">5</button>
-            <button type="button" @click="calcValue = calcValue + '6'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">6</button>
-            <button type="button" @click="calcValue = calcValue + '-'" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">−</button>
-
-            <button type="button" @click="calcValue = calcValue + '1'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">1</button>
-            <button type="button" @click="calcValue = calcValue + '2'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">2</button>
-            <button type="button" @click="calcValue = calcValue + '3'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">3</button>
-            <button type="button" @click="calcValue = calcValue + '+'" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">+</button>
-
-            <button type="button" @click="calcValue = calcValue + '0'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500; grid-column: span 2; text-align: left; padding-left: 20px;">0</button>
-            <button type="button" @click="calcValue = calcValue + '.'" style="background-color: #7a7a7a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px; font-weight: 500;">.</button>
-            <button type="button" @click="applyCalc()" style="background-color: #ff9f0a; color: white; padding: 12px 0; border: none; cursor: pointer; font-size: 18px;">=</button>
-        </div>
-    </div>
-    <style>
-        .pos-input { padding: 0.375rem 0.5rem; border: 1px solid #d1d5db; width: 100%; border-radius: 0.375rem; background-color: #f9fafb; font-size: 0.875rem; }
-        .pos-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
-        .pos-label { font-weight: 500; color: #4b5563; font-size: 0.875rem; padding-right: 0.5rem; }
-        .pos-grid-th { background-color: #f3f4f6; border-bottom: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; font-weight: 600; color: #374151; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;}
-        .pos-grid-td { border-bottom: 1px solid #f3f4f6; padding: 0.5rem; background-color: white; font-size: 0.875rem; color: #1f2937; }
-        
-        .dark .pos-input { background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important; }
-        .dark .pos-input:focus { border-color: #60a5fa !important; box-shadow: 0 0 0 1px #60a5fa !important; }
         .dark .pos-label { color: #9ca3af !important; }
         .dark .pos-grid-th { background-color: #111827 !important; border-color: #374151 !important; color: #d1d5db !important; }
         .dark .pos-grid-td { background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important; }
@@ -568,6 +497,76 @@
                                     {{ $item['name'] }}
                                 </div>
                             </td> 
+                        @endif
+                        @if(in_array('qty_ordered', $visibleColumns)) <td class="pos-grid-td dark:text-gray-400" style="text-align: right; color: #6b7280;">{{ $item['qty_ordered'] > 0 ? number_format($item['qty_ordered'], 0) : '-' }}</td> @endif
+                        @if(in_array('qty_received', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                            <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
+                                   wire:model.lazy="cart.{{ $index }}.qty_received"
+                                   wire:change="recalculateRow({{ $index }})"
+                                   x-on:keydown.space.prevent="openCalc($event)">
+                        </td>
+                        @endif
+                        @if(in_array('unit_price', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                            <div x-data="{ raw: @entangle('cart.' . $index . '.unit_price'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="price-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
+                                       x-on:keydown.space.prevent="openCalc($event)">
+                            </div>
+                        </td>
+                        @endif
+
+                        @if(in_array('harga_jual_1', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_1'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                    <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input pos-grid-input" style="text-align: right;" 
+                                           x-on:keydown.space.prevent="openCalc($event)">
+                                </div>
+                            @else
+                                <div style="text-align: right; padding: 0.375rem 0.5rem; color: #6b7280;" class="dark:text-gray-400">{{ number_format($item['harga_jual_1'], 2) }}</div>
+                            @endif
+                        </td>
+                        @endif
+                        @if(in_array('margin_gol_1', $visibleColumns))
+                        <td class="pos-grid-td dark:bg-gray-800" style="padding: 0.25rem; background-color: #f9fafb;">
+                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
+                                <input type="number" step="any" class="pos-input pos-grid-input {{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
+                                       wire:model.lazy="cart.{{ $index }}.margin_gol_1"
+                                       wire:change="recalculateRow({{ $index }})"
+                                       x-on:keydown.space.prevent="openCalc($event)">
+                            @else
+                                <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_1'], 2) }}</div>
+                            @endif
+                        </td>
+                        @endif
+                        @if(in_array('discount_1', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                            <input onfocus="this.select()" type="number" id="dis1-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
+                                   wire:model.lazy="cart.{{ $index }}.discount_1"
+                                   wire:change="recalculateRow({{ $index }})"
+                                   x-on:keydown.space.prevent="openCalc($event)">
+                        </td>
+                        @endif
+                        @if(in_array('discount_2', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                            <input onfocus="this.select()" type="number" id="dis2-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
+                                   wire:model.lazy="cart.{{ $index }}.discount_2"
+                                   wire:change="recalculateRow({{ $index }})"
+                                   x-on:keydown.space.prevent="openCalc($event)">
+                        </td>
+                        @endif
+                        @if(in_array('discount_3', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                            <input onfocus="this.select()" type="number" step="any" id="dis3-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
+                                   wire:model.lazy="cart.{{ $index }}.discount_3"
+                                   wire:change="recalculateRow({{ $index }})"
+                                   x-on:keydown.space.prevent="openCalc($event)">
+                        </td>
+                        @endif
+                        <td class="pos-grid-td" style="text-align: right; font-weight: 600; color: #111827;" class="dark:text-gray-100">
+                            @if($enable_edit_total)
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.subtotal'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); } }">
                                     <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input font-bold" style="text-align: right;" 
                                            x-on:keydown.space.prevent="openCalc($event)">
                                 </div>
