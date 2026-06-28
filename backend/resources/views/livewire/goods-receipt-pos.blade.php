@@ -54,9 +54,8 @@
                     event.preventDefault();
                     if (colIndex < rowInputs.length - 1) {
                         target = rowInputs[colIndex + 1];
-                    } else if (key === 'Enter' && rowIndex < rows.length - 1) {
-                        let nextRowInputs = Array.from(rows[rowIndex + 1].querySelectorAll('.pos-grid-input:not([disabled])'));
-                        if (nextRowInputs.length > 0) target = nextRowInputs[0];
+                    } else if (key === 'Enter') {
+                        target = document.getElementById('search-input');
                     }
                 } else if (key === 'ArrowLeft') {
                     event.preventDefault();
