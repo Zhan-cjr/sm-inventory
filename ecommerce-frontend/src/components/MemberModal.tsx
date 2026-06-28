@@ -271,7 +271,7 @@ const MemberModal = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl max-w-lg w-full h-full sm:h-[85vh] flex flex-col overflow-hidden transform transition-all animate-scale-up border border-slate-100">
+      <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl max-w-lg w-full h-full sm:h-[85vh] flex flex-col overflow-hidden transform transition-all animate-scale-up border border-slate-100 pb-14 sm:pb-0">
         
         {/* Header */}
         <div className="relative p-6 border-b border-slate-100 flex justify-between items-center bg-white flex-shrink-0">

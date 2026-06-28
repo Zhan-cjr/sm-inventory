@@ -94,7 +94,7 @@ const ProductDetailModal = () => {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col sm:flex-row overflow-hidden transform transition-all animate-scale-up border border-slate-100 relative">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col sm:flex-row overflow-hidden transform transition-all animate-scale-up border border-slate-100 relative pb-14 sm:pb-0">
         
         {/* Mobile Close Button & Handle */}
         <div className="sm:hidden w-full flex justify-center pt-3 pb-1 absolute top-0 z-20">

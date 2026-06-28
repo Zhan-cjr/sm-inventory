@@ -5,7 +5,15 @@ import { useEcom } from '../context/EcomContext';
 const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { setSelectedCategory, setIsMemberModalOpen } = useEcom();
+  const { 
+    setSelectedCategory, 
+    setIsMemberModalOpen,
+    setIsCartOpen,
+    setIsPpobModalOpen,
+    setIsBranchModalOpen,
+    setIsCheckoutModalOpen,
+    setIsProductModalOpen
+  } = useEcom();
 
   const navItems = [
     { path: '/', icon: <Home size={24} />, label: 'Home' },
@@ -16,6 +24,17 @@ const BottomNav = () => {
   ];
 
   const handleNavClick = (item: any) => {
+    // Tutup modal lain
+    if (setIsCartOpen) setIsCartOpen(false);
+    if (setIsPpobModalOpen) setIsPpobModalOpen(false);
+    if (setIsBranchModalOpen) setIsBranchModalOpen(false);
+    if (setIsCheckoutModalOpen) setIsCheckoutModalOpen(false);
+    if (setIsProductModalOpen) setIsProductModalOpen(false);
+    
+    if (item.path !== '#akun' && setIsMemberModalOpen) {
+      setIsMemberModalOpen(false);
+    }
+
     if (item.isAction) {
       if (item.path === '#kategori') {
         if (location.pathname !== '/') {

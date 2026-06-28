@@ -334,7 +334,7 @@ export const CheckoutModal: React.FC = () => {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4 print:p-0 print:bg-white">
-        <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] max-w-lg rounded-none sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col print:max-h-full print:shadow-none print:border-none print:w-full print:rounded-none">
+        <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] max-w-lg rounded-none sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col print:max-h-full print:shadow-none print:border-none print:w-full print:rounded-none pb-14 sm:pb-0">
           
           <div className="p-5 border-b border-slate-100 flex justify-between items-center print:hidden">
             <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
@@ -491,7 +491,7 @@ export const CheckoutModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] max-w-xl rounded-none sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] max-w-xl rounded-none sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col pb-14 sm:pb-0">
         
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white z-10 shadow-sm relative">
           <div>
