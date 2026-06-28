@@ -5,6 +5,57 @@
                 let el = document.getElementById('qty-' + index);
                 if (el) { el.focus(); el.select(); }
             }, 100);
+        },
+        handleGridNav(event) {
+            let current = event.target;
+            if (!current.classList.contains('pos-grid-input')) return;
+            
+            let key = event.key;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(key)) {
+                let tr = current.closest('tr');
+                let tbody = tr.closest('tbody');
+                if (!tr || !tbody) return;
+                
+                let rowInputs = Array.from(tr.querySelectorAll('.pos-grid-input:not([disabled])'));
+                let colIndex = rowInputs.indexOf(current);
+                if (colIndex === -1) return;
+                
+                let rows = Array.from(tbody.querySelectorAll('tr'));
+                let rowIndex = rows.indexOf(tr);
+                
+                let target = null;
+                
+                if (key === 'ArrowRight' || key === 'Enter') {
+                    event.preventDefault();
+                    if (colIndex < rowInputs.length - 1) {
+                        target = rowInputs[colIndex + 1];
+                    } else if (key === 'Enter') {
+                        target = document.getElementById('search-input');
+                    }
+                } else if (key === 'ArrowLeft') {
+                    event.preventDefault();
+                    if (colIndex > 0) {
+                        target = rowInputs[colIndex - 1];
+                    }
+                } else if (key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (rowIndex > 0) {
+                        let prevRowInputs = Array.from(rows[rowIndex - 1].querySelectorAll('.pos-grid-input:not([disabled])'));
+                        if (prevRowInputs.length > colIndex) target = prevRowInputs[colIndex];
+                    }
+                } else if (key === 'ArrowDown') {
+                    event.preventDefault();
+                    if (rowIndex < rows.length - 1) {
+                        let nextRowInputs = Array.from(rows[rowIndex + 1].querySelectorAll('.pos-grid-input:not([disabled])'));
+                        if (nextRowInputs.length > colIndex) target = nextRowInputs[colIndex];
+                    }
+                }
+                
+                if (target) {
+                    target.focus();
+                    if (typeof target.select === 'function') target.select();
+                }
+            }
         }
      }"
      @item-added.window="focusRowQty($event.detail.index)">
@@ -26,6 +77,16 @@
         .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .flex-between { display: flex; justify-content: space-between; align-items: center; }
         .flex-end { display: flex; justify-content: flex-end; align-items: center; }
+
+        /* Hide number spin buttons */
+        input[type=number].pos-input::-webkit-outer-spin-button,
+        input[type=number].pos-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number].pos-input {
+            -moz-appearance: textfield;
+        }
 
         .search-result-item { border-left: 4px solid transparent; transition: all 0.1s ease-in-out; }
         .highlighted-item { background-color: #dbeafe !important; border-left: 4px solid #2563eb !important; }
@@ -289,8 +350,8 @@
                     @if(in_array('stock', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Stok</th> @endif
                     @if(in_array('min_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Min</th> @endif
                     @if(in_array('max_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Max</th> @endif
-                    @if(in_array('qty_saran', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right; background-color: #e0f2fe; color: #0369a1;">Qty Saran</th> @endif
-                    @if(in_array('qty', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right;">Qty Pesan</th> @endif
+                    @if(in_array('qty_saran', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right; background-color: #e0f2fe; color: #0369a1;">Qty Saran</th> @endif
+                    @if(in_array('qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Qty Pesan</th> @endif
                     @if(in_array('unit_cost', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Satuan</th> @endif
                     @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis1 (%)</th> @endif
                     @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis2 (%)</th> @endif
@@ -299,13 +360,19 @@
                     <th class="pos-grid-th" style="width: 3rem; text-align: center;"></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody @keydown="handleGridNav($event)">
                 @forelse($cart as $index => $item)
                     <tr>
                         <td class="pos-grid-td" style="text-align: center;">{{ $loop->iteration }}</td>
                         @if(in_array('sku', $visibleColumns)) <td class="pos-grid-td">{{ $item['sku'] }}</td> @endif
                         @if(in_array('barcode', $visibleColumns)) <td class="pos-grid-td">{{ $item['barcode'] }}</td> @endif
-                        @if(in_array('name', $visibleColumns)) <td class="pos-grid-td" style="font-weight: 500;">{{ $item['name'] }}</td> @endif
+                        @if(in_array('name', $visibleColumns)) 
+                            <td class="pos-grid-td" style="font-weight: 500;">
+                                <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2;">
+                                    {{ $item['name'] }}
+                                </div>
+                            </td> 
+                        @endif
                         @if(in_array('avg_bln', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #8b5cf6;">{{ $item['avg_bln'] }}</td> @endif
                         @if(in_array('avg_minggu', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #a855f7;">{{ $item['avg_minggu'] }}</td> @endif
                         @if(in_array('stock', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #6b7280;">{{ $item['stock'] }}</td> @endif
@@ -314,42 +381,37 @@
                         @if(in_array('qty_saran', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; font-weight: bold; color: #0284c7; background-color: #f0f9ff;">{{ $item['qty_saran'] }}</td> @endif
                         @if(in_array('qty', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" id="qty-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" id="qty-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.qty"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.enter.prevent="document.getElementById('cost-{{ $index }}').focus()">
+                                   wire:change="recalculateRow({{ $index }})">
                         </td>
                         @endif
                         @if(in_array('unit_cost', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
                             <div x-data="{ raw: @entangle('cart.' . $index . '.unit_cost'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
-                                <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="cost-{{ $index }}" class="pos-input" style="text-align: right;" 
-                                       x-on:keydown.enter.prevent="document.getElementById('dis1-{{ $index }}').focus()">
+                                <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="cost-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;">
                             </div>
                         </td>
                         @endif
                         @if(in_array('discount_1', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" id="dis1-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" id="dis1-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.discount_1"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.enter.prevent="document.getElementById('dis2-{{ $index }}').focus()">
+                                   wire:change="recalculateRow({{ $index }})">
                         </td>
                         @endif
                         @if(in_array('discount_2', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" id="dis2-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" id="dis2-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.discount_2"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.enter.prevent="document.getElementById('dis3-{{ $index }}').focus()">
+                                   wire:change="recalculateRow({{ $index }})">
                         </td>
                         @endif
                         @if(in_array('discount_3', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" id="dis3-{{ $index }}" class="pos-input" style="text-align: right;" 
+                            <input onfocus="this.select()" type="number" id="dis3-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
                                    wire:model.lazy="cart.{{ $index }}.discount_3"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.enter.prevent="document.getElementById('search-input').focus()">
+                                   wire:change="recalculateRow({{ $index }})">
                         </td>
                         @endif
                         <td class="pos-grid-td" style="text-align: right; font-weight: 600; color: #111827;" class="dark:text-gray-100">

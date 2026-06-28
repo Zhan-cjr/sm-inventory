@@ -41,6 +41,14 @@
                 <td class="separator">:</td>
                 <td>{{ $doc->received_by }}</td>
             </tr>
+            <tr>
+                <td class="label"></td>
+                <td class="separator"></td>
+                <td></td>
+                <td class="label" style="text-align: right;">Jatuh Tempo</td>
+                <td class="separator">:</td>
+                <td>{{ $doc->due_date ? \Carbon\Carbon::parse($doc->due_date)->format('d-m-Y') : '-' }}</td>
+            </tr>
         </table>
 
         <table class="items-table">
