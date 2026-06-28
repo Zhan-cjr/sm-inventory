@@ -15,6 +15,20 @@ class AllSalesItem extends Model
     protected $table = 'all_sales_items';
 
     /**
+     * The type of the auto-incrementing ID.
+     *
+     * @var string
+     */
+    protected $keyType = 'string';
+
+    /**
+     * Indicates if the IDs are auto-incrementing.
+     *
+     * @var bool
+     */
+    public $incrementing = false;
+
+    /**
      * The attributes that aren't mass assignable.
      *
      * @var array
