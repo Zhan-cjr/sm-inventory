@@ -84,11 +84,13 @@ class SystemReset extends Page
             'suppliers', 'purchase_orders', 'purchase_order_items', 'goods_receipts', 'goods_receipt_items',
             'purchase_returns', 'purchase_return_items', 'purchase_payments', 'purchase_payment_items',
             'kontrabons', 'kontrabon_items', 'kontrabon_deductions', 'supplier_deductions',
-            // Jurnal Keuangan (hanya isi jurnal, COA tetap)
-            'journal_entries', 'journal_entry_lines', 'expenses',
-            // Cabang, Terminal, Pelanggan
-            'branches', 'terminals', 'pos_devices', 'pos_settings', 'customers', 'point_histories',
+            // Jurnal Keuangan (hanya isi jurnal, COA tetap) & Pajak
+            'journal_entries', 'journal_entry_lines', 'expenses', 'tax_invoices',
+            // Cabang, Terminal, Pelanggan (Pengaturan POS dikecualikan agar tidak kereset)
+            'branches', 'terminals', 'pos_devices', 'customers', 'point_histories',
             'reward_redemptions', 'ecommerce_orders', 'ecommerce_order_items',
+            // Log & Import (Ditambahkan)
+            'imports', 'failed_import_rows', 'activity_log',
             // Lain-lain
             'fixed_assets', 'fixed_asset_depreciations', 'promotions', 'vouchers', 'rewards'
         ];
@@ -100,5 +102,9 @@ class SystemReset extends Page
         }
 
         Schema::enableForeignKeyConstraints();
+
+        // Otomatisasi pembersihan Cache & Meilisearch agar sinkron setelah data dihapus
+        \Illuminate\Support\Facades\Artisan::call('cache:clear');
+        \Illuminate\Support\Facades\Artisan::call('scout:flush', ['model' => 'App\Models\Product']);
     }
 }
