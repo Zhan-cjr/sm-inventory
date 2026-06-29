@@ -36,7 +36,7 @@ class ListProducts extends ListRecords
     protected function applySearchToTableQuery(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         if (filled($search = $this->getTableSearch())) {
-            $query->whereIn('id', \App\Models\Product::search($search)->take(100)->keys());
+            $query->whereIn('id', \App\Models\Product::search($search)->take(1000)->keys());
         }
 
         return $query;

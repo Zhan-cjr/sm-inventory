@@ -149,7 +149,7 @@ Route::prefix('v1')->group(function () {
                 return response()->json([]);
             }
             // Execute search using Laravel Scout (Meilisearch)
-            $results = \App\Models\Product::search($query)->take(20)->get();
+            $results = \App\Models\Product::search($query)->take(100)->get();
             return response()->json($results);
         });
 

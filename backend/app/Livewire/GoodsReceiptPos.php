@@ -177,7 +177,7 @@ class GoodsReceiptPos extends Component
             $this->searchResults = Product::where('sku', 'LIKE', '%' . $value . '%')
                 ->orWhere('barcode', 'LIKE', '%' . $value . '%')
                 ->orWhere('name', 'LIKE', '%' . $value . '%')
-                ->limit(5)
+                ->limit(20)
                 ->get();
         } else {
             $this->searchResults = [];
