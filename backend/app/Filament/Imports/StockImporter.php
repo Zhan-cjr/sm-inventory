@@ -161,7 +161,11 @@ class StockImporter extends Importer
                 ->castStateUsing($integerCaster)
                 ->example('100')
                 ->rules(['nullable', 'integer'])
-                ->fillRecordUsing(fn ($record, $state) => $record->qty = $state ?? 0),
+                ->fillRecordUsing(function ($record, $state) {
+                    if ($state !== null) {
+                        $record->quantity_on_hand = $state;
+                    }
+                }),
             ImportColumn::make('min_qty')
                 ->label('Min Stok')
                 ->numeric()
