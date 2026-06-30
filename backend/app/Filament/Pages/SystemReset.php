@@ -105,6 +105,8 @@ class SystemReset extends Page
 
         // Otomatisasi pembersihan Cache & Meilisearch agar sinkron setelah data dihapus
         \Illuminate\Support\Facades\Artisan::call('cache:clear');
-        \Illuminate\Support\Facades\Artisan::call('scout:flush', ['model' => 'App\Models\Product']);
+        if (method_exists(\App\Models\Product::class, 'removeAllFromSearch')) {
+            \App\Models\Product::removeAllFromSearch();
+        }
     }
 }
