@@ -97,6 +97,7 @@ class LaporanPersediaan extends Page implements HasTable
                     ->label('Export')
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-tray')
+                    ->columnMapping(false)
             ]);
     }
 }
