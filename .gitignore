@@ -29,3 +29,5 @@ backend/test_broadcast.php
 backend/test_broadcast_stock.php
 backend/test_redis.php
 frontend/test_ws.cjs
+
+DATABARANG/
