@@ -10,6 +10,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Actions\ExportAction;
 use App\Filament\Exports\StockExporter;
 use Illuminate\Support\Facades\Auth;
 
@@ -91,7 +92,7 @@ class LaporanPersediaan extends Page implements HasTable
                         'type' => 'rekap-total-stok',
                         'tableFilters' => $livewire->tableFilters
                     ]), true),
-                \Filament\Tables\Actions\ExportAction::make()
+                ExportAction::make()
                     ->exporter(StockExporter::class)
                     ->label('Export')
                     ->color('success')
