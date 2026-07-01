@@ -151,7 +151,7 @@ class LaporanHpp extends Page implements HasForms
                 SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
                 
                 SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(p.cost_price_tax, p.cost_price, 0))
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE sbd.transaction_item_id = ti.id
@@ -161,7 +161,7 @@ class LaporanHpp extends Page implements HasForms
                 SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
                 
                 SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(p.cost_price_tax, p.cost_price, 0))
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE sbd.transaction_item_id = ti.id
@@ -170,6 +170,7 @@ class LaporanHpp extends Page implements HasForms
             FROM transaction_items ti
             JOIN transactions t ON ti.transaction_id = t.id
             JOIN products p ON ti.product_id = p.id
+            LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
             WHERE t.is_voided = 0 AND $whereClause
             GROUP BY p.id, p.sku, p.name, p.unit_of_measure
             ORDER BY p.name ASC
@@ -188,7 +189,7 @@ class LaporanHpp extends Page implements HasForms
                 SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
                 
                 SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(p.cost_price_tax, p.cost_price, 0))
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE sbd.transaction_item_id = ti.id
@@ -197,7 +198,7 @@ class LaporanHpp extends Page implements HasForms
                 SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
                 
                 SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(p.cost_price_tax, p.cost_price, 0))
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE sbd.transaction_item_id = ti.id
@@ -207,6 +208,7 @@ class LaporanHpp extends Page implements HasForms
             JOIN transactions t ON ti.transaction_id = t.id
             JOIN products p ON ti.product_id = p.id
             LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
             WHERE t.is_voided = 0 AND $whereClause
             GROUP BY c.id, COALESCE(c.name, 'Tanpa Kategori')
             ORDER BY category_name ASC
@@ -224,7 +226,7 @@ class LaporanHpp extends Page implements HasForms
                 SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
                 
                 SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(p.cost_price_tax, p.cost_price, 0))
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE sbd.transaction_item_id = ti.id
@@ -233,7 +235,7 @@ class LaporanHpp extends Page implements HasForms
                 SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
                 
                 SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(p.cost_price_tax, p.cost_price, 0))
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE sbd.transaction_item_id = ti.id
@@ -242,6 +244,7 @@ class LaporanHpp extends Page implements HasForms
             FROM transaction_items ti
             JOIN transactions t ON ti.transaction_id = t.id
             JOIN products p ON ti.product_id = p.id
+            LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
             WHERE t.is_voided = 0 AND $whereClause
             GROUP BY DATE(t.transaction_date)
             ORDER BY tgl ASC
