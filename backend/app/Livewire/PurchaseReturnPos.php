@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 class PurchaseReturnPos extends Component
 {
+    use Traits\HasPosDraft;
+    
     public $return_number;
     public $return_date;
     public $branch_id;
@@ -86,9 +88,17 @@ class PurchaseReturnPos extends Component
             $this->return_number = 'PRT-' . strtoupper(substr(uniqid(), -6));
             $this->return_date = date('Y-m-d');
             $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
+
+            // Load draft if not editing existing PRT
+            $this->loadDraft();
         }
 
         $this->calculateTotals();
+    }
+
+    public function dehydrate()
+    {
+        $this->saveDraft();
     }
 
     public function updatedSupplierId($value)
@@ -316,6 +326,8 @@ class PurchaseReturnPos extends Component
 
         Notification::make()->title('Retur Pembelian berhasil disimpan.')->success()->send();
         
+        $this->clearDraft();
+
         if ($this->cetak_nota && isset($pr)) {
             $printUrl = route('print.document', ['type' => 'purchase-return', 'ids' => [$pr->id]]);
             $indexUrl = route('filament.admin.resources.purchase-returns.index');

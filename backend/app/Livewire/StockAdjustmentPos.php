@@ -12,6 +12,8 @@ use Filament\Notifications\Notification;
 
 class StockAdjustmentPos extends Component
 {
+    use Traits\HasPosDraft;
+
     public $adjustment_number;
     public $adjustment_date;
     public $branch_id;
@@ -66,9 +68,12 @@ class StockAdjustmentPos extends Component
                 ];
             }
         } else {
-            $this->adjustment_number = 'ADJ-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(2)));
+            $this->adjustment_number = 'ADJ-' . strtoupper(substr(uniqid(), -6));
             $this->adjustment_date = date('Y-m-d');
             $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
+
+            // Load draft if not editing existing adjustment
+            $this->loadDraft();
             
             $firstReason = AdjustmentReason::first();
             if ($firstReason) {
@@ -196,6 +201,11 @@ class StockAdjustmentPos extends Component
         $this->calculateTotals();
     }
 
+    public function dehydrate()
+    {
+        $this->saveDraft();
+    }
+
     public function calculateTotals()
     {
         $this->totalLines = count($this->cart);
@@ -285,6 +295,8 @@ class StockAdjustmentPos extends Component
             Notification::make()->title('Koreksi Stok berhasil disimpan.')->success()->send();
         }
         
+        $this->clearDraft();
+
         if ($this->cetak_nota && !$needsApproval) {
             $printUrl = route('print.document', ['type' => 'adjustment', 'ids' => [$adj->id]]);
             $indexUrl = route('filament.admin.resources.stock-adjustments.index');

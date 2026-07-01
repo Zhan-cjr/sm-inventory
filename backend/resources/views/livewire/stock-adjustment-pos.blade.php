@@ -1,7 +1,8 @@
 <div class="h-full flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden font-sans text-sm"
      x-data="{
         focusRowQty(index) {
-            setTimeout(() => {
+            setTimeout(() =>
+ {
                 let el = document.getElementById('qty-' + index);
                 if (el) { el.focus(); el.select(); }
             }, 100);
@@ -156,7 +157,7 @@
 
             <!-- Interactive Search Dropdown -->
             @if(count($searchResults) > 0)
-            <div style="position: absolute; left: 0; right: 0; top: 100%; z-index: 100; background: white; border: 1px solid #e5e7eb; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-top: 0.25rem; max-height: 300px; overflow-y: auto;" class="dark:bg-gray-800 dark:border-gray-700">
+            <div style="position: absolute; left: 0; right: 0; top: 100%; z-index: 100;  border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-top: 0.25rem; max-height: 300px; overflow-y: auto;" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
                 @foreach($searchResults as $index => $result)
                 <div wire:click="selectProduct('{{ $result->id }}')" 
                      class="search-result-item hover:bg-blue-50 dark:hover:bg-gray-700 dark:border-gray-700"
@@ -176,7 +177,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M1 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zM1 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V7zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V7zM1 12a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-2z"/></svg>
                 Pilih Kolom
             </button>
-            <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 12rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="bg-white dark:bg-gray-800 dark:border-gray-700">
+            <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 12rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
                 @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'stock' => 'Stok Awal', 'qty' => 'Qty Koreksi', 'new_qty' => 'Stok Akhir', 'unit_cost' => 'Harga Beli'] as $key => $label)
                     <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                         <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
@@ -282,6 +283,13 @@
             </div>
         </div>
     </div>
+
+<style>
+    .pos-dropdown-bg { background-color: #ffffff !important; }
+    .dark .pos-dropdown-bg { background-color: #1f2937 !important; border-color: #374151 !important; }
+    .dark .pos-dropdown-bg .dark\:text-gray-200 { color: #e5e7eb !important; }
+    .dark .pos-dropdown-bg .dark\:text-gray-400 { color: #9ca3af !important; }
+</style>
 </div>
 
 

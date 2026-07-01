@@ -1,7 +1,8 @@
 <div class="h-full flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden font-sans text-sm"
      x-data="{
         focusRowQty(index) {
-            setTimeout(() => {
+            setTimeout(() =>
+ {
                 let el = document.getElementById('qty-' + index);
                 if (el) { el.focus(); el.select(); }
             }, 100);
@@ -75,9 +76,9 @@
                                 </button>
                                 
                                 <div x-show="open" @click.away="open = false" 
-                                     style="position: absolute; left: 0; z-index: 50; margin-top: 0.25rem; background: white; border: 1px solid #e5e7eb; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-height: 15rem; overflow-y: auto; width: 100%; min-width: 300px; max-width: 500px;" 
-                                     class="dark:bg-gray-800 dark:border-gray-700">
-                                    <div style="position: sticky; top: 0; padding: 0.5rem; background: white; border-bottom: 1px solid #f3f4f6;" class="dark:bg-gray-800 dark:border-gray-700">
+                                     style="position: absolute; left: 0; z-index: 50; margin-top: 0.25rem;  border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-height: 15rem; overflow-y: auto; width: 100%; min-width: 300px; max-width: 500px;" 
+                                     class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
+                                    <div style="position: sticky; top: 0; padding: 0.5rem; background: white; border-bottom: 1px solid #f3f4f6;" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
                                         <input onfocus="this.select()" type="text" x-model="search" class="pos-input" placeholder="Cari kode/nama supplier..." autofocus @keydown.escape="open = false">
                                     </div>
                                     <template x-for="s in filteredSuppliers" :key="s.id">
@@ -221,6 +222,13 @@
             </div>
         </div>
     </div>
+
+<style>
+    .pos-dropdown-bg { background-color: #ffffff !important; }
+    .dark .pos-dropdown-bg { background-color: #1f2937 !important; border-color: #374151 !important; }
+    .dark .pos-dropdown-bg .dark\:text-gray-200 { color: #e5e7eb !important; }
+    .dark .pos-dropdown-bg .dark\:text-gray-400 { color: #9ca3af !important; }
+</style>
 </div>
 
 

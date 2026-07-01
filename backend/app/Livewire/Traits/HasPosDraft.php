@@ -13,7 +13,7 @@ trait HasPosDraft
     public function saveDraft()
     {
         // Don't save draft if we are editing an existing record
-        if (isset($this->purchaseOrder) || isset($this->goodsReceipt)) {
+        if (isset($this->purchaseOrder) || isset($this->goodsReceipt) || isset($this->purchaseReturn) || isset($this->stockAdjustment)) {
             return;
         }
 
@@ -26,7 +26,7 @@ trait HasPosDraft
             if ($prop->class === static::class) {
                 $name = $prop->getName();
                 // Ignore model instances, large arrays, and file uploads
-                if (!in_array($name, ['purchaseOrder', 'goodsReceipt', 'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image'])) {
+                if (!in_array($name, ['purchaseOrder', 'goodsReceipt', 'purchaseReturn', 'stockAdjustment', 'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image'])) {
                     $draftData[$name] = $this->{$name};
                 }
             }
@@ -41,7 +41,7 @@ trait HasPosDraft
     public function loadDraft()
     {
         // Only load if not editing an existing record
-        if (isset($this->purchaseOrder) || isset($this->goodsReceipt)) {
+        if (isset($this->purchaseOrder) || isset($this->goodsReceipt) || isset($this->purchaseReturn) || isset($this->stockAdjustment)) {
             return;
         }
 
