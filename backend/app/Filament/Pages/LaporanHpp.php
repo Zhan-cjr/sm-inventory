@@ -39,7 +39,7 @@ class LaporanHpp extends Page implements HasForms
         ]);
     }
 
-    public function form(Form $form): Form
+    public function form(\Filament\Schemas\Schema $form): \Filament\Schemas\Schema
     {
         return $form
             ->schema([
