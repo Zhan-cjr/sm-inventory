@@ -105,8 +105,13 @@
                             @elseif($activeTab === 'category')
                                 <th>Kode Kategori</th>
                                 <th>Kelompok Barang</th>
+                            @elseif($activeTab === 'subcategory')
+                                <th>Sub Kategori</th>
+                                <th>Kategori Induk</th>
                             @elseif($activeTab === 'monthly')
                                 <th>Tanggal</th>
+                            @elseif($activeTab === 'yearly')
+                                <th>Bulan</th>
                             @endif
                             
                             <th class="text-right">Penjualan</th>

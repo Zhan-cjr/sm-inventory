@@ -359,10 +359,24 @@ class LaporanHpp extends Page implements HasForms
                 ->label('Cetak Laporan')
                 ->icon('heroicon-o-printer')
                 ->color('info')
-                ->action(function () {
-                    // Open print window by injecting JS
-                    $this->dispatch('print-window');
-                }),
+                ->url(fn () => route('print.report', [
+                    'type' => 'laporan-hpp',
+                    'activeTab' => $this->activeTab,
+                    'tableFilters' => [
+                        'date_filter' => [
+                            'period' => $this->data['period'] ?? 'today',
+                            'created_from' => $this->data['created_from'] ?? null,
+                            'created_until' => $this->data['created_until'] ?? null,
+                        ],
+                        'branch_id' => [
+                            'value' => $this->data['branch_id'] ?? null
+                        ],
+                        'search' => [
+                            'value' => $this->data['search'] ?? null
+                        ]
+                    ]
+                ]))
+                ->openUrlInNewTab(),
             \Filament\Actions\Action::make('export_csv')
                 ->label('Export Excel (CSV)')
                 ->icon('heroicon-o-document-arrow-down')
