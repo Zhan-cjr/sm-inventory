@@ -12,6 +12,8 @@ use Filament\Notifications\Notification;
 
 class PurchaseOrderPos extends Component
 {
+    use Traits\HasPosDraft;
+
     public $po_number;
     public $po_date;
     public $expired_date;
@@ -93,9 +95,17 @@ class PurchaseOrderPos extends Component
             $this->po_number = 'PO-' . date('YmdHis');
             $this->po_date = date('Y-m-d');
             $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
+
+            // Load draft if not editing existing PO
+            $this->loadDraft();
         }
 
         $this->calculateTotals();
+    }
+
+    public function dehydrate()
+    {
+        $this->saveDraft();
     }
 
     public function updatedSearchQuery($value)
@@ -476,6 +486,8 @@ class PurchaseOrderPos extends Component
             Notification::make()->title('Pesanan Pembelian berhasil disimpan.')->success()->send();
         }
         
+        $this->clearDraft();
+
         if ($this->cetak_nota && !$needsApproval) {
             $printUrl = route('print.document', ['type' => 'po', 'ids' => [$po->id]]);
             $indexUrl = route('filament.admin.resources.purchase-orders.index');

@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\DB;
 class GoodsReceiptPos extends Component
 {
     use WithFileUploads;
+    use Traits\HasPosDraft;
+
 
     public $receipt_number;
     public $receipt_date;
@@ -101,9 +103,17 @@ class GoodsReceiptPos extends Component
             $this->receipt_date = date('Y-m-d');
             $this->due_date = date('Y-m-d');
             $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
+
+            // Load draft if not editing existing GR
+            $this->loadDraft();
         }
 
         $this->calculateTotals();
+    }
+
+    public function dehydrate()
+    {
+        $this->saveDraft();
     }
 
     public $only_latest_po = false;
@@ -611,6 +621,8 @@ class GoodsReceiptPos extends Component
         });
 
         Notification::make()->title('Penerimaan Barang berhasil disimpan dan stok telah diupdate.')->success()->send();
+
+        $this->clearDraft();
         
         if ($this->cetak_nota && $gr) {
             $printUrl = route('print.document', ['type' => 'receipt', 'ids' => [$gr->id]]);
