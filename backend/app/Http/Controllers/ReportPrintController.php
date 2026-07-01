@@ -149,217 +149,7 @@ class ReportPrintController extends Controller
         return 'Semua Waktu';
     }
 
-    private function printLaporanHpp(Request $request)
-    {
-        $filters = $request->input('tableFilters', []);
-        $activeTab = $request->input('activeTab', 'item');
-        $branchId = $filters['branch_id']['value'] ?? auth()->user()->branch_id;
-        $search = $filters['search']['value'] ?? null;
-        
-        $dateFilter = $filters['date_filter'] ?? [];
-        $period = $dateFilter['period'] ?? 'today';
-        $from = null;
-        $until = null;
-        
-        if ($period === 'today') {
-            $from = Carbon::today();
-            $until = Carbon::today()->endOfDay();
-        } elseif ($period === 'yesterday') {
-            $from = Carbon::yesterday();
-            $until = Carbon::yesterday()->endOfDay();
-        } elseif ($period === 'this_week') {
-            $from = Carbon::now()->startOfWeek();
-            $until = Carbon::now()->endOfWeek();
-        } elseif ($period === 'last_week') {
-            $from = Carbon::now()->subWeek()->startOfWeek();
-            $until = Carbon::now()->subWeek()->endOfWeek();
-        } elseif ($period === 'this_month') {
-            $from = Carbon::now()->startOfMonth();
-            $until = Carbon::now()->endOfMonth();
-        } elseif ($period === 'last_month') {
-            $from = Carbon::now()->subMonth()->startOfMonth();
-            $until = Carbon::now()->subMonth()->endOfMonth();
-        } elseif ($period === 'custom') {
-            $from = !empty($dateFilter['created_from']) ? Carbon::parse($dateFilter['created_from'])->startOfDay() : Carbon::parse('2000-01-01');
-            $until = !empty($dateFilter['created_until']) ? Carbon::parse($dateFilter['created_until'])->endOfDay() : Carbon::now()->endOfDay();
-        }
-        
-        $whereClause = "t.transaction_date >= ? AND t.transaction_date <= ?";
-        $bindings = [$from, $until];
-        
-        if ($branchId) {
-            $whereClause .= " AND t.branch_id = ?";
-            $bindings[] = $branchId;
-        }
-
-        if ($search) {
-            $whereClause .= " AND (p.name LIKE ? OR p.sku LIKE ? OR c.name LIKE ? OR p.sub_category LIKE ?)";
-            $searchPattern = '%' . $search . '%';
-            $bindings[] = $searchPattern;
-            $bindings[] = $searchPattern;
-            $bindings[] = $searchPattern;
-            $bindings[] = $searchPattern;
-        }
-
-        if ($activeTab === 'item') {
-            $sql = "
-                SELECT 
-                    p.sku as barcode, p.name as item_name, p.unit_of_measure as unit,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity ELSE 0 END) as sales_qty,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity ELSE 0 END) as return_qty,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY p.id, p.sku, p.name, p.unit_of_measure ORDER BY p.name ASC
-            ";
-            $columns = ['Barcode', 'Nama Item', 'Satuan', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
-        } elseif ($activeTab === 'category') {
-            $sql = "
-                SELECT 
-                    c.id as category_id, COALESCE(c.name, 'Tanpa Kategori') as category_name,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY c.id, COALESCE(c.name, 'Tanpa Kategori') ORDER BY category_name ASC
-            ";
-            $columns = ['Kode Kategori', 'Kelompok Barang', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
-        } elseif ($activeTab === 'subcategory') {
-            $sql = "
-                SELECT 
-                    c.id as category_id, COALESCE(c.name, 'Tanpa Kategori') as category_name, p.sub_category,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY c.id, COALESCE(c.name, 'Tanpa Kategori'), p.sub_category ORDER BY category_name ASC, p.sub_category ASC
-            ";
-            $columns = ['Sub Kategori', 'Kategori Induk', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
-        } elseif ($activeTab === 'yearly') {
-            $sql = "
-                SELECT 
-                    DATE_FORMAT(t.transaction_date, '%Y-%m') as tgl,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m') ORDER BY tgl ASC
-            ";
-            $columns = ['Bulan', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
-        } else {
-            // monthly
-            $sql = "
-                SELECT 
-                    DATE(t.transaction_date) as tgl,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY DATE(t.transaction_date) ORDER BY tgl ASC
-            ";
-            $columns = ['Tanggal', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
-        }
-
-        $results = collect(\Illuminate\Support\Facades\DB::select($sql, $bindings));
-        $rows = [];
-        $t_sales = 0; $t_cogs = 0; $t_return = 0; $t_return_cogs = 0; $t_profit = 0;
-
-        foreach ($results as $row) {
-            $netSales = $row->sales_amount - $row->return_amount;
-            $netCogs = $row->cogs_amount - $row->return_cogs_amount;
-            $profit = $netSales - $netCogs;
-            $margin = $row->sales_amount > 0 ? round(($profit / $row->sales_amount) * 100, 2) : 0;
-            
-            $t_sales += $row->sales_amount;
-            $t_cogs += $row->cogs_amount;
-            $t_return += $row->return_amount;
-            $t_return_cogs += $row->return_cogs_amount;
-            $t_profit += $profit;
-
-            $rowData = [];
-            if ($activeTab === 'item') {
-                $rowData = [$row->barcode, $row->item_name, $row->unit];
-            } elseif ($activeTab === 'category') {
-                $rowData = [$row->category_id, $row->category_name];
-            } elseif ($activeTab === 'subcategory') {
-                $rowData = [$row->sub_category ?: '-', $row->category_name];
-            } elseif ($activeTab === 'monthly') {
-                $rowData = [Carbon::parse($row->tgl)->translatedFormat('l, d-F-Y')];
-            } elseif ($activeTab === 'yearly') {
-                $rowData = [Carbon::parse($row->tgl . '-01')->translatedFormat('F Y')];
-            }
-            
-            $rowData = array_merge($rowData, [
-                number_format($row->sales_amount, 0, ',', '.'),
-                number_format($row->cogs_amount, 0, ',', '.'),
-                number_format($row->return_amount, 0, ',', '.'),
-                number_format($row->return_cogs_amount, 0, ',', '.'),
-                number_format($profit, 0, ',', '.'),
-                $margin . '%'
-            ]);
-            $rows[] = $rowData;
-        }
-        
-        $totalMargin = $t_sales > 0 ? round(($t_profit / $t_sales) * 100, 2) : 0;
-        $totalRow = ['<strong>TOTAL KESELURUHAN</strong>'];
-        if ($activeTab === 'item') { $totalRow[] = ''; $totalRow[] = ''; }
-        elseif ($activeTab === 'category' || $activeTab === 'subcategory') { $totalRow[] = ''; }
-
-        $totalRow = array_merge($totalRow, [
-            '<strong>'.number_format($t_sales, 0, ',', '.').'</strong>',
-            '<strong>'.number_format($t_cogs, 0, ',', '.').'</strong>',
-            '<strong>'.number_format($t_return, 0, ',', '.').'</strong>',
-            '<strong>'.number_format($t_return_cogs, 0, ',', '.').'</strong>',
-            '<strong>'.number_format($t_profit, 0, ',', '.').'</strong>',
-            '<strong>'.$totalMargin.'%</strong>'
-        ]);
-        $rows[] = $totalRow;
-
-        return view('print.reports.generic', [
-            'title' => 'Rekapitulasi Harga Pokok Penjualan (HPP)',
-            'period' => $this->getPeriodString(['date_filter' => $dateFilter], 'date_filter'),
-            'columns' => $columns,
-            'rows' => $rows
-        ]);
-    }
-
-    private function printPenjualanKasir($filters)
+    private function printRekapitulasiTransaksi(Request $request)
     {
         $filters = $request->input('tableFilters', []);
         
@@ -1890,5 +1680,215 @@ class ReportPrintController extends Controller
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>'.number_format($t_nominal, 0, ',', '.').'</strong>', '<strong>'.number_format($t_terpakai, 0, ',', '.').'</strong>', '', ''];
 
         return view('print.reports.generic', ['title' => 'Daftar Klaim & Potongan Pemasok', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printLaporanHpp(Request $request)
+    {
+        $filters = $request->input('tableFilters', []);
+        $activeTab = $request->input('activeTab', 'item');
+        $branchId = $filters['branch_id']['value'] ?? auth()->user()->branch_id;
+        $search = $filters['search']['value'] ?? null;
+        
+        $dateFilter = $filters['date_filter'] ?? [];
+        $period = $dateFilter['period'] ?? 'today';
+        $from = null;
+        $until = null;
+        
+        if ($period === 'today') {
+            $from = Carbon::today();
+            $until = Carbon::today()->endOfDay();
+        } elseif ($period === 'yesterday') {
+            $from = Carbon::yesterday();
+            $until = Carbon::yesterday()->endOfDay();
+        } elseif ($period === 'this_week') {
+            $from = Carbon::now()->startOfWeek();
+            $until = Carbon::now()->endOfWeek();
+        } elseif ($period === 'last_week') {
+            $from = Carbon::now()->subWeek()->startOfWeek();
+            $until = Carbon::now()->subWeek()->endOfWeek();
+        } elseif ($period === 'this_month') {
+            $from = Carbon::now()->startOfMonth();
+            $until = Carbon::now()->endOfMonth();
+        } elseif ($period === 'last_month') {
+            $from = Carbon::now()->subMonth()->startOfMonth();
+            $until = Carbon::now()->subMonth()->endOfMonth();
+        } elseif ($period === 'custom') {
+            $from = !empty($dateFilter['created_from']) ? Carbon::parse($dateFilter['created_from'])->startOfDay() : Carbon::parse('2000-01-01');
+            $until = !empty($dateFilter['created_until']) ? Carbon::parse($dateFilter['created_until'])->endOfDay() : Carbon::now()->endOfDay();
+        }
+        
+        $whereClause = "t.transaction_date >= ? AND t.transaction_date <= ?";
+        $bindings = [$from, $until];
+        
+        if ($branchId) {
+            $whereClause .= " AND t.branch_id = ?";
+            $bindings[] = $branchId;
+        }
+
+        if ($search) {
+            $whereClause .= " AND (p.name LIKE ? OR p.sku LIKE ? OR c.name LIKE ? OR p.sub_category LIKE ?)";
+            $searchPattern = '%' . $search . '%';
+            $bindings[] = $searchPattern;
+            $bindings[] = $searchPattern;
+            $bindings[] = $searchPattern;
+            $bindings[] = $searchPattern;
+        }
+
+        if ($activeTab === 'item') {
+            $sql = "
+                SELECT 
+                    p.sku as barcode, p.name as item_name, p.unit_of_measure as unit,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity ELSE 0 END) as sales_qty,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as cogs_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity ELSE 0 END) as return_qty,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as return_cogs_amount
+                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
+                WHERE t.is_voided = 0 AND $whereClause GROUP BY p.id, p.sku, p.name, p.unit_of_measure ORDER BY p.name ASC
+            ";
+            $columns = ['Barcode', 'Nama Item', 'Satuan', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
+        } elseif ($activeTab === 'category') {
+            $sql = "
+                SELECT 
+                    c.id as category_id, COALESCE(c.name, 'Tanpa Kategori') as category_name,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as cogs_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as return_cogs_amount
+                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
+                WHERE t.is_voided = 0 AND $whereClause GROUP BY c.id, COALESCE(c.name, 'Tanpa Kategori') ORDER BY category_name ASC
+            ";
+            $columns = ['Kode Kategori', 'Kelompok Barang', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
+        } elseif ($activeTab === 'subcategory') {
+            $sql = "
+                SELECT 
+                    c.id as category_id, COALESCE(c.name, 'Tanpa Kategori') as category_name, p.sub_category,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as cogs_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as return_cogs_amount
+                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
+                WHERE t.is_voided = 0 AND $whereClause GROUP BY c.id, COALESCE(c.name, 'Tanpa Kategori'), p.sub_category ORDER BY category_name ASC, p.sub_category ASC
+            ";
+            $columns = ['Sub Kategori', 'Kategori Induk', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
+        } elseif ($activeTab === 'yearly') {
+            $sql = "
+                SELECT 
+                    DATE_FORMAT(t.transaction_date, '%Y-%m') as tgl,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as cogs_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as return_cogs_amount
+                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
+                WHERE t.is_voided = 0 AND $whereClause GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m') ORDER BY tgl ASC
+            ";
+            $columns = ['Bulan', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
+        } else {
+            // monthly
+            $sql = "
+                SELECT 
+                    DATE(t.transaction_date) as tgl,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
+                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as cogs_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
+                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
+                    ) ELSE 0 END) as return_cogs_amount
+                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
+                WHERE t.is_voided = 0 AND $whereClause GROUP BY DATE(t.transaction_date) ORDER BY tgl ASC
+            ";
+            $columns = ['Tanggal', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
+        }
+
+        $results = collect(\Illuminate\Support\Facades\DB::select($sql, $bindings));
+        $rows = [];
+        $t_sales = 0; $t_cogs = 0; $t_return = 0; $t_return_cogs = 0; $t_profit = 0;
+
+        foreach ($results as $row) {
+            $netSales = $row->sales_amount - $row->return_amount;
+            $netCogs = $row->cogs_amount - $row->return_cogs_amount;
+            $profit = $netSales - $netCogs;
+            $margin = $row->sales_amount > 0 ? round(($profit / $row->sales_amount) * 100, 2) : 0;
+            
+            $t_sales += $row->sales_amount;
+            $t_cogs += $row->cogs_amount;
+            $t_return += $row->return_amount;
+            $t_return_cogs += $row->return_cogs_amount;
+            $t_profit += $profit;
+
+            $rowData = [];
+            if ($activeTab === 'item') {
+                $rowData = [$row->barcode, $row->item_name, $row->unit];
+            } elseif ($activeTab === 'category') {
+                $rowData = [$row->category_id, $row->category_name];
+            } elseif ($activeTab === 'subcategory') {
+                $rowData = [$row->sub_category ?: '-', $row->category_name];
+            } elseif ($activeTab === 'monthly') {
+                $rowData = [Carbon::parse($row->tgl)->translatedFormat('l, d-F-Y')];
+            } elseif ($activeTab === 'yearly') {
+                $rowData = [Carbon::parse($row->tgl . '-01')->translatedFormat('F Y')];
+            }
+            
+            $rowData = array_merge($rowData, [
+                number_format($row->sales_amount, 0, ',', '.'),
+                number_format($row->cogs_amount, 0, ',', '.'),
+                number_format($row->return_amount, 0, ',', '.'),
+                number_format($row->return_cogs_amount, 0, ',', '.'),
+                number_format($profit, 0, ',', '.'),
+                $margin . '%'
+            ]);
+            $rows[] = $rowData;
+        }
+        
+        $totalMargin = $t_sales > 0 ? round(($t_profit / $t_sales) * 100, 2) : 0;
+        $totalRow = ['<strong>TOTAL KESELURUHAN</strong>'];
+        if ($activeTab === 'item') { $totalRow[] = ''; $totalRow[] = ''; }
+        elseif ($activeTab === 'category' || $activeTab === 'subcategory') { $totalRow[] = ''; }
+
+        $totalRow = array_merge($totalRow, [
+            '<strong>'.number_format($t_sales, 0, ',', '.').'</strong>',
+            '<strong>'.number_format($t_cogs, 0, ',', '.').'</strong>',
+            '<strong>'.number_format($t_return, 0, ',', '.').'</strong>',
+            '<strong>'.number_format($t_return_cogs, 0, ',', '.').'</strong>',
+            '<strong>'.number_format($t_profit, 0, ',', '.').'</strong>',
+            '<strong>'.$totalMargin.'%</strong>'
+        ]);
+        $rows[] = $totalRow;
+
+        return view('print.reports.generic', [
+            'title' => 'Rekapitulasi Harga Pokok Penjualan (HPP)',
+            'period' => $this->getPeriodString(['date_filter' => $dateFilter], 'date_filter'),
+            'columns' => $columns,
+            'rows' => $rows
+        ]);
     }
 }
