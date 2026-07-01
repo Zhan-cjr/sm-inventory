@@ -82,6 +82,7 @@ class StockImporter extends Importer
                         static::$productCache[$state] = Product::where('sku', $state)
                             ->orWhere('barcode', $state)
                             ->orWhere('id', $state)
+                            ->orWhereJsonContains('metadata->additional_barcodes', $state)
                             ->value('id');
                     }
                     $record->product_id = static::$productCache[$state] ?? $state;
@@ -219,6 +220,7 @@ class StockImporter extends Importer
             static::$productCache[$productState] = Product::where('sku', $productState)
                 ->orWhere('barcode', $productState)
                 ->orWhere('id', $productState)
+                ->orWhereJsonContains('metadata->additional_barcodes', $productState)
                 ->value('id');
         }
         $productId = static::$productCache[$productState];
