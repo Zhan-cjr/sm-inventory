@@ -54,6 +54,13 @@ class ProductForm
                     ->disabled($isBranchUser),
                 TextInput::make('sub_category')
                     ->label('Sub Kategori')
+                    ->datalist(function () {
+                        return \App\Models\Product::whereNotNull('sub_category')
+                            ->where('sub_category', '!=', '')
+                            ->distinct()
+                            ->pluck('sub_category')
+                            ->toArray();
+                    })
                     ->disabled($isBranchUser),
                 Select::make('product_type')
                     ->label('Tipe Produk')
