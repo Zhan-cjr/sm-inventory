@@ -46,6 +46,12 @@
                 icon="heroicon-o-calendar-days">
                 Bulanan / Harian
             </x-filament::tabs.item>
+            <x-filament::tabs.item 
+                :active="$activeTab === 'yearly'" 
+                wire:click="setActiveTab('yearly')"
+                icon="heroicon-o-calendar">
+                Tahunan
+            </x-filament::tabs.item>
         </x-filament::tabs>
 
         <script>
@@ -133,6 +139,10 @@
                                 @elseif($activeTab === 'monthly')
                                     <td class="font-bold">
                                         {{ \Carbon\Carbon::parse($row->tgl)->translatedFormat('l, d-F-Y') }}
+                                    </td>
+                                @elseif($activeTab === 'yearly')
+                                    <td class="font-bold">
+                                        {{ \Carbon\Carbon::parse($row->bulan . '-01')->translatedFormat('F Y') }}
                                     </td>
                                 @endif
                                 

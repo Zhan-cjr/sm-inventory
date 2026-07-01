@@ -154,6 +154,8 @@ class LaporanHpp extends Page implements HasForms
             return $this->getSubCategoryData($whereClause, $bindings);
         } elseif ($this->activeTab === 'monthly') {
             return $this->getMonthlyData($whereClause, $bindings);
+        } elseif ($this->activeTab === 'yearly') {
+            return $this->getYearlyData($whereClause, $bindings);
         }
         
         return collect([]);
@@ -313,6 +315,43 @@ class LaporanHpp extends Page implements HasForms
         return collect(DB::select($sql, $bindings));
     }
 
+    private function getYearlyData($whereClause, $bindings)
+    {
+        $sql = "
+            SELECT 
+                DATE_FORMAT(t.transaction_date, '%Y-%m') as bulan,
+                
+                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
+                
+                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                    FROM stock_batch_deductions sbd
+                    JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
+                    WHERE sbd.transaction_item_id = ti.id
+                ) ELSE 0 END) as cogs_amount,
+
+                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
+                
+                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                    FROM stock_batch_deductions sbd
+                    JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
+                    WHERE sbd.transaction_item_id = ti.id
+                ) ELSE 0 END) as return_cogs_amount
+
+            FROM transaction_items ti
+            JOIN transactions t ON ti.transaction_id = t.id
+            JOIN products p ON ti.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
+            WHERE t.is_voided = 0 AND $whereClause
+            GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m')
+            ORDER BY bulan ASC
+        ";
+
+        return collect(DB::select($sql, $bindings));
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -352,6 +391,8 @@ class LaporanHpp extends Page implements HasForms
                             fputcsv($file, ['Sub Kategori', 'Kategori Induk', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %']);
                         } elseif ($this->activeTab === 'monthly') {
                             fputcsv($file, ['Tanggal', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %']);
+                        } elseif ($this->activeTab === 'yearly') {
+                            fputcsv($file, ['Bulan', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %']);
                         }
 
                         // Data rows
@@ -369,6 +410,8 @@ class LaporanHpp extends Page implements HasForms
                                 fputcsv($file, [$row->sub_category ?: '-', $row->category_name, $row->sales_amount, $row->cogs_amount, $row->return_amount, $row->return_cogs_amount, $profit, $margin . '%']);
                             } elseif ($this->activeTab === 'monthly') {
                                 fputcsv($file, [\Carbon\Carbon::parse($row->tgl)->format('Y-m-d'), $row->sales_amount, $row->cogs_amount, $row->return_amount, $row->return_cogs_amount, $profit, $margin . '%']);
+                            } elseif ($this->activeTab === 'yearly') {
+                                fputcsv($file, [\Carbon\Carbon::parse($row->bulan . '-01')->format('Y-m'), $row->sales_amount, $row->cogs_amount, $row->return_amount, $row->return_cogs_amount, $profit, $margin . '%']);
                             }
                         }
                         
