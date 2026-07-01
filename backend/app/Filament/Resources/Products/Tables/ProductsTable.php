@@ -52,6 +52,7 @@ class ProductsTable
                         $q->where('name', 'like', "%{$search}%")
                           ->orWhere('sku', 'like', "%{$search}%")
                           ->orWhere('barcode', 'like', "%{$search}%")
+                          ->orWhere('metadata->additional_barcodes', 'like', "%{$search}%")
                           ->orWhereHas('stocks.racks', function ($q2) use ($search) {
                               $q2->where('rack_code', 'like', "%{$search}%");
                           });

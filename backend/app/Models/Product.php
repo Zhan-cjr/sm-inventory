@@ -20,6 +20,7 @@ class Product extends Model
             'sku' => $this->sku,
             'barcode' => $this->barcode,
             'category' => $this->category ? $this->category->name : '',
+            'additional_barcodes' => isset($this->metadata['additional_barcodes']) ? implode(', ', $this->metadata['additional_barcodes']) : '',
             'product_type' => $this->product_type,
             'is_active' => $this->is_active,
         ];

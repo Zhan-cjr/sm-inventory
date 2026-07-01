@@ -59,6 +59,11 @@ class ProductForm
                         'unique' => 'Barcode ini sudah digunakan oleh produk lain.',
                     ])
                     ->disabled($isBranchUser),
+                \Filament\Forms\Components\TagsInput::make('metadata.additional_barcodes')
+                    ->label('Barcode Tambahan (Multi Barcode)')
+                    ->placeholder('Ketik barcode lalu tekan enter')
+                    ->splitKeys(['Enter', 'Tab', ','])
+                    ->disabled($isBranchUser),
                 TextInput::make('name')
                     ->required()
                     ->disabled($isBranchUser),
