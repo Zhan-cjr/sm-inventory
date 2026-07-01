@@ -36,6 +36,21 @@ class ProductForm
                     ->validationMessages([
                         'unique' => 'SKU ini sudah digunakan oleh produk lain.',
                     ])
+                    ->default(function () {
+                        $prefix = 'SKU-' . date('dmy');
+                        $lastProduct = \App\Models\Product::where('sku', 'like', $prefix . '%')
+                            ->orderBy('sku', 'desc')
+                            ->first();
+                        
+                        if ($lastProduct) {
+                            // Extract the last 4 digits
+                            $lastNumber = (int) substr($lastProduct->sku, -4);
+                            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+                            return $prefix . $newNumber;
+                        }
+                        
+                        return $prefix . '0001';
+                    })
                     ->readOnly(fn (string $operation): bool => $operation === 'edit')
                     ->disabled($isBranchUser),
                 TextInput::make('barcode')
