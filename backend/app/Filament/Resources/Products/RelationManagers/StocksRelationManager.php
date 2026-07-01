@@ -84,6 +84,16 @@ class StocksRelationManager extends RelationManager
                                     $set('selling_price', $price);
                                 }),
                             \Filament\Forms\Components\TextInput::make('harga_jual_1')->label('Harga Jual Gol 1')->rupiah()->default(0)->live(onBlur: true)
+                                ->rules([
+                                    fn (\Filament\Schemas\Components\Utilities\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        if (! $value) return;
+                                        $cost = (float) str_replace(',', '.', str_replace('.', '', (string) $get('cost_price_tax')));
+                                        $price = (float) str_replace(',', '.', str_replace('.', '', (string) $value));
+                                        if ($cost > 0 && $price < $cost) {
+                                            $fail('Harga Jual tidak boleh lebih kecil dari Harga Beli + PPN.');
+                                        }
+                                    }
+                                ])
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                     $cost = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
                                     $price = (float) str_replace(',', '.', str_replace('.', '', $state));
@@ -104,6 +114,16 @@ class StocksRelationManager extends RelationManager
                                     $set('harga_jual_2', str_replace('.', ',', (string)$price));
                                 }),
                             \Filament\Forms\Components\TextInput::make('harga_jual_2')->label('Harga Jual Gol 2')->rupiah()->live(onBlur: true)
+                                ->rules([
+                                    fn (\Filament\Schemas\Components\Utilities\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        if (! $value) return;
+                                        $cost = (float) str_replace(',', '.', str_replace('.', '', (string) $get('cost_price_tax')));
+                                        $price = (float) str_replace(',', '.', str_replace('.', '', (string) $value));
+                                        if ($cost > 0 && $price < $cost) {
+                                            $fail('Harga Jual tidak boleh lebih kecil dari Harga Beli + PPN.');
+                                        }
+                                    }
+                                ])
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                     $cost = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
                                     if ($cost > 0) {
@@ -123,6 +143,16 @@ class StocksRelationManager extends RelationManager
                                     $set('harga_jual_3', str_replace('.', ',', (string)$price));
                                 }),
                             \Filament\Forms\Components\TextInput::make('harga_jual_3')->label('Harga Jual Gol 3')->rupiah()->live(onBlur: true)
+                                ->rules([
+                                    fn (\Filament\Schemas\Components\Utilities\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        if (! $value) return;
+                                        $cost = (float) str_replace(',', '.', str_replace('.', '', (string) $get('cost_price_tax')));
+                                        $price = (float) str_replace(',', '.', str_replace('.', '', (string) $value));
+                                        if ($cost > 0 && $price < $cost) {
+                                            $fail('Harga Jual tidak boleh lebih kecil dari Harga Beli + PPN.');
+                                        }
+                                    }
+                                ])
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                     $cost = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
                                     if ($cost > 0) {
