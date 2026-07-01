@@ -52,14 +52,23 @@ class ProductForm
                     ->searchable()
                     ->preload()
                     ->disabled($isBranchUser),
-                TextInput::make('sub_category')
+                Select::make('sub_category')
                     ->label('Sub Kategori')
-                    ->datalist(function () {
+                    ->options(function () {
                         return \App\Models\Product::whereNotNull('sub_category')
                             ->where('sub_category', '!=', '')
                             ->distinct()
-                            ->pluck('sub_category')
+                            ->pluck('sub_category', 'sub_category')
                             ->toArray();
+                    })
+                    ->searchable()
+                    ->createOptionForm([
+                        \Filament\Forms\Components\TextInput::make('sub_category')
+                            ->label('Sub Kategori Baru')
+                            ->required(),
+                    ])
+                    ->createOptionUsing(function (array $data) {
+                        return $data['sub_category'];
                     })
                     ->disabled($isBranchUser),
                 Select::make('product_type')
