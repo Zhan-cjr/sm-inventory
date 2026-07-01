@@ -35,13 +35,26 @@
                 Per Kelompok Barang
             </x-filament::tabs.item>
             <x-filament::tabs.item 
+                :active="$activeTab === 'subcategory'" 
+                wire:click="setActiveTab('subcategory')"
+                icon="heroicon-o-bars-3-bottom-left">
+                Per Sub Kategori
+            </x-filament::tabs.item>
+            <x-filament::tabs.item 
                 :active="$activeTab === 'monthly'" 
                 wire:click="setActiveTab('monthly')"
-                icon="heroicon-o-calendar-days"
-            >
+                icon="heroicon-o-calendar-days">
                 Bulanan / Harian
             </x-filament::tabs.item>
         </x-filament::tabs>
+
+        <script>
+            document.addEventListener('livewire:initialized', () => {
+                Livewire.on('print-window', (event) => {
+                    setTimeout(() => { window.print(); }, 500);
+                });
+            });
+        </script>
 
         <style>
             .hpp-table { width: 100%; border-collapse: collapse; text-align: left; }
@@ -57,6 +70,20 @@
             .dark .text-red { color: #ef4444 !important; }
             .dark .text-green { color: #22c55e !important; }
             .font-bold { font-weight: bold !important; }
+            
+            .hpp-tfoot { background-color: rgba(243, 244, 246, 0.8); border-top: 2px solid #d1d5db; }
+            .dark .hpp-tfoot { background-color: rgba(31, 41, 55, 0.8); border-top: 2px solid #374151; color: #f3f4f6; }
+
+            @media print {
+                body { background-color: #fff !important; color: #000 !important; }
+                .fi-topbar, .fi-sidebar, .fi-header-heading, .fi-tabs, form, .fi-page-header-actions { display: none !important; }
+                .fi-main { padding: 0 !important; margin: 0 !important; }
+                .hpp-table { width: 100% !important; }
+                .hpp-table th, .hpp-table td { color: #000 !important; border: 1px solid #ddd; padding: 8px; }
+                .dark .hpp-tfoot { background-color: #f3f4f6 !important; color: #000 !important; }
+                .text-green, .text-red { color: #000 !important; }
+                @page { size: landscape; margin: 10mm; }
+            }
         </style>
 
         <!-- Data Table -->
@@ -100,6 +127,9 @@
                                 @elseif($activeTab === 'category')
                                     <td>{{ str_pad($row->category_id ?? 0, 3, '0', STR_PAD_LEFT) }}</td>
                                     <td class="font-bold">{{ $row->category_name }}</td>
+                                @elseif($activeTab === 'subcategory')
+                                    <td>{{ $row->sub_category ?: '-' }}</td>
+                                    <td class="font-bold">{{ $row->category_name }}</td>
                                 @elseif($activeTab === 'monthly')
                                     <td class="font-bold">
                                         {{ \Carbon\Carbon::parse($row->tgl)->translatedFormat('l, d-F-Y') }}
@@ -123,9 +153,9 @@
                             </tr>
                         @endforelse
                     </tbody>
-                    <tfoot style="background-color: rgba(243, 244, 246, 0.8); border-top: 2px solid #d1d5db;">
+                    <tfoot class="hpp-tfoot">
                         <tr>
-                            <td colspan="{{ $activeTab === 'item' ? 3 : ($activeTab === 'category' ? 2 : 1) }}" class="text-right font-bold" style="text-align: right; padding-right: 1rem;">
+                            <td colspan="{{ $activeTab === 'item' ? 3 : ($activeTab === 'category' || $activeTab === 'subcategory' ? 2 : 1) }}" class="text-right font-bold" style="text-align: right; padding-right: 1rem;">
                                 TOTAL KESELURUHAN
                             </td>
                             <td class="text-right font-bold">{{ number_format($totals['sales'], 0, ',', '.') }}</td>

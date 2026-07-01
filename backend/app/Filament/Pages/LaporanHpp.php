@@ -74,7 +74,14 @@ class LaporanHpp extends Page implements HasForms
                         ->hidden(fn () => Auth::user()->branch_id !== null)
                         ->live()
                         ->afterStateUpdated(fn () => $this->dispatch('filterUpdated')),
-                ])
+                ]),
+                Grid::make(1)->schema([
+                    \Filament\Forms\Components\TextInput::make('search')
+                        ->label('Cari Barang / Kategori')
+                        ->placeholder('Ketik pencarian...')
+                        ->live(debounce: 500)
+                        ->afterStateUpdated(fn () => $this->dispatch('filterUpdated')),
+                ]),
             ])
             ->statePath('data');
     }
@@ -120,6 +127,7 @@ class LaporanHpp extends Page implements HasForms
     {
         [$from, $until] = $this->getDateRange();
         $branchId = $this->data['branch_id'] ?? Auth::user()->branch_id;
+        $search = $this->data['search'] ?? null;
         
         $whereClause = "t.transaction_date >= ? AND t.transaction_date <= ?";
         $bindings = [$from, $until];
@@ -129,15 +137,26 @@ class LaporanHpp extends Page implements HasForms
             $bindings[] = $branchId;
         }
 
+        if ($search) {
+            $whereClause .= " AND (p.name LIKE ? OR p.sku LIKE ? OR c.name LIKE ? OR p.sub_category LIKE ?)";
+            $searchPattern = '%' . $search . '%';
+            $bindings[] = $searchPattern;
+            $bindings[] = $searchPattern;
+            $bindings[] = $searchPattern;
+            $bindings[] = $searchPattern;
+        }
+
         if ($this->activeTab === 'item') {
             return $this->getItemData($whereClause, $bindings);
         } elseif ($this->activeTab === 'category') {
             return $this->getCategoryData($whereClause, $bindings);
+        } elseif ($this->activeTab === 'subcategory') {
+            return $this->getSubCategoryData($whereClause, $bindings);
         } elseif ($this->activeTab === 'monthly') {
             return $this->getMonthlyData($whereClause, $bindings);
         }
         
-        return [];
+        return collect([]);
     }
 
     private function getItemData($whereClause, $bindings)
@@ -170,6 +189,7 @@ class LaporanHpp extends Page implements HasForms
             FROM transaction_items ti
             JOIN transactions t ON ti.transaction_id = t.id
             JOIN products p ON ti.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
             WHERE t.is_voided = 0 AND $whereClause
             GROUP BY p.id, p.sku, p.name, p.unit_of_measure
@@ -216,6 +236,45 @@ class LaporanHpp extends Page implements HasForms
 
         return collect(DB::select($sql, $bindings));
     }
+
+    private function getSubCategoryData($whereClause, $bindings)
+    {
+        $sql = "
+            SELECT 
+                c.id as category_id,
+                COALESCE(c.name, 'Tanpa Kategori') as category_name,
+                p.sub_category,
+                
+                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
+                
+                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                    FROM stock_batch_deductions sbd
+                    JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
+                    WHERE sbd.transaction_item_id = ti.id
+                ) ELSE 0 END) as cogs_amount,
+
+                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
+                
+                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
+                    FROM stock_batch_deductions sbd
+                    JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
+                    WHERE sbd.transaction_item_id = ti.id
+                ) ELSE 0 END) as return_cogs_amount
+
+            FROM transaction_items ti
+            JOIN transactions t ON ti.transaction_id = t.id
+            JOIN products p ON ti.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
+            WHERE t.is_voided = 0 AND $whereClause
+            GROUP BY c.id, COALESCE(c.name, 'Tanpa Kategori'), p.sub_category
+            ORDER BY category_name ASC, p.sub_category ASC
+        ";
+
+        return collect(DB::select($sql, $bindings));
+    }
     
     private function getMonthlyData($whereClause, $bindings)
     {
@@ -244,6 +303,7 @@ class LaporanHpp extends Page implements HasForms
             FROM transaction_items ti
             JOIN transactions t ON ti.transaction_id = t.id
             JOIN products p ON ti.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
             WHERE t.is_voided = 0 AND $whereClause
             GROUP BY DATE(t.transaction_date)
@@ -251,5 +311,72 @@ class LaporanHpp extends Page implements HasForms
         ";
 
         return collect(DB::select($sql, $bindings));
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            \Filament\Actions\Action::make('cetak')
+                ->label('Cetak Laporan')
+                ->icon('heroicon-o-printer')
+                ->color('info')
+                ->action(function () {
+                    // Open print window by injecting JS
+                    $this->dispatch('print-window');
+                }),
+            \Filament\Actions\Action::make('export_csv')
+                ->label('Export Excel (CSV)')
+                ->icon('heroicon-o-document-arrow-down')
+                ->color('success')
+                ->action(function () {
+                    $data = $this->getReportData();
+                    $filename = "Laporan_HPP_" . $this->activeTab . "_" . date('Y-m-d') . ".csv";
+
+                    $headers = array(
+                        "Content-type"        => "text/csv",
+                        "Content-Disposition" => "attachment; filename=$filename",
+                        "Pragma"              => "no-cache",
+                        "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+                        "Expires"             => "0"
+                    );
+
+                    $callback = function() use($data) {
+                        $file = fopen('php://output', 'w');
+                        
+                        // Header row
+                        if ($this->activeTab === 'item') {
+                            fputcsv($file, ['Barcode', 'Nama Item', 'Satuan', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %']);
+                        } elseif ($this->activeTab === 'category') {
+                            fputcsv($file, ['Kode Kategori', 'Kelompok Barang', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %']);
+                        } elseif ($this->activeTab === 'subcategory') {
+                            fputcsv($file, ['Sub Kategori', 'Kategori Induk', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %']);
+                        } elseif ($this->activeTab === 'monthly') {
+                            fputcsv($file, ['Tanggal', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %']);
+                        }
+
+                        // Data rows
+                        foreach ($data as $row) {
+                            $netSales = $row->sales_amount - $row->return_amount;
+                            $netCogs = $row->cogs_amount - $row->return_cogs_amount;
+                            $profit = $netSales - $netCogs;
+                            $margin = $row->sales_amount > 0 ? round(($profit / $row->sales_amount) * 100, 2) : 0;
+
+                            if ($this->activeTab === 'item') {
+                                fputcsv($file, [$row->barcode, $row->item_name, $row->unit, $row->sales_amount, $row->cogs_amount, $row->return_amount, $row->return_cogs_amount, $profit, $margin . '%']);
+                            } elseif ($this->activeTab === 'category') {
+                                fputcsv($file, [$row->category_id, $row->category_name, $row->sales_amount, $row->cogs_amount, $row->return_amount, $row->return_cogs_amount, $profit, $margin . '%']);
+                            } elseif ($this->activeTab === 'subcategory') {
+                                fputcsv($file, [$row->sub_category ?: '-', $row->category_name, $row->sales_amount, $row->cogs_amount, $row->return_amount, $row->return_cogs_amount, $profit, $margin . '%']);
+                            } elseif ($this->activeTab === 'monthly') {
+                                fputcsv($file, [\Carbon\Carbon::parse($row->tgl)->format('Y-m-d'), $row->sales_amount, $row->cogs_amount, $row->return_amount, $row->return_cogs_amount, $profit, $margin . '%']);
+                            }
+                        }
+                        
+                        fclose($file);
+                    };
+
+                    return response()->stream($callback, 200, $headers);
+                }),
+        ];
     }
 }
