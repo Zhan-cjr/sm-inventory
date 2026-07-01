@@ -1328,11 +1328,11 @@ export const POSTransaction = ({
     }
 
     if (existingItem) {
-      setItems(items.map(i =>
-        (i.productId === product.id && i.customerNo === customerNo) ? { ...i, quantity: i.quantity + qtyToAdd, manualDiscount: manualDiscount || i.manualDiscount } : i
-      ));
+      const updatedItem = { ...existingItem, quantity: existingItem.quantity + qtyToAdd, manualDiscount: manualDiscount || existingItem.manualDiscount };
+      const otherItems = items.filter(i => !(i.productId === product.id && i.customerNo === customerNo));
+      setItems([updatedItem, ...otherItems]);
     } else {
-      setItems([...items, {
+      setItems([{
         productId: product.id,
         categoryId: product.category_id,
         sku: product.sku,
@@ -1344,7 +1344,7 @@ export const POSTransaction = ({
         isService: product.is_service || false,
         productType: product.product_type || 'physical',
         customerNo: customerNo
-      }]);
+      }, ...items]);
     }
 
     // AI Upsell Recommendation Logic
@@ -1575,7 +1575,7 @@ export const POSTransaction = ({
   };
 
   const handleReturnSuccess = (returnItems, originalReceiptId) => {
-    setItems(prev => [...prev, ...returnItems]);
+    setItems(prev => [...returnItems, ...prev]);
     setIsReturnMode(true);
     setIsReturnModalOpen(false);
     setAlertMsg({ text: `Mode Retur Aktif untuk Nota: ${originalReceiptId}`, type: 'info', persist: true });
