@@ -900,12 +900,42 @@ export const POSTransaction = ({
   const handleInputChange = (val) => {
     setInputValue(val);
     if (!isSubtotalMode && val.length > 1) {
-      const filtered = dbProducts.filter(p =>
-        p.name.toLowerCase().includes(val.toLowerCase()) ||
-        p.sku.toLowerCase().includes(val.toLowerCase()) ||
-        p.barcode?.toLowerCase().includes(val.toLowerCase())
-      ).slice(0, 10);
-      setSearchResults(filtered);
+      const lowerVal = val.toLowerCase();
+      
+      // Check for exact barcode or sku match first (isolated result)
+      const exactMatches = dbProducts.filter(p => 
+        p.barcode?.toLowerCase() === lowerVal || 
+        p.sku.toLowerCase() === lowerVal
+      );
+      
+      if (exactMatches.length > 0) {
+        setSearchResults(exactMatches);
+        setHighlightedIndex(-1);
+        return;
+      }
+
+      // If no exact barcode/sku, score and sort the results
+      const scored = dbProducts.map(p => {
+        let score = 0;
+        const name = p.name.toLowerCase();
+        const sku = p.sku.toLowerCase();
+        const barcode = p.barcode?.toLowerCase() || '';
+
+        if (name === lowerVal) score = 100;
+        else if (name.startsWith(lowerVal)) score = 80;
+        else if (sku.startsWith(lowerVal)) score = 70;
+        else if (barcode.startsWith(lowerVal)) score = 60;
+        else if (name.includes(lowerVal)) score = 40;
+        else if (sku.includes(lowerVal)) score = 30;
+        else if (barcode.includes(lowerVal)) score = 20;
+
+        return { product: p, score };
+      }).filter(item => item.score > 0);
+
+      // Sort descending by score
+      scored.sort((a, b) => b.score - a.score);
+
+      setSearchResults(scored.slice(0, 10).map(item => item.product));
       setHighlightedIndex(-1);
     } else {
       setSearchResults([]);
