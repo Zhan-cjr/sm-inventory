@@ -146,7 +146,7 @@ class LaporanHpp extends Page implements HasForms
             SELECT 
                 p.sku as barcode,
                 p.name as item_name,
-                p.unit as unit,
+                p.unit_of_measure as unit,
                 SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity ELSE 0 END) as sales_qty,
                 SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
                 
@@ -171,7 +171,7 @@ class LaporanHpp extends Page implements HasForms
             JOIN transactions t ON ti.transaction_id = t.id
             JOIN products p ON ti.product_id = p.id
             WHERE t.is_voided = 0 AND $whereClause
-            GROUP BY p.id, p.sku, p.name, p.unit
+            GROUP BY p.id, p.sku, p.name, p.unit_of_measure
             ORDER BY p.name ASC
         ";
 
