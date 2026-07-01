@@ -305,12 +305,20 @@ function App() {
   }
 
   const isManagerOrAdmin = ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SPV', 'EDP', 'SUPERADMIN', 'SUPER_ADMIN'].includes(user?.role?.toUpperCase());
+  const hasEcommerceAuth = user?.custom_authorizations?.includes('PROCESS_ECOMMERCE');
+  const hasSmartOrderAuth = user?.custom_authorizations?.includes('ACCESS_SMART_ORDER');
+  const hasBIAIAuth = user?.custom_authorizations?.includes('ACCESS_BI_AI');
+  const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) || 
+                      user?.custom_authorizations?.includes('APPROVE_PO') || 
+                      user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
+                      
+  const canAccessDashboard = isManagerOrAdmin || hasBIAIAuth;
 
   return (
     <Router>
       <Routes>
         <Route path="/" element={
-          isMobileDevice ? <Navigate to="/mobile" replace /> : (isManagerOrAdmin ? <Navigate to="/dashboard" replace /> : (user.can_access_pos ? <Navigate to="/pos" replace /> : <div style={{padding:'2rem', textAlign:'center', marginTop:'10vh'}}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{padding:'10px 20px', marginTop:'20px'}}>Logout</button></div>))
+          isMobileDevice ? <Navigate to="/mobile" replace /> : (canAccessDashboard ? <Navigate to="/dashboard" replace /> : (user.can_access_pos ? <Navigate to="/pos" replace /> : <div style={{padding:'2rem', textAlign:'center', marginTop:'10vh'}}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{padding:'10px 20px', marginTop:'20px'}}>Logout</button></div>))
         } />
 
         <Route path="/pos" element={
@@ -335,7 +343,7 @@ function App() {
         } />
 
         <Route path="/dashboard" element={
-          isManagerOrAdmin ? (
+          canAccessDashboard ? (
             <BIDashboard user={user} authToken={token} onBack={() => window.location.href='/mobile'} />
           ) : <Navigate to="/pos" replace />
         } />
@@ -343,12 +351,12 @@ function App() {
         <Route path="/mobile" element={
           user ? <MobileLayout user={user} onLogout={handleLogout} /> : <Navigate to="/" replace />
         }>
-          <Route index element={<Navigate to={(!isManagerOrAdmin) ? "scanner" : "dashboard"} replace />} />
-          <Route path="dashboard" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileDashboard user={user} authToken={token} />} />
+          <Route index element={<Navigate to={(!canAccessDashboard) ? "scanner" : "dashboard"} replace />} />
+          <Route path="dashboard" element={(!canAccessDashboard) ? <Navigate to="/mobile/scanner" replace /> : <MobileDashboard user={user} authToken={token} />} />
           <Route path="scanner" element={<MobileProductScanner user={user} authToken={token} />} />
-          <Route path="auth" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileAuthQueue user={user} authToken={token} />} />
-          <Route path="ecommerce" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileEcommerceQueue user={user} authToken={token} />} />
-          <Route path="suggested-orders" element={(!isManagerOrAdmin) ? <Navigate to="/mobile/scanner" replace /> : <MobileSuggestedOrders user={user} authToken={token} />} />
+          <Route path="auth" element={(!isManagerOrAdmin && !hasAuthMenu) ? <Navigate to="/mobile/scanner" replace /> : <MobileAuthQueue user={user} authToken={token} />} />
+          <Route path="ecommerce" element={(!isManagerOrAdmin && !hasEcommerceAuth) ? <Navigate to="/mobile/scanner" replace /> : <MobileEcommerceQueue user={user} authToken={token} />} />
+          <Route path="suggested-orders" element={(!isManagerOrAdmin && !hasSmartOrderAuth) ? <Navigate to="/mobile/scanner" replace /> : <MobileSuggestedOrders user={user} authToken={token} />} />
         </Route>
       </Routes>
     </Router>
