@@ -40,6 +40,24 @@ class ProductsTable
                 }
 
                 $query->with('stocks.racks');
+                
+                // Prioritize exact barcode or sku match in global search if search term exists
+                $search = $livewire->getTableSearch();
+                if ($search) {
+                    $query->orderByRaw("CASE WHEN barcode = ? THEN 1 WHEN sku = ? THEN 2 ELSE 3 END", [$search, $search]);
+                    
+                    // Force exact phrase match across the searchable columns
+                    // to prevent Filament's default behavior of splitting words and returning irrelevant results.
+                    $query->where(function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                          ->orWhere('sku', 'like', "%{$search}%")
+                          ->orWhere('barcode', 'like', "%{$search}%")
+                          ->orWhereHas('stocks.racks', function ($q2) use ($search) {
+                              $q2->where('rack_code', 'like', "%{$search}%");
+                          });
+                    });
+                }
+
                 return $query->withSum('stocks', 'quantity_on_hand');
             })
             ->columns([
