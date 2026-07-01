@@ -95,9 +95,12 @@ class AutoDiscontinueProducts extends Command
         // Global Discontinue Check
         $globalDiscontinuedCount = 0;
         if (!$isDryRun) {
-            // Find products that are active but have NO active stocks in ANY branch
+            // Find products that are active but have NO active stocks in ANY branch, 
+            // AND the product is older than the threshold (e.g., 6 months).
+            // This prevents newly imported master products from being instantly disabled.
             $inactiveProducts = DB::table('products')
                 ->where('is_active', true)
+                ->where('created_at', '<', $thresholdDate)
                 ->whereNotExists(function ($query) {
                     $query->select(DB::raw(1))
                         ->from('stocks')
