@@ -6,6 +6,7 @@ use App\Filament\Imports\ProductImporter;
 use App\Filament\Resources\Products\ProductResource;
 use Filament\Actions\CreateAction;
 use Filament\Actions\ImportAction;
+use Filament\Actions\ExportAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListProducts extends ListRecords
@@ -28,6 +29,11 @@ class ListProducts extends ListRecords
                 ->icon('heroicon-o-building-storefront')
                 ->color('info')
                 ->visible(!$isBranchUser),
+            ExportAction::make('export_products')
+                ->label('Export Excel')
+                ->exporter(\App\Filament\Exports\ProductExporter::class)
+                ->icon('heroicon-o-document-arrow-down')
+                ->color('success'),
             CreateAction::make()
                 ->visible(!$isBranchUser),
         ];

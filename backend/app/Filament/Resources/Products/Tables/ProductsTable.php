@@ -107,7 +107,13 @@ class ProductsTable
                 \Filament\Tables\Filters\SelectFilter::make('branch')
                     ->label('Cabang')
                     ->relationship('stocks.branch', 'name')
-                    ->hidden(fn () => auth()->user()->branch_id !== null)
+                    ->hidden(fn () => auth()->user()->branch_id !== null),
+                \Filament\Tables\Filters\TernaryFilter::make('is_active')
+                    ->label('Status Produk')
+                    ->placeholder('Semua Produk')
+                    ->trueLabel('Produk Aktif')
+                    ->falseLabel('Produk Non Aktif')
+                    ->default(true),
             ])
             ->headerActions([])
             ->recordActions([

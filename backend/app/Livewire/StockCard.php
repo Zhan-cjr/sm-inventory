@@ -34,7 +34,7 @@ class StockCard extends Component
         $query = InventoryLog::where('product_id', $this->productId)
             ->where('branch_id', $effectiveBranchId);
 
-        $logs = $query->latest('id')->paginate(10);
+        $logs = $query->latest()->paginate(10);
 
         return view('livewire.stock-card', [
             'logs' => $logs,
