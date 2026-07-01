@@ -43,32 +43,48 @@
             </x-filament::tabs.item>
         </x-filament::tabs>
 
+        <style>
+            .hpp-table { width: 100%; border-collapse: collapse; text-align: left; }
+            .hpp-table th { padding: 12px 16px; background-color: rgba(243, 244, 246, 0.5); font-weight: 600; font-size: 0.875rem; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+            .hpp-table td { padding: 12px 16px; font-size: 0.875rem; border-bottom: 1px solid #e5e7eb; }
+            .hpp-table tr:hover { background-color: #f9fafb; }
+            .dark .hpp-table th { background-color: rgba(31, 41, 55, 0.5); border-color: #374151; color: #f3f4f6; }
+            .dark .hpp-table td { border-color: #374151; color: #d1d5db; }
+            .dark .hpp-table tr:hover { background-color: #1f2937; }
+            .text-right { text-align: right !important; }
+            .text-red { color: #dc2626 !important; }
+            .text-green { color: #16a34a !important; }
+            .dark .text-red { color: #ef4444 !important; }
+            .dark .text-green { color: #22c55e !important; }
+            .font-bold { font-weight: bold !important; }
+        </style>
+
         <!-- Data Table -->
         <x-filament::card>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-800">
+            <div style="overflow-x: auto;">
+                <table class="hpp-table">
+                    <thead>
                         <tr>
                             @if($activeTab === 'item')
-                                <th class="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Kode/Barcode</th>
-                                <th class="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Nama Item</th>
-                                <th class="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Satuan</th>
+                                <th>Kode/Barcode</th>
+                                <th>Nama Item</th>
+                                <th>Satuan</th>
                             @elseif($activeTab === 'category')
-                                <th class="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Kode Kategori</th>
-                                <th class="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Kelompok Barang</th>
+                                <th>Kode Kategori</th>
+                                <th>Kelompok Barang</th>
                             @elseif($activeTab === 'monthly')
-                                <th class="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Tanggal</th>
+                                <th>Tanggal</th>
                             @endif
                             
-                            <th class="px-4 py-3 text-sm font-semibold text-right text-gray-900 dark:text-gray-100">Penjualan</th>
-                            <th class="px-4 py-3 text-sm font-semibold text-right text-gray-900 dark:text-gray-100">HPP</th>
-                            <th class="px-4 py-3 text-sm font-semibold text-right text-gray-900 dark:text-gray-100">Retur</th>
-                            <th class="px-4 py-3 text-sm font-semibold text-right text-gray-900 dark:text-gray-100">HPP Retur</th>
-                            <th class="px-4 py-3 text-sm font-semibold text-right text-gray-900 dark:text-gray-100">Profit / Laba Kotor</th>
-                            <th class="px-4 py-3 text-sm font-semibold text-right text-gray-900 dark:text-gray-100">% Margin</th>
+                            <th class="text-right">Penjualan</th>
+                            <th class="text-right">HPP</th>
+                            <th class="text-right">Retur</th>
+                            <th class="text-right">HPP Retur</th>
+                            <th class="text-right">Profit / Laba Kotor</th>
+                            <th class="text-right">% Margin</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
+                    <tbody>
                         @forelse($data as $row)
                             @php
                                 $netSales = $row->sales_amount - $row->return_amount;
@@ -76,48 +92,48 @@
                                 $profit = $netSales - $netCogs;
                                 $margin = $row->sales_amount > 0 ? ($profit / $row->sales_amount) * 100 : 0;
                             @endphp
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                            <tr>
                                 @if($activeTab === 'item')
-                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ $row->barcode }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ $row->item_name }}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $row->unit }}</td>
+                                    <td>{{ $row->barcode }}</td>
+                                    <td class="font-bold">{{ $row->item_name }}</td>
+                                    <td>{{ $row->unit }}</td>
                                 @elseif($activeTab === 'category')
-                                    <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ str_pad($row->category_id ?? 0, 3, '0', STR_PAD_LEFT) }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ $row->category_name }}</td>
+                                    <td>{{ str_pad($row->category_id ?? 0, 3, '0', STR_PAD_LEFT) }}</td>
+                                    <td class="font-bold">{{ $row->category_name }}</td>
                                 @elseif($activeTab === 'monthly')
-                                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    <td class="font-bold">
                                         {{ \Carbon\Carbon::parse($row->tgl)->translatedFormat('l, d-F-Y') }}
                                     </td>
                                 @endif
                                 
-                                <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{{ number_format($row->sales_amount, 0, ',', '.') }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{{ number_format($row->cogs_amount, 0, ',', '.') }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-red-600 dark:text-red-400">{{ number_format($row->return_amount, 0, ',', '.') }}</td>
-                                <td class="px-4 py-3 text-sm text-right text-red-600 dark:text-red-400">{{ number_format($row->return_cogs_amount, 0, ',', '.') }}</td>
-                                <td class="px-4 py-3 text-sm text-right font-medium {{ $profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
+                                <td class="text-right">{{ number_format($row->sales_amount, 0, ',', '.') }}</td>
+                                <td class="text-right">{{ number_format($row->cogs_amount, 0, ',', '.') }}</td>
+                                <td class="text-right text-red">{{ number_format($row->return_amount, 0, ',', '.') }}</td>
+                                <td class="text-right text-red">{{ number_format($row->return_cogs_amount, 0, ',', '.') }}</td>
+                                <td class="text-right font-bold {{ $profit >= 0 ? 'text-green' : 'text-red' }}">
                                     {{ number_format($profit, 0, ',', '.') }}
                                 </td>
-                                <td class="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{{ number_format($margin, 2, ',', '.') }}%</td>
+                                <td class="text-right">{{ number_format($margin, 2, ',', '.') }}%</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                                <td colspan="9" style="text-align: center; padding: 2rem; color: #6b7280;">
                                     Tidak ada data penjualan pada periode ini.
                                 </td>
                             </tr>
                         @endforelse
                     </tbody>
-                    <tfoot class="bg-gray-100 dark:bg-gray-800 font-bold border-t-2 border-gray-300 dark:border-gray-600">
+                    <tfoot style="background-color: rgba(243, 244, 246, 0.8); border-top: 2px solid #d1d5db;">
                         <tr>
-                            <td colspan="{{ $activeTab === 'item' ? 3 : ($activeTab === 'category' ? 2 : 1) }}" class="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
+                            <td colspan="{{ $activeTab === 'item' ? 3 : ($activeTab === 'category' ? 2 : 1) }}" class="text-right font-bold" style="text-align: right; padding-right: 1rem;">
                                 TOTAL KESELURUHAN
                             </td>
-                            <td class="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">{{ number_format($totals['sales'], 0, ',', '.') }}</td>
-                            <td class="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">{{ number_format($totals['cogs'], 0, ',', '.') }}</td>
-                            <td class="px-4 py-3 text-sm text-right text-red-600 dark:text-red-400">{{ number_format($totals['return'], 0, ',', '.') }}</td>
-                            <td class="px-4 py-3 text-sm text-right text-red-600 dark:text-red-400">{{ number_format($totals['return_cogs'], 0, ',', '.') }}</td>
-                            <td class="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">{{ number_format($totals['profit'], 0, ',', '.') }}</td>
-                            <td class="px-4 py-3 text-sm text-right text-gray-900 dark:text-gray-100">{{ number_format($totals['margin'], 2, ',', '.') }}%</td>
+                            <td class="text-right font-bold">{{ number_format($totals['sales'], 0, ',', '.') }}</td>
+                            <td class="text-right font-bold">{{ number_format($totals['cogs'], 0, ',', '.') }}</td>
+                            <td class="text-right font-bold text-red">{{ number_format($totals['return'], 0, ',', '.') }}</td>
+                            <td class="text-right font-bold text-red">{{ number_format($totals['return_cogs'], 0, ',', '.') }}</td>
+                            <td class="text-right font-bold">{{ number_format($totals['profit'], 0, ',', '.') }}</td>
+                            <td class="text-right font-bold">{{ number_format($totals['margin'], 2, ',', '.') }}%</td>
                         </tr>
                     </tfoot>
                 </table>
