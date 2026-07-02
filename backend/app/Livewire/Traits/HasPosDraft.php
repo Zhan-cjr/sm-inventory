@@ -7,11 +7,18 @@ use Filament\Notifications\Notification;
 
 trait HasPosDraft
 {
+    protected bool $isDraftCleared = false;
+
     /**
      * Save current component state to cache
      */
     public function saveDraft()
     {
+        // Don't save draft if it was just cleared in this request
+        if ($this->isDraftCleared) {
+            return;
+        }
+
         // Don't save draft if we are editing an existing record
         if (isset($this->purchaseOrder) || isset($this->goodsReceipt) || isset($this->purchaseReturn) || isset($this->stockAdjustment)) {
             return;
@@ -72,5 +79,6 @@ trait HasPosDraft
     public function clearDraft()
     {
         Cache::forget('pos_draft_' . static::class . '_' . auth()->id());
+        $this->isDraftCleared = true;
     }
 }
