@@ -54,6 +54,7 @@ class StocksRelationManager extends RelationManager
                                 ->label('Harga Beli Cabang')
                                 ->helperText('Kosongkan untuk menggunakan harga default produk')
                                 ->rupiah()
+                                ->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->cost_price))
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                     $cost = (float) str_replace(',', '.', str_replace('.', '', $state));
@@ -71,11 +72,12 @@ class StocksRelationManager extends RelationManager
                                 }),
                             \Filament\Forms\Components\TextInput::make('cost_price_tax')
                                 ->label('Harga Beli + PPN')
-                                ->rupiah(),
+                                ->rupiah()
+                                ->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->cost_price_tax)),
                         ])->columnSpanFull()->columns(2),
                         \Filament\Schemas\Components\Group::make([
-                            \Filament\Forms\Components\TextInput::make('qty_min_gol_1')->label('Min Qty Gol 1')->numeric()->default(1)->required(),
-                            \Filament\Forms\Components\TextInput::make('margin_gol_1')->label('Margin Gol 1 (%)')->numeric()->default(0)->live(onBlur: true)
+                            \Filament\Forms\Components\TextInput::make('qty_min_gol_1')->label('Min Qty Gol 1')->numeric()->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => $livewire->ownerRecord?->qty_min_gol_1 ?? 1)->required(),
+                            \Filament\Forms\Components\TextInput::make('margin_gol_1')->label('Margin Gol 1 (%)')->numeric()->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->margin_gol_1))->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                     $cost = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
                                     $margin = (float) str_replace(',', '.', str_replace('.', '', $state));
@@ -83,7 +85,7 @@ class StocksRelationManager extends RelationManager
                                     $set('harga_jual_1', str_replace('.', ',', (string)$price));
                                     $set('selling_price', $price);
                                 }),
-                            \Filament\Forms\Components\TextInput::make('harga_jual_1')->label('Harga Jual Gol 1')->rupiah()->default(0)->live(onBlur: true)
+                            \Filament\Forms\Components\TextInput::make('harga_jual_1')->label('Harga Jual Gol 1')->rupiah()->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->harga_jual_1))->live(onBlur: true)
                                 ->rules([
                                     fn (\Filament\Schemas\Components\Utilities\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
                                         if (! $value) return;
@@ -105,15 +107,15 @@ class StocksRelationManager extends RelationManager
                                 }),
                         ])->columns(3)->columnSpanFull(),
                         \Filament\Schemas\Components\Group::make([
-                            \Filament\Forms\Components\TextInput::make('qty_min_gol_2')->label('Min Qty Gol 2')->numeric(),
-                            \Filament\Forms\Components\TextInput::make('margin_gol_2')->label('Margin Gol 2 (%)')->numeric()->live(onBlur: true)
+                            \Filament\Forms\Components\TextInput::make('qty_min_gol_2')->label('Min Qty Gol 2')->numeric()->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => $livewire->ownerRecord?->qty_min_gol_2),
+                            \Filament\Forms\Components\TextInput::make('margin_gol_2')->label('Margin Gol 2 (%)')->numeric()->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->margin_gol_2))->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                     $cost = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
                                     $margin = (float) str_replace(',', '.', str_replace('.', '', $state));
                                     $price = round($cost * (1 + ($margin / 100)), 2);
                                     $set('harga_jual_2', str_replace('.', ',', (string)$price));
                                 }),
-                            \Filament\Forms\Components\TextInput::make('harga_jual_2')->label('Harga Jual Gol 2')->rupiah()->live(onBlur: true)
+                            \Filament\Forms\Components\TextInput::make('harga_jual_2')->label('Harga Jual Gol 2')->rupiah()->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->harga_jual_2))->live(onBlur: true)
                                 ->rules([
                                     fn (\Filament\Schemas\Components\Utilities\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
                                         if (! $value) return;
@@ -134,15 +136,15 @@ class StocksRelationManager extends RelationManager
                                 }),
                         ])->columns(3)->columnSpanFull(),
                         \Filament\Schemas\Components\Group::make([
-                            \Filament\Forms\Components\TextInput::make('qty_min_gol_3')->label('Min Qty Gol 3')->numeric(),
-                            \Filament\Forms\Components\TextInput::make('margin_gol_3')->label('Margin Gol 3 (%)')->numeric()->live(onBlur: true)
+                            \Filament\Forms\Components\TextInput::make('qty_min_gol_3')->label('Min Qty Gol 3')->numeric()->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => $livewire->ownerRecord?->qty_min_gol_3),
+                            \Filament\Forms\Components\TextInput::make('margin_gol_3')->label('Margin Gol 3 (%)')->numeric()->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->margin_gol_3))->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                     $cost = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
                                     $margin = (float) str_replace(',', '.', str_replace('.', '', $state));
                                     $price = round($cost * (1 + ($margin / 100)), 2);
                                     $set('harga_jual_3', str_replace('.', ',', (string)$price));
                                 }),
-                            \Filament\Forms\Components\TextInput::make('harga_jual_3')->label('Harga Jual Gol 3')->rupiah()->live(onBlur: true)
+                            \Filament\Forms\Components\TextInput::make('harga_jual_3')->label('Harga Jual Gol 3')->rupiah()->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->harga_jual_3))->live(onBlur: true)
                                 ->rules([
                                     fn (\Filament\Schemas\Components\Utilities\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
                                         if (! $value) return;
@@ -162,7 +164,7 @@ class StocksRelationManager extends RelationManager
                                     }
                                 }),
                         ])->columns(3)->columnSpanFull(),
-                        \Filament\Forms\Components\Hidden::make('selling_price')->default(0)
+                        \Filament\Forms\Components\Hidden::make('selling_price')->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => $livewire->ownerRecord?->harga_jual_1 ?? 0)
                     ]),
                 TextInput::make('quantity_on_hand')
                     ->label('Stok Saat Ini')
