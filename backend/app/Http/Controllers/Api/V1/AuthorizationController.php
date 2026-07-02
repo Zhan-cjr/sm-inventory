@@ -87,30 +87,23 @@ class AuthorizationController extends Controller
     {
         $user = $request->user();
         
-        $spatieRoles = array_map('strtolower', $user->roles->pluck('name')->toArray());
-        $dbRole = $user->role;
-        $role = $dbRole ?: 'CASHIER';
+        $hasPosAuth = is_array($user->pos_authorizations) && count($user->pos_authorizations) > 0;
 
-        // Override role if user has Spatie admin roles
-        if (in_array('superadmin', $spatieRoles) || in_array('super_admin', $spatieRoles) || strtolower($dbRole) === 'superadmin' || strtolower($dbRole) === 'super_admin') {
-            $role = 'SUPER_ADMIN';
-        } elseif (in_array('admin', $spatieRoles) || strtolower($dbRole) === 'admin') {
-            $role = 'ADMIN';
-        }
-
-        // Ensure user is manager/supervisor/admin
-        if (!in_array(strtoupper($role), ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SUPER_ADMIN'])) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+        // Ensure user has pos_authorizations to view pending requests
+        if (!$hasPosAuth) {
+            return response()->json(['error' => 'Unauthorized: Tidak memiliki hak akses otorisasi POS'], 403);
         }
 
         $query = AuthorizationRequest::with(['cashier:id,name', 'branch:id,name'])
             ->where('status', 'PENDING')
+            ->whereIn('action', $user->pos_authorizations)
             ->where('expires_at', '>', Carbon::now());
 
         $branchId = $user->branch_id;
-        $isAdmin = in_array(strtoupper($role), ['ADMIN', 'SUPER_ADMIN']);
-        if (!$branchId || $isAdmin) {
-            $branchId = $request->query('branch_id') ?: $branchId;
+        
+        // If user has no branch assigned (Pusat), they can filter by branch
+        if (!$branchId) {
+            $branchId = $request->query('branch_id');
         }
 
         if ($branchId) {

@@ -41,12 +41,12 @@ class PosAuthController extends Controller
             ], 401);
         }
 
-        // Check if user is an admin OR has the specific pos_authorizations
+        // Authorize based strictly on the specific pos_authorizations
         $authorizations = $user->pos_authorizations ?? [];
         
         $isAuthorized = false;
         
-        if ($user->role === 'ADMIN' || in_array($validated['action'], $authorizations)) {
+        if (in_array($validated['action'], $authorizations)) {
             $isAuthorized = true;
         }
 
