@@ -23,7 +23,7 @@
                 <td>{{ $doc->receipt_number }}</td>
                 <td class="label" style="text-align: right; width: 100px;">Tanggal</td>
                 <td class="separator">:</td>
-                <td>{{ \Carbon\Carbon::parse($doc->receipt_date)->format('d-m-Y H:i') }}</td>
+                <td>{{ \Carbon\Carbon::parse($doc->receipt_date)->format('d-m-Y') }}</td>
             </tr>
             <tr>
                 <td class="label">Supplier</td>
