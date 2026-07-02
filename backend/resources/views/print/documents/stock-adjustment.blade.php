@@ -40,34 +40,47 @@
             </tr>
         </table>
 
+        @php
+            $isRetur = $doc->adjustmentReason && strtolower($doc->adjustmentReason->name) === 'retur';
+        @endphp
         <table class="items-table">
             <thead>
                 <tr>
                     <th style="width: 25px;" class="text-center">No</th>
                     <th>Produk / Barang</th>
-                    <th class="text-center" style="width: 60px;">Stok Lama</th>
-                    <th class="text-center" style="width: 60px;">Stok Baru</th>
-                    <th class="text-center" style="width: 40px;">Selisih</th>
+                    @if($isRetur)
+                        <th class="text-center" style="width: 80px;">Qty Retur</th>
+                    @else
+                        <th class="text-center" style="width: 60px;">Stok Lama</th>
+                        <th class="text-center" style="width: 60px;">Stok Baru</th>
+                        <th class="text-center" style="width: 40px;">Selisih</th>
+                    @endif
                     <th class="text-right" style="width: 90px;">HPP / Nilai</th>
                     <th class="text-right" style="width: 90px;">Total Nilai</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($doc->items as $index => $item)
+                @php
+                    $prevQty = (float) $item->previous_quantity;
+                    $newQty = (float) $item->new_quantity;
+                    $diff = $newQty - $prevQty;
+                @endphp
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>
                         {{ $item->product ? $item->product->name : '-' }}
                         <span style="color: #666; font-size: 0.85em;"> | Barcode: {{ $item->product ? $item->product->barcode : '-' }}</span>
                     </td>
-                    <td class="text-center">{{ $item->previous_quantity }}</td>
-                    <td class="text-center">{{ $item->new_quantity }}</td>
-                    <td class="text-center">
-                        @php
-                            $diff = $item->new_quantity - $item->previous_quantity;
-                        @endphp
-                        {{ $diff > 0 ? '+'.$diff : $diff }}
-                    </td>
+                    @if($isRetur)
+                        <td class="text-center">{{ abs($diff) }}</td>
+                    @else
+                        <td class="text-center">{{ $prevQty }}</td>
+                        <td class="text-center">{{ $newQty }}</td>
+                        <td class="text-center">
+                            {{ $diff > 0 ? '+'.$diff : $diff }}
+                        </td>
+                    @endif
                     <td class="text-right">Rp {{ number_format($item->unit_cost ?? 0, 0, ',', '.') }}</td>
                     <td class="text-right">Rp {{ number_format($item->total_cost ?? 0, 0, ',', '.') }}</td>
                 </tr>
