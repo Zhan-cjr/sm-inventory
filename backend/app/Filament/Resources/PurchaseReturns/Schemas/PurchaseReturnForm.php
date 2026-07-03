@@ -71,12 +71,17 @@ class PurchaseReturnForm
                                 // Jika tidak ada batch atau sisa 0, berarti sudah terjual semua, tidak bisa diretur
                                 $remainingQty = $batch ? (float) $batch->remaining_quantity : 0;
 
+                                $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
+                                $taxMultiplier = $gr->include_tax ? (1 + ($taxRate / 100)) : 1;
+                                $netUnitPrice = $item->quantity_received > 0 ? ($item->subtotal / $item->quantity_received) : $item->unit_price;
+                                $returnPrice = round($netUnitPrice * $taxMultiplier, 2);
+
                                 if ($remainingQty > 0) {
                                     $items[] = [
                                         'product_id' => $item->product_id,
                                         'max_qty' => $remainingQty, // Batas maksimal adalah sisa yang belum terjual
                                         'quantity' => 0, // Default 0
-                                        'unit_price' => $item->unit_price,
+                                        'unit_price' => $returnPrice,
                                         'subtotal' => 0,
                                         'reason' => '',
                                     ];

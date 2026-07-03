@@ -1,11 +1,8 @@
 <?php
-$lines = shell_exec('tail -n 2000 storage/logs/laravel.log');
-$lines = explode("\n", $lines);
-foreach($lines as $i => $line) {
-    if (strpos($line, 'local.ERROR') !== false) {
-        echo "\n---\n";
-        for($j=0; $j<20; $j++) {
-            if(isset($lines[$i+$j])) echo $lines[$i+$j] . "\n";
-        }
-    }
+$log = file_get_contents('tail.log');
+preg_match_all('/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] local\.ERROR: (.*?)(?=\n\[\d{4}-\d{2}-\d{2}|$)/s', $log, $matches);
+if (count($matches[0]) > 0) {
+    echo substr(end($matches[1]), 0, 1500);
+} else {
+    echo "No errors found";
 }

@@ -58,7 +58,7 @@
                     <th>Produk / Barang</th>
                     <th class="text-center" style="width: 40px;">Qty</th>
                     <th class="text-right" style="width: 80px;">Harga</th>
-                    <th class="text-right" style="width: 80px;">Diskon(%)</th>
+                    <th class="text-right" style="width: 120px;">Diskon(%)</th>
                     <th class="text-right" style="width: 100px;">Subtotal</th>
                 </tr>
             </thead>
@@ -73,9 +73,13 @@
                     <td class="text-center">{{ $item->quantity_received }}</td>
                     <td class="text-right">Rp {{ number_format($item->unit_price ?? $item->unit_cost ?? 0, 0, ',', '.') }}</td>
                     <td class="text-right">
-                        {{ (float)($item->discount_1 ?? 0) }}
-                        @if((float)($item->discount_2 ?? 0) > 0) +{{ (float)$item->discount_2 }} @endif
-                        @if((float)($item->discount_3 ?? 0) > 0) +{{ (float)$item->discount_3 }} @endif
+                        @php
+                            $discs = [];
+                            if ((float)($item->discount_1 ?? 0) > 0) $discs[] = (float)$item->discount_1 . '%';
+                            if ((float)($item->discount_2 ?? 0) > 0) $discs[] = (float)$item->discount_2 . '%';
+                            if ((float)($item->discount_3 ?? 0) > 0) $discs[] = (float)$item->discount_3 . '%';
+                        @endphp
+                        {{ count($discs) > 0 ? implode(' + ', $discs) : '0%' }}
                     </td>
                     <td class="text-right">Rp {{ number_format($item->subtotal ?? 0, 0, ',', '.') }}</td>
                 </tr>

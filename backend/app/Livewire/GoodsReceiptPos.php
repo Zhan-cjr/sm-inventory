@@ -548,13 +548,14 @@ class GoodsReceiptPos extends Component
                     'subtotal' => $item['subtotal']
                 ]);
 
-                $costPriceTax = $this->include_tax ? round($item['unit_price'] * $taxMultiplier, 2) : $item['unit_price'];
+                $netPrice = $item['qty_received'] > 0 ? ($item['subtotal'] / $item['qty_received']) : $item['unit_price'];
+                $costPriceTax = $this->include_tax ? round($netPrice * $taxMultiplier, 2) : $netPrice;
 
                 // 1. Selalu update Produk Global (Master Data) agar harga global tetap up-to-date
                 $product = Product::find($item['product_id']);
                 if ($product) {
                     $updateData = [
-                        'cost_price' => $item['unit_price'],
+                        'cost_price' => $netPrice,
                         'cost_price_tax' => $costPriceTax,
                     ];
                     if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
@@ -574,7 +575,7 @@ class GoodsReceiptPos extends Component
                     $stock = Stock::where('product_id', $item['product_id'])->where('branch_id', $this->branch_id)->first();
                     if ($stock) {
                         $updateData = [
-                            'cost_price' => $item['unit_price'],
+                            'cost_price' => $netPrice,
                             'cost_price_tax' => $costPriceTax,
                         ];
                         if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {

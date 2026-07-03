@@ -60,7 +60,8 @@ class PurchaseReturnPos extends Component
                         ->first();
                         
                     $remainingQty = $batch ? (float) $batch->remaining_quantity : 0;
-                    $returnPrice = round($item->unit_price * $taxMultiplier, 2);
+                    $netUnitPrice = $item->quantity_received > 0 ? ($item->subtotal / $item->quantity_received) : $item->unit_price;
+                    $returnPrice = round($netUnitPrice * $taxMultiplier, 2);
 
                     // Find if this item was already returned in this PR
                     $prItem = $purchaseReturn->items->where('product_id', $item->product_id)->first();
@@ -124,7 +125,8 @@ class PurchaseReturnPos extends Component
                         ->first();
                         
                     $remainingQty = $batch ? (float) $batch->remaining_quantity : 0;
-                    $returnPrice = round($item->unit_price * $taxMultiplier, 2);
+                    $netUnitPrice = $item->quantity_received > 0 ? ($item->subtotal / $item->quantity_received) : $item->unit_price;
+                    $returnPrice = round($netUnitPrice * $taxMultiplier, 2);
 
                     if ($remainingQty > 0) {
                         $this->cart[] = [

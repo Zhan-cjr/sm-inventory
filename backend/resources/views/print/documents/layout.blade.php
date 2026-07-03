@@ -89,7 +89,7 @@
             text-align: center;
         }
         .summary-box {
-            width: 300px;
+            width: 400px;
             float: right;
             border-collapse: collapse;
         }
@@ -98,9 +98,11 @@
         }
         .summary-box td.label {
             font-weight: bold;
+            white-space: nowrap;
         }
         .summary-box td.value {
             text-align: right;
+            white-space: nowrap;
         }
         .footer {
             margin-top: 50px;
