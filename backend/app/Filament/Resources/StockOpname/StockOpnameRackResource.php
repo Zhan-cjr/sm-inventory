@@ -115,12 +115,20 @@ class StockOpnameRackResource extends Resource
             ]);
     }
 
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\StocksRelationManager::class,
+        ];
+    }
+
     public static function getPages(): array
     {
         return [
             'index'  => Pages\ListStockOpnameRacks::route('/'),
             'create' => Pages\CreateStockOpnameRack::route('/create'),
             'edit'   => Pages\EditStockOpnameRack::route('/{record}/edit'),
+            'unassigned' => Pages\UnassignedStocks::route('/unassigned'),
         ];
     }
 

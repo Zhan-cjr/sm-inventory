@@ -12,6 +12,13 @@ class ListStockOpnameRacks extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()];
+        return [
+            \Filament\Actions\Action::make('unassigned_stocks')
+                ->label('Barang Tanpa Rak')
+                ->icon('heroicon-o-exclamation-triangle')
+                ->color('warning')
+                ->url(fn () => StockOpnameRackResource::getUrl('unassigned')),
+            CreateAction::make(),
+        ];
     }
 }
