@@ -30,6 +30,13 @@ class FixHistoricalPrices extends Command
      */
     public function handle()
     {
+        IlluminateSupportFacadesDB::transaction(function () {
+            $this->runMigration();
+        });
+    }
+
+    public function runMigration()
+    {
         $this->info('Starting historical data fix...');
 
         $org = Organization::first();
