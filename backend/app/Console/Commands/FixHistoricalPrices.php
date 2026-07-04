@@ -30,7 +30,7 @@ class FixHistoricalPrices extends Command
      */
     public function handle()
     {
-        IlluminateSupportFacadesDB::transaction(function () {
+        \Illuminate\Support\Facades\DB::transaction(function () {
             $this->runMigration();
         });
     }
