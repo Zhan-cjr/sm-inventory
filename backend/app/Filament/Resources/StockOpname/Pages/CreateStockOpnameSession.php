@@ -33,48 +33,93 @@ class CreateStockOpnameSession extends CreateRecord
     protected function afterCreate(): void
     {
         $session  = $this->record;
+        $opnameMode = $this->data['opname_mode'] ?? 'by_rack';
         $rackIds  = $this->data['rack_ids'] ?? [];
 
-        DB::transaction(function () use ($session, $rackIds) {
-            foreach ($rackIds as $rackId) {
-                $rack = StockOpnameRack::find($rackId);
-                if (!$rack) continue;
+        DB::transaction(function () use ($session, $opnameMode, $rackIds) {
+            if ($opnameMode === 'all_items') {
+                $virtualRack = StockOpnameRack::firstOrCreate(
+                    [
+                        'branch_id' => $session->branch_id,
+                        'rack_code' => 'ALL-RACK',
+                    ],
+                    [
+                        'rack_name' => 'Semua Barang (Tanpa Rak)',
+                        'location_description' => 'Rak virtual untuk menampung seluruh barang',
+                        'is_active' => true,
+                    ]
+                );
 
-                // Buat pivot rak-sesi dengan token unik
                 $rackSession = StockOpnameRackSession::create([
                     'session_id'    => $session->id,
-                    'rack_id'       => $rackId,
+                    'rack_id'       => $virtualRack->id,
                     'rack_token'    => Str::random(48),
                     'count1_status' => 'PENDING',
                     'count2_status' => 'PENDING',
                 ]);
 
-                // Ambil produk yang ada di rak ini (via pivot stock_stock_opname_rack)
-                // Dan ambil stoknya di cabang sesi
                 $stocks = Stock::with('product')
                     ->where('branch_id', $session->branch_id)
                     ->where('quantity_on_hand', '>=', 0)
-                    ->whereHas('racks', function ($q) use ($rackId) {
-                        $q->where('stock_opname_racks.id', $rackId);
-                    })
                     ->get();
 
+                $itemsData = [];
+                $now = now();
                 foreach ($stocks as $stock) {
                     if (!$stock->product || !$stock->product->is_active) continue;
 
-                    // Cek apakah produk ini sudah ada di rak lain dalam sesi ini
-                    // (allowed - produk bisa ada di banyak rak)
-                    StockOpnameItem::firstOrCreate(
-                        [
-                            'rack_session_id' => $rackSession->id,
-                            'product_id'      => $stock->product_id,
-                        ],
-                        [
-                            'session_id'      => $session->id,
-                            'system_quantity'  => $stock->quantity_on_hand,
-                            'status'          => 'PENDING',
-                        ]
-                    );
+                    $itemsData[] = [
+                        'id'              => Str::uuid()->toString(),
+                        'session_id'      => $session->id,
+                        'rack_session_id' => $rackSession->id,
+                        'product_id'      => $stock->product_id,
+                        'system_quantity' => $stock->quantity_on_hand,
+                        'status'          => 'PENDING',
+                        'created_at'      => $now,
+                        'updated_at'      => $now,
+                    ];
+                }
+
+                foreach (array_chunk($itemsData, 500) as $chunk) {
+                    StockOpnameItem::insert($chunk);
+                }
+
+            } else {
+                foreach ($rackIds as $rackId) {
+                    $rack = StockOpnameRack::find($rackId);
+                    if (!$rack) continue;
+
+                    $rackSession = StockOpnameRackSession::create([
+                        'session_id'    => $session->id,
+                        'rack_id'       => $rackId,
+                        'rack_token'    => Str::random(48),
+                        'count1_status' => 'PENDING',
+                        'count2_status' => 'PENDING',
+                    ]);
+
+                    $stocks = Stock::with('product')
+                        ->where('branch_id', $session->branch_id)
+                        ->where('quantity_on_hand', '>=', 0)
+                        ->whereHas('racks', function ($q) use ($rackId) {
+                            $q->where('stock_opname_racks.id', $rackId);
+                        })
+                        ->get();
+
+                    foreach ($stocks as $stock) {
+                        if (!$stock->product || !$stock->product->is_active) continue;
+
+                        StockOpnameItem::firstOrCreate(
+                            [
+                                'rack_session_id' => $rackSession->id,
+                                'product_id'      => $stock->product_id,
+                            ],
+                            [
+                                'session_id'      => $session->id,
+                                'system_quantity'  => $stock->quantity_on_hand,
+                                'status'          => 'PENDING',
+                            ]
+                        );
+                    }
                 }
             }
         });

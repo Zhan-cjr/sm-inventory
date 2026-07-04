@@ -298,13 +298,34 @@
     </div>
 </div>
 
+<!-- Review Unscanned Modal -->
+<div class="modal-overlay" id="review-modal" style="z-index: 60;">
+    <div class="modal" style="max-width: 500px; max-height: 90vh; display: flex; flex-direction: column;">
+        <div class="modal-header">
+            <span class="modal-title">⚠️ Barang Belum Di-scan</span>
+            <button class="modal-close" onclick="closeReviewModal()" type="button">✕</button>
+        </div>
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5;">
+            Terdapat produk yang dibiarkan kosong (tidak di-scan). Tentukan status barang tersebut di rak ini:
+        </div>
+        <div id="review-list" style="overflow-y: auto; flex: 1; padding-right: 5px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+            <!-- Injected via JS -->
+        </div>
+        <div style="margin-top: auto;">
+            <button type="button" class="btn-submit" onclick="confirmReviewAndSubmit()" style="width: 100%;">
+                Konfirmasi & Kirim Data
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- JS: html5-qrcode + search + form logic -->
 <script src="{{ asset('js/html5-qrcode.min.js') }}"></script>
 <script>
 (function() {
     // ─── Search filter ───
     const searchInput = document.getElementById('search-product');
-    const productList = document.querySelectorAll('#product-list .product-item');
+    let productList = document.querySelectorAll('#product-list .product-item');
     const countEl     = document.getElementById('item-count');
 
     function filterProducts(q) {
@@ -322,34 +343,114 @@
     }
     searchInput.addEventListener('input', () => filterProducts(searchInput.value));
 
-    // ─── Enter key navigation between qty inputs ───
+    // ─── Enter key navigation: kembali ke search bar ───
     const qtyInputs = Array.from(document.querySelectorAll('.qty-input'));
     qtyInputs.forEach((inp, idx) => {
         inp.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const next = qtyInputs[idx + 1];
-                if (next) next.focus();
+                document.getElementById('search-product').focus();
             }
         });
     });
 
-    // ─── Submit confirmation ───
+    // ─── Submit confirmation & Review Unscanned ───
+    let unscannedItems = [];
+    
     document.getElementById('count-form').addEventListener('submit', function(e) {
-        const btn = document.getElementById('submit-btn');
         const allInputs = document.querySelectorAll('.qty-input');
-        let hasEmpty = false;
+        unscannedItems = [];
+        
         allInputs.forEach(inp => {
-            if (inp.closest('.product-item').style.display !== 'none' && inp.value === '') {
-                hasEmpty = true;
+            const itemDiv = inp.closest('.product-item');
+            if (itemDiv.style.display !== 'none' && inp.value === '') {
+                unscannedItems.push({
+                    id: itemDiv.dataset.itemId || inp.name.match(/\[(.*?)\]/)[1],
+                    name: itemDiv.querySelector('.product-name').textContent,
+                    input: inp
+                });
             }
         });
-        if (hasEmpty && !confirm('Ada produk yang belum diisi qty-nya. Lanjutkan submit?')) {
-            e.preventDefault(); return;
+        
+        if (unscannedItems.length > 0) {
+            e.preventDefault();
+            showReviewModal();
+            return;
         }
+        
+        proceedSubmit();
+    });
+    
+    function proceedSubmit() {
+        const btn = document.getElementById('submit-btn');
         btn.disabled = true;
         btn.textContent = '⏳ Mengirim data...';
-    });
+        document.getElementById('count-form').submit();
+    }
+    
+    window.showReviewModal = function() {
+        const listEl = document.getElementById('review-list');
+        listEl.innerHTML = '';
+        
+        unscannedItems.forEach((item, index) => {
+            const isNewQty = item.input.name.includes('new_quantities');
+            const hiddenInputs = isNewQty 
+                ? '' 
+                : `<input type="radio" name="review_action_${item.id}" value="remove" id="ra_rem_${item.id}" style="accent-color: #ef4444;">
+                   <label for="ra_rem_${item.id}" style="font-size: 13px; cursor: pointer; color: #fca5a5;">Keluarkan dari Rak</label>`;
+                   
+            listEl.innerHTML += `
+                <div style="background: var(--surface); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
+                    <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">${item.name}</div>
+                    <div style="display: flex; gap: 16px; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input type="radio" name="review_action_${item.id}" value="zero" checked style="accent-color: var(--blue);">
+                            <span style="font-size: 13px;">Stok 0 (Habis)</span>
+                        </label>
+                        ${isNewQty ? '' : `
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input type="radio" name="review_action_${item.id}" value="remove" style="accent-color: #ef4444;">
+                            <span style="font-size: 13px; color: #fca5a5;">Bukan di Rak Ini (Hapus)</span>
+                        </label>`}
+                    </div>
+                </div>
+            `;
+        });
+        
+        document.getElementById('review-modal').classList.add('open');
+    }
+    
+    window.closeReviewModal = function() {
+        document.getElementById('review-modal').classList.remove('open');
+    }
+    
+    window.confirmReviewAndSubmit = function() {
+        const form = document.getElementById('count-form');
+        
+        // Remove old hidden inputs if any
+        document.querySelectorAll('.remove-rack-input').forEach(el => el.remove());
+        
+        unscannedItems.forEach(item => {
+            const action = document.querySelector(`input[name="review_action_${item.id}"]:checked`).value;
+            if (action === 'zero') {
+                item.input.value = '0';
+            } else if (action === 'remove') {
+                // We add a hidden input array remove_from_rack[]
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'remove_from_rack[]';
+                hidden.value = item.id;
+                hidden.className = 'remove-rack-input';
+                form.appendChild(hidden);
+                
+                // Set qty to 0 just in case to pass validation
+                item.input.value = '0';
+            }
+        });
+        
+        closeReviewModal();
+        proceedSubmit();
+    }
 
     // ─── Barcode scan & highlight logic ───
     function findAndFocusByBarcode(code) {
@@ -371,28 +472,89 @@
         productList.forEach(el => el.classList.remove('scan-match', 'highlighted'));
 
         if (found) {
-            // Scroll into view & highlight
-            found.classList.add('scan-match');
-            found.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-            // Focus qty input
-            const qtyEl = found.querySelector('.qty-input');
-            if (qtyEl) {
-                setTimeout(() => {
-                    qtyEl.focus();
-                    qtyEl.select();
-                }, 300);
-            }
-
-            status.className = 'scan-status found';
-            status.textContent = `✅ Ditemukan: ${found.querySelector('.product-name').textContent}`;
-
-            // Auto-close modal after 1.2s if scanning was done by camera
-            setTimeout(() => closeScanModal(), 1200);
+            highlightAndFocus(found, status, code);
         } else {
-            status.className = 'scan-status notfound';
-            status.textContent = `❌ Produk dengan barcode "${code}" tidak ditemukan di rak ini.`;
+            status.className = 'scan-status';
+            status.textContent = 'Mencari produk di server...';
+            
+            fetch(`{{ route('opname.search-product') }}?code=${encodeURIComponent(code)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        status.className = 'scan-status notfound';
+                        status.textContent = `❌ Produk "${code}" tidak ditemukan di server.`;
+                    } else {
+                        // Create new product item in DOM
+                        const list = document.getElementById('product-list');
+                        const div = document.createElement('div');
+                        div.className = 'product-item';
+                        div.dataset.name = data.name.toLowerCase();
+                        div.dataset.sku = data.sku.toLowerCase();
+                        div.dataset.barcode = data.barcode ? data.barcode.toLowerCase() : '';
+                        
+                        const meta = `SKU: ${data.sku}` + 
+                                     (data.barcode ? ` &nbsp;&middot;&nbsp; Barcode: ${data.barcode}` : '') +
+                                     (data.category_name ? ` &nbsp;&middot;&nbsp; ${data.category_name}` : '');
+                                     
+                        div.innerHTML = `
+                            <div>
+                                <div class="product-name">${data.name} <span style="color:#10b981;font-size:10px;">(BARU)</span></div>
+                                <div class="product-meta">${meta}</div>
+                            </div>
+                            <input type="number" name="new_quantities[${data.id}]"
+                                   class="qty-input" placeholder="0" min="0" step="1" inputmode="numeric">
+                        `;
+                        
+                        list.insertBefore(div, list.firstChild); // prepend to top
+                        
+                        // Update lists
+                        productList = document.querySelectorAll('#product-list .product-item');
+                        const countEl = document.getElementById('item-count');
+                        let visibleCount = Array.from(productList).filter(e => e.style.display !== 'none').length;
+                        countEl.textContent = `Menampilkan ${visibleCount} produk`;
+                        
+                        // Handle enter key for new input
+                        const newInput = div.querySelector('.qty-input');
+                        newInput.addEventListener('keydown', e => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                document.getElementById('search-product').focus();
+                            }
+                        });
+                        
+                        highlightAndFocus(div, status, code);
+                    }
+                })
+                .catch(err => {
+                    status.className = 'scan-status notfound';
+                    status.textContent = `❌ Gagal menghubungi server.`;
+                });
         }
+    }
+
+    function highlightAndFocus(found, status, code) {
+        // Reset all highlight classes
+        productList = document.querySelectorAll('#product-list .product-item');
+        productList.forEach(el => el.classList.remove('scan-match', 'highlighted'));
+
+        // Scroll into view & highlight
+        found.classList.add('scan-match');
+        found.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Focus qty input
+        const qtyEl = found.querySelector('.qty-input');
+        if (qtyEl) {
+            setTimeout(() => {
+                qtyEl.focus();
+                qtyEl.select();
+            }, 300);
+        }
+
+        status.className = 'scan-status found';
+        status.textContent = `✅ Ditemukan: ${found.querySelector('.product-name').textContent.replace('(BARU)', '')}`;
+
+        // Auto-close modal after 1.2s if scanning was done by camera
+        setTimeout(() => closeScanModal(), 1200);
     }
 
     // ─── Camera scan modal ───

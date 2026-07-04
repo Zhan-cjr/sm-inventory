@@ -120,6 +120,9 @@ class ViewStockOpnameSession extends ViewRecord
                 ->color('danger')
                 ->visible(fn () => $record->status === 'FINAL_CHECK')
                 ->url(fn () => StockOpnameSessionResource::getUrl('final-check', ['record' => $record])),
+
+            \Filament\Actions\DeleteAction::make()
+                ->visible(fn () => $record->status !== 'COMPLETED'),
         ];
     }
 
@@ -170,6 +173,24 @@ class ViewStockOpnameSession extends ViewRecord
                 'approved_by'  => Auth::id(),
                 'completed_at' => now(),
             ]);
+
+            // Assign products to their scanned racks
+            $scannedItems = $session->items()->with('rackSession.rack')->get();
+            foreach ($scannedItems as $item) {
+                if ($item->rackSession && $item->rackSession->rack) {
+                    $rack = $item->rackSession->rack;
+                    // Skip virtual rack if any
+                    if ($rack->rack_code === 'ALL-RACK') continue;
+
+                    $stock = Stock::where('branch_id', $session->branch_id)
+                        ->where('product_id', $item->product_id)
+                        ->first();
+                        
+                    if ($stock) {
+                        $stock->racks()->syncWithoutDetaching([$rack->id]);
+                    }
+                }
+            }
             
             // Catat jurnal akuntansi Stok Opname
             $accountingService = new \App\Services\AccountingService();

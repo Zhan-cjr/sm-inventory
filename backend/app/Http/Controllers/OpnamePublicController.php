@@ -144,6 +144,51 @@ class OpnamePublicController extends Controller
                 }
             }
 
+            // Handle items removed from rack
+            if ($request->has('remove_from_rack') && is_array($request->remove_from_rack)) {
+                foreach ($request->remove_from_rack as $itemId) {
+                    $item = StockOpnameItem::where('id', $itemId)
+                        ->where('rack_session_id', $rackSession->id)
+                        ->first();
+                        
+                    if ($item) {
+                        // Detach from Stock
+                        $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
+                            ->where('product_id', $item->product_id)
+                            ->first();
+                            
+                        if ($stock && $rackSession->rack_id) {
+                            $stock->racks()->detach($rackSession->rack_id);
+                        }
+                        
+                        $item->delete();
+                        
+                        // Ensure it's not marked as submitted for the 0.0 default fallback
+                        $submittedIds[] = $itemId; 
+                    }
+                }
+            }
+
+            // Handle dynamically added products (new_quantities)
+            if ($request->has('new_quantities') && is_array($request->new_quantities)) {
+                foreach ($request->new_quantities as $productId => $qty) {
+                    $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
+                    $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
+                        ->where('product_id', $productId)
+                        ->first();
+                        
+                    \App\Models\StockOpnameItem::create([
+                        'session_id' => $rackSession->session_id,
+                        'rack_session_id' => $rackSession->id,
+                        'product_id' => $productId,
+                        'system_quantity' => $stock ? $stock->quantity_on_hand : 0,
+                        'count1_quantity' => $actualQty,
+                        'count1_at' => now(),
+                        'status' => 'COUNT1_DONE',
+                    ]);
+                }
+            }
+
             // Default any remaining PENDING items in this rack session to 0.0
             $remainingPendingItems = StockOpnameItem::where('rack_session_id', $rackSession->id)
                 ->where('status', 'PENDING')
@@ -300,6 +345,55 @@ class OpnamePublicController extends Controller
                 }
             }
 
+            // Handle items removed from rack
+            if ($request->has('remove_from_rack') && is_array($request->remove_from_rack)) {
+                foreach ($request->remove_from_rack as $itemId) {
+                    $item = StockOpnameItem::where('id', $itemId)
+                        ->where('rack_session_id', $rackSession->id)
+                        ->first();
+                        
+                    if ($item) {
+                        // Detach from Stock
+                        $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
+                            ->where('product_id', $item->product_id)
+                            ->first();
+                            
+                        if ($stock && $rackSession->rack_id) {
+                            $stock->racks()->detach($rackSession->rack_id);
+                        }
+                        
+                        $item->delete();
+                        
+                        // Ensure it's not marked as submitted for the 0.0 default fallback
+                        $submittedIds[] = $itemId; 
+                    }
+                }
+            }
+
+            // Handle dynamically added products (new_quantities)
+            if ($request->has('new_quantities') && is_array($request->new_quantities)) {
+                foreach ($request->new_quantities as $productId => $qty) {
+                    $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
+                    $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
+                        ->where('product_id', $productId)
+                        ->first();
+                        
+                    $newItem = \App\Models\StockOpnameItem::create([
+                        'session_id' => $rackSession->session_id,
+                        'rack_session_id' => $rackSession->id,
+                        'product_id' => $productId,
+                        'system_quantity' => $stock ? $stock->quantity_on_hand : 0,
+                        'count1_quantity' => 0.0, // Pengecek 2 menambahkan produk baru yg terlewat, brarti count1=0
+                        'count1_at' => now(),
+                        'count2_quantity' => $actualQty,
+                        'count2_at' => now(),
+                        'status' => 'COUNT1_DONE',
+                    ]);
+                    
+                    $newItem->detectDiscrepancy();
+                }
+            }
+
             // Default any remaining COUNT1_DONE items in this rack session to 0.0
             $remainingItems = StockOpnameItem::where('rack_session_id', $rackSession->id)
                 ->where('status', 'COUNT1_DONE')
@@ -335,6 +429,30 @@ class OpnamePublicController extends Controller
             'role'      => $request->role,
             'rack_code' => $request->rack_code,
             'next_url'  => $request->next_url,
+        ]);
+    }
+
+    public function searchProduct(Request $request)
+    {
+        $code = $request->query('code');
+        if (!$code) {
+            return response()->json(['error' => 'Code required'], 400);
+        }
+
+        $product = \App\Models\Product::where('sku', $code)
+            ->orWhere('barcode', $code)
+            ->first();
+
+        if (!$product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        return response()->json([
+            'id' => $product->id,
+            'name' => $product->name,
+            'sku' => $product->sku,
+            'barcode' => $product->barcode,
+            'category_name' => $product->category?->name,
         ]);
     }
 }

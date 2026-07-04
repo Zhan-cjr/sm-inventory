@@ -57,10 +57,24 @@ class StockOpnameSessionResource extends Resource
                     ->required()
                     ->default(now()),
 
+                \Filament\Forms\Components\Radio::make('opname_mode')
+                    ->label('Mode Opname')
+                    ->options([
+                        'by_rack' => 'Berdasarkan Rak (Pilih Rak)',
+                        'all_items' => 'Semua Barang (Tanpa Rak)'
+                    ])
+                    ->default('by_rack')
+                    ->inline()
+                    ->required()
+                    ->reactive()
+                    ->dehydrated(false)
+                    ->columnSpanFull(),
+
                 Select::make('rack_ids')
                     ->label('Rak yang Diikutkan')
                     ->multiple()
-                    ->required()
+                    ->required(fn (callable $get) => $get('opname_mode') === 'by_rack')
+                    ->visible(fn (callable $get) => $get('opname_mode') === 'by_rack')
                     ->columnSpanFull()
                     ->options(function (callable $get) {
                         $branchId = $get('branch_id') ?? Auth::user()->branch_id;
@@ -157,7 +171,7 @@ class StockOpnameSessionResource extends Resource
             ->recordActions([
                 ViewAction::make(),
                 DeleteAction::make()
-                    ->visible(fn (StockOpnameSession $record) => $record->status === 'DRAFT'),
+                    ->visible(fn (StockOpnameSession $record) => $record->status !== 'COMPLETED'),
             ]);
     }
 

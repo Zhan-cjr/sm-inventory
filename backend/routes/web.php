@@ -106,6 +106,10 @@ Route::prefix('opname')->name('opname.')->middleware('web')->group(function () {
     Route::get('/selesai', [\App\Http\Controllers\OpnamePublicController::class, 'done'])
         ->name('done');
 
+    // Pencarian produk dinamis via barcode (AJAX)
+    Route::get('/search-product', [\App\Http\Controllers\OpnamePublicController::class, 'searchProduct'])
+        ->name('search-product');
+
     // ★ PORTAL UTAMA — scan QR sesi, pilih peran (penghitung atau pengecek)
     //   QR code ini yang dicetak admin dan ditempel di papan pengumuman / dibagikan ke tim
     //   (Ditempatkan paling bawah agar tidak membayangi route statis seperti /selesai)
