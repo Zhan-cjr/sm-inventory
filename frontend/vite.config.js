@@ -62,6 +62,27 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'vendor';
+            }
+            if (id.includes('lucide-react') || id.includes('recharts')) {
+              return 'ui';
+            }
+            if (id.includes('html5-qrcode') || id.includes('laravel-echo') || id.includes('pusher-js')) {
+              return 'utils';
+            }
+            return 'modules';
+          }
+        }
+      }
+    }
+  },
   server: {
     port: 4173,
     allowedHosts: true,
