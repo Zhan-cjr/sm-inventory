@@ -39,7 +39,33 @@ class ProductsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                // 
+                Action::make('tambahkan_barang')
+                    ->label('Tambah Barang')
+                    ->icon('heroicon-o-plus')
+                    ->color('primary')
+                    ->form([
+                        \Filament\Forms\Components\Select::make('product_ids')
+                            ->label('Pilih Barang')
+                            ->multiple()
+                            ->searchable()
+                            ->options(function ($livewire) {
+                                $currentSupplierId = $livewire->getOwnerRecord()->id;
+                                return \App\Models\Product::where('supplier_id', '!=', $currentSupplierId)
+                                    ->orWhereNull('supplier_id')
+                                    ->pluck('name', 'id');
+                            })
+                            ->required(),
+                    ])
+                    ->action(function (array $data, $livewire) {
+                        $supplierId = $livewire->getOwnerRecord()->id;
+                        \App\Models\Product::whereIn('id', $data['product_ids'])
+                            ->update(['supplier_id' => $supplierId]);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title('Berhasil menambahkan barang ke pemasok ini')
+                            ->success()
+                            ->send();
+                    }),
             ])
             ->actions([
                 Action::make('pindah_pemasok')
