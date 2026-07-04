@@ -12,5 +12,5 @@ class LaporanStokOpnameCluster extends Cluster
     protected static ?string $navigationLabel = 'Laporan Stok Opname';
     protected static ?string $title = 'Laporan Stok Opname';
     protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
-    protected static \Filament\Pages\SubNavigationPosition $subNavigationPosition = \Filament\Pages\SubNavigationPosition::Top;
+    protected static ?\Filament\Pages\Enums\SubNavigationPosition $subNavigationPosition = \Filament\Pages\Enums\SubNavigationPosition::Top;
 }
