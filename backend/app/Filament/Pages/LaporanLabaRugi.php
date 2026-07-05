@@ -31,15 +31,77 @@ class LaporanLabaRugi extends Page implements HasTable
     protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
     protected static ?int $navigationSort = 6;
 
+    public function getSubheading(): ?string
+    {
+        return 'Catatan: Nilai HPP yang tercantum pada laporan ini sudah termasuk PPN (HPP + PPN).';
+    }
+
     protected string $view = 'filament.pages.report-page';
 
     public function table(Table $table): Table
     {
+        $subquery = \Illuminate\Support\Facades\DB::table('transactions as t')
+            ->select([
+                't.id',
+                't.local_transaction_id',
+                't.transaction_date',
+                't.branch_id',
+                't.final_amount',
+                't.payment_method',
+                't.payment_details',
+                \Illuminate\Support\Facades\DB::raw("'OFFLINE' as transaction_source"),
+                \Illuminate\Support\Facades\DB::raw("COALESCE((
+                    SELECT SUM(
+                        COALESCE(
+                            (SELECT SUM(sbd.quantity * sb.cost_price) 
+                             FROM stock_batch_deductions sbd 
+                             JOIN stock_batches sb ON sbd.stock_batch_id = sb.id 
+                             WHERE sbd.transaction_item_id = ti.id),
+                            ti.quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0)
+                        )
+                    )
+                    FROM transaction_items ti
+                    JOIN products p ON ti.product_id = p.id
+                    LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
+                    WHERE ti.transaction_id = t.id
+                ), 0) as raw_cogs")
+            ])
+            ->where('t.is_voided', false)
+            ->unionAll(
+                \Illuminate\Support\Facades\DB::table('ecommerce_orders as eo')
+                    ->select([
+                        'eo.id',
+                        'eo.id as local_transaction_id',
+                        'eo.created_at as transaction_date',
+                        'eo.branch_id',
+                        'eo.total_amount as final_amount',
+                        'eo.payment_method',
+                        \Illuminate\Support\Facades\DB::raw("NULL as payment_details"),
+                        \Illuminate\Support\Facades\DB::raw("'ONLINE' as transaction_source"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE((
+                            SELECT SUM(
+                                COALESCE(
+                                    (SELECT SUM(sbd.quantity * sb.cost_price) 
+                                     FROM stock_batch_deductions sbd 
+                                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id 
+                                     WHERE sbd.ecommerce_order_item_id = ei.id),
+                                    ei.quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0)
+                                )
+                            )
+                            FROM ecommerce_order_items ei
+                            JOIN products p ON ei.product_id = p.id
+                            LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = eo.branch_id
+                            WHERE ei.ecommerce_order_id = eo.id
+                        ), 0) as raw_cogs")
+                    ])
+                    ->where('eo.status', 'COMPLETED')
+            );
+
         return $table
             ->query(
                 Transaction::query()
-                    ->where('is_voided', false)
-                    ->with(['branch', 'items.product'])
+                    ->fromSub($subquery, 'transactions')
+                    ->with(['branch']) // Items are no longer eager-loaded because it'll fail for ecommerce IDs
             )
             ->columns([
                 TextColumn::make('local_transaction_id')
@@ -89,10 +151,14 @@ class LaporanLabaRugi extends Page implements HasTable
                 TextColumn::make('cogs')
                     ->label('Total HPP')
                     ->money('IDR', true)
-                    ->state(fn (Transaction $record): float => $record->cogs)
-                    // Note: Cannot summarize computed column easily with native Sum without custom summarizer, but we can do it via a custom Query summarizer if needed.
-                    // For now, we'll display it per row.
-                    ->sortable(),
+                    ->state(fn (Transaction $record): float => $record->raw_cogs)
+                    ->summarize(
+                        Summarizer::make()
+                            ->label('Total HPP')
+                            ->using(fn ($query) => (clone $query)->sum('raw_cogs'))
+                            ->money('IDR')
+                    )
+                    ->sortable(query: fn ($query, $direction) => $query->orderBy('raw_cogs', $direction)),
                 TextColumn::make('gross_profit')
                     ->label('Laba Kotor')
                     ->money('IDR', true)
@@ -107,13 +173,37 @@ class LaporanLabaRugi extends Page implements HasTable
                         } elseif (strtoupper($record->payment_method) === 'POINT') {
                             $pointPayment = (float) $record->final_amount;
                         }
-                        return ($record->final_amount - $pointPayment) - $record->cogs;
+                        return ($record->final_amount - $pointPayment) - $record->raw_cogs;
                     })
+                    ->summarize(
+                        Summarizer::make()
+                            ->label('Total Laba Kotor')
+                            ->using(function ($query) {
+                                $totalFinalAmount = (clone $query)->sum('final_amount');
+                                $pointOnly = (clone $query)->whereIn('payment_method', ['POINT', 'point'])->sum('final_amount');
+                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details']);
+                                $multiPoint = $multiRecords->sum(function ($record) {
+                                    $details = $record->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    return is_array($details) ? collect($details)->where('method', 'POINT')->sum('amount') : 0;
+                                });
+                                $netSales = $totalFinalAmount - ($pointOnly + $multiPoint);
+                                $totalCogs = (clone $query)->sum('raw_cogs');
+                                return $netSales - $totalCogs;
+                            })
+                            ->money('IDR')
+                    )
                     ->badge()
                     ->color(fn ($state) => $state >= 0 ? 'success' : 'danger')
-                    ->sortable(),
+                    ->sortable(query: fn ($query, $direction) => $query->orderByRaw('(final_amount - raw_cogs) ' . $direction)),
             ])
             ->filters([
+                \Filament\Tables\Filters\SelectFilter::make('transaction_source')
+                    ->label('Sumber Penjualan')
+                    ->options([
+                        'OFFLINE' => 'Kasir Offline',
+                        'ONLINE' => 'Online E-Commerce',
+                    ]),
                 \App\Filament\Filters\DateFilterHelper::make('transaction_date'),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')

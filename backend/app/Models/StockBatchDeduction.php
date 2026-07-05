@@ -11,7 +11,8 @@ class StockBatchDeduction extends Model
 
     protected $fillable = [
         'stock_batch_id', 
-        'transaction_item_id', 
+        'transaction_item_id',
+        'ecommerce_order_item_id',
         'quantity'
     ];
 

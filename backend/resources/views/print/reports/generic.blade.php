@@ -3,6 +3,9 @@
 @section('title', $title . ' - Periode : ' . $period)
 
 @section('content')
+@if(isset($note) && !empty($note))
+    <p style="font-style: italic; font-size: 12px; color: #555; margin-bottom: 10px;">{{ $note }}</p>
+@endif
 <table class="report-table">
     <thead>
         <tr>

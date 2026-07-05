@@ -632,19 +632,80 @@ class ReportPrintController extends Controller
 
     private function printLaporanLabaRugi($filters)
     {
-        $query = Transaction::query()->where('is_voided', false);
-        $query = $this->applyDateFilters($query, $filters);
+        $subquery = \Illuminate\Support\Facades\DB::table('transactions as t')
+            ->select([
+                't.id',
+                't.local_transaction_id',
+                't.transaction_date',
+                't.branch_id',
+                't.final_amount',
+                't.payment_method',
+                't.payment_details',
+                \Illuminate\Support\Facades\DB::raw("'OFFLINE' as transaction_source"),
+                \Illuminate\Support\Facades\DB::raw("COALESCE((
+                    SELECT SUM(
+                        COALESCE(
+                            (SELECT SUM(sbd.quantity * sb.cost_price) 
+                             FROM stock_batch_deductions sbd 
+                             JOIN stock_batches sb ON sbd.stock_batch_id = sb.id 
+                             WHERE sbd.transaction_item_id = ti.id),
+                            ti.quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0)
+                        )
+                    )
+                    FROM transaction_items ti
+                    JOIN products p ON ti.product_id = p.id
+                    LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
+                    WHERE ti.transaction_id = t.id
+                ), 0) as raw_cogs")
+            ])
+            ->where('t.is_voided', false)
+            ->unionAll(
+                \Illuminate\Support\Facades\DB::table('ecommerce_orders as eo')
+                    ->select([
+                        'eo.id',
+                        'eo.id as local_transaction_id',
+                        'eo.created_at as transaction_date',
+                        'eo.branch_id',
+                        'eo.total_amount as final_amount',
+                        'eo.payment_method',
+                        \Illuminate\Support\Facades\DB::raw("NULL as payment_details"),
+                        \Illuminate\Support\Facades\DB::raw("'ONLINE' as transaction_source"),
+                        \Illuminate\Support\Facades\DB::raw("COALESCE((
+                            SELECT SUM(
+                                COALESCE(
+                                    (SELECT SUM(sbd.quantity * sb.cost_price) 
+                                     FROM stock_batch_deductions sbd 
+                                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id 
+                                     WHERE sbd.ecommerce_order_item_id = ei.id),
+                                    ei.quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0)
+                                )
+                            )
+                            FROM ecommerce_order_items ei
+                            JOIN products p ON ei.product_id = p.id
+                            LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = eo.branch_id
+                            WHERE ei.ecommerce_order_id = eo.id
+                        ), 0) as raw_cogs")
+                    ])
+                    ->where('eo.status', 'COMPLETED')
+            );
+
+        $query = Transaction::query()->fromSub($subquery, 'transactions');
+        $query = $this->applyDateFilters($query, $filters, 'transaction_date');
         
         if (auth()->user()->branch_id !== null) {
             $query->where('branch_id', auth()->user()->branch_id);
         } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
             $query->where('branch_id', $filters['branch_id']['value']);
         }
+
+        if (isset($filters['transaction_source']['value']) && !empty($filters['transaction_source']['value'])) {
+            $query->where('transaction_source', $filters['transaction_source']['value']);
+        }
         
         $transactions = $query->orderBy('transaction_date', 'asc')->get();
         $period = $this->getPeriodString($filters);
 
-        $columns = ['Tanggal', 'No Transaksi', 'Omset/Pendapatan', 'HPP (Modal)', 'Laba Kotor'];
+        $columns = ['Tanggal', 'No Transaksi', 'Sumber', 'Omset/Pendapatan', 'HPP (Modal)', 'Laba Kotor'];
         $rows = [];
         $t_omset = 0; $t_hpp = 0; $t_laba = 0;
 
@@ -660,7 +721,7 @@ class ReportPrintController extends Controller
                 $pointPayment = (float) $t->final_amount;
             }
             $omset = (float) $t->final_amount - $pointPayment;
-            $hpp = $t->cogs > 0 ? (float) $t->cogs : (float) $t->total_amount * 0.7;
+            $hpp = (float) $t->raw_cogs;
             $laba = $omset - $hpp;
 
             $t_omset += $omset; $t_hpp += $hpp; $t_laba += $laba;
@@ -668,14 +729,21 @@ class ReportPrintController extends Controller
             $rows[] = [
                 \Carbon\Carbon::parse($t->transaction_date)->format('d M Y H:i'),
                 $t->local_transaction_id,
+                $t->transaction_source,
                 number_format($omset, 0, ',', '.'),
                 number_format($hpp, 0, ',', '.'),
                 number_format($laba, 0, ',', '.')
             ];
         }
-        $rows[] = ['<strong>TOTAL</strong>', '', '<strong>'.number_format($t_omset, 0, ',', '.').'</strong>', '<strong>'.number_format($t_hpp, 0, ',', '.').'</strong>', '<strong>'.number_format($t_laba, 0, ',', '.').'</strong>'];
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '<strong>'.number_format($t_omset, 0, ',', '.').'</strong>', '<strong>'.number_format($t_hpp, 0, ',', '.').'</strong>', '<strong>'.number_format($t_laba, 0, ',', '.').'</strong>'];
 
-        return view('print.reports.generic', ['title' => 'Laporan Laba Rugi (Estimasi)', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+        return view('print.reports.generic', [
+            'title' => 'Laporan Laba Rugi (Estimasi)', 
+            'period' => $period, 
+            'columns' => $columns, 
+            'rows' => $rows,
+            'note' => 'Catatan: Nilai HPP yang tercantum pada laporan ini sudah termasuk PPN (HPP + PPN).'
+        ]);
     }
 
     private function printLaporanBarangDijual($filters)
@@ -1686,150 +1754,34 @@ class ReportPrintController extends Controller
     {
         $filters = $request->input('tableFilters', []);
         $activeTab = $request->input('activeTab', 'item');
-        $branchId = $filters['branch_id']['value'] ?? auth()->user()->branch_id;
-        $search = $filters['search']['value'] ?? null;
+        
+        $hppPage = app(\App\Filament\Pages\LaporanHpp::class);
+        $hppPage->activeTab = $activeTab;
         
         $dateFilter = $filters['date_filter'] ?? [];
-        $period = $dateFilter['period'] ?? 'today';
-        $from = null;
-        $until = null;
         
-        if ($period === 'today') {
-            $from = Carbon::today();
-            $until = Carbon::today()->endOfDay();
-        } elseif ($period === 'yesterday') {
-            $from = Carbon::yesterday();
-            $until = Carbon::yesterday()->endOfDay();
-        } elseif ($period === 'this_week') {
-            $from = Carbon::now()->startOfWeek();
-            $until = Carbon::now()->endOfWeek();
-        } elseif ($period === 'last_week') {
-            $from = Carbon::now()->subWeek()->startOfWeek();
-            $until = Carbon::now()->subWeek()->endOfWeek();
-        } elseif ($period === 'this_month') {
-            $from = Carbon::now()->startOfMonth();
-            $until = Carbon::now()->endOfMonth();
-        } elseif ($period === 'last_month') {
-            $from = Carbon::now()->subMonth()->startOfMonth();
-            $until = Carbon::now()->subMonth()->endOfMonth();
-        } elseif ($period === 'custom') {
-            $from = !empty($dateFilter['created_from']) ? Carbon::parse($dateFilter['created_from'])->startOfDay() : Carbon::parse('2000-01-01');
-            $until = !empty($dateFilter['created_until']) ? Carbon::parse($dateFilter['created_until'])->endOfDay() : Carbon::now()->endOfDay();
-        }
+        $hppPage->data = [
+            'period' => $dateFilter['period'] ?? 'today',
+            'created_from' => $dateFilter['created_from'] ?? null,
+            'created_until' => $dateFilter['created_until'] ?? null,
+            'branch_id' => $filters['branch_id']['value'] ?? auth()->user()->branch_id,
+            'search' => $filters['search']['value'] ?? null,
+            'transaction_source' => $filters['transaction_source']['value'] ?? 'ALL',
+        ];
         
-        $whereClause = "t.transaction_date >= ? AND t.transaction_date <= ?";
-        $bindings = [$from, $until];
+        $results = $hppPage->getReportData();
         
-        if ($branchId) {
-            $whereClause .= " AND t.branch_id = ?";
-            $bindings[] = $branchId;
-        }
-
-        if ($search) {
-            $whereClause .= " AND (p.name LIKE ? OR p.sku LIKE ? OR c.name LIKE ? OR p.sub_category LIKE ?)";
-            $searchPattern = '%' . $search . '%';
-            $bindings[] = $searchPattern;
-            $bindings[] = $searchPattern;
-            $bindings[] = $searchPattern;
-            $bindings[] = $searchPattern;
-        }
-
         if ($activeTab === 'item') {
-            $sql = "
-                SELECT 
-                    p.sku as barcode, p.name as item_name, p.unit_of_measure as unit,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity ELSE 0 END) as sales_qty,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity ELSE 0 END) as return_qty,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY p.id, p.sku, p.name, p.unit_of_measure ORDER BY p.name ASC
-            ";
             $columns = ['Barcode', 'Nama Item', 'Satuan', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
         } elseif ($activeTab === 'category') {
-            $sql = "
-                SELECT 
-                    c.id as category_id, COALESCE(c.name, 'Tanpa Kategori') as category_name,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY c.id, COALESCE(c.name, 'Tanpa Kategori') ORDER BY category_name ASC
-            ";
             $columns = ['Kode Kategori', 'Kelompok Barang', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
         } elseif ($activeTab === 'subcategory') {
-            $sql = "
-                SELECT 
-                    c.id as category_id, COALESCE(c.name, 'Tanpa Kategori') as category_name, p.sub_category,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY c.id, COALESCE(c.name, 'Tanpa Kategori'), p.sub_category ORDER BY category_name ASC, p.sub_category ASC
-            ";
             $columns = ['Sub Kategori', 'Kategori Induk', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
         } elseif ($activeTab === 'yearly') {
-            $sql = "
-                SELECT 
-                    DATE_FORMAT(t.transaction_date, '%Y-%m') as tgl,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m') ORDER BY tgl ASC
-            ";
             $columns = ['Bulan', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
         } else {
-            // monthly
-            $sql = "
-                SELECT 
-                    DATE(t.transaction_date) as tgl,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as sales_amount,
-                    SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as cogs_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN ti.quantity * (ti.unit_price - ti.discount_per_item) ELSE 0 END) as return_amount,
-                    SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
-                        SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(st.cost_price_tax, st.cost_price, p.cost_price_tax, p.cost_price, 0))
-                        FROM stock_batch_deductions sbd JOIN stock_batches sb ON sbd.stock_batch_id = sb.id WHERE sbd.transaction_item_id = ti.id
-                    ) ELSE 0 END) as return_cogs_amount
-                FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id JOIN products p ON ti.product_id = p.id LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN stocks st ON st.product_id = p.id AND st.branch_id = t.branch_id
-                WHERE t.is_voided = 0 AND $whereClause GROUP BY DATE(t.transaction_date) ORDER BY tgl ASC
-            ";
             $columns = ['Tanggal', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];
         }
-
-        $results = collect(\Illuminate\Support\Facades\DB::select($sql, $bindings));
         $rows = [];
         $t_sales = 0; $t_cogs = 0; $t_return = 0; $t_return_cogs = 0; $t_profit = 0;
 
@@ -1888,7 +1840,8 @@ class ReportPrintController extends Controller
             'title' => 'Rekapitulasi Harga Pokok Penjualan (HPP)',
             'period' => $this->getPeriodString(['date_filter' => $dateFilter], 'date_filter'),
             'columns' => $columns,
-            'rows' => $rows
+            'rows' => $rows,
+            'note' => 'Catatan: Nilai HPP yang tercantum pada laporan ini sudah termasuk PPN (HPP + PPN).'
         ]);
     }
 }

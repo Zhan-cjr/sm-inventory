@@ -62,9 +62,25 @@ class SendDailyReport extends Command
 
             $onlineTransactions = $ecommerceOrders->count();
             $onlineSales = $ecommerceOrders->sum('total_amount');
-            $onlineProfit = $ecommerceOrders->sum(function($order) {
-                $cogs = $order->items->sum(function($item) {
-                    return $item->product ? ($item->product->cost_price * $item->quantity) : 0;
+            $onlineProfit = $ecommerceOrders->sum(function($order) use ($branch) {
+                $cogs = $order->items->sum(function($item) use ($branch) {
+                    if (!$item->product_id || !$item->product) return 0;
+
+                    $stock = \App\Models\Stock::where('product_id', $item->product_id)
+                        ->where('branch_id', $branch->id)
+                        ->first();
+
+                    $stCostPriceTax = $stock ? $stock->cost_price_tax : 0;
+                    $stCostPrice = $stock ? $stock->cost_price : 0;
+                    $pCostPriceTax = $item->product->cost_price_tax ?? 0;
+                    $pCostPrice = $item->product->cost_price ?? 0;
+                    
+                    $fallbackPrice = $stCostPriceTax > 0 ? $stCostPriceTax : 
+                        ($stCostPrice > 0 ? $stCostPrice : 
+                        ($pCostPriceTax > 0 ? $pCostPriceTax : 
+                        ($pCostPrice > 0 ? $pCostPrice : 0)));
+
+                    return $item->quantity * (float) $fallbackPrice;
                 });
                 return $order->total_amount - $cogs;
             });
@@ -107,6 +123,7 @@ class SendDailyReport extends Command
         $message .= "Total Trx: " . number_format($grandTotalTransactions, 0, ',', '.') . "\n";
         $message .= "Total Omset: Rp " . number_format($grandTotalSales, 0, ',', '.') . "\n";
         $message .= "Total Laba Kotor: Rp " . number_format($grandTotalProfit, 0, ',', '.') . "\n";
+        $message .= "\n_(Catatan: Perhitungan Laba Kotor berdasar HPP yang sudah termasuk PPN)_\n";
 
         // Fetch users to send report to
         // Assuming Super Admin, Manager or Owner gets the report

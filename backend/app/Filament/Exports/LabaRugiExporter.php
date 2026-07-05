@@ -17,6 +17,7 @@ class LabaRugiExporter extends Exporter
             ExportColumn::make('local_transaction_id')->label('No Transaksi'),
             ExportColumn::make('transaction_date')->label('Tanggal'),
             ExportColumn::make('branch.name')->label('Cabang'),
+            ExportColumn::make('transaction_source')->label('Sumber Penjualan'),
             ExportColumn::make('final_amount')
                 ->label('Penjualan Bersih')
                 ->state(function (Transaction $record) {
@@ -32,7 +33,7 @@ class LabaRugiExporter extends Exporter
                     }
                     return $record->final_amount - $pointPayment;
                 }),
-            ExportColumn::make('cogs')->label('Total HPP')->state(fn (Transaction $record): float => $record->cogs),
+            ExportColumn::make('cogs')->label('Total HPP')->state(fn (Transaction $record): float => $record->raw_cogs),
             ExportColumn::make('gross_profit')
                 ->label('Laba Kotor')
                 ->state(function (Transaction $record) {
@@ -46,7 +47,7 @@ class LabaRugiExporter extends Exporter
                     } elseif (strtoupper($record->payment_method) === 'POINT') {
                         $pointPayment = (float) $record->final_amount;
                     }
-                    return ($record->final_amount - $pointPayment) - $record->cogs;
+                    return ($record->final_amount - $pointPayment) - $record->raw_cogs;
                 }),
         ];
     }
