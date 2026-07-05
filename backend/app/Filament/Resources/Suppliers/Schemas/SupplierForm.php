@@ -17,7 +17,23 @@ class SupplierForm
                 Select::make('organization_id')
                     ->relationship('organization', 'name')
                     ->required(),
-                TextInput::make('code'),
+                TextInput::make('code')
+                    ->default(function () {
+                        $dateCode = now()->format('dmy'); // DDMMYY
+                        $lastSupplier = \App\Models\Supplier::where('code', 'like', "SUP-{$dateCode}%")
+                            ->orderBy('code', 'desc')
+                            ->first();
+
+                        if ($lastSupplier) {
+                            $lastSequence = (int) substr($lastSupplier->code, -3);
+                            $nextSequence = str_pad($lastSequence + 1, 3, '0', STR_PAD_LEFT);
+                        } else {
+                            $nextSequence = '001';
+                        }
+
+                        return "SUP-{$dateCode}{$nextSequence}";
+                    })
+                    ->unique(ignoreRecord: true),
                 TextInput::make('name')
                     ->required(),
                 TextInput::make('contact_person'),
