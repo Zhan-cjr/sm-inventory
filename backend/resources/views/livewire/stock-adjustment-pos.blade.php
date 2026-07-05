@@ -23,6 +23,11 @@
         .dark .pos-grid-td { background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important; }
         .dark .bg-white { background-color: #1f2937 !important; }
         .dark .empty-state { color: #9ca3af !important; }
+
+        .error-row .pos-grid-td { background-color: #fee2e2 !important; }
+        .dark .error-row .pos-grid-td { background-color: rgba(153, 27, 27, 0.3) !important; }
+        .error-row .pos-input { background-color: #fecaca !important; border-color: #ef4444 !important; color: #7f1d1d !important; }
+        .dark .error-row .pos-input { background-color: rgba(153, 27, 27, 0.5) !important; border-color: #ef4444 !important; color: #fecaca !important; }
         
         .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .flex-between { display: flex; justify-content: space-between; align-items: center; }
@@ -207,7 +212,7 @@
             </thead>
             <tbody>
                 @forelse($cart as $index => $item)
-                    <tr>
+                    <tr class="{{ $item['new_qty'] < 0 ? 'error-row' : '' }}">
                         <td class="pos-grid-td" style="text-align: center;">{{ $loop->iteration }}</td>
                         @if(in_array('sku', $visibleColumns)) <td class="pos-grid-td">{{ $item['sku'] }}</td> @endif
                         @if(in_array('barcode', $visibleColumns)) <td class="pos-grid-td">{{ $item['barcode'] }}</td> @endif

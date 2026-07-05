@@ -231,6 +231,17 @@ class StockAdjustmentPos extends Component
             return;
         }
 
+        foreach ($this->cart as $item) {
+            if ($item['new_qty'] < 0) {
+                Notification::make()
+                    ->title('Stok tidak mencukupi!')
+                    ->body("Produk {$item['name']} tidak dapat dikurangi {$item['qty']} karena sisa stok hanya {$item['stock']}.")
+                    ->danger()
+                    ->send();
+                return;
+            }
+        }
+
         $organization = \App\Models\Organization::find(auth()->user()->organization_id ?? \App\Models\Organization::first()->id);
         
         $needsApproval = false;
