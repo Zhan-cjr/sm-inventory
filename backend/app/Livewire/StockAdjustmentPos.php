@@ -149,9 +149,13 @@ class StockAdjustmentPos extends Component
             $this->dispatch('item-added', index: $existingIndex);
         } else {
             // Get stock
-            $stock = \App\Models\Stock::where('product_id', $product->id)
+            $stockRecord = \App\Models\Stock::where('product_id', $product->id)
                 ->where('branch_id', $this->branch_id)
-                ->value('quantity_on_hand') ?? 0;
+                ->first();
+
+            $stock = $stockRecord ? $stockRecord->quantity_on_hand : 0;
+            // Gunakan cost_price_tax dari cabang jika ada, jika tidak fallback ke cost_price_tax produk
+            $unitCost = ($stockRecord && $stockRecord->cost_price_tax > 0) ? $stockRecord->cost_price_tax : ($product->cost_price_tax > 0 ? $product->cost_price_tax : $product->cost_price);
 
             $qty = 1;
             $multiplier = $this->reason_type === 'MINUS' ? -1 : 1;
@@ -165,8 +169,8 @@ class StockAdjustmentPos extends Component
                 'stock' => $stock,
                 'qty' => $qty,
                 'new_qty' => $newQty,
-                'unit_cost' => $product->cost_price,
-                'subtotal' => $product->cost_price * $qty
+                'unit_cost' => $unitCost,
+                'subtotal' => $unitCost * $qty
             ];
         }
 

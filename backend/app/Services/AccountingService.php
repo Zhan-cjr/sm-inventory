@@ -735,7 +735,7 @@ class AccountingService
 
         foreach ($adjustment->items as $item) {
             $diff = $item->new_quantity - $item->previous_quantity;
-            $cogs = $item->product->cost_price ?? 0;
+            $cogs = $item->unit_cost > 0 ? $item->unit_cost : ($item->product->cost_price_tax > 0 ? $item->product->cost_price_tax : ($item->product->cost_price ?? 0));
             $value = abs($diff * $cogs);
 
             if ($diff < 0) {
@@ -862,7 +862,8 @@ class AccountingService
             if ($diff == 0) continue;
 
             $product = \App\Models\Product::find($productId);
-            $cogs = $product->cost_price ?? 0;
+            $stock = \App\Models\Stock::where('product_id', $productId)->where('branch_id', $session->branch_id)->first();
+            $cogs = ($stock && $stock->cost_price_tax > 0) ? $stock->cost_price_tax : ($product->cost_price_tax > 0 ? $product->cost_price_tax : ($product->cost_price ?? 0));
             $value = abs($diff * $cogs);
 
             if ($diff < 0) {
