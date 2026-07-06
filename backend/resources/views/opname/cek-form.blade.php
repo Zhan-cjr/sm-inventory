@@ -518,7 +518,12 @@
     }
 
     // ─── Barcode match & focus ───
+    let isProcessingScan = false;
+
     function findAndFocusByBarcode(code) {
+        if (isProcessingScan) return;
+        isProcessingScan = true;
+
         code = code.toLowerCase().trim();
         const status = document.getElementById('scan-status');
         let found = null;
@@ -540,6 +545,7 @@
                     if (data.error) {
                         status.className = 'scan-status notfound';
                         status.textContent = `❌ Produk "${code}" tidak ditemukan di server.`;
+                        isProcessingScan = false;
                     } else {
                         // Create new product item in DOM
                         const list = document.getElementById('product-list');
@@ -586,6 +592,7 @@
                 .catch(err => {
                     status.className = 'scan-status notfound';
                     status.textContent = `❌ Gagal menghubungi server.`;
+                    isProcessingScan = false;
                 });
         }
     }
@@ -613,6 +620,7 @@
     let html5QrCode = null;
 
     window.openScanModal = function() {
+        isProcessingScan = false;
         document.getElementById('scan-modal').classList.add('open');
         document.getElementById('scan-status').className = 'scan-status';
         document.getElementById('scan-status').textContent = 'Memulai kamera...';
@@ -646,7 +654,10 @@
 
     window.manualSearch = function() {
         const val = document.getElementById('manual-barcode').value;
-        if (val.trim()) findAndFocusByBarcode(val);
+        if (val.trim()) {
+            isProcessingScan = false;
+            findAndFocusByBarcode(val);
+        }
     };
 
     document.getElementById('manual-barcode').addEventListener('keydown', e => {
