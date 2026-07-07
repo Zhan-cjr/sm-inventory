@@ -323,6 +323,92 @@
 <script src="{{ asset('js/html5-qrcode.min.js') }}"></script>
 <script>
 (function() {
+    const storageKey = 'opname_hitung_{{ $rackSession->rack_token }}';
+
+    function saveDraft() {
+        const state = {
+            checker_name: document.querySelector('input[name="counter_name"]').value,
+            items: []
+        };
+        
+        document.querySelectorAll('.product-item').forEach(el => {
+            if (el.style.display !== 'none') {
+                const qtyInput = el.querySelector('.qty-input');
+                if (qtyInput && qtyInput.value !== '') {
+                    state.items.push({
+                        id: el.dataset.itemId || (qtyInput.name.match(/\[(.*?)\]/) ? qtyInput.name.match(/\[(.*?)\]/)[1] : null),
+                        qty: qtyInput.value,
+                        isNew: qtyInput.name.includes('new_quantities'),
+                        name: el.dataset.name,
+                        sku: el.dataset.sku,
+                        barcode: el.dataset.barcode,
+                        rawName: el.querySelector('.product-name').innerHTML,
+                        rawMeta: el.querySelector('.product-meta').innerHTML
+                    });
+                }
+            }
+        });
+        
+        localStorage.setItem(storageKey, JSON.stringify(state));
+    }
+
+    function loadDraft() {
+        const saved = localStorage.getItem(storageKey);
+        if (!saved) return;
+        
+        try {
+            const state = JSON.parse(saved);
+            const nameInput = document.querySelector('input[name="counter_name"]');
+            if (nameInput && state.checker_name) nameInput.value = state.checker_name;
+            
+            state.items.forEach(item => {
+                if (item.isNew) {
+                    let existing = document.querySelector(`.product-item input[name="new_quantities[${item.id}]"]`);
+                    if (!existing) {
+                        const list = document.getElementById('product-list');
+                        const div = document.createElement('div');
+                        div.className = 'product-item';
+                        div.dataset.name = item.name;
+                        div.dataset.sku = item.sku;
+                        div.dataset.barcode = item.barcode;
+                        div.innerHTML = `
+                            <div>
+                                <div class="product-name">${item.rawName}</div>
+                                <div class="product-meta">${item.rawMeta}</div>
+                            </div>
+                            <input type="number" name="new_quantities[${item.id}]" class="qty-input" placeholder="0" min="0" step="1" inputmode="numeric" value="${item.qty}">
+                        `;
+                        list.insertBefore(div, list.firstChild);
+                        
+                        const newInput = div.querySelector('.qty-input');
+                        newInput.addEventListener('keydown', e => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const searchInp = document.getElementById('search-product');
+                                searchInp.value = '';
+                                filterProducts('');
+                                searchInp.focus();
+                            }
+                        });
+                        newInput.addEventListener('input', saveDraft);
+                    } else {
+                        existing.value = item.qty;
+                    }
+                } else {
+                    const inp = document.querySelector(`input[name="quantities[${item.id}]"]`);
+                    if (inp) inp.value = item.qty;
+                }
+            });
+            
+            productList = document.querySelectorAll('#product-list .product-item');
+            const countEl = document.getElementById('item-count');
+            let visibleCount = Array.from(productList).filter(e => e.style.display !== 'none').length;
+            if (countEl) countEl.textContent = `Menampilkan ${visibleCount} produk`;
+        } catch(e) {
+            console.error("Gagal meload draft", e);
+        }
+    }
+
     // ─── Search filter ───
     const searchInput = document.getElementById('search-product');
     let productList = document.querySelectorAll('#product-list .product-item');
@@ -343,13 +429,29 @@
     }
     searchInput.addEventListener('input', () => filterProducts(searchInput.value));
 
+    // Support for physical barcode scanners typing into the search input
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = searchInput.value.trim();
+            if (val) {
+                isProcessingScan = false;
+                findAndFocusByBarcode(val);
+            }
+        }
+    });
+
     // ─── Enter key navigation: kembali ke search bar ───
     const qtyInputs = Array.from(document.querySelectorAll('.qty-input'));
     qtyInputs.forEach((inp, idx) => {
+        inp.addEventListener('input', saveDraft); // Auto-save on input
         inp.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                document.getElementById('search-product').focus();
+                const searchInp = document.getElementById('search-product');
+                searchInp.value = '';
+                filterProducts('');
+                searchInp.focus();
             }
         });
     });
@@ -382,6 +484,7 @@
     });
     
     function proceedSubmit() {
+        localStorage.removeItem(storageKey); // Clear draft on submit
         const btn = document.getElementById('submit-btn');
         btn.disabled = true;
         btn.textContent = '⏳ Mengirim data...';
@@ -488,6 +591,10 @@
                     if (data.error) {
                         status.className = 'scan-status notfound';
                         status.textContent = `❌ Produk "${code}" tidak ditemukan di server.`;
+                        if (!document.getElementById('scan-modal').classList.contains('open')) {
+                            alert(`❌ Produk "${code}" tidak ditemukan di server.`);
+                            searchInput.select();
+                        }
                         isProcessingScan = false;
                     } else {
                         // Create new product item in DOM
@@ -521,10 +628,14 @@
                         
                         // Handle enter key for new input
                         const newInput = div.querySelector('.qty-input');
+                        newInput.addEventListener('input', saveDraft); // Auto-save new input
                         newInput.addEventListener('keydown', e => {
                             if (e.key === 'Enter') {
                                 e.preventDefault();
-                                document.getElementById('search-product').focus();
+                                const searchInp = document.getElementById('search-product');
+                                searchInp.value = '';
+                                filterProducts('');
+                                searchInp.focus();
                             }
                         });
                         
@@ -534,6 +645,10 @@
                 .catch(err => {
                     status.className = 'scan-status notfound';
                     status.textContent = `❌ Gagal menghubungi server.`;
+                    if (!document.getElementById('scan-modal').classList.contains('open')) {
+                        alert(`❌ Gagal menghubungi server.`);
+                        searchInput.select();
+                    }
                     isProcessingScan = false;
                 });
         }
@@ -547,6 +662,8 @@
         // Scroll into view & highlight
         found.classList.add('scan-match');
         found.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        closeScanModal(); // Close modal immediately so user can see the item and input qty
 
         // Focus qty input
         const qtyEl = found.querySelector('.qty-input');
@@ -554,14 +671,14 @@
             setTimeout(() => {
                 qtyEl.focus();
                 qtyEl.select();
-            }, 300);
+            }, 100);
         }
 
         status.className = 'scan-status found';
         status.textContent = `✅ Ditemukan: ${found.querySelector('.product-name').textContent.replace('(BARU)', '')}`;
-
-        // Auto-close modal after 1.2s if scanning was done by camera
-        setTimeout(() => closeScanModal(), 1200);
+        
+        // Allow next scan
+        setTimeout(() => { isProcessingScan = false; }, 500);
     }
 
     // ─── Camera scan modal ───
@@ -623,6 +740,9 @@
     document.getElementById('scan-modal').addEventListener('click', function(e) {
         if (e.target === this) closeScanModal();
     });
+    // Load draft when initializing
+    document.querySelector('input[name="counter_name"]')?.addEventListener('input', saveDraft);
+    loadDraft();
 })();
 </script>
 </body>
