@@ -87,7 +87,11 @@ def process_nl_query(query: str, branch_id: str = None, chat_history: list = Non
 - If the user asks for 'semua cabang' or explicitly requests another branch by name (e.g. 'cabang pasirhayam'), you MUST REFUSE them immediately with 'ANSWER: Maaf, Anda tidak memiliki akses ke data cabang lain.'
 """
         else:
-            security_rules = "- The user is an Admin. They can view all data across all branches. Do NOT restrict their queries to any specific branch unless they ask for it."
+            security_rules = """
+- The user is an Admin. They can view all data across all branches.
+- If the user asks for data about a SPECIFIC branch by name (e.g., 'cabang A' or 'Pasirhayam'), you MUST JOIN the `branches` table (e.g., `ON transactions.branch_id = branches.id`) and filter using `WHERE branches.name LIKE '%A%'`. DO NOT filter `branch_id` directly with a string name, because `branch_id` is a UUID.
+- If the user asks for data GENERALLY (without specifying a branch name), you MUST JOIN the `branches` table and include `branches.name` in your SELECT and GROUP BY clauses (e.g., `SELECT branches.name, SUM(...) ... GROUP BY branches.name`), so the admin sees the details per branch.
+"""
 
         history_text = ""
         if chat_history and len(chat_history) > 0:
@@ -113,7 +117,6 @@ INSTRUCTIONS:
 - If the user is asking about inventory data, sales, or anything requiring database lookup, write a read-only MySQL query (SELECT only). Prefix it EXACTLY with 'SQL: '.
 - CRITICAL: Only use tables and columns that exist in the schema above.
 - For sales ("penjualan"), ALWAYS use the `transactions` table. You MUST calculate revenue using `SUM(final_amount)` (not total_amount) and you MUST include the condition `is_voided = 0`.
-- If the user specifies a branch name, ALWAYS use `LIKE '%branch_name%'` instead of exact `=` matching, because users often type partial names (e.g. 'pasirhayam' for 'Selamat Pasirhayam').
 - Do NOT wrap the query in markdown backticks (```). Just write the raw SQL query after 'SQL: '.
 - Do NOT add any conversational text or explanation. Output ONLY the 'ANSWER: ...' or 'SQL: ...' line.
 """
@@ -168,7 +171,7 @@ YOU MUST ALWAYS CLARIFY in your answer that the data yang ditampilkan KHUSUS HAN
         else:
             answer_security_rules = """
 IMPORTANT CONTEXT FOR YOUR ANSWER:
-The user is an Admin. The data provided below is GLOBAL TOTAL (Gabungan dari SELURUH CABANG). YOU MUST ALWAYS CLARIFY in your answer that this data is KESELURUHAN CABANG.
+The user is an Admin. If they did not specify a branch, the data provided is the GLOBAL TOTAL (Gabungan dari SELURUH CABANG) and you MUST state so. If they asked for a specific branch, CLARIFY that the data is khusus untuk cabang yang mereka tanyakan.
 """
 
         prompt_answer = f"""You are a helpful and polite smart assistant for 'SM Inventory' app.
