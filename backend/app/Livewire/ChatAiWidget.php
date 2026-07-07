@@ -56,6 +56,7 @@ class ChatAiWidget extends Component
             $response = Http::timeout(60)->post('http://localhost:8001/api/v1/ai/ask', [
                 'question' => $userQuestion,
                 'branch_id' => $branchId, // Pass branch for security
+                'chat_history' => $this->chatHistory, // Pass chat history for context
             ]);
 
             if ($response->successful()) {
@@ -63,7 +64,7 @@ class ChatAiWidget extends Component
                 $this->chatHistory[] = [
                     'role' => 'assistant',
                     'content' => $data['response'] ?? 'Maaf, saya tidak mengerti data tersebut.',
-                    'sql' => $data['sql'] ?? null,
+                    'sql' => $data['sql_executed'] ?? null,
                     'data' => $data['data'] ?? [],
                 ];
             } else {

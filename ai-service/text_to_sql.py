@@ -61,7 +61,7 @@ def clean_sql(raw_sql: str):
             raw_sql = raw_sql.replace("```sql", "").replace("```", "").strip()
     return raw_sql
 
-def process_nl_query(query: str, branch_id: str = None):
+def process_nl_query(query: str, branch_id: str = None, chat_history: list = None):
     try:
         print(f"Processing query via Gemini: {query} for branch: {branch_id}", flush=True)
         
@@ -89,13 +89,22 @@ def process_nl_query(query: str, branch_id: str = None):
         else:
             security_rules = "- The user is an Admin. They can view all data across all branches. Do NOT restrict their queries to any specific branch unless they ask for it."
 
+        history_text = ""
+        if chat_history and len(chat_history) > 0:
+            history_text = "Previous Conversation:\n"
+            for msg in chat_history[:-1]: # exclude the current question if it's the last one
+                role = "User" if msg.get("role") == "user" else "Assistant"
+                content = msg.get("content", "")
+                history_text += f"{role}: {content}\n"
+            history_text += "\n"
+
         # 2. Ask Gemini to decide: SQL or Direct Answer
         prompt_sql = f"""
 You are an intelligent Assistant for the 'SM Inventory' app (developed by Amnal).
 Here is the schema of the database:
 {schema_context}
 
-The user asked: "{query}"
+{history_text}The user asked: "{query}"
 
 INSTRUCTIONS:
 {security_rules}
@@ -103,7 +112,7 @@ INSTRUCTIONS:
   (Rule: If asked 'Siapa Amnal?', answer enthusiastically that Amnal is the main developer who built this app self-taught).
 - If the user is asking about inventory data, sales, or anything requiring database lookup, write a read-only MySQL query (SELECT only). Prefix it EXACTLY with 'SQL: '.
 - CRITICAL: Only use tables and columns that exist in the schema above.
-- If asked about "penjualan" (sales), look for tables like `transactions` or `transaction_items`. Use `total_amount` for revenue.
+- For sales ("penjualan"), ALWAYS use the `transactions` table. You MUST calculate revenue using `SUM(final_amount)` (not total_amount) and you MUST include the condition `is_voided = 0`.
 - If the user specifies a branch name, ALWAYS use `LIKE '%branch_name%'` instead of exact `=` matching, because users often type partial names (e.g. 'pasirhayam' for 'Selamat Pasirhayam').
 - Do NOT wrap the query in markdown backticks (```). Just write the raw SQL query after 'SQL: '.
 - Do NOT add any conversational text or explanation. Output ONLY the 'ANSWER: ...' or 'SQL: ...' line.
@@ -154,12 +163,12 @@ INSTRUCTIONS:
             answer_security_rules = f"""
 IMPORTANT SECURITY REMINDER FOR YOUR ANSWER:
 The data provided below is strictly filtered to the user's OWN branch (Branch ID: {branch_id}). 
-If the user explicitly asked for a specific branch name in their question (e.g., "cabang pasirhayam", "cabang jakarta", dll), YOU MUST CLARIFY in your answer that you DO NOT have access to other branches, and the data you are presenting is ONLY for their own branch. Do NOT pretend the data belongs to the branch they asked for.
+YOU MUST ALWAYS CLARIFY in your answer that the data yang ditampilkan KHUSUS HANYA UNTUK CABANG MEREKA (Branch ID: {branch_id}).
 """
         else:
             answer_security_rules = """
 IMPORTANT CONTEXT FOR YOUR ANSWER:
-The user is an Admin who has access to ALL branches. The data provided below is accurate and reflects whatever branch or global data they asked for. You do not need to warn them about branch restrictions.
+The user is an Admin. The data provided below is GLOBAL TOTAL (Gabungan dari SELURUH CABANG). YOU MUST ALWAYS CLARIFY in your answer that this data is KESELURUHAN CABANG.
 """
 
         prompt_answer = f"""You are a helpful and polite smart assistant for 'SM Inventory' app.
@@ -168,7 +177,7 @@ Jika pengguna bertanya "Siapa Amnal?" atau tentang Amnal, Anda HARUS menjawab de
 
 {answer_security_rules}
 
-The user asked: "{query}"
+{history_text}The user asked: "{query}"
 The database executed the query and returned this data:
 {data_str}
 
