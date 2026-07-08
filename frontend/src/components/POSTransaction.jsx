@@ -3002,6 +3002,7 @@ export const POSTransaction = ({
               className="modern-barcode-input"
               style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
               value={directCashInput}
+              maxLength={11}
               onChange={(e) => {
                 setDirectCashInput(formatThousandSeparator(e.target.value));
               }}
@@ -3009,6 +3010,10 @@ export const POSTransaction = ({
                 if (e.key === 'Enter') {
                   const val = parseFloat(directCashInput.replace(/\./g, ''));
                   if (!isNaN(val) && val !== 0) {
+                    const changeAmt = val - (finalAmount - payments.reduce((sum, p) => sum + p.amount, 0));
+                    if (changeAmt > 100000) {
+                      if (!window.confirm(`Peringatan: Kembalian terlalu besar (Rp ${formatThousandSeparator(changeAmt)}). Lanjutkan transaksi?`)) return;
+                    }
                     setIsDirectCashModalOpen(false);
                     processTransaction('CASH', null, val);
                   }
@@ -3025,6 +3030,10 @@ export const POSTransaction = ({
               <button className="btn-success" style={{ flex: 1 }} onClick={() => {
                 const val = parseFloat(directCashInput.replace(/\./g, ''));
                 if (!isNaN(val) && val !== 0) {
+                  const changeAmt = val - (finalAmount - payments.reduce((sum, p) => sum + p.amount, 0));
+                  if (changeAmt > 100000) {
+                    if (!window.confirm(`Peringatan: Kembalian terlalu besar (Rp ${formatThousandSeparator(changeAmt)}). Lanjutkan transaksi?`)) return;
+                  }
                   setIsDirectCashModalOpen(false);
                   processTransaction('CASH', null, val);
                 }
@@ -3092,11 +3101,16 @@ export const POSTransaction = ({
               style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
               placeholder="0"
               value={multiCashInput}
+              maxLength={11}
               onChange={(e) => setMultiCashInput(formatThousandSeparator(e.target.value))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const val = parseFloat(multiCashInput.replace(/\./g, ''));
                   if (!isNaN(val) && val > 0) {
+                    const changeAmt = (payments.reduce((sum, p) => sum + p.amount, 0) + val) - finalAmount;
+                    if (changeAmt > 100000) {
+                      if (!window.confirm(`Peringatan: Kembalian terlalu besar (Rp ${formatThousandSeparator(changeAmt)}). Lanjutkan?`)) return;
+                    }
                     setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
                     setIsMultiCashModalOpen(false);
                     setMultiCashInput('');
@@ -3116,6 +3130,10 @@ export const POSTransaction = ({
               <button className="btn-success" style={{ flex: 1 }} onClick={() => {
                 const val = parseFloat(multiCashInput.replace(/\./g, ''));
                 if (!isNaN(val) && val > 0) {
+                  const changeAmt = (payments.reduce((sum, p) => sum + p.amount, 0) + val) - finalAmount;
+                  if (changeAmt > 100000) {
+                    if (!window.confirm(`Peringatan: Kembalian terlalu besar (Rp ${formatThousandSeparator(changeAmt)}). Lanjutkan?`)) return;
+                  }
                   setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
                   setIsMultiCashModalOpen(false);
                   setMultiCashInput('');
