@@ -55,9 +55,17 @@ class LaporanPenjualanKasir extends Page implements HasTable
                     ->collapsible(),
             ])
             ->columns([
-                TextColumn::make('local_transaction_id')
+                TextColumn::make('short_id')
                     ->label('No Transaksi')
-                    ->searchable(),
+                    ->searchable(query: function ($query, $search) {
+                        $query->where('receipt_number', 'like', "%{$search}%")
+                              ->orWhere('local_transaction_id', 'like', "%{$search}%");
+                    })
+                    ->sortable(query: fn ($query, $direction) => $query->orderBy('receipt_number', $direction))
+                    ->badge()
+                    ->color('gray')
+                    ->copyable()
+                    ->copyMessage('No transaksi disalin!'),
                 TextColumn::make('transaction_date')
                     ->label('Tanggal')
                     ->dateTime('d M Y H:i')
