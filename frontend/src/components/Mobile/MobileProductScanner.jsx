@@ -196,8 +196,8 @@ export function MobileProductScanner({ user, authToken }) {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <span style={{ color: 'var(--text-muted)' }}>Sisa Stok (Sistem)</span>
-              <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: scannedProduct.stock_quantity <= 0 ? '#ef4444' : 'inherit' }}>
-                {scannedProduct.stock_quantity} <span style={{ fontSize: '0.8rem', fontWeight: 'normal' }}>{scannedProduct.unit_of_measure}</span>
+              <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: (scannedProduct.quantity_on_hand !== undefined ? scannedProduct.quantity_on_hand : scannedProduct.stock_quantity) <= 0 ? '#ef4444' : 'inherit' }}>
+                {scannedProduct.quantity_on_hand !== undefined ? scannedProduct.quantity_on_hand : scannedProduct.stock_quantity} <span style={{ fontSize: '0.8rem', fontWeight: 'normal' }}>{scannedProduct.unit_of_measure}</span>
               </span>
             </div>
             {scannedProduct.rack_code && (
