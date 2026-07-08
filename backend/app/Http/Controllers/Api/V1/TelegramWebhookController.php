@@ -67,13 +67,30 @@ class TelegramWebhookController extends Controller
 
             // 3. Teruskan pesan ke AI Service
             try {
+                $cacheKey = 'telegram_chat_history_' . $chatId;
+                $chatHistory = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+                
+                // Tambahkan pesan user saat ini ke history sementara untuk dikirim sebagai konteks
+                $chatHistoryForAi = $chatHistory;
+                $chatHistoryForAi[] = ['role' => 'user', 'content' => $messageText];
+
                 $aiResponse = Http::timeout(60)->post('http://localhost:8001/api/v1/ai/ask', [
                     'question' => $messageText,
                     'branch_id' => $branchId,
+                    'chat_history' => $chatHistoryForAi, // Kirim history
                 ]);
 
                 if ($aiResponse->successful()) {
                     $reply = $aiResponse->json('response');
+                    
+                    // Simpan percakapan ke cache (maksimal 10 percakapan terakhir)
+                    $chatHistory[] = ['role' => 'user', 'content' => $messageText];
+                    $chatHistory[] = ['role' => 'assistant', 'content' => $reply];
+                    
+                    if (count($chatHistory) > 10) {
+                        $chatHistory = array_slice($chatHistory, -10);
+                    }
+                    \Illuminate\Support\Facades\Cache::put($cacheKey, $chatHistory, now()->addMinutes(60));
                     
                     // Format response jika ada data tabel
                     $data = $aiResponse->json('data');

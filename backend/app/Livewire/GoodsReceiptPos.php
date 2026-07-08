@@ -280,6 +280,168 @@ class GoodsReceiptPos extends Component
 
     public $enable_edit_total = false;
 
+    // AI Scanner specific properties
+    public $scan_image;
+    public $scan_loading = false;
+
+    public function scanInvoiceAction()
+    {
+        $this->validate([
+            'scan_image' => 'required|image|max:10240', // max 10MB
+        ]);
+
+        if (!$this->supplier_id) {
+            Notification::make()->title('Pilih Supplier Terlebih Dahulu')->warning()->send();
+            return;
+        }
+
+        $this->scan_loading = true;
+
+        try {
+            // Get original path
+            $filePath = $this->scan_image->getRealPath();
+            $fileContent = fopen($filePath, 'r');
+
+            $response = \Illuminate\Support\Facades\Http::timeout(120)->attach(
+                'file', $fileContent, $this->scan_image->getClientOriginalName()
+            )->post('http://localhost:8001/api/v1/ai/scan-invoice', [
+                'supplier_id' => $this->supplier_id
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if (isset($data['items']) && is_array($data['items'])) {
+                    foreach ($data['items'] as $item) {
+                        $productId = $item['product_id'] ?? null;
+                        
+                        if ($productId) {
+                            $product = Product::find($productId);
+                            if ($product) {
+                                // Find in cart
+                                $idx = collect($this->cart)->search(fn($c) => $c['product_id'] == $product->id);
+                                if ($idx !== false) {
+                                    $this->cart[$idx]['qty_received'] = $item['qty'];
+                                    $this->cart[$idx]['unit_price'] = $item['unit_price'];
+                                    $this->cart[$idx]['discount_1'] = $item['discount_1'] ?? 0;
+                                    $this->cart[$idx]['discount_2'] = $item['discount_2'] ?? 0;
+                                    $this->cart[$idx]['discount_3'] = $item['discount_3'] ?? 0;
+                                    $this->recalculateRow($idx);
+                                } else {
+                                    // Add to cart with scanned data
+                                    $stock = null;
+                                    if ($this->branch_id) {
+                                        $stock = Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->first();
+                                    }
+                                    
+                                    $this->cart[] = [
+                                        'product_id' => $product->id,
+                                        'sku' => $product->sku,
+                                        'barcode' => $product->barcode,
+                                        'name' => $product->name,
+                                        'qty_ordered' => 0,
+                                        'qty_received' => $item['qty'],
+                                        'unit_price' => $item['unit_price'],
+                                        'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($product->harga_jual_1 ?? 0),
+                                        'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($product->margin_gol_1 ?? 0),
+                                        'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($product->harga_jual_2 ?? 0),
+                                        'margin_gol_2' => ($stock && $stock->margin_gol_2 > 0) ? $stock->margin_gol_2 : ($product->margin_gol_2 ?? 0),
+                                        'harga_jual_3' => ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($product->harga_jual_3 ?? 0),
+                                        'margin_gol_3' => ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($product->margin_gol_3 ?? 0),
+                                        'discount_1' => $item['discount_1'] ?? 0,
+                                        'discount_2' => $item['discount_2'] ?? 0,
+                                        'discount_3' => $item['discount_3'] ?? 0,
+                                        'subtotal' => $item['subtotal'] ?? 0,
+                                        'needs_mapping' => false
+                                    ];
+                                    $this->recalculateRow(count($this->cart) - 1);
+                                }
+                            }
+                        } else {
+                            $this->cart[] = [
+                                'product_id' => null,
+                                'raw_name' => $item['raw_name'],
+                                'sku' => '-',
+                                'barcode' => '-',
+                                'name' => '⚠️ ' . $item['raw_name'] . ' (Pilih Produk)',
+                                'qty_ordered' => 0,
+                                'qty_received' => $item['qty'],
+                                'unit_price' => $item['unit_price'],
+                                'harga_jual_1' => 0,
+                                'margin_gol_1' => 0,
+                                'harga_jual_2' => 0,
+                                'margin_gol_2' => 0,
+                                'harga_jual_3' => 0,
+                                'margin_gol_3' => 0,
+                                'discount_1' => $item['discount_1'] ?? 0,
+                                'discount_2' => $item['discount_2'] ?? 0,
+                                'discount_3' => $item['discount_3'] ?? 0,
+                                'subtotal' => $item['subtotal'] ?? 0,
+                                'needs_mapping' => true
+                            ];
+                        }
+                    }
+                    $this->calculateTotals();
+                    Notification::make()->title('Scan AI Selesai')->success()->send();
+                } else {
+                    Notification::make()->title('AI gagal mendeteksi item faktur')->warning()->send();
+                }
+            } else {
+                Notification::make()->title('Gagal menghubungi AI Service')->danger()->send();
+            }
+
+        } catch (\Exception $e) {
+            Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
+        }
+
+        $this->scan_loading = false;
+        $this->scan_image = null; // reset
+    }
+
+    public function mapProduct($index, $productId)
+    {
+        $product = Product::find($productId);
+        if (!$product) return;
+        
+        $item = $this->cart[$index];
+        $rawName = $item['raw_name'] ?? null;
+        
+        if ($rawName && $this->supplier_id) {
+            \Illuminate\Support\Facades\DB::table('supplier_item_mappings')->insertOrIgnore([
+                'id' => \Illuminate\Support\Str::uuid(),
+                'supplier_id' => $this->supplier_id,
+                'raw_name' => $rawName,
+                'product_id' => $productId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Replace the unmapped item with the real product
+        $stock = null;
+        if ($this->branch_id) {
+            $stock = Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->first();
+        }
+
+        $this->cart[$index]['product_id'] = $product->id;
+        $this->cart[$index]['sku'] = $product->sku;
+        $this->cart[$index]['barcode'] = $product->barcode;
+        $this->cart[$index]['name'] = $product->name;
+        $this->cart[$index]['needs_mapping'] = false;
+        
+        $this->cart[$index]['harga_jual_1'] = ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($product->harga_jual_1 ?? 0);
+        $this->cart[$index]['margin_gol_1'] = ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($product->margin_gol_1 ?? 0);
+        $this->cart[$index]['harga_jual_2'] = ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($product->harga_jual_2 ?? 0);
+        $this->cart[$index]['margin_gol_2'] = ($stock && $stock->margin_gol_2 > 0) ? $stock->margin_gol_2 : ($product->margin_gol_2 ?? 0);
+        $this->cart[$index]['harga_jual_3'] = ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($product->harga_jual_3 ?? 0);
+        $this->cart[$index]['margin_gol_3'] = ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($product->margin_gol_3 ?? 0);
+        
+        $this->recalculateRow($index);
+        $this->calculateTotals();
+        
+        Notification::make()->title('Produk berhasil dipetakan!')->success()->send();
+    }
+
     public function removeExistingImage($index)
     {
         if (isset($this->existing_faktur_image[$index])) {

@@ -23,6 +23,7 @@ from typing import Optional
 class QueryRequest(BaseModel):
     question: str
     branch_id: Optional[str] = None
+    chat_history: Optional[list] = None
 
 @app.get("/")
 def read_root():
@@ -32,8 +33,37 @@ def read_root():
 def ask_ai(request: QueryRequest):
     try:
         # text_to_sql engine converts natural language to sql, runs it, and returns a human readable answer
-        response = process_nl_query(request.question, request.branch_id)
+        response = process_nl_query(request.question, request.branch_id, request.chat_history)
         return {"response": response["answer"], "data": response.get("data", [])}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+from invoice_scanner import scan_invoice
+import shutil
+import os
+from fastapi import UploadFile, File, Form
+
+@app.post("/api/v1/ai/scan-invoice")
+async def api_scan_invoice(
+    file: UploadFile = File(...),
+    supplier_id: Optional[str] = Form(None)
+):
+    try:
+        # Save temp file
+        temp_file_path = f"temp_{file.filename}"
+        with open(temp_file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        result = scan_invoice(temp_file_path, supplier_id)
+        
+        # Cleanup
+        try:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+        except Exception as e:
+            print(f"Warning: Failed to cleanup {temp_file_path}: {e}")
+            
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

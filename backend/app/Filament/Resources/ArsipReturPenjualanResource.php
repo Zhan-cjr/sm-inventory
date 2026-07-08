@@ -63,7 +63,7 @@ class ArsipReturPenjualanResource extends Resource
                 Section::make('Informasi Transaksi')
                     ->schema([
                         Grid::make(3)->schema([
-                            TextEntry::make('local_transaction_id')->label('No Nota'),
+                            TextEntry::make('receipt_number')->label('No Nota'),
                             TextEntry::make('transaction_date')->label('Tanggal & Jam')->dateTime('d M Y H:i:s'),
                             TextEntry::make('customer.name')->label('Customer')->default('Tunai'),
                             TextEntry::make('cashier.name')->label('Kasir'),
@@ -109,7 +109,7 @@ class ArsipReturPenjualanResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('local_transaction_id')
+                Tables\Columns\TextColumn::make('receipt_number')
                     ->label('No Nota')
                     ->searchable()
                     ->sortable(),

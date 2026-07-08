@@ -231,9 +231,9 @@ class LaporanHpp extends Page implements HasForms
                 p.name as item_name,
                 p.unit_of_measure as unit,
                 SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN t.ti_quantity ELSE 0 END) as sales_qty,
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
+                SUM(CASE WHEN t.ti_quantity > 0 THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
                 
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity > 0 THEN (
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
@@ -242,15 +242,15 @@ class LaporanHpp extends Page implements HasForms
                 ) ELSE 0 END) as cogs_amount,
 
                 SUM(CASE WHEN t.transaction_type = 'RETURN' THEN t.ti_quantity ELSE 0 END) as return_qty,
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS(t.ti_quantity) * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
                 
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS((
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE (t.transaction_source = 'OFFLINE' AND sbd.transaction_item_id = t.item_id)
                        OR (t.transaction_source = 'ONLINE' AND sbd.ecommerce_order_item_id = t.item_id)
-                ) ELSE 0 END) as return_cogs_amount
+                )) ELSE 0 END) as return_cogs_amount
 
             FROM $fromClause t
             JOIN products p ON t.product_id = p.id
@@ -271,9 +271,9 @@ class LaporanHpp extends Page implements HasForms
                 c.id as category_id,
                 COALESCE(c.name, 'Tanpa Kategori') as category_name,
                 
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
+                SUM(CASE WHEN t.ti_quantity > 0 THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
                 
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity > 0 THEN (
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
@@ -281,15 +281,15 @@ class LaporanHpp extends Page implements HasForms
                        OR (t.transaction_source = 'ONLINE' AND sbd.ecommerce_order_item_id = t.item_id)
                 ) ELSE 0 END) as cogs_amount,
 
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS(t.ti_quantity) * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
                 
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS((
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE (t.transaction_source = 'OFFLINE' AND sbd.transaction_item_id = t.item_id)
                        OR (t.transaction_source = 'ONLINE' AND sbd.ecommerce_order_item_id = t.item_id)
-                ) ELSE 0 END) as return_cogs_amount
+                )) ELSE 0 END) as return_cogs_amount
 
             FROM $fromClause t
             JOIN products p ON t.product_id = p.id
@@ -311,9 +311,9 @@ class LaporanHpp extends Page implements HasForms
                 COALESCE(c.name, 'Tanpa Kategori') as category_name,
                 p.sub_category,
                 
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
+                SUM(CASE WHEN t.ti_quantity > 0 THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
                 
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity > 0 THEN (
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
@@ -321,15 +321,15 @@ class LaporanHpp extends Page implements HasForms
                        OR (t.transaction_source = 'ONLINE' AND sbd.ecommerce_order_item_id = t.item_id)
                 ) ELSE 0 END) as cogs_amount,
 
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS(t.ti_quantity) * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
                 
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS((
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE (t.transaction_source = 'OFFLINE' AND sbd.transaction_item_id = t.item_id)
                        OR (t.transaction_source = 'ONLINE' AND sbd.ecommerce_order_item_id = t.item_id)
-                ) ELSE 0 END) as return_cogs_amount
+                )) ELSE 0 END) as return_cogs_amount
 
             FROM $fromClause t
             JOIN products p ON t.product_id = p.id
@@ -349,9 +349,9 @@ class LaporanHpp extends Page implements HasForms
             SELECT 
                 DATE(t.transaction_date) as tgl,
                 
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
+                SUM(CASE WHEN t.ti_quantity > 0 THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
                 
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity > 0 THEN (
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
@@ -359,15 +359,15 @@ class LaporanHpp extends Page implements HasForms
                        OR (t.transaction_source = 'ONLINE' AND sbd.ecommerce_order_item_id = t.item_id)
                 ) ELSE 0 END) as cogs_amount,
 
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS(t.ti_quantity) * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
                 
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS((
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE (t.transaction_source = 'OFFLINE' AND sbd.transaction_item_id = t.item_id)
                        OR (t.transaction_source = 'ONLINE' AND sbd.ecommerce_order_item_id = t.item_id)
-                ) ELSE 0 END) as return_cogs_amount
+                )) ELSE 0 END) as return_cogs_amount
 
             FROM $fromClause t
             JOIN products p ON t.product_id = p.id
@@ -387,9 +387,9 @@ class LaporanHpp extends Page implements HasForms
             SELECT 
                 DATE_FORMAT(t.transaction_date, '%Y-%m') as bulan,
                 
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
+                SUM(CASE WHEN t.ti_quantity > 0 THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as sales_amount,
                 
-                SUM(CASE WHEN COALESCE(t.transaction_type, '') != 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity > 0 THEN (
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
@@ -397,15 +397,15 @@ class LaporanHpp extends Page implements HasForms
                        OR (t.transaction_source = 'ONLINE' AND sbd.ecommerce_order_item_id = t.item_id)
                 ) ELSE 0 END) as cogs_amount,
 
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN t.ti_quantity * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS(t.ti_quantity) * (t.ti_unit_price - t.ti_discount_per_item) ELSE 0 END) as return_amount,
                 
-                SUM(CASE WHEN t.transaction_type = 'RETURN' THEN (
+                SUM(CASE WHEN t.ti_quantity < 0 THEN ABS((
                     SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), t.ti_quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
                     FROM stock_batch_deductions sbd
                     JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
                     WHERE (t.transaction_source = 'OFFLINE' AND sbd.transaction_item_id = t.item_id)
                        OR (t.transaction_source = 'ONLINE' AND sbd.ecommerce_order_item_id = t.item_id)
-                ) ELSE 0 END) as return_cogs_amount
+                )) ELSE 0 END) as return_cogs_amount
 
             FROM $fromClause t
             JOIN products p ON t.product_id = p.id

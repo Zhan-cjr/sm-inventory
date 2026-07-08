@@ -1,8 +1,7 @@
 <div class="h-full flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden font-sans text-sm"
      x-data="{
         focusRowQty(index) {
-            setTimeout(() =>
- {
+            setTimeout(() => {
                 let el = document.getElementById('qty-' + index);
                 if (el) { el.focus(); el.select(); }
             }, 100);
@@ -109,6 +108,12 @@
         }
      }"
      @item-added.window="focusRowQty($event.detail.index)">
+
+    <script>
+        if (!window.posAllProducts) {
+            window.posAllProducts = {!! json_encode(\App\Models\Product::select('id', 'name', 'sku', 'barcode')->orderBy('name')->get()) !!};
+        }
+    </script>
 
     <!-- Mini Calculator Popup -->
     <div x-show="calcOpen" @click.away="closeCalc()" 
@@ -237,7 +242,20 @@
                             <div style="font-size: 0.7rem; color: #6b7280; margin-top: 0.25rem;">Bisa pilih >1 file. Maks 10MB/file. Gambar dikompres otomatis.</div>
                             @error('faktur_image.*') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                             <div wire:loading wire:target="faktur_image" class="text-xs text-blue-500 mt-1">Mengupload...</div>
-                            
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="pos-label" style="color: #4f46e5; font-weight: 700;">✨ Scan Faktur (AI)</td>
+                        <td>
+                            <div style="display: flex; gap: 0.5rem; align-items: center; background-color: #eef2ff; padding: 0.5rem; border-radius: 0.375rem; border: 1px dashed #6366f1;" class="dark:bg-indigo-900/20 dark:border-indigo-800">
+                                <input type="file" class="pos-input" wire:model="scan_image" accept="image/jpeg, image/png" style="flex: 1; padding-top: 0.25rem; background-color: white;" class="dark:bg-gray-800">
+                                <button type="button" wire:click="scanInvoiceAction" wire:loading.attr="disabled" wire:target="scan_image, scanInvoiceAction" style="background-color: #4f46e5; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.25rem; cursor: pointer; font-weight: 600; white-space: nowrap; transition: opacity 0.2s;">
+                                    <span wire:loading.remove wire:target="scanInvoiceAction">Proses Scan</span>
+                                    <span wire:loading wire:target="scanInvoiceAction">Memproses...</span>
+                                </button>
+                            </div>
+                            @error('scan_image') <div style="color: #ef4444; font-size: 0.75rem; margin-top: 0.25rem;">{{ $message }}</div> @enderror
+
                             <!-- Daftar Foto Lama (Jika sedang Edit) -->
                             @if(count($existing_faktur_image) > 0)
                                 <div class="mt-2 text-sm text-gray-700 dark:text-gray-300 font-medium border-t border-gray-200 dark:border-gray-700 pt-2">
@@ -494,15 +512,70 @@
                         @if(in_array('barcode', $visibleColumns)) <td class="pos-grid-td">{{ $item['barcode'] }}</td> @endif
                         @if(in_array('name', $visibleColumns)) 
                             <td class="pos-grid-td" style="font-weight: 500;">
-                                <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2;">
-                                    {{ $item['name'] }}
-                                </div>
+                                @if(isset($item['needs_mapping']) && $item['needs_mapping'])
+                                    <div class="flex flex-col gap-1">
+                                        <div class="text-red-600 dark:text-red-400 font-semibold text-xs whitespace-normal line-height-1.2">
+                                            {{ $item['name'] }}
+                                        </div>
+                                        <div class="flex gap-1" x-data="{ 
+                                            open: false, 
+                                            search: '', 
+                                            selectedId: '',
+                                            selectedName: '-- Ketik untuk cari produk --',
+                                            get filteredProducts() {
+                                                if (this.search === '') return [];
+                                                let q = this.search.toLowerCase();
+                                                return window.posAllProducts.filter(p => 
+                                                    p.name.toLowerCase().includes(q) || 
+                                                    (p.sku && p.sku.toLowerCase().includes(q)) ||
+                                                    (p.barcode && p.barcode.toLowerCase().includes(q))
+                                                ).slice(0, 50);
+                                            },
+                                            selectProduct(id, name) {
+                                                this.selectedId = id;
+                                                this.selectedName = name;
+                                                this.open = false;
+                                                this.search = '';
+                                            }
+                                        }" style="position: relative; flex: 1;">
+                                            <div @click="open = !open" class="pos-input text-xs flex-between cursor-pointer bg-white dark:bg-gray-800" style="padding: 0.35rem 0.5rem; min-height: 28px; display: flex; justify-content: space-between; align-items: center;">
+                                                <span x-text="selectedName" class="truncate dark:text-gray-200"></span>
+                                                <svg style="width: 12px; height: 12px; color: #9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                            </div>
+                                            
+                                            <div x-show="open" @click.away="open = false" style="position: absolute; left: 0; top: 100%; z-index: 50; width: 350px; margin-top: 2px; max-height: 200px;" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700 shadow-lg rounded">
+                                                <div style="padding: 0.25rem; border-bottom: 1px solid #e5e7eb;" class="dark:border-gray-700 bg-white dark:bg-gray-800 sticky top-0">
+                                                    <input type="text" x-model="search" class="pos-input text-xs dark:bg-gray-900" style="width: 100%;" placeholder="Ketik nama, SKU, atau barcode..." @keydown.escape="open = false" autofocus>
+                                                </div>
+                                                <div style="max-height: 160px; overflow-y: auto;" class="bg-white dark:bg-gray-800">
+                                                    <template x-for="p in filteredProducts" :key="p.id">
+                                                        <div @click="selectProduct(p.id, p.name)" class="text-xs hover:bg-blue-50 dark:hover:bg-gray-700 cursor-pointer" style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #f3f4f6;">
+                                                            <div x-text="p.name" style="font-weight: 500;" class="text-gray-900 dark:text-gray-200"></div>
+                                                            <div style="font-size: 0.65rem;" class="text-gray-500 dark:text-gray-400">
+                                                                <span x-show="p.sku" x-text="'SKU: ' + p.sku"></span>
+                                                                <span x-show="p.sku && p.barcode"> | </span>
+                                                                <span x-show="p.barcode" x-text="'Bar: ' + p.barcode"></span>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                    <div x-show="search !== '' && filteredProducts.length === 0" style="padding: 0.5rem; text-align: center; font-size: 0.7rem;" class="text-gray-400">Tidak ditemukan</div>
+                                                    <div x-show="search === ''" style="padding: 0.5rem; text-align: center; font-size: 0.7rem;" class="text-gray-400">Ketik untuk mencari (maks 50 tampil)</div>
+                                                </div>
+                                            </div>
+                                            <button type="button" @click="if(selectedId) $wire.mapProduct({{ $index }}, selectedId)" class="bg-blue-600 text-white px-2 py-1 rounded text-xs ml-1 whitespace-nowrap" :disabled="!selectedId" :class="!selectedId ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'">Simpan</button>
+                                        </div>
+                                    </div>
+                                @else
+                                    <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2;">
+                                        {{ $item['name'] }}
+                                    </div>
+                                @endif
                             </td> 
                         @endif
                         @if(in_array('qty_ordered', $visibleColumns)) <td class="pos-grid-td dark:text-gray-400" style="text-align: right; color: #6b7280;">{{ $item['qty_ordered'] > 0 ? number_format($item['qty_ordered'], 0) : '-' }}</td> @endif
                         @if(in_array('qty_received', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right; font-weight: 700; color: #2563eb;" 
+                        <td class="pos-grid-td" style="padding: 0.25rem; {{ ($item['qty_ordered'] > 0 && $item['qty_received'] != $item['qty_ordered']) ? 'background-color: #fee2e2; border-left: 3px solid #ef4444;' : '' }}">
+                            <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right; font-weight: 700; color: {{ ($item['qty_ordered'] > 0 && $item['qty_received'] != $item['qty_ordered']) ? '#ef4444' : '#2563eb' }};" 
                                    wire:model.lazy="cart.{{ $index }}.qty_received"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.space.prevent="openCalc($event)">

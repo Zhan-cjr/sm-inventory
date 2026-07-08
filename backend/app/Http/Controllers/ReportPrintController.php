@@ -275,7 +275,7 @@ class ReportPrintController extends Controller
     {
         $query = Transaction::query()
             ->where('is_voided', false)
-            ->with(['cashier', 'shift']);
+            ->with(['cashier', 'shift', 'items']);
 
         $query = $this->applyDateFilters($query, $filters);
 
@@ -322,19 +322,25 @@ class ReportPrintController extends Controller
             }
 
             $data[$key]['jml_nota'] += 1;
-            $isReturn = $t->transaction_type === 'RETURN';
+            $gross_sales = 0;
+            $gross_returns = 0;
             
-            if ($isReturn) {
-                // Untuk retur, gross penjualan tidak bertambah, dicatat sebagai pengurang di retur
-                $data[$key]['retur'] += abs($t->final_amount);
-                $data[$key]['jual_netto'] += $t->final_amount; // final_amount is negative
-            } else {
-                $data[$key]['penjualan'] += $t->total_amount;
-                // Total diskon meliputi discount item, manual diskon total, dan promo
-                $total_discount = ($t->discount_amount ?? 0) + ($t->manual_discount ?? 0) + ($t->promo_discount ?? 0);
-                $data[$key]['diskon'] += $total_discount;
-                $data[$key]['jual_netto'] += $t->final_amount;
+            foreach ($t->items as $item) {
+                if ($item->quantity > 0) {
+                    $gross_sales += ($item->quantity * $item->unit_price);
+                } else {
+                    $gross_returns += (abs($item->quantity) * $item->unit_price);
+                }
             }
+            
+            $data[$key]['penjualan'] += $gross_sales;
+            $data[$key]['retur'] += $gross_returns;
+            
+            $total_discount = ($t->discount_amount ?? 0) + ($t->manual_discount ?? 0) + ($t->promo_discount ?? 0);
+            $data[$key]['diskon'] += $total_discount;
+            $data[$key]['jual_netto'] += $t->final_amount;
+            
+            $isReturn = $t->final_amount < 0;
 
             // Memproses Pembayaran (mendukung multi payment dan single payment fallback)
             $details = $t->payment_details;

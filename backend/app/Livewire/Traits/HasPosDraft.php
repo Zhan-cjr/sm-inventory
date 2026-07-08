@@ -33,7 +33,7 @@ trait HasPosDraft
             if ($prop->class === static::class) {
                 $name = $prop->getName();
                 // Ignore model instances, large arrays, and file uploads
-                if (!in_array($name, ['purchaseOrder', 'goodsReceipt', 'purchaseReturn', 'stockAdjustment', 'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image'])) {
+                if (!in_array($name, ['purchaseOrder', 'goodsReceipt', 'purchaseReturn', 'stockAdjustment', 'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image', 'scan_image'])) {
                     $draftData[$name] = $this->{$name};
                 }
             }

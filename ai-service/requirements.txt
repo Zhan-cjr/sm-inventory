@@ -6,3 +6,5 @@ mysql-connector-python
 mlxtend
 google-generativeai
 python-dotenv
+python-multipart
+Pillow

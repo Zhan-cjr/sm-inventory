@@ -240,47 +240,54 @@ class ShiftController extends Controller
 
             foreach ($transactions as $tx) {
                 $amount = $tx->final_amount;
-                if ($amount > 0) {
-                    $method = strtoupper($tx->payment_method);
-                    if ($method === 'CASH') {
-                        $cash_sales += $amount;
-                    } elseif ($method === 'CARD') {
-                        $card_sales += $amount;
-                        $bankName = $tx->bank ? $tx->bank->name : 'EDC';
-                        if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
-                        $cardSalesByBank[$bankName] += $amount;
-                    } elseif ($method === 'VOUCHER') {
-                        $voucher_sales += $amount;
-                    } elseif ($method === 'MULTI') {
-                        $details = $tx->payment_details;
-                        if (is_string($details)) $details = json_decode($details, true);
-                        if (is_array($details)) {
-                            // Sum components
-                            $cash_amt = collect($details)->where('method', 'CASH')->sum('amount');
-                            if ($cash_amt > 0) $cash_amt = max(0, $cash_amt - $tx->change_amount);
-                            $cash_sales += $cash_amt;
-
-                            $voucher_amt = collect($details)->where('method', 'VOUCHER')->sum('amount');
-                            $voucher_sales += $voucher_amt;
-
-                            $cardDetails = collect($details)->where('method', 'CARD');
-                            foreach ($cardDetails as $c) {
-                                $card_sales += $c['amount'];
-                                $bankName = $c['label'] ?? 'EDC';
-                                if (strpos($bankName, 'Card: ') === 0) $bankName = substr($bankName, 6);
-                                if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
-                                $cardSalesByBank[$bankName] += $c['amount'];
-                            }
-                        }
-                    }
+            $tx_sales = 0;
+            $tx_returns = 0;
+            foreach ($tx->items as $item) {
+                if ($item->quantity > 0) {
+                    $tx_sales += ($item->quantity * ($item->unit_price - $item->discount_per_item));
                 } else {
-                    $method = strtoupper($tx->payment_method);
-                    if ($method === 'CASH') {
-                        $cash_returns += abs($amount);
-                    } elseif ($method === 'CARD') {
-                        $card_returns += abs($amount);
+                    $tx_returns += (abs($item->quantity) * ($item->unit_price - $item->discount_per_item));
+                }
+            }
+            $tx_sales -= ($tx->manual_discount + $tx->promo_discount);
+            if ($tx_sales < 0) $tx_sales = 0;
+
+            $method = strtoupper($tx->payment_method);
+            
+            if ($method === 'CASH' || $method === 'POINT') {
+                $cash_sales += $tx_sales;
+                $cash_returns += $tx_returns;
+            } elseif ($method === 'CARD') {
+                $card_sales += $tx_sales;
+                $card_returns += $tx_returns;
+                $bankName = $tx->bank ? $tx->bank->name : 'EDC';
+                if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
+                $cardSalesByBank[$bankName] += $amount; // net amount for bank
+            } elseif ($method === 'VOUCHER') {
+                $voucher_sales += $tx_sales;
+            } elseif ($method === 'MULTI') {
+                $details = $tx->payment_details;
+                if (is_string($details)) $details = json_decode($details, true);
+                if (is_array($details)) {
+                    $cash_amt = collect($details)->where('method', 'CASH')->sum('amount');
+                    if ($cash_amt > 0) $cash_amt = max(0, $cash_amt - $tx->change_amount);
+                    
+                    $voucher_amt = collect($details)->where('method', 'VOUCHER')->sum('amount');
+                    $voucher_sales += $voucher_amt;
+                    
+                    $cash_returns += $tx_returns;
+                    $cash_sales += ($cash_amt + $tx_returns);
+                    
+                    $cardDetails = collect($details)->where('method', 'CARD');
+                    foreach ($cardDetails as $c) {
+                        $card_sales += $c['amount'];
+                        $bankName = $c['label'] ?? 'EDC';
+                        if (strpos($bankName, 'Card: ') === 0) $bankName = substr($bankName, 6);
+                        if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
+                        $cardSalesByBank[$bankName] += $c['amount'];
                     }
                 }
+            }
             }
 
             $shift->end_time = now();
@@ -312,7 +319,7 @@ class ShiftController extends Controller
             $returns = Transaction::with(['items.product'])
                 ->where('shift_id', $shift->id)
                 ->where('is_voided', false)
-                ->where('final_amount', '<', 0)
+                ->where('transaction_type', 'RETURN')
                 ->get();
             
             $returnItems = [];
@@ -390,55 +397,63 @@ class ShiftController extends Controller
 
         foreach ($transactions as $tx) {
             $amount = $tx->final_amount;
-            if ($amount > 0) {
-                $method = strtoupper($tx->payment_method);
-                if ($method === 'CASH') {
-                    $cash_sales += $amount;
-                } elseif ($method === 'CARD') {
-                    $card_sales += $amount;
-                    $bankName = $tx->bank ? $tx->bank->name : 'EDC';
-                    if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
-                    $cardSalesByBank[$bankName] += $amount;
-                } elseif ($method === 'VOUCHER') {
-                    $voucher_sales += $amount;
-                } elseif ($method === 'MULTI') {
-                    $details = $tx->payment_details;
-                    if (is_string($details)) $details = json_decode($details, true);
-                    if (is_array($details)) {
-                        $cash_amt = collect($details)->where('method', 'CASH')->sum('amount');
-                        if ($cash_amt > 0) $cash_amt = max(0, $cash_amt - $tx->change_amount);
-                        $cash_sales += $cash_amt;
+            $tx_sales = 0;
+            $tx_returns = 0;
+            foreach ($tx->items as $item) {
+                if ($item->quantity > 0) {
+                    $tx_sales += ($item->quantity * ($item->unit_price - $item->discount_per_item));
+                } else {
+                    $tx_returns += (abs($item->quantity) * ($item->unit_price - $item->discount_per_item));
+                }
+            }
+            $tx_sales -= ($tx->manual_discount + $tx->promo_discount);
+            if ($tx_sales < 0) $tx_sales = 0;
 
-                        $voucher_amt = collect($details)->where('method', 'VOUCHER')->sum('amount');
-                        $voucher_sales += $voucher_amt;
-
-                        $cardDetails = collect($details)->where('method', 'CARD');
-                        foreach ($cardDetails as $c) {
-                            $card_sales += $c['amount'];
-                            $bankName = $c['label'] ?? 'EDC';
-                            if (strpos($bankName, 'Card: ') === 0) $bankName = substr($bankName, 6);
-                            if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
-                            $cardSalesByBank[$bankName] += $c['amount'];
-                        }
+            $method = strtoupper($tx->payment_method);
+            
+            if ($method === 'CASH' || $method === 'POINT') {
+                $cash_sales += $tx_sales;
+                $cash_returns += $tx_returns;
+            } elseif ($method === 'CARD') {
+                $card_sales += $tx_sales;
+                $card_returns += $tx_returns;
+                $bankName = $tx->bank ? $tx->bank->name : 'EDC';
+                if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
+                $cardSalesByBank[$bankName] += $amount; // net amount for bank
+            } elseif ($method === 'VOUCHER') {
+                $voucher_sales += $tx_sales;
+            } elseif ($method === 'MULTI') {
+                $details = $tx->payment_details;
+                if (is_string($details)) $details = json_decode($details, true);
+                if (is_array($details)) {
+                    $cash_amt = collect($details)->where('method', 'CASH')->sum('amount');
+                    if ($cash_amt > 0) $cash_amt = max(0, $cash_amt - $tx->change_amount);
+                    
+                    $voucher_amt = collect($details)->where('method', 'VOUCHER')->sum('amount');
+                    $voucher_sales += $voucher_amt;
+                    
+                    $cash_returns += $tx_returns;
+                    $cash_sales += ($cash_amt + $tx_returns);
+                    
+                    $cardDetails = collect($details)->where('method', 'CARD');
+                    foreach ($cardDetails as $c) {
+                        $card_sales += $c['amount'];
+                        $bankName = $c['label'] ?? 'EDC';
+                        if (strpos($bankName, 'Card: ') === 0) $bankName = substr($bankName, 6);
+                        if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
+                        $cardSalesByBank[$bankName] += $c['amount'];
                     }
                 }
-            } else {
-                $method = strtoupper($tx->payment_method);
-                if ($method === 'CASH') {
-                    $cash_returns += abs($amount);
-                } elseif ($method === 'CARD') {
-                    $card_returns += abs($amount);
-                }
-                
-                // Add to returnItems
-                foreach ($tx->items as $item) {
-                    if ($item->quantity < 0) {
-                        $returnItems[] = [
-                            'product_name' => $item->product ? $item->product->name : 'Unknown Item',
-                            'quantity' => abs($item->quantity),
-                            'total' => abs($item->quantity * $item->unit_price)
-                        ];
-                    }
+            }
+
+            // Add to returnItems
+            foreach ($tx->items as $item) {
+                if ($item->quantity < 0) {
+                    $returnItems[] = [
+                        'product_name' => $item->product ? $item->product->name : 'Unknown Item',
+                        'quantity' => abs($item->quantity),
+                        'total' => abs($item->quantity * $item->unit_price)
+                    ];
                 }
             }
         }
