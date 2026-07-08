@@ -138,7 +138,7 @@ class StockOpnameSessionResource extends Resource
                         default       => $state,
                     }),
 
-                TextColumn::make('rackSessions_count')
+                TextColumn::make('rack_sessions_count')
                     ->counts('rackSessions')
                     ->label('Jml Rak'),
 
