@@ -68,6 +68,8 @@ class ReportPrintController extends Controller
                 return $this->printRekapitulasiTransaksi($request);
             case 'laporan-hpp':
                 return $this->printLaporanHpp($request);
+            case 'laporan-rekap-tipe-suplier':
+                return $this->printLaporanRekapTipeSuplier($filters);
             default:
                 abort(404, 'Tipe laporan tidak ditemukan');
         }
@@ -1849,5 +1851,110 @@ class ReportPrintController extends Controller
             'rows' => $rows,
             'note' => 'Catatan: Nilai HPP yang tercantum pada laporan ini sudah termasuk PPN (HPP + PPN).'
         ]);
+    }
+
+    public function printLaporanRekapTipeSuplier($filters)
+    {
+        $organization = \App\Models\Organization::first();
+        $taxRate = $organization->tax_rate ?? 11;
+        $branchId = $filters['branch_id']['value'] ?? null;
+        $branch = $branchId ? \App\Models\Branch::find($branchId) : null;
+
+        $subquery = \Illuminate\Support\Facades\DB::table('transaction_items as ti')
+            ->join('products as p', 'ti.product_id', '=', 'p.id')
+            ->leftJoin('suppliers as s', 'p.supplier_id', '=', 's.id')
+            ->join('transactions as t', 'ti.transaction_id', '=', 't.id')
+            ->where('t.is_voided', false)
+            ->selectRaw("
+                CASE 
+                    WHEN s.id IS NULL THEN 'TANPA SUPLIER'
+                    WHEN s.name LIKE '[%]%' THEN SUBSTRING_INDEX(SUBSTRING_INDEX(s.name, ']', 1), '[', -1)
+                    WHEN s.name LIKE '(%)%' THEN SUBSTRING_INDEX(SUBSTRING_INDEX(s.name, ')', 1), '(', -1)
+                    WHEN s.name LIKE '{%}%' THEN SUBSTRING_INDEX(SUBSTRING_INDEX(s.name, '}', 1), '{', -1)
+                    ELSE SUBSTRING_INDEX(s.name, ' ', 1)
+                END as tipe_suplier,
+                t.transaction_date,
+                t.branch_id,
+                CASE WHEN ti.quantity > 0 THEN ti.quantity * (ti.unit_price - COALESCE(ti.discount_per_item, 0)) ELSE 0 END as jual,
+                CASE WHEN ti.quantity > 0 THEN ti.quantity * COALESCE(NULLIF(p.cost_price_tax, 0), p.cost_price, 0) ELSE 0 END as hpp,
+                CASE WHEN ti.quantity < 0 THEN ABS(ti.quantity) * (ti.unit_price - COALESCE(ti.discount_per_item, 0)) ELSE 0 END as retur,
+                CASE WHEN ti.quantity < 0 THEN ABS(ti.quantity) * COALESCE(NULLIF(p.cost_price_tax, 0), p.cost_price, 0) ELSE 0 END as hpp_retur
+            ");
+            
+        $query = \Illuminate\Support\Facades\DB::table(\Illuminate\Support\Facades\DB::raw("({$subquery->toSql()}) as sub"))
+            ->mergeBindings($subquery)
+            ->selectRaw("
+                tipe_suplier,
+                SUM(jual) as jual,
+                SUM(hpp) as hpp,
+                SUM(retur) as retur,
+                SUM(hpp_retur) as hpp_retur
+            ")
+            ->groupBy('tipe_suplier');
+
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+
+        // Apply date filter manually
+        $dateFilter = $filters['date_filter'] ?? [];
+        $period = $dateFilter['period'] ?? null;
+        $periodString = 'Semua Periode';
+        if ($period === 'today') {
+            $query->whereDate('transaction_date', Carbon::today());
+            $periodString = Carbon::today()->translatedFormat('d-m-Y');
+        } elseif ($period === 'yesterday') {
+            $query->whereDate('transaction_date', Carbon::yesterday());
+            $periodString = Carbon::yesterday()->translatedFormat('d-m-Y');
+        } elseif ($period === 'this_week') {
+            $query->whereBetween('transaction_date', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
+            $periodString = Carbon::now()->startOfWeek()->translatedFormat('d-m-Y') . ' - ' . Carbon::now()->endOfWeek()->translatedFormat('d-m-Y');
+        } elseif ($period === 'last_week') {
+            $query->whereBetween('transaction_date', [Carbon::now()->subWeek()->startOfWeek(), Carbon::now()->subWeek()->endOfWeek()]);
+            $periodString = Carbon::now()->subWeek()->startOfWeek()->translatedFormat('d-m-Y') . ' - ' . Carbon::now()->subWeek()->endOfWeek()->translatedFormat('d-m-Y');
+        } elseif ($period === 'this_month') {
+            $query->whereMonth('transaction_date', Carbon::now()->month)->whereYear('transaction_date', Carbon::now()->year);
+            $periodString = Carbon::now()->startOfMonth()->translatedFormat('d-m-Y') . ' - ' . Carbon::now()->endOfMonth()->translatedFormat('d-m-Y');
+        } elseif ($period === 'last_month') {
+            $query->whereMonth('transaction_date', Carbon::now()->subMonth()->month)->whereYear('transaction_date', Carbon::now()->subMonth()->year);
+            $periodString = Carbon::now()->subMonth()->startOfMonth()->translatedFormat('d-m-Y') . ' - ' . Carbon::now()->subMonth()->endOfMonth()->translatedFormat('d-m-Y');
+        } elseif ($period === 'custom') {
+            if (!empty($dateFilter['created_from'])) {
+                $query->whereDate('transaction_date', '>=', $dateFilter['created_from']);
+            }
+            if (!empty($dateFilter['created_until'])) {
+                $query->whereDate('transaction_date', '<=', $dateFilter['created_until']);
+            }
+            $from = !empty($dateFilter['created_from']) ? Carbon::parse($dateFilter['created_from'])->translatedFormat('d-m-Y') : 'Awal';
+            $until = !empty($dateFilter['created_until']) ? Carbon::parse($dateFilter['created_until'])->translatedFormat('d-m-Y') : 'Akhir';
+            $periodString = "$from - $until";
+        }
+
+        $data = $query->orderBy('tipe_suplier')->get()->map(function($row) {
+            $row->selisih = ($row->jual - $row->hpp) - ($row->retur - $row->hpp_retur);
+            return $row;
+        });
+        
+        $fpRow = $data->firstWhere('tipe_suplier', 'FP');
+        $fpHakPpn = 0;
+        $fpMargin = 0;
+        if ($fpRow) {
+            $fpHakPpn = $fpRow->selisih * ($taxRate / 100);
+            if ($fpRow->jual > 0) {
+                $fpMargin = ($fpRow->selisih / $fpRow->jual) * 100;
+            }
+        }
+
+        $totalJual = $data->sum('jual');
+        $totalHpp = $data->sum('hpp');
+        $totalRetur = $data->sum('retur');
+        $totalHppRetur = $data->sum('hpp_retur');
+        $totalSelisih = $data->sum('selisih');
+
+        return view('print.laporan-rekap-tipe-suplier', compact(
+            'data', 'periodString', 'branch', 'organization', 'taxRate',
+            'fpRow', 'fpHakPpn', 'fpMargin',
+            'totalJual', 'totalHpp', 'totalRetur', 'totalHppRetur', 'totalSelisih'
+        ));
     }
 }
