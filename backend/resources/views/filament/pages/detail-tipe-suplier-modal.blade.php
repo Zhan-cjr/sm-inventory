@@ -16,6 +16,10 @@
         text-transform: uppercase;
         font-weight: 600;
         text-align: left;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
     }
     .custom-detail-table th.text-right,
     .custom-detail-table td.text-right {
@@ -27,12 +31,18 @@
     .custom-detail-table tbody tr:hover {
         background-color: #374151; /* hover:bg-gray-700 */
     }
-    .custom-detail-table tfoot tr {
+    .custom-detail-table tfoot td {
         background-color: #374151; /* bg-gray-700 */
         font-weight: 600;
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+        box-shadow: 0 -2px 2px -1px rgba(0, 0, 0, 0.4);
     }
     .custom-detail-container {
         overflow-x: auto;
+        overflow-y: auto;
+        max-height: 65vh;
         border-radius: 0.5rem;
         border: 1px solid #4b5563;
     }
