@@ -226,20 +226,20 @@ class RekapitulasiTransaksi extends Page implements HasTable
                 ->sum(\Illuminate\Support\Facades\DB::raw('ABS(adjustment_quantity * unit_cost)'));
         }
         if ($type === 'penjualan') {
-            $q = \App\Models\Transaction::where('transaction_type', 'SALES')
-                ->where('is_voided', false)
+            $q = \App\Models\Transaction::where('is_voided', false)
                 ->whereBetween('transaction_date', [$startDateTime, $endDateTime]);
             if ($isMultiple) $q->whereIn('branch_id', $branchIds);
             else $q->where('branch_id', $branchIds);
             return (float) $q->sum('final_amount');
         }
         if ($type === 'retur_jual') {
-            $q = \App\Models\Transaction::where('transaction_type', 'RETURN')
-                ->where('is_voided', false)
-                ->whereBetween('transaction_date', [$startDateTime, $endDateTime]);
-            if ($isMultiple) $q->whereIn('branch_id', $branchIds);
-            else $q->where('branch_id', $branchIds);
-            return abs((float) $q->sum('final_amount'));
+            $q = \App\Models\TransactionItem::whereHas('transaction', function ($q2) use ($startDateTime, $endDateTime, $isMultiple, $branchIds) {
+                $q2->where('is_voided', false)
+                   ->whereBetween('transaction_date', [$startDateTime, $endDateTime]);
+                if ($isMultiple) $q2->whereIn('branch_id', $branchIds);
+                else $q2->where('branch_id', $branchIds);
+            })->where('quantity', '<', 0);
+            return (float) $q->sum(\Illuminate\Support\Facades\DB::raw('ABS(quantity) * (unit_price - COALESCE(discount_per_item, 0))'));
         }
         if ($type === 'pengeluaran') {
             $q = \App\Models\Expense::whereBetween('expense_date', [$startDateTime, $endDateTime]);

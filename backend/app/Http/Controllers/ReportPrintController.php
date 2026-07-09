@@ -229,17 +229,18 @@ class ReportPrintController extends Controller
                     ->sum(\Illuminate\Support\Facades\DB::raw('ABS(adjustment_quantity * unit_cost)'));
             }
 
-            $penjualan = Transaction::where('transaction_type', 'SALES')
-                ->where('is_voided', false)
+            $penjualan = Transaction::where('is_voided', false)
                 ->where('branch_id', $bId)
                 ->whereBetween('transaction_date', [$startDateTime, $endDateTime])
                 ->sum('final_amount');
 
-            $returJual = abs((float) Transaction::where('transaction_type', 'RETURN')
-                ->where('is_voided', false)
-                ->where('branch_id', $bId)
-                ->whereBetween('transaction_date', [$startDateTime, $endDateTime])
-                ->sum('final_amount'));
+            $returJual = \App\Models\TransactionItem::whereHas('transaction', function ($q) use ($startDateTime, $endDateTime, $bId) {
+                    $q->where('is_voided', false)
+                      ->where('branch_id', $bId)
+                      ->whereBetween('transaction_date', [$startDateTime, $endDateTime]);
+                })->where('quantity', '<', 0)
+                ->sum(\Illuminate\Support\Facades\DB::raw('ABS(quantity) * (unit_price - COALESCE(discount_per_item, 0))'));
+            $returJual = (float) $returJual;
 
             $pengeluaran = \App\Models\Expense::where('branch_id', $bId)
                 ->whereBetween('expense_date', [$startDateTime, $endDateTime])
