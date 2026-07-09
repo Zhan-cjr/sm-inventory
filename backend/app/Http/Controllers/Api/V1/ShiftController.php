@@ -319,7 +319,6 @@ class ShiftController extends Controller
             $returns = Transaction::with(['items.product'])
                 ->where('shift_id', $shift->id)
                 ->where('is_voided', false)
-                ->where('transaction_type', 'RETURN')
                 ->get();
             
             $returnItems = [];

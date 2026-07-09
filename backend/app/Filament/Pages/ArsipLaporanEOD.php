@@ -165,7 +165,6 @@ class ArsipLaporanEOD extends Page implements HasTable
         $returns = Transaction::with(['items.product'])
             ->where('shift_id', $shift->id)
             ->where('is_voided', false)
-            ->where('final_amount', '<', 0)
             ->get();
         
         $returnItems = [];
