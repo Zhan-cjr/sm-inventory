@@ -29,22 +29,15 @@ class DashboardController extends Controller
         // 1. Total Penjualan & Transaksi Hari Ini
         $todayTransactions = Transaction::where('branch_id', $branchId)
             ->whereDate('transaction_date', $today)
+            ->where('is_voided', false)
+            ->with('items.product')
             ->get();
 
-        $todaySales = $todayTransactions->sum('total_amount');
+        $todaySales = $todayTransactions->sum('final_amount');
         $todayCount = $todayTransactions->count();
 
         // 2. Total Cost (COGS) & Gross Profit Hari Ini
-        // We join with stocks to get the cost_price
-        $todayCogs = DB::table('transaction_items')
-            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-            ->join('stocks', function($join) use ($branchId) {
-                $join->on('transaction_items.product_id', '=', 'stocks.product_id')
-                     ->where('stocks.branch_id', '=', $branchId);
-            })
-            ->where('transactions.branch_id', $branchId)
-            ->whereDate('transactions.transaction_date', $today)
-            ->sum(DB::raw('transaction_items.quantity * COALESCE(NULLIF(stocks.cost_price_tax, 0), stocks.cost_price, 0)'));
+        $todayCogs = $todayTransactions->sum('cogs');
 
         $grossProfit = $todaySales - $todayCogs;
         $profitMargin = $todaySales > 0 ? ($grossProfit / $todaySales) * 100 : 0;
