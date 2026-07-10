@@ -117,6 +117,7 @@ INSTRUCTIONS:
 - If the user is asking about inventory data, sales, or anything requiring database lookup, write a read-only MySQL query (SELECT only). Prefix it EXACTLY with 'SQL: '.
 - CRITICAL: Only use tables and columns that exist in the schema above.
 - For sales ("penjualan"), ALWAYS use the `transactions` table. You MUST calculate revenue using `SUM(final_amount)` (not total_amount) and you MUST include the condition `is_voided = 0`.
+- For questions about "HPP", "Harga Pokok", "Modal", "Laba", "Profit", or "Keuntungan", you MUST use the `all_sales_items` view (it combines POS and E-Commerce). Calculate HPP using `SUM(total_cogs)` and Profit/Laba using `SUM(subtotal - total_cogs)`.
 - Do NOT wrap the query in markdown backticks (```). Just write the raw SQL query after 'SQL: '.
 - Do NOT add any conversational text or explanation. Output ONLY the 'ANSWER: ...' or 'SQL: ...' line.
 """
