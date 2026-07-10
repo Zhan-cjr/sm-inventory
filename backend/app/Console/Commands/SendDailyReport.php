@@ -62,27 +62,8 @@ class SendDailyReport extends Command
 
             $onlineTransactions = $ecommerceOrders->count();
             $onlineSales = $ecommerceOrders->sum('total_amount');
-            $onlineProfit = $ecommerceOrders->sum(function($order) use ($branch) {
-                $cogs = $order->items->sum(function($item) use ($branch) {
-                    if (!$item->product_id || !$item->product) return 0;
-
-                    $stock = \App\Models\Stock::where('product_id', $item->product_id)
-                        ->where('branch_id', $branch->id)
-                        ->first();
-
-                    $stCostPriceTax = $stock ? $stock->cost_price_tax : 0;
-                    $stCostPrice = $stock ? $stock->cost_price : 0;
-                    $pCostPriceTax = $item->product->cost_price_tax ?? 0;
-                    $pCostPrice = $item->product->cost_price ?? 0;
-                    
-                    $fallbackPrice = $stCostPriceTax > 0 ? $stCostPriceTax : 
-                        ($stCostPrice > 0 ? $stCostPrice : 
-                        ($pCostPriceTax > 0 ? $pCostPriceTax : 
-                        ($pCostPrice > 0 ? $pCostPrice : 0)));
-
-                    return $item->quantity * (float) $fallbackPrice;
-                });
-                return $order->total_amount - $cogs;
+            $onlineProfit = $ecommerceOrders->sum(function($order) {
+                return $order->gross_profit;
             });
             
             $totalTransactions = $offlineTransactions + $onlineTransactions;
