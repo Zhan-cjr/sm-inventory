@@ -139,27 +139,65 @@ class ConsignmentBilling extends Page implements HasForms
                 ->sum('purchase_return_items.quantity');
 
             // 4. Hitung Unbilled Sold (Belum Pernah Ditagih sampai Cut-Off)
-            $unbilledSold = TransactionItem::join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            $unbilledPosItems = TransactionItem::join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
                 ->where('transaction_items.product_id', $product->id)
                 ->where('transactions.branch_id', $this->branch_id)
                 ->whereNull('transaction_items.kontrabon_id')
                 ->where('transactions.is_voided', false)
                 ->where('transactions.transaction_date', '<=', $this->end_date . ' 23:59:59')
-                ->sum('transaction_items.quantity');
+                ->select('transaction_items.*')
+                ->get();
+
+            $unbilledSold = $unbilledPosItems->sum('quantity');
                 
-            $unbilledEcommerceSold = \App\Models\EcommerceOrderItem::join('ecommerce_orders', 'ecommerce_order_items.ecommerce_order_id', '=', 'ecommerce_orders.id')
+            $unbilledEcomItems = \App\Models\EcommerceOrderItem::join('ecommerce_orders', 'ecommerce_order_items.ecommerce_order_id', '=', 'ecommerce_orders.id')
                 ->where('ecommerce_order_items.product_id', $product->id)
                 ->where('ecommerce_orders.branch_id', $this->branch_id)
                 ->whereNull('ecommerce_order_items.kontrabon_id')
                 ->where('ecommerce_orders.status', 'COMPLETED')
                 ->where('ecommerce_orders.created_at', '<=', $this->end_date . ' 23:59:59')
-                ->sum('ecommerce_order_items.quantity');
+                ->select('ecommerce_order_items.*')
+                ->get();
+                
+            $unbilledEcommerceSold = $unbilledEcomItems->sum('quantity');
                 
             $soldQty += $unbilledEcommerceSold; // Add to display total sold
             $unbilledSold += $unbilledEcommerceSold; // Add to unbilled calculation
 
-            // Tagihan dihitung berdasarkan HPP
-            $amountOwed = $unbilledSold * $product->cost_price;
+            // Tagihan dihitung berdasarkan HPP dari Batch
+            $amountOwed = 0;
+            $stock = \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->first();
+            $fallbackPrice = $stock && $stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock && $stock->cost_price > 0 ? $stock->cost_price : ($product->cost_price_tax > 0 ? $product->cost_price_tax : $product->cost_price));
+
+            foreach ($unbilledPosItems as $item) {
+                $batchCogs = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+                    ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+                    ->where('sbd.transaction_item_id', $item->id)
+                    ->sum(\Illuminate\Support\Facades\DB::raw('sbd.quantity * sb.cost_price'));
+
+                if ($item->quantity > 0) {
+                    $amountOwed += $batchCogs > 0 ? $batchCogs : ($item->quantity * $fallbackPrice);
+                } else {
+                    $deduction = $batchCogs > 0 ? $batchCogs : (abs($item->quantity) * $fallbackPrice);
+                    $amountOwed -= $deduction;
+                }
+            }
+
+            foreach ($unbilledEcomItems as $item) {
+                $batchCogs = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+                    ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+                    ->where('sbd.ecommerce_order_item_id', $item->id)
+                    ->sum(\Illuminate\Support\Facades\DB::raw('sbd.quantity * sb.cost_price'));
+
+                if ($item->quantity > 0) {
+                    $amountOwed += $batchCogs > 0 ? $batchCogs : ($item->quantity * $fallbackPrice);
+                } else {
+                    $deduction = $batchCogs > 0 ? $batchCogs : (abs($item->quantity) * $fallbackPrice);
+                    $amountOwed -= $deduction;
+                }
+            }
+            
+            $averageCostPrice = $unbilledSold > 0 ? ($amountOwed / $unbilledSold) : $fallbackPrice;
 
             if ($received > 0 || $soldQty > 0 || $returned > 0 || $unbilledSold > 0) {
                 $data[] = [
@@ -170,7 +208,7 @@ class ConsignmentBilling extends Page implements HasForms
                     'sold' => $soldQty,
                     'returned' => $returned,
                     'unbilled_qty' => $unbilledSold,
-                    'cost_price' => $product->cost_price,
+                    'cost_price' => $averageCostPrice,
                     'amount_owed' => $amountOwed,
                 ];
                 $totalTagihan += $amountOwed;

@@ -81,6 +81,11 @@ class LaporanBarangDijual extends Page implements HasTable
                     ->label('Harga Beli + PPN')
                     ->money('IDR', true)
                     ->state(function (AllSalesItem $record) {
+                        $qty = abs($record->quantity);
+                        if ($qty > 0 && $record->total_cogs > 0) {
+                            return $record->total_cogs / $qty;
+                        }
+
                         $branch_id = $record->branch_id;
                         $stock = \App\Models\Stock::where('product_id', $record->product_id)
                                 ->where('branch_id', $branch_id)

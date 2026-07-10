@@ -27,6 +27,16 @@ class GoodsReceiptItemObserver
         
         $stock->increment('quantity_on_hand', $item->quantity_received);
 
+        // Calculate true cost price (net after discount + PPN)
+        $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
+        $taxMultiplier = 1 + ($taxRate / 100);
+        
+        // $item->subtotal is already after discounts. 
+        $netPrice = $item->quantity_received > 0 ? ((float)$item->subtotal / $item->quantity_received) : $item->unit_price;
+        
+        // If GR includes tax, HPP must include tax (as per Laporan HPP requirements)
+        $finalCostPrice = $gr->include_tax ? round($netPrice * $taxMultiplier, 2) : $netPrice;
+
         // Create Stock Batch for FIFO
         StockBatch::create([
             'product_id' => $item->product_id,
@@ -35,7 +45,7 @@ class GoodsReceiptItemObserver
             'reference_doc_id' => $gr->id,
             'initial_quantity' => $item->quantity_received,
             'remaining_quantity' => $item->quantity_received,
-            'cost_price' => $item->unit_price,
+            'cost_price' => $finalCostPrice,
             'entry_date' => $gr->receipt_date->format('Y-m-d') . ' ' . date('H:i:s'),
         ]);
     }

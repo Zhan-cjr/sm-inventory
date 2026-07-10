@@ -497,7 +497,13 @@ class ReportPrintController extends Controller
     private function printLaporanPersediaan($filters)
     {
         // Laporan Persediaan uses Stock model as per LaporanPersediaan.php
-        $query = \App\Models\Stock::query()->with(['branch', 'product', 'product.category']);
+        $query = \App\Models\Stock::query()->with(['branch', 'product', 'product.category'])
+            ->addSelect([
+                'batch_valuation' => \App\Models\StockBatch::select(\Illuminate\Support\Facades\DB::raw('COALESCE(SUM(remaining_quantity * cost_price), 0)'))
+                    ->whereColumn('product_id', 'stocks.product_id')
+                    ->whereColumn('branch_id', 'stocks.branch_id')
+                    ->where('remaining_quantity', '>', 0)
+            ]);
         $query = $this->applyDateFilters($query, $filters, 'created_at');
         
         if (auth()->user()->branch_id !== null) {
@@ -509,17 +515,24 @@ class ReportPrintController extends Controller
         $stocks = $query->orderBy('created_at', 'desc')->get();
         $period = $this->getPeriodString($filters);
 
-        $columns = ['Cabang', 'Produk', 'Kategori', 'Sisa Stok', 'Harga Pokok (+PPN)', 'Valuasi Stok'];
+        $columns = ['Cabang', 'Produk', 'Kategori', 'Sisa Stok', 'Harga Pokok (Rata-rata)', 'Valuasi Stok'];
         $rows = [];
         foreach ($stocks as $s) {
-            $costPriceTax = $s->cost_price_tax > 0 ? $s->cost_price_tax : ($s->product->cost_price_tax ?? $s->product->cost_price ?? 0);
+            if ($s->quantity_on_hand > 0 && $s->batch_valuation > 0) {
+                $costPriceTax = $s->batch_valuation / $s->quantity_on_hand;
+                $valuation = $s->batch_valuation;
+            } else {
+                $costPriceTax = $s->cost_price_tax > 0 ? $s->cost_price_tax : ($s->product->cost_price_tax ?? $s->product->cost_price ?? 0);
+                $valuation = $s->quantity_on_hand * $costPriceTax;
+            }
+            
             $rows[] = [
                 $s->branch ? $s->branch->name : 'Pusat / Global',
                 $s->product ? $s->product->name : '-',
                 ($s->product && $s->product->category) ? $s->product->category->name : '-',
                 $s->quantity_on_hand,
                 number_format($costPriceTax, 0, ',', '.'),
-                number_format($s->quantity_on_hand * $costPriceTax, 0, ',', '.')
+                number_format($valuation, 0, ',', '.')
             ];
         }
 
@@ -528,7 +541,13 @@ class ReportPrintController extends Controller
 
     private function printRekapTotalStok($filters)
     {
-        $query = \App\Models\Stock::query()->with(['branch', 'product', 'product.category']);
+        $query = \App\Models\Stock::query()->with(['branch', 'product', 'product.category'])
+            ->addSelect([
+                'batch_valuation' => \App\Models\StockBatch::select(\Illuminate\Support\Facades\DB::raw('COALESCE(SUM(remaining_quantity * cost_price), 0)'))
+                    ->whereColumn('product_id', 'stocks.product_id')
+                    ->whereColumn('branch_id', 'stocks.branch_id')
+                    ->where('remaining_quantity', '>', 0)
+            ]);
         // Apply branch filter if any
         if (auth()->user()->branch_id !== null) {
             $query->where('branch_id', auth()->user()->branch_id);
@@ -562,8 +581,12 @@ class ReportPrintController extends Controller
                 ];
             }
             
-            $costPriceTax = $stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->product->cost_price_tax ?? $stock->product->cost_price ?? 0);
-            $valuation = $stock->quantity_on_hand * $costPriceTax;
+            if ($stock->quantity_on_hand > 0 && $stock->batch_valuation > 0) {
+                $valuation = $stock->batch_valuation;
+            } else {
+                $costPriceTax = $stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->product->cost_price_tax ?? $stock->product->cost_price ?? 0);
+                $valuation = $stock->quantity_on_hand * $costPriceTax;
+            }
             
             $data[$key]['total_qty'] += $stock->quantity_on_hand;
             $data[$key]['total_valuation'] += $valuation;
@@ -790,12 +813,17 @@ class ReportPrintController extends Controller
             $product_id = $i->product_id;
             
             $cost_price = 0;
-            $branch_id = $i->branch_id;
-            if ($branch_id) {
-                $stock = \App\Models\Stock::where('product_id', $i->product_id)->where('branch_id', $branch_id)->first();
-                $cost_price = ($stock && $stock->cost_price > 0) ? $stock->cost_price : ($i->product ? $i->product->cost_price : 0);
+            $qty = abs($i->quantity);
+            if ($qty > 0 && $i->total_cogs > 0) {
+                $cost_price = $i->total_cogs / $qty;
             } else {
-                $cost_price = $i->product ? $i->product->cost_price : 0;
+                $branch_id = $i->branch_id;
+                if ($branch_id) {
+                    $stock = \App\Models\Stock::where('product_id', $i->product_id)->where('branch_id', $branch_id)->first();
+                    $cost_price = ($stock && $stock->cost_price_tax > 0) ? $stock->cost_price_tax : (($stock && $stock->cost_price > 0) ? $stock->cost_price : ($i->product ? ($i->product->cost_price_tax > 0 ? $i->product->cost_price_tax : $i->product->cost_price) : 0));
+                } else {
+                    $cost_price = $i->product ? ($i->product->cost_price_tax > 0 ? $i->product->cost_price_tax : $i->product->cost_price) : 0;
+                }
             }
 
             if(!isset($grouped[$product_id])) {

@@ -41,6 +41,10 @@ class LaporanRekapTipeSuplier extends Page implements HasTable
             ->join('products as p', 'ti.product_id', '=', 'p.id')
             ->leftJoin('suppliers as s', 'p.supplier_id', '=', 's.id')
             ->join('transactions as t', 'ti.transaction_id', '=', 't.id')
+            ->leftJoin('stocks as st', function($join) {
+                $join->on('st.product_id', '=', 'p.id')
+                     ->on('st.branch_id', '=', 't.branch_id');
+            })
             ->where('t.is_voided', false)
             ->selectRaw("
                 CASE 
@@ -53,9 +57,19 @@ class LaporanRekapTipeSuplier extends Page implements HasTable
                 t.transaction_date,
                 t.branch_id,
                 CASE WHEN ti.quantity > 0 THEN ti.quantity * (ti.unit_price - COALESCE(ti.discount_per_item, 0)) ELSE 0 END as jual,
-                CASE WHEN ti.quantity > 0 THEN ti.quantity * COALESCE(NULLIF(p.cost_price_tax, 0), p.cost_price, 0) ELSE 0 END as hpp,
+                CASE WHEN ti.quantity > 0 THEN (
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
+                    FROM stock_batch_deductions sbd
+                    JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
+                    WHERE sbd.transaction_item_id = ti.id
+                ) ELSE 0 END as hpp,
                 CASE WHEN ti.quantity < 0 THEN ABS(ti.quantity) * (ti.unit_price - COALESCE(ti.discount_per_item, 0)) ELSE 0 END as retur,
-                CASE WHEN ti.quantity < 0 THEN ABS(ti.quantity) * COALESCE(NULLIF(p.cost_price_tax, 0), p.cost_price, 0) ELSE 0 END as hpp_retur
+                CASE WHEN ti.quantity < 0 THEN ABS((
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
+                    FROM stock_batch_deductions sbd
+                    JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
+                    WHERE sbd.transaction_item_id = ti.id
+                )) ELSE 0 END as hpp_retur
             ");
 
         return $table
@@ -170,6 +184,10 @@ class LaporanRekapTipeSuplier extends Page implements HasTable
             ->join('products as p', 'ti.product_id', '=', 'p.id')
             ->leftJoin('suppliers as s', 'p.supplier_id', '=', 's.id')
             ->join('transactions as t', 'ti.transaction_id', '=', 't.id')
+            ->leftJoin('stocks as st', function($join) {
+                $join->on('st.product_id', '=', 'p.id')
+                     ->on('st.branch_id', '=', 't.branch_id');
+            })
             ->where('t.is_voided', false)
             ->selectRaw("
                 CASE 
@@ -187,9 +205,19 @@ class LaporanRekapTipeSuplier extends Page implements HasTable
                 CASE WHEN ti.quantity > 0 THEN ti.quantity ELSE 0 END as qty_jual,
                 CASE WHEN ti.quantity < 0 THEN ABS(ti.quantity) ELSE 0 END as qty_retur,
                 CASE WHEN ti.quantity > 0 THEN ti.quantity * (ti.unit_price - COALESCE(ti.discount_per_item, 0)) ELSE 0 END as jual,
-                CASE WHEN ti.quantity > 0 THEN ti.quantity * COALESCE(NULLIF(p.cost_price_tax, 0), p.cost_price, 0) ELSE 0 END as hpp,
+                CASE WHEN ti.quantity > 0 THEN (
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
+                    FROM stock_batch_deductions sbd
+                    JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
+                    WHERE sbd.transaction_item_id = ti.id
+                ) ELSE 0 END as hpp,
                 CASE WHEN ti.quantity < 0 THEN ABS(ti.quantity) * (ti.unit_price - COALESCE(ti.discount_per_item, 0)) ELSE 0 END as retur,
-                CASE WHEN ti.quantity < 0 THEN ABS(ti.quantity) * COALESCE(NULLIF(p.cost_price_tax, 0), p.cost_price, 0) ELSE 0 END as hpp_retur
+                CASE WHEN ti.quantity < 0 THEN ABS((
+                    SELECT COALESCE(SUM(sbd.quantity * sb.cost_price), ti.quantity * COALESCE(NULLIF(st.cost_price_tax, 0), NULLIF(st.cost_price, 0), NULLIF(p.cost_price_tax, 0), p.cost_price, 0))
+                    FROM stock_batch_deductions sbd
+                    JOIN stock_batches sb ON sbd.stock_batch_id = sb.id
+                    WHERE sbd.transaction_item_id = ti.id
+                )) ELSE 0 END as hpp_retur
             ");
 
         $query = DB::table(DB::raw("({$subquery->toSql()}) as sub"))

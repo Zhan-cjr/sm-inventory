@@ -35,6 +35,12 @@ class LaporanPersediaan extends Page implements HasTable
             ->query(
                 Stock::query()
                     ->with(['branch', 'product', 'product.category'])
+                    ->addSelect([
+                        'batch_valuation' => \App\Models\StockBatch::select(\Illuminate\Support\Facades\DB::raw('COALESCE(SUM(remaining_quantity * cost_price), 0)'))
+                            ->whereColumn('product_id', 'stocks.product_id')
+                            ->whereColumn('branch_id', 'stocks.branch_id')
+                            ->where('remaining_quantity', '>', 0)
+                    ])
             )
             ->columns([
                 TextColumn::make('branch.name')
@@ -56,14 +62,24 @@ class LaporanPersediaan extends Page implements HasTable
                     ->badge()
                     ->color(fn ($state, Stock $record) => $state <= ($record->reorder_point ?? 0) ? 'danger' : 'success'),
                 TextColumn::make('cost_price_tax')
-                    ->label('Harga Pokok (+PPN)')
+                    ->label('Harga Pokok (Rata-rata Batch)')
                     ->money('IDR', true)
-                    ->state(fn (Stock $record) => $record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0))
+                    ->state(function (Stock $record) {
+                        if ($record->quantity_on_hand > 0 && $record->batch_valuation > 0) {
+                            return $record->batch_valuation / $record->quantity_on_hand;
+                        }
+                        return $record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0);
+                    })
                     ->sortable(),
                 TextColumn::make('valuation')
-                    ->label('Valuasi Stok')
+                    ->label('Valuasi Stok (FIFO)')
                     ->money('IDR', true)
-                    ->state(fn (Stock $record): float => $record->quantity_on_hand * ($record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0)))
+                    ->state(function (Stock $record) {
+                        if ($record->quantity_on_hand > 0 && $record->batch_valuation > 0) {
+                            return (float) $record->batch_valuation;
+                        }
+                        return (float) $record->quantity_on_hand * ($record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0));
+                    })
                     ->sortable(),
             ])
             ->filters([

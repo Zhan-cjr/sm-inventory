@@ -130,6 +130,17 @@ class AccountingService
         $cogsProduct = 0.0;
         $cogsService = 0.0;
 
+        $batchCogsQuery = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+            ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+            ->whereIn('sbd.transaction_item_id', $transaction->items->pluck('id'))
+            ->select('sbd.transaction_item_id', \Illuminate\Support\Facades\DB::raw('SUM(sbd.quantity * sb.cost_price) as total_cogs'))
+            ->groupBy('sbd.transaction_item_id')
+            ->pluck('total_cogs', 'transaction_item_id');
+            
+        $stocksFallback = \App\Models\Stock::where('branch_id', $transaction->branch_id)
+            ->whereIn('product_id', $transaction->items->pluck('product_id')->filter())
+            ->get()->keyBy('product_id');
+
         foreach ($transaction->items as $item) {
             if ($item->is_assembly_component) continue;
 
@@ -142,10 +153,23 @@ class AccountingService
 
             $sumGross += $itemGross;
 
-            if ($isService && $item->product) {
-                $cogsService += (float)$item->product->cost_price * (float)$item->quantity;
-            } elseif (!$isService && $item->product) {
-                $cogsProduct += (float)$item->product->cost_price * (float)$item->quantity;
+            if ($item->product) {
+                if (isset($batchCogsQuery[$item->id])) {
+                    $itemCogs = $batchCogsQuery[$item->id];
+                } else {
+                    $stock = $stocksFallback[$item->product_id] ?? null;
+                    $fallbackPrice = $stock && $stock->cost_price_tax > 0 ? $stock->cost_price_tax :
+                                     ($stock && $stock->cost_price > 0 ? $stock->cost_price :
+                                     ($item->product->cost_price_tax > 0 ? $item->product->cost_price_tax : 
+                                      $item->product->cost_price));
+                    $itemCogs = (float)$fallbackPrice * (float)$item->quantity;
+                }
+                
+                if ($isService) {
+                    $cogsService += $itemCogs;
+                } else {
+                    $cogsProduct += $itemCogs;
+                }
             }
 
             $itemsData[] = compact('itemGross', 'isService', 'isTaxable');
@@ -661,8 +685,28 @@ class AccountingService
         }
 
         // 4. Catat Harga Pokok Penjualan (HPP) & Persediaan
-        $cogs = $order->items->sum(function ($item) {
-            return $item->product ? ($item->product->cost_price * $item->quantity) : 0;
+        $batchCogsQuery = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+            ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+            ->whereIn('sbd.ecommerce_order_item_id', $order->items->pluck('id'))
+            ->select('sbd.ecommerce_order_item_id', \Illuminate\Support\Facades\DB::raw('SUM(sbd.quantity * sb.cost_price) as total_cogs'))
+            ->groupBy('sbd.ecommerce_order_item_id')
+            ->pluck('total_cogs', 'ecommerce_order_item_id');
+
+        $stocksFallback = \App\Models\Stock::where('branch_id', $order->branch_id)
+            ->whereIn('product_id', $order->items->pluck('product_id')->filter())
+            ->get()->keyBy('product_id');
+
+        $cogs = $order->items->sum(function ($item) use ($batchCogsQuery, $stocksFallback) {
+            if (!$item->product) return 0;
+            if (isset($batchCogsQuery[$item->id])) {
+                return $batchCogsQuery[$item->id];
+            }
+            $stock = $stocksFallback[$item->product_id] ?? null;
+            $fallbackPrice = $stock && $stock->cost_price_tax > 0 ? $stock->cost_price_tax :
+                             ($stock && $stock->cost_price > 0 ? $stock->cost_price :
+                             ($item->product->cost_price_tax > 0 ? $item->product->cost_price_tax : 
+                              $item->product->cost_price));
+            return (float)$fallbackPrice * (float)$item->quantity;
         });
 
         if ($cogs > 0 && $hppAccount && $persediaanAccount) {

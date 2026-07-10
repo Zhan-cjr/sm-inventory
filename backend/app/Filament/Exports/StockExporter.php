@@ -24,9 +24,19 @@ class StockExporter extends Exporter
                 ->state(fn (Stock $record) => $record->quantity_on_hand + 0),
             ExportColumn::make('product.cost_price_tax')
                 ->label('Harga Pokok')
-                ->state(fn (Stock $record): float => $record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0)),
+                ->state(function (Stock $record) {
+                    if ($record->quantity_on_hand > 0 && isset($record->batch_valuation) && $record->batch_valuation > 0) {
+                        return $record->batch_valuation / $record->quantity_on_hand;
+                    }
+                    return $record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0);
+                }),
             ExportColumn::make('product.selling_price')->label('Harga Jual'),
-            ExportColumn::make('valuation')->label('Valuasi Stok')->state(fn (Stock $record): float => $record->quantity_on_hand * ($record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0))),
+            ExportColumn::make('valuation')->label('Valuasi Stok')->state(function (Stock $record) {
+                if ($record->quantity_on_hand > 0 && isset($record->batch_valuation) && $record->batch_valuation > 0) {
+                    return (float) $record->batch_valuation;
+                }
+                return (float) $record->quantity_on_hand * ($record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0));
+            }),
         ];
     }
 
