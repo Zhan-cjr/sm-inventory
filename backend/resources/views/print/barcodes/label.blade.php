@@ -5,8 +5,8 @@
     <title>Cetak Label Barcode</title>
     <style>
         @page {
-            /* Kertas label 32x18mm 3 line biasanya lebarnya 100mm s/d 104mm */
-            size: 104mm 18mm;
+            /* Kertas label 32x18mm 3 line rapat (tanpa jarak) = 96mm */
+            size: 96mm 18mm;
             margin: 0;
         }
         body {
@@ -16,21 +16,14 @@
             background: #fff;
             color: #000;
         }
-        .page {
-            width: 104mm;
-            height: 18mm;
-            display: flex;
-            flex-direction: row;
-            justify-content: flex-start;
-            align-items: flex-start;
-            gap: 2mm; /* Jarak antar kolom label biasanya 2mm */
-            page-break-after: always;
-            overflow: hidden;
-            box-sizing: border-box;
-            padding-left: 1mm; /* Margin kiri agar tidak terlalu mepet ke ujung kertas */
-        }
-        .page:last-child {
-            page-break-after: auto;
+        .container {
+            display: grid;
+            grid-template-columns: 32mm 32mm 32mm;
+            column-gap: 0; /* Tanpa jarak antar kolom */
+            row-gap: 0; /* Tanpa jarak vertikal */
+            grid-auto-rows: 18mm;
+            width: 96mm;
+            padding: 0; /* Hapus padding jika kertas benar-benar 96mm tanpa sisa */
         }
         .label {
             width: 32mm;
@@ -43,6 +36,7 @@
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
+            page-break-inside: avoid;
         }
         .product-name {
             font-size: 7px;
@@ -97,23 +91,12 @@
         } else {
             $dateStr = \Carbon\Carbon::now()->format('d/m/y');
         }
-
-        // Kumpulkan semua item sesuai dengan quantity copies
-        $allLabels = [];
-        foreach($products as $product) {
-            $itemCopies = isset($from_session) && $from_session ? $product->copies : $copies;
-            for($i = 0; $i < $itemCopies; $i++) {
-                $allLabels[] = $product;
-            }
-        }
-        
-        // Pecah menjadi baris berisi 3 kolom
-        $chunks = array_chunk($allLabels, 3);
     @endphp
 
-    @foreach($chunks as $chunk)
-        <div class="page">
-            @foreach($chunk as $product)
+    <div class="container">
+        @foreach($products as $product)
+            @php $itemCopies = isset($from_session) && $from_session ? $product->copies : $copies; @endphp
+            @for($i = 0; $i < $itemCopies; $i++)
                 <div class="label">
                     <div style="font-size: 5px; font-weight: bold; text-align: center; margin-bottom:1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">
                         {{ Str::limit($orgName . ' - ' . $branchName, 35) }}
@@ -134,8 +117,8 @@
                     </div>
                     <div class="price">Rp {{ number_format($product->selling_price, 0, ',', '.') }}</div>
                 </div>
-            @endforeach
-        </div>
-    @endforeach
+            @endfor
+        @endforeach
+    </div>
 </body>
 </html>
