@@ -50,16 +50,9 @@ def run_market_basket_analysis():
                   .sum().unstack().reset_index().fillna(0)
                   .set_index('transaction_id'))
                   
-        # Convert quantities to 1 or 0
-        def encode_units(x):
-            if x <= 0: return 0
-            if x >= 1: return 1
-            
-        # Use map for pandas >= 2.1.0, and applymap for older versions to avoid 500 error
-        if hasattr(basket, 'map'):
-            basket_sets = basket.map(encode_units)
-        else:
-            basket_sets = basket.applymap(encode_units)
+        # Convert quantities to booleans (True if > 0, else False)
+        # This handles NaN safely and mlxtend requires boolean dataframes
+        basket_sets = basket > 0
         
         # We need at least some transactions to find patterns
         if len(basket_sets) < 2:
