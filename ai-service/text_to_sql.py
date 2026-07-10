@@ -89,8 +89,8 @@ def process_nl_query(query: str, branch_id: str = None, chat_history: list = Non
         else:
             security_rules = """
 - The user is an Admin. They can view all data across all branches.
-- If the user asks for data about a SPECIFIC branch by name (e.g., 'cabang A' or 'Pasirhayam'), you MUST JOIN the `branches` table (e.g., `ON transactions.branch_id = branches.id`) and filter using `WHERE branches.name LIKE '%A%'`. DO NOT filter `branch_id` directly with a string name, because `branch_id` is a UUID.
-- If the user asks for data GENERALLY (without specifying a branch name), you MUST JOIN the `branches` table and include `branches.name` in your SELECT and GROUP BY clauses (e.g., `SELECT branches.name, SUM(...) ... GROUP BY branches.name`), so the admin sees the details per branch.
+- If the user asks for data about a SPECIFIC branch by name (e.g., 'cabang A' or 'Pasirhayam'), you MUST JOIN the `branches` table (e.g., `ON all_sales_items.branch_id = branches.id`) and filter using `WHERE REPLACE(LOWER(branches.name), ' ', '') LIKE REPLACE(LOWER('%cabang_name%'), ' ', '')`. DO NOT filter `branch_id` directly with a string name.
+- If the user asks for data GENERALLY (without specifying a branch name), you MUST JOIN the `branches` table and include `branches.name` in your SELECT and GROUP BY clauses, so the admin sees the details per branch.
 """
 
         history_text = ""
