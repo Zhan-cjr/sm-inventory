@@ -11,7 +11,7 @@
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Arial', 'Segoe UI', sans-serif;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             background: #fff;
             color: #000;
             -webkit-print-color-adjust: exact;
@@ -20,146 +20,188 @@
         .container {
             display: flex;
             flex-wrap: wrap;
-            gap: 2mm;
             justify-content: flex-start;
+            gap: 5px;
+            padding: 5px;
         }
         .pricecard {
-            width: 70mm;
-            height: 35mm;
+            width: 60mm;
+            height: 30mm;
             box-sizing: border-box;
-            border: 1px solid #d32f2f; /* Vibrant Red Border */
-            border-radius: 2mm;
             background: #fff;
+            position: relative;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             page-break-inside: avoid;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 6px;
+            border: 1px solid #ccc;
         }
-
-        /* Header: Org & Date with Yellow Banner */
+        
         .header {
             display: flex;
             justify-content: space-between;
+            align-items: stretch;
+            height: 8mm;
+        }
+        .logo-container {
+            padding: 1mm 2mm;
+            flex: 1;
+            display: flex;
             align-items: center;
-            background-color: #ffcc00; /* Eye-catching Yellow */
-            padding: 1.5mm 2mm;
-            border-bottom: 1.5px solid #d32f2f;
+            justify-content: flex-start;
         }
-        .org-name {
-            font-size: 5px;
-            font-weight: 900;
-            color: #000;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 70%;
-            text-transform: uppercase;
+        .logo-container img {
+            max-height: 5.5mm;
+            max-width: 100%;
+            object-fit: contain;
         }
-        .date {
-            font-size: 5px;
-            font-weight: 900;
-            color: #000;
-            width: 30%;
-            text-align: right;
-            background: #fff;
-            padding: 0.2mm 1mm;
-            border-radius: 1mm;
-        }
-
-        /* Body Wrapper */
-        .body-content {
-            padding: 1mm 2mm 1.5mm 2mm;
+        .store-info {
+            background: #cc0000;
+            color: #ffffff;
+            border-bottom-left-radius: 8px;
+            padding: 1mm 2mm;
             display: flex;
             flex-direction: column;
-            flex-grow: 1;
-            justify-content: space-between;
-        }
-
-        /* Product Name */
-        .product-name {
-            font-size: 9px;
-            font-weight: 900;
-            line-height: 1.1;
-            text-transform: uppercase;
+            justify-content: center;
+            align-items: center;
             text-align: center;
-            overflow: hidden;
+            max-width: 55%;
+        }
+        .store-name {
+            font-weight: bold;
+            font-size: 8px;
+            margin-bottom: 1px;
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
+        .store-motto {
+            font-size: 4.5px;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        
+        .separator {
+            height: 1px;
+            background: #cc0000;
+            margin: 0 2mm;
+        }
+        
+        .body-content {
+            display: flex;
+            flex: 1;
+            padding: 1mm 2mm 0 2mm;
+        }
+        .product-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding-right: 1mm;
+        }
+        .product-name {
+            font-weight: bold;
+            font-size: 8px;
+            line-height: 1.2;
+            text-transform: uppercase;
+            color: #111;
+            height: 2.4em; /* Jatah pas 2 baris */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end; /* Supaya teks menempel ke bawah */
+        }
+        .product-name span {
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
-            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .grey-line {
+            height: 1px;
+            background: #ccc;
+            width: 100%;
+            flex-shrink: 0;
+        }
+        
+        .product-price {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #0b2239; /* Dark Navy for contrast */
+            align-items: flex-start; /* Supaya Rp. sejajar atas dengan angka */
+            flex: 1;
+            padding-top: 0.5mm;
+            padding-bottom: 0.5mm;
         }
-
-        /* Price */
-        .price-area {
-            text-align: center;
-            margin-top: -1mm;
-            margin-bottom: 0.5mm;
-            display: flex;
-            justify-content: center;
-            align-items: baseline;
-            color: #d32f2f; /* Bold Red Price */
-        }
-        .rp {
-            font-size: 10px;
+        .price-currency {
             font-weight: 900;
-            margin-right: 1mm;
+            font-size: 8px;
+            color: #cc0000;
+            margin-right: 2px;
+            margin-top: 1.5mm; /* Penyesuaian visual agar rata atas dengan angka besar */
         }
-        .price-val {
-            font-size: 34px;
+        .price-amount {
             font-weight: 900;
+            font-size: 24px;
+            color: #cc0000;
             letter-spacing: -1px;
             line-height: 0.8;
-            text-shadow: 1px 1px 0px rgba(0,0,0,0.1);
         }
-
-        /* Footer: Barcode & SKU */
+        
+        .barcode-wrapper {
+            width: 24mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 0.5mm;
+        }
+        .barcode-wrapper svg {
+            max-width: 100%;
+            height: 7.5mm;
+        }
+        .barcode-text {
+            font-size: 6px;
+            letter-spacing: 1px;
+            margin-top: 1mm;
+            font-family: monospace;
+            font-weight: bold;
+        }
+        
         .footer {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            border-top: 1px dashed #ccc;
-            padding-top: 1mm;
+            height: 4mm;
+            padding-right: 2mm;
         }
-        .barcode {
-            width: 42mm;
+        .print-date {
+            background: #222;
+            color: #fff;
+            padding: 1mm 2mm;
+            border-top-right-radius: 6px;
             display: flex;
-            flex-direction: column;
             align-items: center;
-        }
-        .barcode svg {
-            width: 100%;
-            height: 5.5mm;
-        }
-        .barcode-text {
-            font-size: 5px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            margin-top: 0.5mm;
-            color: #333;
-        }
-        
-        .sku-info {
-            font-size: 7.5px; /* Enlarge SKU */
-            font-weight: 900;
-            color: #000;
-            text-align: right;
-            padding-bottom: 0.5mm;
-            display: flex;
-            flex-direction: column;
-            background: #f0f0f0; /* Slight highlight for SKU */
-            padding: 0.5mm 1mm;
-            border-radius: 1mm;
-        }
-        .sku-lbl {
             font-size: 4px;
-            color: #d32f2f;
-            text-transform: uppercase;
+            font-weight: bold;
+            height: 2mm;
         }
+        .print-date svg {
+            width: 2mm;
+            height: 2mm;
+            margin-right: 1mm;
+            fill: #fff;
+        }
+        .stripes {
+            display: flex;
+            gap: 1mm;
+            height: 2mm;
+            margin-bottom: 1mm;
+        }
+        .stripe {
+            width: 2mm;
+            transform: skewX(-30deg);
+        }
+        .stripe-red { background: #cc0000; width: 2.5mm; }
+        .stripe-grey { background: #b0b0b0; }
     </style>
 </head>
 <body onload="window.print()">
@@ -168,7 +210,7 @@
         $org = \App\Models\Organization::first();
         $orgName = $org ? $org->name : 'Toko Kita';
         $branch = \App\Models\Branch::find($branch_id ?? null);
-        $branchName = $branch ? $branch->name : 'Pusat';
+        $branchName = $branch ? $branch->name : 'Pasar UmMat';
         
         if (($date_type ?? 'cetak') === 'expired' && !empty($custom_date)) {
             $dateStr = \Carbon\Carbon::parse($custom_date)->format('d/m/Y');
@@ -179,48 +221,67 @@
 
     <div class="container">
         @foreach($products as $product)
-            @php 
-                $itemCopies = isset($from_session) && $from_session ? $product->copies : $copies; 
-                $formattedPrice = number_format($product->selling_price, 0, ',', '.');
-            @endphp
+            @php $itemCopies = isset($from_session) && $from_session ? $product->copies : $copies; @endphp
             @for($i = 0; $i < $itemCopies; $i++)
                 <div class="pricecard">
-                    
                     <!-- Header -->
                     <div class="header">
-                        <div class="org-name">{{ $orgName }} - {{ $branchName }}</div>
-                        <div class="date">{{ $dateStr }}</div>
+                        <div class="logo-container">
+                            @if($org && $org->logo_path)
+                                <img src="{{ asset('storage/' . $org->logo_path) }}" alt="Logo">
+                            @else
+                                <h1 style="font-size: 10px; margin: 0; color: #cc0000;">{{ $orgName }}</h1>
+                            @endif
+                        </div>
+                        <div class="store-info">
+                            <div class="store-name">{{ Str::limit($branchName, 20) }}</div>
+                            <div class="store-motto">Untung Murah Manfaat<br>dan InsyaAllah Berkah</div>
+                        </div>
                     </div>
                     
+                    <div class="separator"></div>
+                    
+                    <!-- Body -->
                     <div class="body-content">
-                        <!-- Product Name -->
-                        <div class="product-name">
-                            {{ $product->name }}
+                        <div class="product-info">
+                            <div class="product-name">
+                                <span>{{ $product->name }}</span>
+                            </div>
+                            
+                            <div class="grey-line" style="margin-top: 1mm; margin-bottom: 0.5mm;"></div>
+                            
+                            <div class="product-price">
+                                <span class="price-currency">Rp.</span>
+                                <span class="price-amount">{{ number_format($product->selling_price, 0, ',', '.') }}</span>
+                            </div>
+                            
+                            <div class="grey-line" style="margin-bottom: 0.5mm;"></div>
                         </div>
                         
-                        <!-- Price -->
-                        <div class="price-area">
-                            <span class="rp">Rp</span>
-                            <span class="price-val">{{ $formattedPrice }}</span>
-                        </div>
-
-                        <!-- Footer -->
-                        <div class="footer">
-                            <div class="barcode">
-                                @if($product->barcode)
-                                    {!! $generator->getBarcode($product->barcode, $generator::TYPE_CODE_128, 1.5, 35) !!}
-                                    <div class="barcode-text">{{ $product->barcode }}</div>
-                                @else
-                                    <div style="font-size: 8px; border: 1px solid #ccc; width: 100%; text-align: center; padding: 1mm 0;">No Barcode</div>
-                                @endif
-                            </div>
-                            <div class="sku-info">
-                                <span class="sku-lbl">SKU / KODE</span>
-                                <span>{{ $product->sku }}</span>
-                            </div>
+                        <div class="barcode-wrapper">
+                            @if($product->barcode)
+                                {!! $generator->getBarcode($product->barcode, $generator::TYPE_CODE_128, 1, 30) !!}
+                                <div class="barcode-text">{{ $product->barcode }}</div>
+                            @else
+                                <div style="font-size: 6px; margin-top: 3mm;">No Barcode</div>
+                            @endif
                         </div>
                     </div>
                     
+                    <!-- Footer -->
+                    <div class="footer">
+                        <div class="print-date">
+                            <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+                            TGL CETAK <span style="margin: 0 1mm; font-weight: normal;">|</span> {{ $dateStr }}
+                        </div>
+                        <div class="stripes">
+                            <div class="stripe stripe-red"></div>
+                            <div class="stripe stripe-grey"></div>
+                            <div class="stripe stripe-grey"></div>
+                            <div class="stripe stripe-grey"></div>
+                            <div class="stripe stripe-grey"></div>
+                        </div>
+                    </div>
                 </div>
             @endfor
         @endforeach
