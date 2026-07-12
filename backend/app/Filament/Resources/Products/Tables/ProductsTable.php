@@ -19,27 +19,25 @@ class ProductsTable
         return $table
             ->modifyQueryUsing(function (\Illuminate\Database\Eloquent\Builder $query, \Filament\Tables\Contracts\HasTable $livewire) {
                 $user = \Illuminate\Support\Facades\Auth::user();
+                $branchId = null;
 
                 if ($user && $user->branch_id) {
-                    $query->with(['stocks' => function ($q) use ($user) {
-                        $q->where('branch_id', $user->branch_id)->with('racks');
-                    }]);
-                    return $query->withSum(['stocks' => function ($q) use ($user) {
-                        $q->where('branch_id', $user->branch_id);
-                    }], 'quantity_on_hand');
+                    $branchId = $user->branch_id;
+                } else {
+                    $branchId = $livewire->tableFilters['branch']['value'] ?? null;
                 }
 
-                $branchId = $livewire->tableFilters['branch']['value'] ?? null;
                 if ($branchId) {
                     $query->with(['stocks' => function ($q) use ($branchId) {
                         $q->where('branch_id', $branchId)->with('racks');
                     }]);
-                    return $query->withSum(['stocks' => function ($q) use ($branchId) {
+                    $query->withSum(['stocks' => function ($q) use ($branchId) {
                         $q->where('branch_id', $branchId);
                     }], 'quantity_on_hand');
+                } else {
+                    $query->with('stocks.racks');
+                    $query->withSum('stocks', 'quantity_on_hand');
                 }
-
-                $query->with('stocks.racks');
                 
                 // Prioritize exact barcode or sku match in global search if search term exists
                 $search = $livewire->getTableSearch();
@@ -59,7 +57,7 @@ class ProductsTable
                     });
                 }
 
-                return $query->withSum('stocks', 'quantity_on_hand');
+                return $query;
             })
             ->columns([
                 ImageColumn::make('image_path')
