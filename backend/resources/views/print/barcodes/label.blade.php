@@ -38,15 +38,16 @@
         }
         
         .left-section {
-            width: 6.5mm;
-            background: #000;
-            color: #fff;
+            width: 5.5mm;
+            background: #fff;
+            color: #000;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
-            padding: 1.5mm 0 1.5mm 0;
+            padding: 1.5mm 0;
             box-sizing: border-box;
+            border-right: 1px solid #000;
         }
         .branch-text-container {
             display: flex;
@@ -59,7 +60,7 @@
         .branch-line {
             writing-mode: vertical-rl;
             transform: rotate(180deg);
-            font-size: 5.5px;
+            font-size: 6px;
             font-weight: bold;
             letter-spacing: 0.3px;
             white-space: nowrap;
@@ -67,21 +68,22 @@
         .cart-icon {
             width: 3.5mm;
             height: 3.5mm;
-            fill: #fff;
+            fill: #000;
             margin-top: 1mm;
             transform: rotate(-90deg);
         }
 
         .middle-section {
-            width: 20.5mm;
-            padding: 1mm 1.5mm;
+            width: 22.5mm;
+            padding: 1mm 1mm;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             box-sizing: border-box;
+            background: #fff;
         }
         .product-name {
-            font-size: 6px;
+            font-size: 5.5px;
             font-weight: bold;
             line-height: 1.1;
             overflow: hidden;
@@ -89,17 +91,40 @@
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             text-overflow: ellipsis;
-            min-height: 13.5px;
             text-transform: uppercase;
+            text-align: center;
         }
-        .divider {
-            border-top: 1.5px solid #000;
-            margin: 0.5mm 0;
+        
+        .barcode-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
         }
+        .barcode-wrapper {
+            width: 100%;
+            height: 5mm;
+            display: flex;
+            justify-content: center;
+        }
+        .barcode-wrapper svg {
+            width: 100%;
+            max-width: 21mm;
+            height: 100%;
+        }
+        .barcode-number {
+            font-size: 5px;
+            letter-spacing: 1.5px;
+            margin-top: 0.5mm;
+            font-weight: bold;
+        }
+
         .price-container {
             display: flex;
+            justify-content: center;
             align-items: baseline;
-            margin-bottom: 0.5mm;
+            margin-top: 0.5mm;
         }
         .price-currency {
             font-size: 6.5px;
@@ -111,35 +136,10 @@
             font-weight: bold;
             letter-spacing: -0.5px;
         }
-        .barcode-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-grow: 1;
-            justify-content: flex-end;
-            margin-bottom: 0.5mm;
-        }
-        .barcode-wrapper {
-            width: 100%;
-            height: 4.5mm;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-        }
-        .barcode-wrapper svg {
-            max-width: 100%;
-            height: 100%;
-            width: auto;
-        }
-        .barcode-number {
-            font-size: 5.5px;
-            letter-spacing: 1.5px;
-            margin-top: 1px;
-        }
 
         .right-section {
-            width: 5mm;
-            border-left: 1.5px solid #000;
+            width: 4mm;
+            border-left: 1px solid #000;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -149,7 +149,7 @@
         .date-text {
             writing-mode: vertical-rl;
             transform: rotate(180deg);
-            font-size: 7px;
+            font-size: 6px;
             font-weight: bold;
             white-space: nowrap;
         }
@@ -211,20 +211,21 @@
 
                     <div class="middle-section">
                         <div class="product-name">{{ $product->name }}</div>
-                        <div class="divider"></div>
-                        <div class="price-container">
-                            <span class="price-currency">Rp.</span>
-                            <span class="price-amount">{{ number_format($product->selling_price, 0, ',', '.') }}</span>
-                        </div>
+                        
                         <div class="barcode-section">
                             <div class="barcode-wrapper">
                                 @if($barcode)
-                                    {!! $generator->getBarcode($barcode, $generator::TYPE_CODE_128, 1, 45) !!}
+                                    {!! $generator->getBarcode($barcode, $generator::TYPE_CODE_128, 2, 40) !!}
                                 @else
                                     <div style="font-size: 6px;">No Barcode</div>
                                 @endif
                             </div>
                             <div class="barcode-number">{{ $barcode }}</div>
+                        </div>
+
+                        <div class="price-container">
+                            <span class="price-currency">Rp.</span>
+                            <span class="price-amount">{{ number_format($product->selling_price, 0, ',', '.') }}</span>
                         </div>
                     </div>
 
