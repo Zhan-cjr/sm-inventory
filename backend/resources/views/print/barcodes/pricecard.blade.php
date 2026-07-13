@@ -221,7 +221,7 @@
 
     <div class="container">
         @foreach($products as $product)
-            @php $itemCopies = isset($from_session) && $from_session ? $product->copies : $copies; @endphp
+            @php $itemCopies = $product->copies ?? 1; @endphp
             @for($i = 0; $i < $itemCopies; $i++)
                 <div class="pricecard">
                     <!-- Header -->

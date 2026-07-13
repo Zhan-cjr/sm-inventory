@@ -192,7 +192,7 @@
     <div class="container">
         @foreach($products as $product)
             @php 
-                $itemCopies = isset($from_session) && $from_session ? $product->copies : $copies; 
+                $itemCopies = $product->copies ?? 1; 
                 $barcode = $product->barcode ?? $product->sku;
             @endphp
             @for($i = 0; $i < $itemCopies; $i++)

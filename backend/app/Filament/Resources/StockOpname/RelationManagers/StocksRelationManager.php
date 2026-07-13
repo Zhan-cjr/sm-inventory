@@ -128,6 +128,26 @@ class StocksRelationManager extends RelationManager
             ])
             ->bulkActions([
                 BulkActionGroup::make([
+                    \Filament\Actions\BulkAction::make('cetak_pricecard_rak')
+                        ->label('Cetak Pricecard')
+                        ->icon('heroicon-o-tag')
+                        ->color('warning')
+                        ->form([
+                            \Filament\Forms\Components\TextInput::make('copies')
+                                ->label('Jumlah Pricecard per Produk')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->required(),
+                        ])
+                        ->action(function (\Illuminate\Support\Collection $records, array $data) {
+                            $productIds = $records->pluck('product_id')->unique()->toArray();
+                            return redirect()->route('print.barcode.pricecard', [
+                                'product_ids' => $productIds,
+                                'copies' => $data['copies'],
+                            ]);
+                        })
+                        ->deselectRecordsAfterCompletion(),
                     DetachBulkAction::make()->label('Keluarkan Terpilih'),
                 ]),
             ]);
