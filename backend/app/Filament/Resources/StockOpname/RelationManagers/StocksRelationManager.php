@@ -140,11 +140,15 @@ class StocksRelationManager extends RelationManager
                                 ->minValue(1)
                                 ->required(),
                         ])
-                        ->action(function (\Illuminate\Support\Collection $records, array $data) {
+                        ->action(function (\Illuminate\Support\Collection $records, array $data, $livewire) {
                             $productIds = $records->pluck('product_id')->unique()->toArray();
+                            $branchId = (method_exists($livewire, 'getOwnerRecord') && $livewire->getOwnerRecord()) 
+                                ? $livewire->getOwnerRecord()->branch_id 
+                                : \Illuminate\Support\Facades\Auth::user()->branch_id;
                             return redirect()->route('print.barcode.pricecard', [
                                 'product_ids' => $productIds,
                                 'copies' => $data['copies'],
+                                'branch_id' => $branchId,
                             ]);
                         })
                         ->deselectRecordsAfterCompletion(),

@@ -29,6 +29,12 @@ class BarcodePrintController extends Controller
                 $product = Product::find($item['product_id'] ?? null);
                 if ($product) {
                     $product->copies = (int) ($item['copies'] ?? 1);
+                    if ($branchId) {
+                        $stock = \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $branchId)->first();
+                        $product->display_price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $product->selling_price;
+                    } else {
+                        $product->display_price = $product->selling_price;
+                    }
                     $products->push($product);
                 }
             }
@@ -54,6 +60,12 @@ class BarcodePrintController extends Controller
         // Give them all the same copies
         foreach ($products as $p) {
             $p->copies = $copies;
+            if ($branchId) {
+                $stock = \App\Models\Stock::where('product_id', $p->id)->where('branch_id', $branchId)->first();
+                $p->display_price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $p->selling_price;
+            } else {
+                $p->display_price = $p->selling_price;
+            }
         }
 
         return view('print.barcodes.label', [
@@ -87,6 +99,12 @@ class BarcodePrintController extends Controller
                 $product = Product::find($item['product_id'] ?? null);
                 if ($product) {
                     $product->copies = (int) ($item['copies'] ?? 1);
+                    if ($branchId) {
+                        $stock = \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $branchId)->first();
+                        $product->display_price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $product->selling_price;
+                    } else {
+                        $product->display_price = $product->selling_price;
+                    }
                     $products->push($product);
                 }
             }
@@ -111,6 +129,12 @@ class BarcodePrintController extends Controller
         // Give them all the same copies
         foreach ($products as $p) {
             $p->copies = $copies;
+            if ($branchId) {
+                $stock = \App\Models\Stock::where('product_id', $p->id)->where('branch_id', $branchId)->first();
+                $p->display_price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $p->selling_price;
+            } else {
+                $p->display_price = $p->selling_price;
+            }
         }
 
         return view('print.barcodes.pricecard', [

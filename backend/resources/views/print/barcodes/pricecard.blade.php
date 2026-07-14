@@ -252,7 +252,7 @@
                             
                             <div class="product-price">
                                 <span class="price-currency">Rp.</span>
-                                <span class="price-amount">{{ number_format($product->selling_price, 0, ',', '.') }}</span>
+                                <span class="price-amount">{{ number_format($product->display_price ?? $product->selling_price, 0, ',', '.') }}</span>
                             </div>
                             
                             <div class="grey-line" style="margin-bottom: 0.5mm;"></div>

@@ -89,13 +89,19 @@ class BarcodePrinter extends Page implements HasForms
                             })
                             ->getOptionLabelUsing(fn ($value): ?string => Product::find($value)?->name)
                             ->live(onBlur: true)
-                            ->afterStateUpdated(function ($state, callable $set) {
+                            ->afterStateUpdated(function ($state, callable $set, $get) {
                                 if ($state) {
                                     $product = Product::find($state);
                                     if ($product) {
                                         $set('sku', $product->sku);
                                         $set('barcode', $product->barcode);
-                                        $set('price', $product->selling_price);
+                                        $branchId = $get('../../branch_id');
+                                        if ($branchId) {
+                                            $stock = \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $branchId)->first();
+                                            $set('price', ($stock && $stock->selling_price > 0) ? $stock->selling_price : $product->selling_price);
+                                        } else {
+                                            $set('price', $product->selling_price);
+                                        }
                                     }
                                 }
                             })
@@ -159,11 +165,14 @@ class BarcodePrinter extends Page implements HasForms
                         $currentItems = $this->data['print_items'] ?? [];
                         foreach ($receipt->items as $item) {
                             if ($item->product) {
+                                $branchId = $this->data['branch_id'] ?? auth()->user()->branch_id;
+                                $stock = $branchId ? \App\Models\Stock::where('product_id', $item->product_id)->where('branch_id', $branchId)->first() : null;
+                                $price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $item->product->selling_price;
                                 $currentItems[] = [
                                     'product_id' => $item->product_id,
                                     'sku' => $item->product->sku,
                                     'barcode' => $item->product->barcode,
-                                    'price' => $item->product->selling_price,
+                                    'price' => $price,
                                     'copies' => $item->quantity_received > 0 ? $item->quantity_received : 1,
                                 ];
                             }
@@ -201,7 +210,9 @@ class BarcodePrinter extends Page implements HasForms
                         $name = str_replace('"', '""', $product->name);
                         $sku = $product->sku ?? '';
                         $barcode = $product->barcode ?? '';
-                        $price = $product->selling_price ?? '';
+                        $branchId = $this->data['branch_id'] ?? auth()->user()->branch_id;
+                        $stock = $branchId ? \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $branchId)->first() : null;
+                        $price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : ($product->selling_price ?? '');
                         $copies = (int) ($item['copies'] ?? 1);
                         
                         for ($i = 0; $i < $copies; $i++) {
