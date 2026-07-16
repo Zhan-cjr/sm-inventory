@@ -20,12 +20,12 @@ trait HasApprovals
             'level' => $level,
         ]);
         
-        $this->sendTelegramNotification();
+        $this->sendTelegramNotification($approval);
         
         return $approval;
     }
 
-    protected function sendTelegramNotification()
+    protected function sendTelegramNotification($approval = null)
     {
         $token = env('TELEGRAM_BOT_TOKEN');
         if (!$token) return;
@@ -67,25 +67,40 @@ trait HasApprovals
         } else {
             $creatorName = $this->recorder?->name ?? 'System';
         }
-
-        $baseUrl = env('FRONTEND_URL', request()->getSchemeAndHttpHost());
-        $link = rtrim($baseUrl, '/') . "/mobile/auth";
         
         $message = "📄 <b>Permintaan Persetujuan Dokumen</b>\n\n";
         $message .= "<b>Tipe:</b> {$type}\n";
         $message .= "<b>No Dokumen:</b> {$docNumber}\n";
         $message .= "<b>Cabang:</b> {$branchName}\n";
-        $message .= "<b>Dibuat oleh:</b> {$creatorName}\n\n";
-        $message .= "Tautan: " . $link;
+        $message .= "<b>Dibuat oleh:</b> {$creatorName}\n";
+
+        $replyMarkup = null;
+        if ($approval) {
+            $replyMarkup = json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ Setuju', 'callback_data' => "action:approve:{$approval->id}"],
+                        ['text' => '❌ Tolak', 'callback_data' => "action:reject:{$approval->id}"]
+                    ],
+                    [
+                        ['text' => '🔍 Tampilkan Rincian (Review)', 'callback_data' => "action:review:{$approval->id}"]
+                    ]
+                ]
+            ]);
+        }
 
         // 1. Send to individuals (Supervisors)
         foreach ($supervisors as $spv) {
-            \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+            $payload = [
                 'chat_id' => $spv->telegram_chat_id,
                 'text' => $message,
                 'parse_mode' => 'HTML',
                 'disable_web_page_preview' => true,
-            ]);
+            ];
+            if ($replyMarkup) {
+                $payload['reply_markup'] = $replyMarkup;
+            }
+            \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
         }
 
         // 2. Send to Specific Telegram Group
@@ -103,12 +118,16 @@ trait HasApprovals
                 }
 
                 if ($groupId) {
-                    \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+                    $payload = [
                         'chat_id' => $groupId,
                         'text' => "👥 <b>Pemberitahuan Grup</b>\n\n" . $message,
                         'parse_mode' => 'HTML',
                         'disable_web_page_preview' => true,
-                    ]);
+                    ];
+                    if ($replyMarkup) {
+                        $payload['reply_markup'] = $replyMarkup;
+                    }
+                    \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
                 }
             }
         }
