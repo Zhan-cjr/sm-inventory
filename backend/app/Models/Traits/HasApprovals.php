@@ -89,6 +89,8 @@ trait HasApprovals
             ]);
         }
 
+        $sentMessages = [];
+
         // 1. Send to individuals (Supervisors)
         foreach ($supervisors as $spv) {
             $payload = [
@@ -100,7 +102,16 @@ trait HasApprovals
             if ($replyMarkup) {
                 $payload['reply_markup'] = $replyMarkup;
             }
-            \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
+            $response = \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
+            if ($response->successful() && $approval) {
+                $result = $response->json('result');
+                if (isset($result['message_id']) && isset($result['chat']['id'])) {
+                    $sentMessages[] = [
+                        'chat_id' => $result['chat']['id'],
+                        'message_id' => $result['message_id']
+                    ];
+                }
+            }
         }
 
         // 2. Send to Specific Telegram Group
@@ -127,19 +138,36 @@ trait HasApprovals
                     if ($replyMarkup) {
                         $payload['reply_markup'] = $replyMarkup;
                     }
-                    \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
+                    $response = \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
+                    if ($response->successful() && $approval) {
+                        $result = $response->json('result');
+                        if (isset($result['message_id']) && isset($result['chat']['id'])) {
+                            $sentMessages[] = [
+                                'chat_id' => $result['chat']['id'],
+                                'message_id' => $result['message_id']
+                            ];
+                        }
+                    }
                 }
             }
+        }
+
+        if ($approval && !empty($sentMessages)) {
+            $approval->update(['telegram_messages' => $sentMessages]);
         }
     }
 
     public function approve($userId, $notes = null)
     {
-        $this->approvals()->where('status', 'pending')->update([
-            'status' => 'approved',
-            'user_id' => $userId,
-            'notes' => $notes,
-        ]);
+        $approvals = $this->approvals()->where('status', 'pending')->get();
+        foreach ($approvals as $approval) {
+            $approval->update([
+                'status' => 'approved',
+                'user_id' => $userId,
+                'notes' => $notes,
+            ]);
+            $this->updateTelegramMessageStatus($approval, 'approve', $userId);
+        }
         
         $this->update(['status' => 'approved']);
 
@@ -150,12 +178,99 @@ trait HasApprovals
 
     public function reject($userId, $notes = null)
     {
-        $this->approvals()->where('status', 'pending')->update([
-            'status' => 'rejected',
-            'user_id' => $userId,
-            'notes' => $notes,
-        ]);
+        $approvals = $this->approvals()->where('status', 'pending')->get();
+        foreach ($approvals as $approval) {
+            $approval->update([
+                'status' => 'rejected',
+                'user_id' => $userId,
+                'notes' => $notes,
+            ]);
+            $this->updateTelegramMessageStatus($approval, 'reject', $userId);
+        }
         
         $this->update(['status' => 'rejected']);
+    }
+
+    public function cancelPendingApprovals()
+    {
+        $approvals = $this->approvals()->where('status', 'pending')->get();
+        foreach ($approvals as $approval) {
+            $approval->update([
+                'status' => 'cancelled',
+                'notes' => 'Otomatis dibatalkan karena dokumen telah diubah.',
+            ]);
+            $this->updateTelegramMessageStatus($approval, 'cancel');
+        }
+    }
+
+    protected function updateTelegramMessageStatus($approval, $action, $userId = null)
+    {
+        $token = env('TELEGRAM_BOT_TOKEN');
+        if (!$token) return;
+
+        $messages = $approval->telegram_messages;
+        if (empty($messages) || !is_array($messages)) return;
+
+        $userName = 'Sistem';
+        if ($userId) {
+            $user = \App\Models\User::find($userId);
+            if ($user) $userName = $user->name;
+        }
+
+        $statusText = "";
+        if ($action === 'approve') {
+            $statusText = "✅ <b>Disetujui</b> oleh {$userName} (via Sistem)";
+        } elseif ($action === 'reject') {
+            $statusText = "❌ <b>Ditolak</b> oleh {$userName} (via Sistem)";
+        } elseif ($action === 'cancel') {
+            $statusText = "🚫 <b>Persetujuan dibatalkan</b> karena dokumen telah diubah.";
+        }
+
+        foreach ($messages as $msg) {
+            $chatId = $msg['chat_id'] ?? null;
+            $messageId = $msg['message_id'] ?? null;
+            
+            if ($chatId && $messageId) {
+                // Fetch the original message text if possible, but Telegram API doesn't allow fetching a single message directly by bot.
+                // We will just append the status to a generic text, or better, we can't easily fetch it.
+                // Wait! If we use editMessageReplyMarkup with empty markup, it just removes buttons and keeps original text!
+                // Let's do that first to remove buttons, then we don't necessarily have to change the text.
+                // Actually, editMessageText requires 'text', which would overwrite the original message.
+                // To just remove the buttons, we can use `editMessageReplyMarkup`!
+                // But the user requested to SEE who approved it.
+                // If we must append text, we would need to store the original text too.
+                // Or we can just build the original text again?
+                // Yes, we can rebuild the original text exactly like in `sendTelegramNotification`!
+                
+                $branchName = $this->branch ? $this->branch->name : 'Pusat';
+                $modelClass = class_basename($this);
+                $type = 'Koreksi Stok';
+                if ($modelClass === 'PurchaseOrder') $type = 'Purchase Order';
+                elseif ($modelClass === 'WarehouseCheck') $type = 'Pengecekan Gudang';
+                
+                $docNumber = $this->po_number ?? $this->adjustment_number ?? '-';
+                
+                $creatorName = 'System';
+                if ($modelClass === 'PurchaseOrder') $creatorName = $this->creator?->name ?? 'System';
+                elseif ($modelClass === 'WarehouseCheck') $creatorName = $this->checker?->name ?? 'System';
+                else $creatorName = $this->recorder?->name ?? 'System';
+
+                $baseText = "📄 <b>Permintaan Persetujuan Dokumen</b>\n\n";
+                $baseText .= "<b>Tipe:</b> {$type}\n";
+                $baseText .= "<b>No Dokumen:</b> {$docNumber}\n";
+                $baseText .= "<b>Cabang:</b> {$branchName}\n";
+                $baseText .= "<b>Dibuat oleh:</b> {$creatorName}\n\n";
+                
+                $finalText = $baseText . $statusText;
+
+                \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/editMessageText", [
+                    'chat_id' => $chatId,
+                    'message_id' => $messageId,
+                    'text' => $finalText,
+                    'parse_mode' => 'HTML',
+                    'disable_web_page_preview' => true,
+                ]);
+            }
+        }
     }
 }

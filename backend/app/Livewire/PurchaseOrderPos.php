@@ -483,6 +483,10 @@ class PurchaseOrderPos extends Component
             $po->requestApproval('Otomatis: ' . implode(', ', $approvalReason));
             Notification::make()->title('PO memerlukan persetujuan Manajer.')->warning()->send();
         } else {
+            if ($this->purchaseOrder) {
+                // Bersihkan approval lama jika PO diedit dan tidak butuh approval lagi
+                $po->cancelPendingApprovals();
+            }
             Notification::make()->title('Pesanan Pembelian berhasil disimpan.')->success()->send();
         }
         
