@@ -11,7 +11,11 @@ class Approval extends Model
     use HasUuids;
 
     protected $fillable = [
-        'approvable_type', 'approvable_id', 'user_id', 'status', 'notes', 'level'
+        'approvable_type', 'approvable_id', 'user_id', 'status', 'notes', 'level', 'telegram_messages'
+    ];
+
+    protected $casts = [
+        'telegram_messages' => 'array',
     ];
 
     public function approvable()
