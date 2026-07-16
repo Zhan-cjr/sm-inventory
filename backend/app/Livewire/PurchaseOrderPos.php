@@ -461,6 +461,9 @@ class PurchaseOrderPos extends Component
             $this->purchaseOrder->update($data);
             $this->purchaseOrder->items()->delete();
             $po = $this->purchaseOrder;
+            
+            // ALWAYS cancel old pending approvals because the document has been modified
+            $po->cancelPendingApprovals();
         } else {
             $po = PurchaseOrder::create($data);
         }
@@ -483,10 +486,6 @@ class PurchaseOrderPos extends Component
             $po->requestApproval('Otomatis: ' . implode(', ', $approvalReason));
             Notification::make()->title('PO memerlukan persetujuan Manajer.')->warning()->send();
         } else {
-            if ($this->purchaseOrder) {
-                // Bersihkan approval lama jika PO diedit dan tidak butuh approval lagi
-                $po->cancelPendingApprovals();
-            }
             Notification::make()->title('Pesanan Pembelian berhasil disimpan.')->success()->send();
         }
         
