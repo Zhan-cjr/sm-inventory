@@ -54,15 +54,58 @@ class AuthorizationController extends Controller
             $message .= "<b>Cabang:</b> {$branchName}\n";
             $message .= "<b>Kasir:</b> {$user->name}\n";
             $message .= "<b>Tindakan:</b> {$actionLabel}\n\n";
-            $message .= "Tautan: " . $link;
+            
+            // Add some details directly to the message if available
+            if (!empty($request->details)) {
+                if (isset($request->details['product_name'])) {
+                    $message .= "<b>Produk:</b> {$request->details['product_name']}\n";
+                }
+                if (isset($request->details['discount_amount'])) {
+                    $message .= "<b>Diskon:</b> Rp " . number_format($request->details['discount_amount'], 0, ',', '.') . "\n";
+                }
+                if (isset($request->details['amount'])) {
+                    $message .= "<b>Nominal:</b> Rp " . number_format($request->details['amount'], 0, ',', '.') . "\n";
+                }
+                $message .= "\n";
+            }
+            
+            $message .= "Buka PWA: " . $link;
 
+            $replyMarkup = json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ Setuju', 'callback_data' => "pos_auth:approve:{$authRequest->id}"],
+                        ['text' => '❌ Tolak', 'callback_data' => "pos_auth:reject:{$authRequest->id}"]
+                    ],
+                    [
+                        ['text' => '🔍 Rincian', 'callback_data' => "pos_auth:review:{$authRequest->id}"]
+                    ]
+                ]
+            ]);
+
+            $sentMessages = [];
             foreach ($supervisors as $spv) {
-                \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+                $response = \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
                     'chat_id' => $spv->telegram_chat_id,
                     'text' => $message,
                     'parse_mode' => 'HTML',
                     'disable_web_page_preview' => true,
+                    'reply_markup' => $replyMarkup,
                 ]);
+                
+                if ($response->successful()) {
+                    $result = $response->json('result');
+                    if (isset($result['message_id']) && isset($result['chat']['id'])) {
+                        $sentMessages[] = [
+                            'chat_id' => $result['chat']['id'],
+                            'message_id' => $result['message_id']
+                        ];
+                    }
+                }
+            }
+            
+            if (!empty($sentMessages)) {
+                $authRequest->update(['telegram_messages' => $sentMessages]);
             }
         }
 
@@ -140,6 +183,8 @@ class AuthorizationController extends Controller
             'status' => 'APPROVED',
             'supervisor_id' => $user->id
         ]);
+        
+        $this->updateTelegramMessageStatus($authRequest, 'approve', $user->name);
 
         return response()->json(['data' => $authRequest]);
     }
@@ -169,7 +214,64 @@ class AuthorizationController extends Controller
             'status' => 'REJECTED',
             'supervisor_id' => $user->id
         ]);
+        
+        $this->updateTelegramMessageStatus($authRequest, 'reject', $user->name);
 
         return response()->json(['data' => $authRequest]);
+    }
+
+    protected function updateTelegramMessageStatus($authRequest, $action, $userName)
+    {
+        $token = env('TELEGRAM_BOT_TOKEN');
+        if (!$token) return;
+
+        $messages = $authRequest->telegram_messages;
+        if (empty($messages) || !is_array($messages)) return;
+
+        $statusText = "";
+        if ($action === 'approve') {
+            $statusText = "✅ <b>Disetujui</b> oleh {$userName} (via Sistem)";
+        } elseif ($action === 'reject') {
+            $statusText = "❌ <b>Ditolak</b> oleh {$userName} (via Sistem)";
+        }
+
+        $branchName = $authRequest->branch ? $authRequest->branch->name : 'Pusat';
+        $cashierName = $authRequest->cashier ? $authRequest->cashier->name : 'Kasir';
+        $actionLabel = str_replace('_', ' ', strtoupper($authRequest->action));
+
+        $baseText = "🔔 <b>Permintaan Otorisasi Baru</b>\n\n";
+        $baseText .= "<b>Cabang:</b> {$branchName}\n";
+        $baseText .= "<b>Kasir:</b> {$cashierName}\n";
+        $baseText .= "<b>Tindakan:</b> {$actionLabel}\n\n";
+        
+        if (!empty($authRequest->details)) {
+            if (isset($authRequest->details['product_name'])) {
+                $baseText .= "<b>Produk:</b> {$authRequest->details['product_name']}\n";
+            }
+            if (isset($authRequest->details['discount_amount'])) {
+                $baseText .= "<b>Diskon:</b> Rp " . number_format($authRequest->details['discount_amount'], 0, ',', '.') . "\n";
+            }
+            if (isset($authRequest->details['amount'])) {
+                $baseText .= "<b>Nominal:</b> Rp " . number_format($authRequest->details['amount'], 0, ',', '.') . "\n";
+            }
+            $baseText .= "\n";
+        }
+
+        $finalText = $baseText . $statusText;
+
+        foreach ($messages as $msg) {
+            $chatId = $msg['chat_id'] ?? null;
+            $messageId = $msg['message_id'] ?? null;
+            
+            if ($chatId && $messageId) {
+                \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/editMessageText", [
+                    'chat_id' => $chatId,
+                    'message_id' => $messageId,
+                    'text' => $finalText,
+                    'parse_mode' => 'HTML',
+                    'disable_web_page_preview' => true,
+                ]);
+            }
+        }
     }
 }

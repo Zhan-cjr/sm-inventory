@@ -17,12 +17,14 @@ class AuthorizationRequest extends Model
         'action',
         'details',
         'status',
-        'expires_at'
+        'expires_at',
+        'telegram_messages'
     ];
 
     protected $casts = [
         'details' => 'array',
         'expires_at' => 'datetime',
+        'telegram_messages' => 'array',
     ];
 
     public function cashier()

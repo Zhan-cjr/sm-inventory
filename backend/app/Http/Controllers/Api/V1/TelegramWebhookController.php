@@ -195,7 +195,7 @@ class TelegramWebhookController extends Controller
             $telegramName .= ' ' . $callbackQuery['from']['last_name'];
         }
 
-        if (!str_starts_with($data, 'action:')) {
+        if (!str_starts_with($data, 'action:') && !str_starts_with($data, 'pos_auth:')) {
             return response()->json(['status' => 'ok']);
         }
 
@@ -203,9 +203,13 @@ class TelegramWebhookController extends Controller
         if (count($parts) < 3) return response()->json(['status' => 'ok']);
         
         $action = $parts[1];
-        $approvalId = $parts[2];
+        $id = $parts[2];
 
-        $approval = \App\Models\Approval::with(['approvable'])->find($approvalId);
+        if (str_starts_with($data, 'pos_auth:')) {
+            return $this->handlePosAuthCallback($callbackQuery, $callbackQueryId, $action, $id, $botToken, $chatId, $messageId, $telegramUserId, $telegramName);
+        }
+
+        $approval = \App\Models\Approval::with(['approvable'])->find($id);
         
         if (!$approval || $approval->status !== 'pending') {
             $this->answerCallbackQuery($botToken, $callbackQueryId, "Permintaan persetujuan tidak ditemukan atau sudah diproses.", true);
@@ -315,6 +319,83 @@ class TelegramWebhookController extends Controller
             $newText = $callbackQuery['message']['text'] . "\n\n" . $statusText;
             $this->editMessageText($botToken, $chatId, $messageId, $newText); // No reply_markup means buttons are removed
             $this->answerCallbackQuery($botToken, $callbackQueryId, "Berhasil memproses dokumen!");
+            return response()->json(['status' => 'ok']);
+        }
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    private function handlePosAuthCallback($callbackQuery, $callbackQueryId, $action, $authRequestId, $botToken, $chatId, $messageId, $telegramUserId, $telegramName)
+    {
+        $authRequest = \App\Models\AuthorizationRequest::with(['cashier'])->find($authRequestId);
+        
+        if (!$authRequest || $authRequest->status !== 'PENDING') {
+            $this->answerCallbackQuery($botToken, $callbackQueryId, "Permintaan otorisasi tidak ditemukan atau sudah diproses.", true);
+            $this->editMessageText($botToken, $chatId, $messageId, $callbackQuery['message']['text'] . "\n\n<i>Otorisasi sudah diproses atau tidak ditemukan.</i>");
+            return response()->json(['status' => 'ok']);
+        }
+
+        // Authorization Check
+        $user = User::where('telegram_chat_id', (string) $telegramUserId)->first();
+        $isAuthorized = false;
+
+        if ($user && is_array($user->pos_authorizations) && in_array($authRequest->action, $user->pos_authorizations)) {
+            // Also check branch authorization
+            if ($user->branch_id === null || $user->branch_id === $authRequest->branch_id) {
+                $isAuthorized = true;
+            }
+        }
+
+        if (!$isAuthorized) {
+            $this->answerCallbackQuery($botToken, $callbackQueryId, "Maaf, Anda tidak memiliki izin otorisasi untuk aksi ini di cabang tersebut.", true);
+            return response()->json(['status' => 'unauthorized']);
+        }
+
+        if ($action === 'review') {
+            $text = $callbackQuery['message']['text'] . "\n\n<b>🔍 Rincian Permintaan:</b>\n";
+            
+            if (!empty($authRequest->details)) {
+                foreach ($authRequest->details as $key => $val) {
+                    // Prettify keys
+                    $prettyKey = ucwords(str_replace('_', ' ', $key));
+                    if (is_numeric($val)) {
+                        if ($key === 'discount_amount' || $key === 'amount' || $key === 'total') {
+                            $val = "Rp " . number_format($val, 0, ',', '.');
+                        }
+                    }
+                    $text .= "- {$prettyKey}: {$val}\n";
+                }
+            } else {
+                $text .= "<i>Tidak ada rincian tambahan.</i>";
+            }
+
+            $replyMarkup = json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ Setuju', 'callback_data' => "pos_auth:approve:{$authRequest->id}"],
+                        ['text' => '❌ Tolak', 'callback_data' => "pos_auth:reject:{$authRequest->id}"]
+                    ]
+                ]
+            ]);
+
+            $this->editMessageText($botToken, $chatId, $messageId, $text, $replyMarkup);
+            $this->answerCallbackQuery($botToken, $callbackQueryId);
+            return response()->json(['status' => 'ok']);
+        }
+
+        if ($action === 'approve' || $action === 'reject') {
+            $status = $action === 'approve' ? 'APPROVED' : 'REJECTED';
+            
+            $authRequest->update([
+                'status' => $status,
+                'supervisor_id' => $user->id
+            ]);
+
+            $statusText = $action === 'approve' ? "✅ <b>Disetujui</b> oleh {$user->name} (Telegram)" : "❌ <b>Ditolak</b> oleh {$user->name} (Telegram)";
+            $newText = $callbackQuery['message']['text'] . "\n\n" . $statusText;
+            
+            $this->editMessageText($botToken, $chatId, $messageId, $newText);
+            $this->answerCallbackQuery($botToken, $callbackQueryId, "Otorisasi berhasil diproses!");
             return response()->json(['status' => 'ok']);
         }
 
