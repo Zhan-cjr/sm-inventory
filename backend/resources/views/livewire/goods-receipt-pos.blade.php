@@ -443,8 +443,10 @@
                 } else {
                     $supplier = \App\Models\Supplier::find($supplier_id);
                     if ($supplier && $supplier->gr_requires_po && empty($purchase_order_id)) {
-                        $isSearchDisabled = true;
-                        $searchDisabledReason = 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';
+                        if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                            $isSearchDisabled = true;
+                            $searchDisabledReason = 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';
+                        }
                     }
                 }
             @endphp
