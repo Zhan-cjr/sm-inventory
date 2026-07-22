@@ -507,63 +507,55 @@ class GoodsReceiptPos extends Component
             $index = $parts[0];
             $field = $parts[1];
             
+            if ($field === 'subtotal' && $this->enable_edit_total) {
+                $qty = (float) ($this->cart[$index]['qty_received'] ?? 0);
+                $subtotal = (float) $value;
+                if ($qty > 0) {
+                    $d3 = (float) ($this->cart[$index]['discount_3'] ?? 0) / 100;
+                    $d2 = (float) ($this->cart[$index]['discount_2'] ?? 0) / 100;
+                    $d1 = (float) ($this->cart[$index]['discount_1'] ?? 0) / 100;
+                    $f3 = 1 - $d3; if ($f3 == 0) $f3 = 1;
+                    $f2 = 1 - $d2; if ($f2 == 0) $f2 = 1;
+                    $f1 = 1 - $d1; if ($f1 == 0) $f1 = 1;
+                    $baseTotal = $subtotal / $f3 / $f2 / $f1;
+                    $this->cart[$index]['unit_price'] = round($baseTotal / $qty, 2);
+                }
+            }
+
+            $this->recalculateRow($index);
+            
             $item = $this->cart[$index];
-            $basePrice = (float) ($item['unit_price'] ?? 0);
+            $qty = (float) ($item['qty_received'] ?? 0);
+            $netPrice = $qty > 0 ? ((float)($item['subtotal'] ?? 0) / $qty) : (float) ($item['unit_price'] ?? 0);
+            
             $product = \App\Models\Product::find($item['product_id']);
-            $price = ($this->include_tax && $product && $product->is_taxable) ? round($basePrice * 1.11, 2) : $basePrice;
+            $costPriceTax = ($this->include_tax && $product && $product->is_taxable) ? round($netPrice * 1.11, 2) : $netPrice;
 
             if (in_array($field, ['margin_gol_1', 'margin_gol_2', 'margin_gol_3'])) {
                 $gol = substr($field, -1);
                 $margin = (float) $value;
-                if ($price > 0) {
-                    $this->cart[$index]["harga_jual_{$gol}"] = round($price * (1 + ($margin / 100)), 2);
+                if ($costPriceTax > 0) {
+                    $this->cart[$index]["harga_jual_{$gol}"] = round($costPriceTax * (1 + ($margin / 100)), 2);
                 }
             } elseif (in_array($field, ['harga_jual_1', 'harga_jual_2', 'harga_jual_3'])) {
                 $gol = substr($field, -1);
                 $sellingPrice = (float) $value;
-                if ($sellingPrice > 0 && $price > 0) {
-                    $this->cart[$index]["margin_gol_{$gol}"] = round((($sellingPrice - $price) / $price) * 100, 2);
+                if ($sellingPrice > 0 && $costPriceTax > 0) {
+                    $this->cart[$index]["margin_gol_{$gol}"] = round((($sellingPrice - $costPriceTax) / $costPriceTax) * 100, 2);
                 } else {
                     $this->cart[$index]["margin_gol_{$gol}"] = 0;
                 }
-            } elseif ($field === 'unit_price') {
+            } else {
                 foreach([1, 2, 3] as $i) {
                     $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
-                    if ($sellingPrice > 0 && $price > 0) {
-                        $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $price) / $price) * 100, 2);
+                    if ($sellingPrice > 0 && $costPriceTax > 0) {
+                        $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $costPriceTax) / $costPriceTax) * 100, 2);
                     } else {
                         $this->cart[$index]["margin_gol_{$i}"] = 0;
                     }
                 }
-            } elseif ($field === 'subtotal') {
-                if ($this->enable_edit_total) {
-                    $qty = (float) ($this->cart[$index]['qty_received'] ?? 0);
-                    $subtotal = (float) $value;
-                    if ($qty > 0) {
-                        $d3 = (float) ($item['discount_3'] ?? 0) / 100;
-                        $d2 = (float) ($item['discount_2'] ?? 0) / 100;
-                        $d1 = (float) ($item['discount_1'] ?? 0) / 100;
-                        $f3 = 1 - $d3; if ($f3 == 0) $f3 = 1;
-                        $f2 = 1 - $d2; if ($f2 == 0) $f2 = 1;
-                        $f1 = 1 - $d1; if ($f1 == 0) $f1 = 1;
-                        $baseTotal = $subtotal / $f3 / $f2 / $f1;
-                        $this->cart[$index]['unit_price'] = round($baseTotal / $qty, 2);
-                        // recalculate margins
-                        $newBasePrice = $this->cart[$index]['unit_price'];
-                        $newPrice = ($this->include_tax && $product && $product->is_taxable) ? round($newBasePrice * 1.11, 2) : $newBasePrice;
-                        foreach([1, 2, 3] as $i) {
-                            $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
-                            if ($sellingPrice > 0 && $newPrice > 0) {
-                                $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $newPrice) / $newPrice) * 100, 2);
-                            } else {
-                                $this->cart[$index]["margin_gol_{$i}"] = 0;
-                            }
-                        }
-                    }
-                }
             }
-            
-            $this->recalculateRow($index);
+
             $this->calculateTotals();
         }
     }
@@ -593,14 +585,16 @@ class GoodsReceiptPos extends Component
     {
         // Recalculate all margins since the cost basis changed
         foreach ($this->cart as $index => $item) {
-            $basePrice = (float) ($item['unit_price'] ?? 0);
+            $qty = (float) ($item['qty_received'] ?? 0);
+            $netPrice = $qty > 0 ? ((float)($item['subtotal'] ?? 0) / $qty) : (float) ($item['unit_price'] ?? 0);
+            
             $product = \App\Models\Product::find($item['product_id']);
-            $price = ($this->include_tax && $product && $product->is_taxable) ? round($basePrice * 1.11, 2) : $basePrice;
+            $costPriceTax = ($this->include_tax && $product && $product->is_taxable) ? round($netPrice * 1.11, 2) : $netPrice;
             
             foreach([1, 2, 3] as $i) {
-                $sellingPrice = (float) ($item["harga_jual_{$i}"] ?? 0);
-                if ($sellingPrice > 0 && $price > 0) {
-                    $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $price) / $price) * 100, 2);
+                $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
+                if ($sellingPrice > 0 && $costPriceTax > 0) {
+                    $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $costPriceTax) / $costPriceTax) * 100, 2);
                 } else {
                     $this->cart[$index]["margin_gol_{$i}"] = 0;
                 }
