@@ -97,6 +97,7 @@ class UserForm
                                         'ACCESS_SMART_ORDER' => 'Akses Menu Order Pintar (Mobile)',
                                         'ACCESS_BI_AI' => 'Akses Menu BI & AI (Mobile)',
                                         'TOGGLE_SUPPLIER_GR_PO' => 'Ubah Wajib PO di Pemasok',
+                                        'BYPASS_GR_PO_REQUIRED' => 'Bypass Wajib PO (Penerimaan Barang)',
                                     ])
                                     ->columns(2)
                                     ->helperText('Centang izin khusus untuk backend, berlaku spesifik untuk user ini (termasuk Admin/Superadmin wajib dicentang).'),

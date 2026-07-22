@@ -190,8 +190,10 @@ class GoodsReceiptPos extends Component
 
         $supplier = Supplier::find($this->supplier_id);
         if ($supplier && $supplier->gr_requires_po && empty($this->purchase_order_id)) {
-            $this->searchResults = [];
-            return;
+            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                $this->searchResults = [];
+                return;
+            }
         }
 
         if (strlen($value) >= 2) {
@@ -225,8 +227,10 @@ class GoodsReceiptPos extends Component
 
         $supplier = Supplier::find($this->supplier_id);
         if ($supplier && $supplier->gr_requires_po && empty($this->purchase_order_id)) {
-            Notification::make()->title('Penerimaan barang wajib dengan PO untuk Pemasok ini.')->warning()->send();
-            return;
+            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                Notification::make()->title('Penerimaan barang wajib dengan PO untuk Pemasok ini.')->warning()->send();
+                return;
+            }
         }
 
         if (strlen($this->searchQuery) > 0) {
