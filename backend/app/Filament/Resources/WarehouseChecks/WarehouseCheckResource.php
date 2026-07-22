@@ -186,6 +186,73 @@ class WarehouseCheckResource extends Resource
 
                         return redirect()->to(\App\Filament\Resources\GoodsReceipts\GoodsReceiptResource::getUrl('edit', ['record' => $gr]));
                     }),
+
+                Action::make('edit_rejected')
+                    ->label('Revisi / Edit')
+                    ->icon('heroicon-o-pencil-square')
+                    ->color('warning')
+                    ->visible(fn (WarehouseCheck $record) => $record->status === 'rejected')
+                    ->modalHeading('Revisi Pengecekan Gudang')
+                    ->modalDescription('Anda dapat mengedit Qty Fisik atau menghapus barang. Jika total qty masih melebihi PO, akan kembali meminta otorisasi.')
+                    ->mountUsing(function ($form, WarehouseCheck $record) {
+                        $record->load('items.product');
+                        $form->fill([
+                            'items' => $record->items->map(fn($item) => [
+                                'id' => $item->id,
+                                'product_id' => $item->product_id,
+                                'product_name' => $item->product ? $item->product->name : (\Illuminate\Support\Facades\DB::table('products')->where('id', $item->product_id)->value('name') ?? 'Unknown'),
+                                'qty_po' => $item->qty_po,
+                                'qty_scanned' => $item->qty_scanned,
+                            ])->toArray()
+                        ]);
+                    })
+                    ->form([
+                        \Filament\Forms\Components\Repeater::make('items')
+                            ->label('Daftar Barang')
+                            ->schema([
+                                \Filament\Forms\Components\Hidden::make('id'),
+                                \Filament\Forms\Components\Hidden::make('product_id'),
+                                \Filament\Forms\Components\TextInput::make('product_name')
+                                    ->disabled()
+                                    ->label('Barang'),
+                                \Filament\Forms\Components\TextInput::make('qty_po')
+                                    ->disabled()
+                                    ->label('Sisa PO'),
+                                \Filament\Forms\Components\TextInput::make('qty_scanned')
+                                    ->numeric()
+                                    ->required()
+                                    ->label('Qty Fisik'),
+                            ])
+                            ->disableItemCreation()
+                            ->columns(3)
+                    ])
+                    ->action(function (WarehouseCheck $record, array $data) {
+                        $submittedIds = collect($data['items'])->pluck('id')->filter()->toArray();
+                        // Hapus item yang dibuang dari repeater
+                        $record->items()->whereNotIn('id', $submittedIds)->delete();
+                
+                        $hasOverQty = false;
+                        foreach ($data['items'] as $itemData) {
+                            $checkItem = $record->items()->where('id', $itemData['id'])->first();
+                            if ($checkItem) {
+                                $checkItem->update([
+                                    'qty_scanned' => $itemData['qty_scanned']
+                                ]);
+                                
+                                if ($itemData['qty_scanned'] > $checkItem->qty_po) {
+                                    $hasOverQty = true;
+                                }
+                            }
+                        }
+                
+                        if ($hasOverQty) {
+                            $record->requestApproval('Revisi: Terdapat kuantitas barang yang melebihi sisa PO.', 1);
+                            \Filament\Notifications\Notification::make()->title('Disimpan: Menunggu Otorisasi lagi karena Qty > PO')->warning()->send();
+                        } else {
+                            $record->update(['status' => 'approved', 'notes' => 'Direvisi oleh Gudang (Qty sesuai PO)']);
+                            \Filament\Notifications\Notification::make()->title('Disimpan: Otomatis Disetujui (Sesuai PO)')->success()->send();
+                        }
+                    }),
             ])
             ->toolbarActions([]);
     }

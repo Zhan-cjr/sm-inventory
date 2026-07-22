@@ -13,12 +13,13 @@ class Supplier extends Model
 
     protected $fillable = [
         'organization_id', 'code', 'name', 'contact_person', 
-        'phone', 'email', 'address', 'is_active', 'default_due_days', 'default_po_expired_days', 'payment_method', 'is_consignment'
+        'phone', 'email', 'address', 'is_active', 'default_due_days', 'default_po_expired_days', 'payment_method', 'is_consignment', 'gr_requires_po'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'is_consignment' => 'boolean',
+        'gr_requires_po' => 'boolean',
     ];
 
     public function organization(): BelongsTo

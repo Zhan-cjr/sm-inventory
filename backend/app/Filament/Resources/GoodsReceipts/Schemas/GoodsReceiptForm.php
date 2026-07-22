@@ -39,7 +39,15 @@ class GoodsReceiptForm
                     )
                     ->disabledOn('edit')
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->required(function (\Filament\Forms\Get $get) {
+                        $supplierId = $get('supplier_id');
+                        if ($supplierId) {
+                            $supplier = \App\Models\Supplier::find($supplierId);
+                            return $supplier && $supplier->gr_requires_po;
+                        }
+                        return false;
+                    }),
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')
                     ->required()

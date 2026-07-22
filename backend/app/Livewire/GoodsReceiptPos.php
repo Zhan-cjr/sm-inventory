@@ -37,7 +37,7 @@ class GoodsReceiptPos extends Component
     public $tax_amount = 0;
     public $cetak_nota = false;
 
-    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'harga_jual_1', 'margin_gol_1', 'harga_jual_2', 'margin_gol_2', 'harga_jual_3', 'margin_gol_3', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
+    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'harga_jual_1', 'margin_gol_1', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
 
     public $searchQuery = '';
     public $cart = [];
@@ -183,6 +183,17 @@ class GoodsReceiptPos extends Component
 
     public function updatedSearchQuery($value)
     {
+        if (empty($this->supplier_id)) {
+            $this->searchResults = [];
+            return;
+        }
+
+        $supplier = Supplier::find($this->supplier_id);
+        if ($supplier && $supplier->gr_requires_po && empty($this->purchase_order_id)) {
+            $this->searchResults = [];
+            return;
+        }
+
         if (strlen($value) >= 2) {
             $this->searchResults = Product::where('sku', 'LIKE', '%' . $value . '%')
                 ->orWhere('barcode', 'LIKE', '%' . $value . '%')
@@ -207,6 +218,17 @@ class GoodsReceiptPos extends Component
 
     public function searchProduct()
     {
+        if (empty($this->supplier_id)) {
+            Notification::make()->title('Pilih Pemasok terlebih dahulu.')->warning()->send();
+            return;
+        }
+
+        $supplier = Supplier::find($this->supplier_id);
+        if ($supplier && $supplier->gr_requires_po && empty($this->purchase_order_id)) {
+            Notification::make()->title('Penerimaan barang wajib dengan PO untuk Pemasok ini.')->warning()->send();
+            return;
+        }
+
         if (strlen($this->searchQuery) > 0) {
             $product = Product::where('sku', $this->searchQuery)
                 ->orWhere('barcode', $this->searchQuery)
@@ -480,18 +502,18 @@ class GoodsReceiptPos extends Component
             } elseif (in_array($field, ['harga_jual_1', 'harga_jual_2', 'harga_jual_3'])) {
                 $gol = substr($field, -1);
                 $sellingPrice = (float) $value;
-                if ($price > 0) {
+                if ($sellingPrice > 0 && $price > 0) {
                     $this->cart[$index]["margin_gol_{$gol}"] = round((($sellingPrice - $price) / $price) * 100, 2);
                 } else {
-                    $this->cart[$index]["margin_gol_{$i}"] = 100;
+                    $this->cart[$index]["margin_gol_{$gol}"] = 0;
                 }
             } elseif ($field === 'unit_price') {
                 foreach([1, 2, 3] as $i) {
                     $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
-                    if ($price > 0) {
+                    if ($sellingPrice > 0 && $price > 0) {
                         $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $price) / $price) * 100, 2);
                     } else {
-                        $this->cart[$index]["margin_gol_{$i}"] = 100;
+                        $this->cart[$index]["margin_gol_{$i}"] = 0;
                     }
                 }
             } elseif ($field === 'subtotal') {
@@ -512,10 +534,10 @@ class GoodsReceiptPos extends Component
                         $newPrice = ($this->include_tax && $product && $product->is_taxable) ? round($newBasePrice * 1.11, 2) : $newBasePrice;
                         foreach([1, 2, 3] as $i) {
                             $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
-                            if ($newPrice > 0) {
+                            if ($sellingPrice > 0 && $newPrice > 0) {
                                 $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $newPrice) / $newPrice) * 100, 2);
                             } else {
-                                $this->cart[$index]["margin_gol_{$i}"] = 100;
+                                $this->cart[$index]["margin_gol_{$i}"] = 0;
                             }
                         }
                     }
@@ -558,10 +580,10 @@ class GoodsReceiptPos extends Component
             
             foreach([1, 2, 3] as $i) {
                 $sellingPrice = (float) ($item["harga_jual_{$i}"] ?? 0);
-                if ($price > 0) {
+                if ($sellingPrice > 0 && $price > 0) {
                     $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $price) / $price) * 100, 2);
                 } else {
-                    $this->cart[$index]["margin_gol_{$i}"] = 100;
+                    $this->cart[$index]["margin_gol_{$i}"] = 0;
                 }
             }
         }
@@ -625,6 +647,22 @@ class GoodsReceiptPos extends Component
         if (empty($this->cart)) {
             Notification::make()->title('Keranjang kosong!')->danger()->send();
             return;
+        }
+
+        foreach ($this->cart as $item) {
+            foreach ([1, 2, 3] as $gol) {
+                if (isset($item["margin_gol_{$gol}"]) && $item["margin_gol_{$gol}"] < 0) {
+                    $hargaJual = (float) ($item["harga_jual_{$gol}"] ?? 0);
+                    if ($hargaJual > 0) {
+                        Notification::make()
+                            ->title("Margin Golongan {$gol} produk '{$item['name']}' minus ({$item["margin_gol_{$gol}"]}%)!")
+                            ->body("Silakan tampilkan kolom Harga Jual {$gol} (lewat Pilih Kolom) dan sesuaikan nilainya agar tidak rugi.")
+                            ->danger()
+                            ->send();
+                        return;
+                    }
+                }
+            }
         }
 
         $imagePaths = $this->existing_faktur_image;
@@ -722,12 +760,18 @@ class GoodsReceiptPos extends Component
                     ];
                     if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
                         $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
-                        $updateData['margin_gol_1'] = $item['margin_gol_1'] ?? $product->margin_gol_1;
                         $updateData['harga_jual_2'] = $item['harga_jual_2'] ?? $product->harga_jual_2;
-                        $updateData['margin_gol_2'] = $item['margin_gol_2'] ?? $product->margin_gol_2;
                         $updateData['harga_jual_3'] = $item['harga_jual_3'] ?? $product->harga_jual_3;
-                        $updateData['margin_gol_3'] = $item['margin_gol_3'] ?? $product->margin_gol_3;
-                        $updateData['selling_price'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
+                        
+                        foreach([1, 2, 3] as $i) {
+                            $hj = (float) $updateData["harga_jual_{$i}"];
+                            if ($hj > 0 && $costPriceTax > 0) {
+                                $updateData["margin_gol_{$i}"] = round((($hj - $costPriceTax) / $costPriceTax) * 100, 2);
+                            } else {
+                                $updateData["margin_gol_{$i}"] = 0;
+                            }
+                        }
+                        $updateData['selling_price'] = $updateData['harga_jual_1'];
                     }
                     $product->update($updateData);
                 }
@@ -742,12 +786,18 @@ class GoodsReceiptPos extends Component
                         ];
                         if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
                             $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $stock->harga_jual_1;
-                            $updateData['margin_gol_1'] = $item['margin_gol_1'] ?? $stock->margin_gol_1;
                             $updateData['harga_jual_2'] = $item['harga_jual_2'] ?? $stock->harga_jual_2;
-                            $updateData['margin_gol_2'] = $item['margin_gol_2'] ?? $stock->margin_gol_2;
                             $updateData['harga_jual_3'] = $item['harga_jual_3'] ?? $stock->harga_jual_3;
-                            $updateData['margin_gol_3'] = $item['margin_gol_3'] ?? $stock->margin_gol_3;
-                            $updateData['selling_price'] = $item['harga_jual_1'] ?? $stock->harga_jual_1;
+                            
+                            foreach([1, 2, 3] as $i) {
+                                $hj = (float) $updateData["harga_jual_{$i}"];
+                                if ($hj > 0 && $costPriceTax > 0) {
+                                    $updateData["margin_gol_{$i}"] = round((($hj - $costPriceTax) / $costPriceTax) * 100, 2);
+                                } else {
+                                    $updateData["margin_gol_{$i}"] = 0;
+                                }
+                            }
+                            $updateData['selling_price'] = $updateData['harga_jual_1'];
                         }
                         $stock->update($updateData);
                     }

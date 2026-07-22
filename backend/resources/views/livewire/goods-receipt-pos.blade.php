@@ -434,8 +434,23 @@
                     this.highlightedIndex = -1;
                 }
              }">
-            <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
-                   placeholder="Scan barcode atau ketik nama produk... tekan Enter"
+            @php
+                $isSearchDisabled = false;
+                $searchDisabledReason = '';
+                if (empty($supplier_id)) {
+                    $isSearchDisabled = true;
+                    $searchDisabledReason = 'Pilih Pemasok terlebih dahulu.';
+                } else {
+                    $supplier = \App\Models\Supplier::find($supplier_id);
+                    if ($supplier && $supplier->gr_requires_po && empty($purchase_order_id)) {
+                        $isSearchDisabled = true;
+                        $searchDisabledReason = 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';
+                    }
+                }
+            @endphp
+            <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem; {{ $isSearchDisabled ? 'background-color: #f3f4f6; cursor: not-allowed;' : '' }}"
+                   placeholder="{{ $isSearchDisabled ? $searchDisabledReason : 'Scan barcode atau ketik nama produk... tekan Enter' }}"
+                   {{ $isSearchDisabled ? 'disabled' : '' }}
                    wire:model.live.debounce.250ms="searchQuery"
                    @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
                    @keydown.arrow-down.prevent="moveDown()"
@@ -471,7 +486,7 @@
                     Pilih Kolom
                 </button>
                 <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border-radius: 0.5rem; padding: 0.5rem; width: 12rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
-                    @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga Satuan', 'harga_jual_1' => 'Harga Jual', 'margin_gol_1' => 'Margin', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
+                    @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga Satuan', 'harga_jual_1' => 'Harga Jual 1', 'margin_gol_1' => 'Margin 1', 'harga_jual_2' => 'Harga Jual 2', 'margin_gol_2' => 'Margin 2', 'harga_jual_3' => 'Harga Jual 3', 'margin_gol_3' => 'Margin 3', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
                         <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                             <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
                             <span class="text-xs text-gray-800 dark:text-gray-200">{{ $label }}</span>
@@ -495,8 +510,12 @@
                     @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Qty Terima</th> @endif
                     @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Satuan</th> @endif
 
-                    @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual</th> @endif
-                    @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Margin (%)</th> @endif
+                    @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual 1</th> @endif
+                    @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Margin 1 (%)</th> @endif
+                    @if(in_array('harga_jual_2', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual 2</th> @endif
+                    @if(in_array('margin_gol_2', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Margin 2 (%)</th> @endif
+                    @if(in_array('harga_jual_3', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual 3</th> @endif
+                    @if(in_array('margin_gol_3', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Margin 3 (%)</th> @endif
                     @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis1 (%)</th> @endif
                     @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis2 (%)</th> @endif
                     @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis3 (%)</th> @endif
@@ -611,6 +630,56 @@
                                        x-on:keydown.space.prevent="openCalc($event)">
                             @else
                                 <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_1'], 2) }}</div>
+                            @endif
+                        </td>
+                        @endif
+                        
+                        @if(in_array('harga_jual_2', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_2'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                    <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input pos-grid-input" style="text-align: right;" 
+                                           x-on:keydown.space.prevent="openCalc($event)">
+                                </div>
+                            @else
+                                <div style="text-align: right; padding: 0.375rem 0.5rem; color: #6b7280;" class="dark:text-gray-400">{{ number_format($item['harga_jual_2'] ?? 0, 2) }}</div>
+                            @endif
+                        </td>
+                        @endif
+                        @if(in_array('margin_gol_2', $visibleColumns))
+                        <td class="pos-grid-td dark:bg-gray-800" style="padding: 0.25rem; background-color: #f9fafb;">
+                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
+                                <input type="number" step="any" class="pos-input pos-grid-input {{ ($item['margin_gol_2'] ?? 0) < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
+                                       wire:model.lazy="cart.{{ $index }}.margin_gol_2"
+                                       wire:change="recalculateRow({{ $index }})"
+                                       x-on:keydown.space.prevent="openCalc($event)">
+                            @else
+                                <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ ($item['margin_gol_2'] ?? 0) < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_2'] ?? 0, 2) }}</div>
+                            @endif
+                        </td>
+                        @endif
+                        
+                        @if(in_array('harga_jual_3', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_3'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                    <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input pos-grid-input" style="text-align: right;" 
+                                           x-on:keydown.space.prevent="openCalc($event)">
+                                </div>
+                            @else
+                                <div style="text-align: right; padding: 0.375rem 0.5rem; color: #6b7280;" class="dark:text-gray-400">{{ number_format($item['harga_jual_3'] ?? 0, 2) }}</div>
+                            @endif
+                        </td>
+                        @endif
+                        @if(in_array('margin_gol_3', $visibleColumns))
+                        <td class="pos-grid-td dark:bg-gray-800" style="padding: 0.25rem; background-color: #f9fafb;">
+                            @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
+                                <input type="number" step="any" class="pos-input pos-grid-input {{ ($item['margin_gol_3'] ?? 0) < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
+                                       wire:model.lazy="cart.{{ $index }}.margin_gol_3"
+                                       wire:change="recalculateRow({{ $index }})"
+                                       x-on:keydown.space.prevent="openCalc($event)">
+                            @else
+                                <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ ($item['margin_gol_3'] ?? 0) < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_3'] ?? 0, 2) }}</div>
                             @endif
                         </td>
                         @endif

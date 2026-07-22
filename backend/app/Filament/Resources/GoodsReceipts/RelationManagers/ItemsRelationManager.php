@@ -32,7 +32,31 @@ class ItemsRelationManager extends RelationManager
                     ->getSearchResultsUsing(fn (string $search): \Illuminate\Database\Eloquent\Builder => 
                         \App\Models\Product::whereIn('id', \App\Models\Product::search($search)->take(50)->keys())
                     )
-                    ->required(),
+                    ->required()
+                    ->disabled(function (\Livewire\Component $livewire) {
+                        $ownerRecord = $livewire->ownerRecord;
+                        if (! $ownerRecord || empty($ownerRecord->supplier_id)) {
+                            return true;
+                        }
+                        if ($ownerRecord->supplier && $ownerRecord->supplier->gr_requires_po) {
+                            if (empty($ownerRecord->purchase_order_id)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    })
+                    ->helperText(function (\Livewire\Component $livewire) {
+                        $ownerRecord = $livewire->ownerRecord;
+                        if (! $ownerRecord || empty($ownerRecord->supplier_id)) {
+                            return 'Pilih Pemasok terlebih dahulu di form utama.';
+                        }
+                        if ($ownerRecord->supplier && $ownerRecord->supplier->gr_requires_po) {
+                            if (empty($ownerRecord->purchase_order_id)) {
+                                return 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';
+                            }
+                        }
+                        return null;
+                    }),
                 TextInput::make('quantity_ordered')
                     ->label('Qty Pesanan')
                     ->numeric(),
@@ -100,7 +124,25 @@ class ItemsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                CreateAction::make(),
+                CreateAction::make()
+                    ->beforeFormFilled(function (\Livewire\Component $livewire, \Filament\Actions\CreateAction $action) {
+                        $ownerRecord = $livewire->ownerRecord;
+                        if (! $ownerRecord || empty($ownerRecord->supplier_id)) {
+                            \Filament\Notifications\Notification::make()
+                                ->warning()
+                                ->title('Pemasok Belum Dipilih')
+                                ->body('Harap lengkapi form Pemasok terlebih dahulu sebelum menambahkan barang.')
+                                ->send();
+                        } elseif ($ownerRecord->supplier && $ownerRecord->supplier->gr_requires_po) {
+                            if (empty($ownerRecord->purchase_order_id)) {
+                                \Filament\Notifications\Notification::make()
+                                    ->warning()
+                                    ->title('Penerimaan barang wajib dengan PO')
+                                    ->body('Pemasok ini diatur wajib menggunakan Purchase Order.')
+                                    ->send();
+                            }
+                        }
+                    }),
             ])
             ->actions([
                 EditAction::make(),

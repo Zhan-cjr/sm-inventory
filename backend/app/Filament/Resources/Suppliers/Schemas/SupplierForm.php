@@ -70,6 +70,11 @@ class SupplierForm
                     ->label('Supplier Konsinyasi / Titip Jual')
                     ->helperText('Jika aktif, seluruh barang dari supplier ini tidak diakui sebagai Hutang/Aset saat diterima.')
                     ->default(false),
+                Toggle::make('gr_requires_po')
+                    ->label('Penerimaan Wajib PO')
+                    ->helperText('Jika aktif, penerimaan barang dari supplier ini wajib menyertakan Purchase Order (PO).')
+                    ->default(true)
+                    ->disabled(fn() => ! auth()->user()->hasCustomAuthorization('TOGGLE_SUPPLIER_GR_PO')),
             ]);
     }
 }

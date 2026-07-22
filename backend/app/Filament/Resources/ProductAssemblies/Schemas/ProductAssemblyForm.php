@@ -208,8 +208,12 @@ class ProductAssemblyForm
                                 ->afterStateUpdated(function (Set $set, Get $get, $harga) {
                                     $hpp = (float) ($get('cost_price_tax') ?? 0);
                                     $harga = (float) $harga;
-                                    if ($hpp > 0 && $harga > 0) {
-                                        $set('margin_gol_1', round((($harga - $hpp) / $hpp) * 100, 2));
+                                    if ($hpp > 0) {
+                                        if ($harga > 0) {
+                                            $set('margin_gol_1', round((($harga - $hpp) / $hpp) * 100, 2));
+                                        } else {
+                                            $set('margin_gol_1', 0);
+                                        }
                                     }
                                 })
                                 ->columnSpan(2),

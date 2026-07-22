@@ -97,13 +97,17 @@ class StocksRelationManager extends RelationManager
                                     }
                                 ])
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
-                                    $cost = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
-                                    $price = (float) str_replace(',', '.', str_replace('.', '', $state));
-                                    if ($cost > 0) {
-                                        $margin = round((($price - $cost) / $cost) * 100, 2);
-                                        $set('margin_gol_1', str_replace('.', ',', (string)$margin));
+                                    $hpp = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
+                                    $harga = (float) str_replace(',', '.', str_replace('.', '', $state));
+                                    if ($hpp > 0) {
+                                        if ($harga > 0) {
+                                            $new_margin = round((($harga - $hpp) / $hpp) * 100, 2);
+                                            $set("margin_gol_1", str_replace('.', ',', (string)$new_margin));
+                                        } else {
+                                            $set("margin_gol_1", "0");
+                                        }
                                     }
-                                    $set('selling_price', $price);
+                                    $set('selling_price', $harga);
                                 }),
                         ])->columns(3)->columnSpanFull(),
                         \Filament\Schemas\Components\Group::make([
@@ -127,11 +131,15 @@ class StocksRelationManager extends RelationManager
                                     }
                                 ])
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
-                                    $cost = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
-                                    if ($cost > 0) {
-                                        $price = (float) str_replace(',', '.', str_replace('.', '', $state));
-                                        $margin = round((($price - $cost) / $cost) * 100, 2);
-                                        $set('margin_gol_2', str_replace('.', ',', (string)$margin));
+                                    $hpp = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
+                                    $harga = (float) str_replace(',', '.', str_replace('.', '', $state));
+                                    if ($hpp > 0) {
+                                        if ($harga > 0) {
+                                            $margin = round((($harga - $hpp) / $hpp) * 100, 2);
+                                            $set('margin_gol_2', str_replace('.', ',', (string)$margin));
+                                        } else {
+                                            $set('margin_gol_2', '0');
+                                        }
                                     }
                                 }),
                         ])->columns(3)->columnSpanFull(),
@@ -156,11 +164,15 @@ class StocksRelationManager extends RelationManager
                                     }
                                 ])
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
-                                    $cost = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
-                                    if ($cost > 0) {
-                                        $price = (float) str_replace(',', '.', str_replace('.', '', $state));
-                                        $margin = round((($price - $cost) / $cost) * 100, 2);
-                                        $set('margin_gol_3', str_replace('.', ',', (string)$margin));
+                                    $hpp = (float) str_replace(',', '.', str_replace('.', '', $get('cost_price_tax')));
+                                    $harga = (float) str_replace(',', '.', str_replace('.', '', $state));
+                                    if ($hpp > 0) {
+                                        if ($harga > 0) {
+                                            $margin = round((($harga - $hpp) / $hpp) * 100, 2);
+                                            $set('margin_gol_3', str_replace('.', ',', (string)$margin));
+                                        } else {
+                                            $set('margin_gol_3', '0');
+                                        }
                                     }
                                 }),
                         ])->columns(3)->columnSpanFull(),

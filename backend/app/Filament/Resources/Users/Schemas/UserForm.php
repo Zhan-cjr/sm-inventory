@@ -96,6 +96,7 @@ class UserForm
                                         'PROCESS_ECOMMERCE' => 'Proses Pesanan E-Commerce',
                                         'ACCESS_SMART_ORDER' => 'Akses Menu Order Pintar (Mobile)',
                                         'ACCESS_BI_AI' => 'Akses Menu BI & AI (Mobile)',
+                                        'TOGGLE_SUPPLIER_GR_PO' => 'Ubah Wajib PO di Pemasok',
                                     ])
                                     ->columns(2)
                                     ->helperText('Centang izin khusus untuk backend, berlaku spesifik untuk user ini (termasuk Admin/Superadmin wajib dicentang).'),
