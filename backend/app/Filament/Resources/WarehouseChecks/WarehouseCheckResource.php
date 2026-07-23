@@ -53,6 +53,10 @@ class WarehouseCheckResource extends Resource
                     ->label('Nomor PO')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('purchaseOrder.supplier.name')
+                    ->label('Nama Pemasok')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('checker.name')
                     ->label('Diperiksa Oleh')
                     ->searchable(),
