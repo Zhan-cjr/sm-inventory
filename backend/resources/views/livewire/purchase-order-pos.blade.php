@@ -486,11 +486,89 @@
         </div>
     </div>
 
+@if($showZeroQtyModal)
+    <div class="pos-modal-overlay">
+        <div class="pos-modal-card">
+            <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                <div class="pos-modal-icon-bg">
+                    <svg style="width: 24px; height: 24px; min-width: 24px; min-height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div style="flex: 1 1 0%;">
+                    <h3 class="pos-modal-title">Kuantitas masih 0</h3>
+                    <p class="pos-modal-body">
+                        Qty produk <span class="pos-modal-highlight">"{{ $zeroQtyProductNames }}"</span> masih 0 (kosong).
+                    </p>
+                </div>
+            </div>
+            <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button wire:click="$set('showZeroQtyModal', false)" type="button" class="pos-btn-cancel">
+                    Cancel
+                </button>
+                <button wire:click="removeZeroQtyItems" type="button" class="pos-btn-danger">
+                    Hapus Semua
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
 <style>
     .pos-dropdown-bg { background-color: #ffffff !important; }
     .dark .pos-dropdown-bg { background-color: #1f2937 !important; border-color: #374151 !important; }
     .dark .pos-dropdown-bg .dark\:text-gray-200 { color: #e5e7eb !important; }
     .dark .pos-dropdown-bg .dark\:text-gray-400 { color: #9ca3af !important; }
+
+    /* Modal Theme Styles */
+    .pos-modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999999;
+        display: flex; align-items: center; justify-content: center;
+        background-color: rgba(0, 0, 0, 0.3) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        filter: none !important;
+        padding: 1rem;
+    }
+    .pos-modal-card {
+        background-color: #ffffff; border-radius: 0.75rem;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+        border: 1px solid #e5e7eb; max-width: 28rem; width: 100%; padding: 1.5rem; color: #1f2937;
+    }
+    .dark .pos-modal-card {
+        background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important;
+    }
+    .pos-modal-icon-bg {
+        padding: 0.75rem; background-color: #fef3c7; color: #d97706; border-radius: 9999px;
+        flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem;
+    }
+    .dark .pos-modal-icon-bg {
+        background-color: rgba(217, 119, 6, 0.2) !important; color: #fbbf24 !important;
+    }
+    .pos-modal-title { font-size: 1.125rem; font-weight: 700; color: #111827; margin: 0; }
+    .dark .pos-modal-title { color: #ffffff !important; }
+    .pos-modal-body { margin-top: 0.5rem; font-size: 0.875rem; color: #4b5563; line-height: 1.5; }
+    .dark .pos-modal-body { color: #d1d5db !important; }
+    .pos-modal-highlight { font-weight: 600; color: #111827; }
+    .dark .pos-modal-highlight { color: #f9fafb !important; }
+    
+    .pos-btn-cancel {
+        padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; color: #374151;
+        background-color: #f3f4f6; border-radius: 0.5rem; border: 1px solid #d1d5db; cursor: pointer;
+        transition: background-color 0.15s, border-color 0.15s;
+    }
+    .dark .pos-btn-cancel {
+        background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important;
+    }
+    .pos-btn-cancel:hover { background-color: #e5e7eb; }
+    .dark .pos-btn-cancel:hover { background-color: #4b5563 !important; }
+
+    .pos-btn-danger {
+        padding: 0.5rem 1.25rem; font-size: 0.875rem; font-weight: 600; color: #ffffff;
+        background-color: #4f46e5; border-radius: 0.5rem; border: none; cursor: pointer;
+        transition: background-color 0.15s;
+    }
+    .pos-btn-danger:hover { background-color: #4338ca; }
 </style>
 </div>
 

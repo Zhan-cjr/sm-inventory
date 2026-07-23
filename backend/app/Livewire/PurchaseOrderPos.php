@@ -9,9 +9,15 @@ use App\Models\Branch;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use Filament\Notifications\Notification;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 
-class PurchaseOrderPos extends Component
+class PurchaseOrderPos extends Component implements HasActions, HasForms
 {
+    use InteractsWithActions;
+    use InteractsWithForms;
     use Traits\HasPosDraft;
 
     public $po_number;
@@ -37,6 +43,9 @@ class PurchaseOrderPos extends Component
     public $discount_subtotal = 0;
     public $discount_subtotal_type = 'nominal'; // 'percent' or 'nominal'
     public $grandTotal = 0;
+
+    public $showZeroQtyModal = false;
+    public $zeroQtyProductNames = '';
 
     public $searchResults = [];
 
@@ -381,6 +390,18 @@ class PurchaseOrderPos extends Component
         $this->calculateTotals();
     }
 
+    #[Livewire\Attributes\On('removeZeroQtyItems')]
+    public function removeZeroQtyItems()
+    {
+        $this->cart = array_values(array_filter($this->cart, function ($item) {
+            return !empty($item['qty']) && (float) $item['qty'] > 0;
+        }));
+        
+        $this->calculateTotals();
+        $this->showZeroQtyModal = false;
+        Notification::make()->title('Produk dengan qty 0 berhasil dihapus dari keranjang.')->success()->send();
+    }
+
     public function calculateTotals()
     {
         $this->totalLines = count($this->cart);
@@ -412,6 +433,14 @@ class PurchaseOrderPos extends Component
 
         if (empty($this->cart)) {
             Notification::make()->title('Keranjang kosong!')->danger()->send();
+            return;
+        }
+
+        $zeroQtyItems = collect($this->cart)->filter(fn($item) => empty($item['qty']) || (float) $item['qty'] <= 0);
+        
+        if ($zeroQtyItems->isNotEmpty()) {
+            $this->zeroQtyProductNames = $zeroQtyItems->pluck('name')->implode(', ');
+            $this->showZeroQtyModal = true;
             return;
         }
 
