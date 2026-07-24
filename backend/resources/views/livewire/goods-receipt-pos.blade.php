@@ -515,20 +515,20 @@
                     <th class="pos-grid-th" style="width: 3rem; text-align: center;">No</th>
                     @if(in_array('sku', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">SKU</th> @endif
                     @if(in_array('barcode', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">Barcode</th> @endif
-                    @if(in_array('name', $visibleColumns)) <th class="pos-grid-th">Nama Produk</th> @endif
+                    @if(in_array('name', $visibleColumns)) <th class="pos-grid-th" style="min-width: 18rem; width: 30%;">Nama Produk</th> @endif
                     @if(in_array('qty_ordered', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Qty PO</th> @endif
                     @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Qty Terima</th> @endif
-                    @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Satuan</th> @endif
+                    @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 8.5rem; text-align: right;">Harga Satuan</th> @endif
 
-                    @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual 1</th> @endif
-                    @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Margin 1 (%)</th> @endif
-                    @if(in_array('harga_jual_2', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual 2</th> @endif
-                    @if(in_array('margin_gol_2', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Margin 2 (%)</th> @endif
-                    @if(in_array('harga_jual_3', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Harga Jual 3</th> @endif
-                    @if(in_array('margin_gol_3', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Margin 3 (%)</th> @endif
-                    @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis1 (%)</th> @endif
-                    @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis2 (%)</th> @endif
-                    @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis3 (%)</th> @endif
+                    @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 7.5rem; text-align: right;">Harga Jual 1</th> @endif
+                    @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Margin 1 (%)</th> @endif
+                    @if(in_array('harga_jual_2', $visibleColumns)) <th class="pos-grid-th" style="width: 7.5rem; text-align: right;">Harga Jual 2</th> @endif
+                    @if(in_array('margin_gol_2', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Margin 2 (%)</th> @endif
+                    @if(in_array('harga_jual_3', $visibleColumns)) <th class="pos-grid-th" style="width: 7.5rem; text-align: right;">Harga Jual 3</th> @endif
+                    @if(in_array('margin_gol_3', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Margin 3 (%)</th> @endif
+                    @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Dis1 (%)</th> @endif
+                    @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Dis2 (%)</th> @endif
+                    @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Dis3 (%)</th> @endif
                     <th class="pos-grid-th" style="width: 10rem; text-align: right;">Total</th>
                     <th class="pos-grid-th" style="width: 3rem; text-align: center;"></th>
                 </tr>
@@ -595,9 +595,9 @@
                                         </div>
                                     </div>
                                 @else
-                                    <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2;">
-                                        {{ $item['name'] }}
-                                    </div>
+                                     <div style="white-space: normal; word-break: break-word; line-height: 1.35; min-width: 220px; font-weight: 600;" class="text-gray-900 dark:text-gray-100">
+                                         {{ $item['name'] }}
+                                     </div>
                                 @endif
                             </td> 
                         @endif
@@ -745,10 +745,10 @@
     </div>
 
     <!-- Footer Summary & Actions -->
-    <div style="padding: 1rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;" class="bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
+    <div style="padding: 1rem; padding-right: 4.5rem; border-top: 1px solid #e5e7eb; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;" class="bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
         
         <!-- Actions Button -->
-        <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-right: auto;">
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
             <button wire:click="save" style="background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
                 SIMPAN
@@ -756,53 +756,53 @@
             <a href="{{ route('filament.admin.resources.goods-receipts.index') }}" style="background-color: #fff; color: #374151; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; font-size: 0.875rem; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
                 Batal
             </a>
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 ml-4 cursor-pointer">
+            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 ml-2 cursor-pointer whitespace-nowrap">
                 <input type="checkbox" wire:model="cetak_nota" class="rounded text-blue-600">
                 Cetak Nota setelah simpan
             </label>
         </div>
         
         <!-- Totals -->
-        <div style="display: flex; align-items: center; gap: 2rem;">
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; margin-right: 1rem;">
-                <label class="flex items-center gap-2 cursor-pointer">
+        <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin-left: auto;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
+                <label class="flex items-center gap-2 cursor-pointer whitespace-nowrap">
                     <input type="checkbox" wire:model.live="include_tax" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Include PPN ({{ (float)(\App\Models\Organization::first()->tax_rate ?? 11) }}%)</span>
                 </label>
             </div>
 
-            <div style="text-align: right;">
-                <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Total Baris / Qty</div>
-                <div style="font-weight: 600; font-size: 1rem; color: #374151;" class="dark:text-gray-200">{{ $totalLines }} Items / {{ number_format($totalQty, 0) }} Pcs</div>
+            <div style="text-align: right; min-width: max-content;">
+                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Total Baris / Qty</div>
+                <div style="font-weight: 600; font-size: 0.95rem; color: #374151;" class="dark:text-gray-200">{{ $totalLines }} Items / {{ number_format($totalQty, 0) }} Pcs</div>
             </div>
 
-            <div style="text-align: right; min-width: 8rem;">
-                <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Subtotal Gross</div>
-                <div style="font-weight: 600; font-size: 1rem; color: #374151;" class="dark:text-gray-200">Rp {{ number_format($subtotal, 2) }}</div>
+            <div style="text-align: right; min-width: max-content;">
+                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Subtotal Gross</div>
+                <div style="font-weight: 600; font-size: 0.95rem; color: #374151;" class="dark:text-gray-200">Rp {{ number_format($subtotal, 2) }}</div>
             </div>
 
-            <div style="text-align: right; min-width: 10rem;">
-                <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Disc. Subtotal</div>
+            <div style="text-align: right; min-width: max-content;">
+                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Disc. Subtotal</div>
                 <div class="flex items-center justify-end gap-1">
-                    <select wire:model.live="discount_subtotal_type" class="pos-input" style="width: 4rem; padding: 0.125rem 0.25rem;">
+                    <select wire:model.live="discount_subtotal_type" class="pos-input" style="width: 3.5rem; padding: 0.125rem 0.25rem;">
                         <option value="nominal">Rp</option>
                         <option value="percent">%</option>
                     </select>
-                    <input onfocus="this.select()" type="number" wire:model.live="discount_subtotal" class="pos-input" style="width: 6rem; padding: 0.125rem 0.25rem; text-align: right;">
+                    <input onfocus="this.select()" type="number" wire:model.live="discount_subtotal" class="pos-input" style="width: 5.5rem; padding: 0.125rem 0.25rem; text-align: right;">
                 </div>
             </div>
 
-            <div style="text-align: right; min-width: 8rem;">
-                <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN ({{ (float)(\App\Models\Organization::first()->tax_rate ?? 11) }}%)</div>
+            <div style="text-align: right; min-width: max-content;">
+                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN ({{ (float)(\App\Models\Organization::first()->tax_rate ?? 11) }}%)</div>
                 <div class="flex items-center justify-end gap-1">
                     <span style="font-size: 0.75rem; color: #6b7280;">Rp</span>
-                    <input onfocus="this.select()" type="number" wire:model.live="tax_amount" class="pos-input" style="width: 7rem; padding: 0.125rem 0.25rem; text-align: right; border-style: dashed; background: transparent;">
+                    <input onfocus="this.select()" type="number" wire:model.live="tax_amount" class="pos-input" style="width: 6rem; padding: 0.125rem 0.25rem; text-align: right; border-style: dashed; background: transparent;">
                 </div>
             </div>
 
-            <div style="text-align: right; min-width: 10rem;">
-                <div style="color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Grand Total</div>
-                <div style="font-weight: 700; font-size: 1.5rem; color: #1d4ed8;" class="dark:text-blue-400">Rp {{ number_format($grandTotal, 2) }}</div>
+            <div style="text-align: right; min-width: max-content; background-color: rgba(37, 99, 235, 0.08); padding: 0.35rem 0.75rem; border-radius: 0.5rem; border: 1px solid rgba(37, 99, 235, 0.25);" class="dark:bg-blue-950/40 dark:border-blue-800/50">
+                <div style="color: #4b5563; font-size: 0.7rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;" class="dark:text-blue-300">Grand Total</div>
+                <div style="font-weight: 800; font-size: 1.4rem; color: #1d4ed8; white-space: nowrap;" class="dark:text-blue-400">Rp {{ number_format($grandTotal, 2) }}</div>
             </div>
         </div>
     </div>
