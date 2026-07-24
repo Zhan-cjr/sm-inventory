@@ -27,15 +27,18 @@ class ManageMarketBasketRules extends ManageRecords
                     $aiUrl = env('AI_SERVICE_URL', 'http://127.0.0.1:8001') . '/api/v1/ai/train-market-basket';
                     
                     try {
-                        $response = Http::timeout(10)->post($aiUrl);
+                        $response = Http::timeout(5)->post($aiUrl);
                         if ($response->successful()) {
                             $data = $response->json();
-                            \Filament\Notifications\Notification::make()
-                                ->title('AI Selesai Menganalisis!')
-                                ->body('Ditemukan ' . ($data['rules_count'] ?? 0) . ' aturan pola bundling baru.')
-                                ->success()
-                                ->send();
-                            return;
+                            $count = $data['rules_count'] ?? 0;
+                            if ($count > 0) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('AI Selesai Menganalisis!')
+                                    ->body("Ditemukan {$count} aturan pola bundling baru.")
+                                    ->success()
+                                    ->send();
+                                return;
+                            }
                         }
                     } catch (\Exception $e) {
                         // AI Microservice is offline, run native database Apriori analysis fallback!
@@ -93,7 +96,7 @@ class ManageMarketBasketRules extends ManageRecords
         $savedCount = 0;
 
         foreach ($pairCounts as $key => $pairFreq) {
-            if ($pairFreq < 2) continue; // Minimal 2 transaksi bersamaan
+            if ($pairFreq < 2) continue;
 
             [$antId, $conId] = explode('___', $key);
 

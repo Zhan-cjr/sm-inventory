@@ -22,13 +22,16 @@ class TrainMarketBasketCommand extends Command
         $aiUrl = env('AI_SERVICE_URL', 'http://127.0.0.1:8001') . '/api/v1/ai/train-market-basket';
 
         try {
-            $response = Http::timeout(10)->post($aiUrl);
+            $response = Http::timeout(5)->post($aiUrl);
             if ($response->successful()) {
                 $data = $response->json();
                 $count = $data['rules_count'] ?? 0;
-                $this->info("AI Microservice selesai menganalisis. Ditemukan {$count} pola bundling.");
-                Log::info("AI MBA Training completed via microservice: {$count} rules found.");
-                return 0;
+                if ($count > 0) {
+                    $this->info("AI Microservice selesai menganalisis. Ditemukan {$count} pola bundling.");
+                    Log::info("AI MBA Training completed via microservice: {$count} rules found.");
+                    return 0;
+                }
+                $this->warn('AI Microservice mengembalikan 0 pola. Beralih ke analisis Apriori Database Native...');
             }
         } catch (\Exception $e) {
             $this->warn('AI Microservice tidak merespons. Menggunakan analisis Apriori Database Native...');
