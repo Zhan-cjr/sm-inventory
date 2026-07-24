@@ -62,6 +62,7 @@
      @item-added.window="focusRowQty($event.detail.index)">
     <style>
         .pos-input { padding: 0.375rem 0.5rem; border: 1px solid #d1d5db; width: 100%; border-radius: 0.375rem; background-color: #f9fafb; font-size: 0.875rem; }
+        .pos-grid-input { padding: 0.35rem 0.4rem !important; font-size: 0.85rem !important; font-weight: 600 !important; width: 100% !important; }
         .pos-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
         .pos-label { font-weight: 500; color: #4b5563; font-size: 0.875rem; padding-right: 0.5rem; }
         .pos-grid-th { background-color: #f3f4f6; border-bottom: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; font-weight: 600; color: #374151; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;}
@@ -353,11 +354,11 @@
                     @if(in_array('max_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Max</th> @endif
                     @if(in_array('qty_saran', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right; background-color: #e0f2fe; color: #0369a1;">Qty Saran</th> @endif
                     @if(in_array('qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Qty Pesan</th> @endif
-                    @if(in_array('unit_cost', $visibleColumns)) <th class="pos-grid-th" style="width: 8.5rem; text-align: right;">Harga Satuan</th> @endif
+                    @if(in_array('unit_cost', $visibleColumns)) <th class="pos-grid-th" style="width: 11rem; min-width: 11rem; text-align: right;">Harga Satuan</th> @endif
                     @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Dis1 (%)</th> @endif
                     @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Dis2 (%)</th> @endif
                     @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Dis3 (%)</th> @endif
-                    <th class="pos-grid-th" style="width: 8.5rem; text-align: right;">Total</th>
+                    <th class="pos-grid-th" style="width: 11rem; min-width: 11rem; text-align: right;">Total</th>
                     <th class="pos-grid-th" style="width: 2.5rem; text-align: center;"></th>
                 </tr>
             </thead>
@@ -388,7 +389,7 @@
                         </td>
                         @endif
                         @if(in_array('unit_cost', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
+                        <td class="pos-grid-td" style="padding: 0.25rem; min-width: 11rem;">
                             <div x-data="{ raw: @entangle('cart.' . $index . '.unit_cost'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
                                 <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="cost-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;">
                             </div>
@@ -415,7 +416,7 @@
                                    wire:change="recalculateRow({{ $index }})">
                         </td>
                         @endif
-                        <td class="pos-grid-td" style="text-align: right; font-weight: 600; color: #111827;" class="dark:text-gray-100">
+                        <td class="pos-grid-td" style="text-align: right; font-weight: 600; color: #111827; min-width: 11rem; white-space: nowrap;" class="dark:text-gray-100">
                             {{ number_format($item['subtotal'], 2) }}
                         </td>
                         <td class="pos-grid-td" style="text-align: center;">
