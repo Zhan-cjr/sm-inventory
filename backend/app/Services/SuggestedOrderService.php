@@ -117,17 +117,29 @@ class SuggestedOrderService
         $leadTime = (int)($stock->product->lead_time_days ?? 7);
         $targetDays = (int)($stock->desired_inventory_days ?? 30);
         $safetyStock = (float)ceil($ads * 3);
-        $reorderPoint = (float)max(1, ceil(($ads * $leadTime) + $safetyStock));
+        $reorderPoint = (float)max(0, ceil(($ads * $leadTime) + $safetyStock));
         $targetQty = (float)ceil($ads * $targetDays);
         
-        $suggested_qty = max(0, (float)ceil($targetQty - $current_qty));
+        $suggested_qty = 0;
         $status = 'OK';
         
-        if ($current_qty <= 0) {
-            $suggested_qty = max(1, abs($current_qty) + ($targetQty > 0 ? $targetQty : 10));
+        if ($current_qty < 0) {
+            $suggested_qty = abs($current_qty) + $targetQty;
             $status = 'CRITICAL';
-        } else if ($current_qty <= $reorderPoint || $suggested_qty > 0) {
-            $status = 'REORDER';
+        } else if ($current_qty == 0) {
+            if ($ads > 0) {
+                $suggested_qty = $targetQty > 0 ? $targetQty : 1;
+                $status = 'CRITICAL';
+            } else {
+                $suggested_qty = 0;
+                $status = 'OK';
+            }
+        } else if ($current_qty <= $reorderPoint && $ads > 0) {
+            $suggested_qty = max(0, $targetQty - $current_qty);
+            $status = $suggested_qty > 0 ? 'REORDER' : 'OK';
+        } else {
+            $suggested_qty = 0;
+            $status = 'OK';
         }
 
         $result = [

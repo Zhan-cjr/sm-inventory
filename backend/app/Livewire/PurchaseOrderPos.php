@@ -306,16 +306,17 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 }
             }
         } else {
-            // Min-Max Method
-            $products = Product::where('supplier_id', $this->supplier_id)
+            // Min-Max Method: Query ONLY items registered in stocks for THIS branch
+            $branchStocks = \App\Models\Stock::where('branch_id', $this->branch_id)
                 ->where('is_active', true)
-                ->with(['stocks' => function($q) {
-                    $q->where('branch_id', $this->branch_id);
-                }])
+                ->whereHas('product', fn($q) => $q->where('supplier_id', $this->supplier_id)->where('is_active', true))
+                ->with('product')
                 ->get();
 
-            foreach ($products as $product) {
-                $stockRec = $product->stocks->first();
+            foreach ($branchStocks as $stockRec) {
+                $product = $stockRec->product;
+                if (!$product) continue;
+
                 $currentStock = (float)($stockRec->quantity_on_hand ?? 0);
                 $minQty = (float)($stockRec->min_qty ?? 0);
                 $maxQty = (float)($stockRec->max_qty ?? 0);
@@ -326,9 +327,6 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                     if ($currentStock < $minQty) {
                         $suggestedQty = max(1, $maxQty - $currentStock);
                     }
-                } else if ($currentStock <= 0) {
-                    // Fallback for empty stock when min/max has not been manually defined
-                    $suggestedQty = 10;
                 }
 
                 if ($suggestedQty > 0) {
