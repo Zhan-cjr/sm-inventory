@@ -48,18 +48,30 @@ class SuggestedOrderService
 
     public function calculateForBranch(string $branchId, array $filters = []): array
     {
-        $aiData = $this->fetchFromAI($branchId);
-        $suggestions = array_values($aiData);
+        $query = Stock::query()
+            ->where('branch_id', $branchId)
+            ->where('is_active', true)
+            ->whereHas('product', fn($q) => $q->where('is_active', true));
+
+        if (!empty($filters['supplier_id'])) {
+            $query->whereHas('product', fn($q) => $q->where('supplier_id', $filters['supplier_id']));
+        }
 
         if (!empty($filters['product_id'])) {
-            $suggestions = array_filter($suggestions, fn($item) => $item['product_id'] === $filters['product_id']);
-        }
-        if (!empty($filters['supplier_id'])) {
-            $products = Product::where('supplier_id', $filters['supplier_id'])->pluck('id')->toArray();
-            $suggestions = array_filter($suggestions, fn($item) => in_array($item['product_id'], $products));
+            $query->where('product_id', $filters['product_id']);
         }
 
-        return array_values($suggestions);
+        $stocks = $query->with(['product'])->get();
+        $suggestions = [];
+
+        foreach ($stocks as $stock) {
+            $res = $this->calculateForStock($stock);
+            if ($res['suggested_qty'] > 0 || $res['status'] !== 'OK') {
+                $suggestions[] = $res;
+            }
+        }
+
+        return $suggestions;
     }
 
     public function calculateForStock(Stock $stock): array

@@ -290,7 +290,6 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
         // Kosongkan keranjang terlebih dahulu agar saran sebelumnya tidak bertumpuk
         $this->cart = [];
-
         $addedCount = 0;
 
         if ($method === 'sales') {
@@ -300,13 +299,16 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             foreach ($suggestions as $suggestion) {
                 if ($suggestion['suggested_qty'] > 0) {
                     $product = Product::find($suggestion['product_id']);
-                    $this->addItemWithQty($product, $suggestion['suggested_qty'], null, $suggestion['suggested_qty']);
-                    $addedCount++;
+                    if ($product) {
+                        $this->addItemWithQty($product, $suggestion['suggested_qty'], null, $suggestion['suggested_qty']);
+                        $addedCount++;
+                    }
                 }
             }
         } else {
-            // Optimization: Eager load stocks for the current branch
+            // Min-Max Method
             $products = Product::where('supplier_id', $this->supplier_id)
+                ->where('is_active', true)
                 ->with(['stocks' => function($q) {
                     $q->where('branch_id', $this->branch_id);
                 }])
@@ -314,16 +316,19 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
             foreach ($products as $product) {
                 $stockRec = $product->stocks->first();
-                $currentStock = $stockRec->quantity_on_hand ?? 0;
-                $minQty = $stockRec->min_qty ?? 0;
-                $maxQty = $stockRec->max_qty ?? 0;
+                $currentStock = (float)($stockRec->quantity_on_hand ?? 0);
+                $minQty = (float)($stockRec->min_qty ?? 0);
+                $maxQty = (float)($stockRec->max_qty ?? 0);
 
                 $suggestedQty = 0;
 
-                if ($method === 'minmax') {
+                if ($minQty > 0 && $maxQty > 0) {
                     if ($currentStock < $minQty) {
-                        $suggestedQty = $maxQty - $currentStock;
+                        $suggestedQty = max(1, $maxQty - $currentStock);
                     }
+                } else if ($currentStock <= 0) {
+                    // Fallback for empty stock when min/max has not been manually defined
+                    $suggestedQty = 10;
                 }
 
                 if ($suggestedQty > 0) {
@@ -334,7 +339,8 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         if ($addedCount > 0) {
-            Notification::make()->title("$addedCount barang ditambahkan ke saran order.")->success()->send();
+            $methodName = $method === 'sales' ? 'Analisa Penjualan 30 Hari & AI' : 'Batas Stok Min-Max';
+            Notification::make()->title("{$addedCount} barang berhasil ditambahkan berdasarkan {$methodName}.")->success()->send();
         } else {
             Notification::make()->title("Tidak ada barang yang perlu diorder untuk supplier ini.")->info()->send();
         }
