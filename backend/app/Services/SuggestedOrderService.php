@@ -135,4 +135,27 @@ class SuggestedOrderService
         $this->stockCalculationCache[$cacheKey] = $result;
         return $result;
     }
+
+    public function getRestockNeededStockIds(?string $branchId = null): array
+    {
+        $query = Stock::query()
+            ->where('is_active', true)
+            ->whereHas('product', fn($q) => $q->where('is_active', true));
+
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+
+        $stocks = $query->get();
+        $neededStockIds = [];
+
+        foreach ($stocks as $stock) {
+            $result = $this->calculateForStock($stock);
+            if ($result['suggested_qty'] > 0 || $result['status'] !== 'OK') {
+                $neededStockIds[] = $stock->id;
+            }
+        }
+
+        return $neededStockIds;
+    }
 }

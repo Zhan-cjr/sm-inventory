@@ -107,16 +107,13 @@ class SuggestedOrders extends Page implements HasTable
             ])
             ->filters([
                 \Filament\Tables\Filters\Filter::make('perlu_kulakan')
-                    ->label('Perlu Kulakan (Saran > 0 / Kritis)')
+                    ->label('Perlu Kulakan (Kritis & Perlu Order)')
                     ->toggle()
                     ->default(true)
                     ->query(function (Builder $query) {
-                        return $query->where(function ($q) {
-                            $q->where('quantity_on_hand', '<=', 0)
-                              ->orWhereHas('product', function($pq) {
-                                  $pq->where('is_active', true);
-                              });
-                        });
+                        $branchId = request('tableFilters.branch_id.value') ?? (auth()->user()->branch_id ?? null);
+                        $neededIds = app(SuggestedOrderService::class)->getRestockNeededStockIds($branchId);
+                        return $query->whereIn('stocks.id', $neededIds);
                     }),
                 \Filament\Tables\Filters\SelectFilter::make('branch_id')
                     ->label('Cabang')
