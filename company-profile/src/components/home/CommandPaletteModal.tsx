@@ -22,7 +22,7 @@ const mockSearchItems: SearchItem[] = [
   { id: "5", title: "Selamat Hotel & Executive Lounge", category: "Fasilitas", subtitle: "Akomodasi nyaman dan ramah keluarga", url: "/facilities", icon: ShoppingCart },
   { id: "6", title: "Foodcourt & Culinary Zone", category: "Fasilitas", subtitle: "Pusat kuliner nusantara higienis", url: "/facilities", icon: ShoppingCart },
   { id: "7", title: "Promo Berkah Akhir Bulan - Diskon 50%", category: "Promo/Berita", subtitle: "Potongan harga spesial member", url: "/news", icon: Newspaper },
-  { id: "8", title: "Grand Opening Cabang Baru Garut", category: "Promo/Berita", subtitle: "Nikmati voucher belanja gratis", url: "/news", icon: Newspaper },
+  { id: "8", title: "Grand Opening Cabang Baru Sukabumi", category: "Promo/Berita", subtitle: "Nikmati voucher belanja gratis", url: "/news", icon: Newspaper },
   { id: "9", title: "Store Manager Trainee", category: "Karir", subtitle: "Full-time • Penempatan Cianjur & Bandung", url: "/careers", icon: Briefcase },
   { id: "10", title: "Digital Marketing Specialist", category: "Karir", subtitle: "Full-time • Head Office Cianjur", url: "/careers", icon: Briefcase },
 ];

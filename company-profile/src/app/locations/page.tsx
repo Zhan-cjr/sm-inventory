@@ -16,7 +16,7 @@ const DynamicMap = dynamic(() => import("@/components/MapComponent"), {
   ),
 });
 
-const cityChips = ["Semua", "Cianjur", "Sukabumi", "Bandung", "Garut", "Bogor"];
+const cityChips = ["Semua", "Cianjur", "Sukabumi", "Bandung"];
 
 export default function LocationsPage() {
   const { branches, facilities, isLoading } = useCompanyProfile();

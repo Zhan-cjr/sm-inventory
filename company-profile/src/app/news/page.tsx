@@ -28,10 +28,10 @@ const defaultArticles: Article[] = [
   },
   {
     id: 102,
-    title: "Grand Opening Cabang Baru Toserba Selamat Garut Superstore",
-    slug: "grand-opening-garut",
+    title: "Grand Opening Cabang Baru Toserba Selamat Sukabumi Plaza",
+    slug: "grand-opening-sukabumi",
     type: "Berita",
-    content: "Resmi dibuka! Cabang ke-27 Toserba Selamat kini hadir di Garut dengan fasilitas supermarket syariah lengkap, Fitness Center, dan area Foodcourt keluarga.",
+    content: "Resmi dibuka! Cabang terbaru Toserba Selamat kini hadir di Sukabumi dengan fasilitas supermarket syariah lengkap, Fitness Center, dan area Foodcourt keluarga.",
     image_url: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=2574&auto=format&fit=crop",
     published_at: "2026-07-15",
     created_at: "2026-07-15"
