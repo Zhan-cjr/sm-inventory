@@ -13,9 +13,19 @@ class MemberTier extends Model
     protected $fillable = [
         'organization_id',
         'name',
+        'badge',
         'min_points',
+        'min_spend_text',
         'discount_percent',
-        'color_hex'
+        'color_hex',
+        'color_gradient',
+        'perks',
+    ];
+
+    protected $casts = [
+        'perks' => 'array',
+        'min_points' => 'integer',
+        'discount_percent' => 'float',
     ];
 
     public function organization(): BelongsTo

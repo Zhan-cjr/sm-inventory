@@ -5,24 +5,28 @@ export function useCompanyProfile() {
   const [settings, setSettings] = useState<any>(null);
   const [facilities, setFacilities] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
+  const [memberTiers, setMemberTiers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [settingsRes, facilitiesRes, branchesRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/settings`),
-          fetch(`${API_BASE_URL}/facilities`),
-          fetch(`${API_BASE_URL}/branches`),
+        const [settingsRes, facilitiesRes, branchesRes, tiersRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/settings`).catch(() => null),
+          fetch(`${API_BASE_URL}/facilities`).catch(() => null),
+          fetch(`${API_BASE_URL}/branches`).catch(() => null),
+          fetch(`${API_BASE_URL}/member-tiers`).catch(() => null),
         ]);
 
-        const settingsData = await settingsRes.json();
-        const facilitiesData = await facilitiesRes.json();
-        const branchesData = await branchesRes.json();
-
-        setSettings(settingsData);
-        setFacilities(facilitiesData);
-        setBranches(branchesData);
+        if (settingsRes?.ok) setSettings(await settingsRes.json());
+        if (facilitiesRes?.ok) setFacilities(await facilitiesRes.json());
+        if (branchesRes?.ok) setBranches(await branchesRes.json());
+        if (tiersRes?.ok) {
+          const tiersData = await tiersRes.json();
+          if (Array.isArray(tiersData) && tiersData.length > 0) {
+            setMemberTiers(tiersData);
+          }
+        }
       } catch (error) {
         console.error('Failed to fetch company profile data from backend:', error);
       } finally {
@@ -33,5 +37,5 @@ export function useCompanyProfile() {
     fetchData();
   }, []);
 
-  return { settings, facilities, branches, isLoading };
+  return { settings, facilities, branches, memberTiers, isLoading };
 }

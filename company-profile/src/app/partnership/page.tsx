@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Handshake, Store, TrendingUp, CheckCircle2, Building2, Send, AlertCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Handshake, Store, TrendingUp, CheckCircle2, Building2, Send, AlertCircle, HelpCircle, ChevronDown } from "lucide-react";
 
-const fadeIn = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.8 } }
-};
+const faqList = [
+  { q: "Apa saja kriteria produk supplier yang bisa masuk Toserba Selamat?", a: "Produk harus terjamin kehalalannya (bersertifikat halal MUI/BPJPH), memiliki izin edar resmi (BPOM/P-IRT), kemasan higienis, dan kontinuitas stok yang terjamin." },
+  { q: "Berapa lama proses evaluasi pengajuan kemitraan?", a: "Tim Merchandising kami akan meninjau dokumen dalam waktu 3-5 hari kerja. Anda akan dihubungi langsung via Telepon/WhatsApp untuk proses sampel." },
+  { q: "Apakah UMKM lokal mendapatkan prioritas tempat di store?", a: "Ya! Toserba Selamat berkomitmen mendukung pemberdayaan UMKM lokal melalui program 'Pojok Berkah UMKM' di setiap cabang kami." },
+];
 
 export default function PartnershipPage() {
+  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     business_name: "",
     owner_name: "",
@@ -21,6 +23,7 @@ export default function PartnershipPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -56,10 +59,11 @@ export default function PartnershipPage() {
         category: "Pemasok Barang (Supplier)",
         description: "",
       });
+      setStep(1);
     } catch (err: any) {
       console.error(err);
       setStatus("error");
-      setErrorMessage(err.message);
+      setErrorMessage(err.message || "Gagal mengirim formulir kemitraan.");
     } finally {
       setLoading(false);
     }
@@ -67,219 +71,254 @@ export default function PartnershipPage() {
 
   return (
     <div className="bg-slate-50 min-h-screen pt-28 pb-32 text-slate-900 relative overflow-hidden">
+      
       {/* Background Decor */}
-      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-secondary/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[700px] h-[700px] bg-secondary/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[700px] h-[700px] bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
 
-      <div className="container mx-auto px-4 max-w-7xl relative z-10">
+      <div className="container mx-auto px-4 md:px-8 max-w-7xl relative z-10">
         
         {/* Header */}
-        <motion.div 
-          initial="hidden"
-          animate="visible"
-          variants={{
-            hidden: { opacity: 0 },
-            visible: { opacity: 1, transition: { staggerChildren: 0.2 } }
-          }}
-          className="text-center mb-16 sm:mb-24"
-        >
-          <motion.div variants={fadeIn} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel border-accent/30 text-accent text-xs sm:text-sm font-bold tracking-widest uppercase mb-6 bg-white/80 shadow-sm">
-            <Handshake size={16} /> Kemitraan UMKM & B2B
-          </motion.div>
-          <motion.h1 variants={fadeIn} className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-slate-900 mb-6 sm:mb-8 tracking-tight">
-            Tumbuh Bersama <span className="bg-gradient-to-r from-primary to-accent text-gradient">Kami</span>
-          </motion.h1>
-          <motion.p variants={fadeIn} className="text-base sm:text-lg md:text-xl text-slate-600 font-medium max-w-3xl mx-auto leading-relaxed px-2">
-            Toserba Selamat membuka peluang kemitraan bagi UMKM dan Perusahaan yang memiliki produk unggulan untuk dipasarkan di seluruh jaringan ritel kami.
-          </motion.p>
-        </motion.div>
+        <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/20 text-slate-800 text-xs font-bold uppercase tracking-widest">
+            <Handshake size={15} className="text-primary" /> Kemitraan Strategis &amp; Supplier
+          </span>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 tracking-tight">
+            Tumbuh Bersama <span className="bg-gradient-to-r from-primary via-primary-light to-secondary text-gradient">Toserba Selamat</span>
+          </h1>
+          <p className="text-slate-600 font-medium text-base sm:text-lg leading-relaxed">
+            Toserba Selamat membuka kesempatan emas bagi UMKM, Produsen, dan Pemilik Merek untuk memasarkan produk di 26+ cabang store kami.
+          </p>
+        </div>
 
-        <div className="grid lg:grid-cols-5 gap-8 lg:gap-12">
-          {/* Info Section */}
-          <motion.div 
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            className="lg:col-span-2 space-y-6"
-          >
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl relative overflow-hidden group h-full">
-              <h3 className="text-2xl font-bold text-slate-900 mb-6">Mengapa Bermitra?</h3>
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 mb-24">
+          
+          {/* Left Column: Advantages */}
+          <div className="lg:col-span-5 space-y-6">
+            <div className="bg-white rounded-3xl p-8 border border-slate-200/80 shadow-lg space-y-6">
+              <h3 className="text-2xl font-black text-slate-900">Mengapa Bermitra Dengan Kami?</h3>
               
-              <div className="space-y-6">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+              <div className="space-y-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                     <Store size={24} />
                   </div>
                   <div>
-                    <h4 className="text-slate-900 font-bold mb-1">Jaringan Penjualan Luas</h4>
-                    <p className="text-slate-600 font-medium text-sm leading-relaxed">Akses ke puluhan cabang kami yang tersebar strategis dengan ribuan pelanggan aktif setiap harinya.</p>
+                    <h4 className="font-bold text-slate-900 text-base">Jaringan 26+ Store Physical</h4>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">Produk Anda langsung dilihat dan dijangkau oleh ratusan ribu pembeli harian.</p>
                   </div>
                 </div>
-                
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
                     <TrendingUp size={24} />
                   </div>
                   <div>
-                    <h4 className="text-slate-900 font-bold mb-1">Pertumbuhan Bisnis</h4>
-                    <p className="text-slate-600 font-medium text-sm leading-relaxed">Ekspansi pasar produk Anda secara masif melalui ekosistem offline dan online Toserba Selamat.</p>
+                    <h4 className="font-bold text-slate-900 text-base">Pertumbuhan Penjualan Stabil</h4>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">Didukung promosi katalog mingguan dan sistem inventaris digital terkoneksi.</p>
                   </div>
                 </div>
 
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary shrink-0">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-accent/20 text-emerald-800 flex items-center justify-center shrink-0">
                     <Building2 size={24} />
                   </div>
                   <div>
-                    <h4 className="text-slate-900 font-bold mb-1">Pembayaran Terjamin</h4>
-                    <p className="text-slate-600 font-medium text-sm leading-relaxed">Sistem keuangan yang profesional, transparan, dan dapat diandalkan untuk kenyamanan berbisnis.</p>
+                    <h4 className="font-bold text-slate-900 text-base">Sewa Space &amp; Booth Tenant</h4>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">Tersedia space sewa tenant makanan/minuman dengan trafik pengunjung tinggi.</p>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-12 p-6 rounded-2xl bg-slate-50 border border-slate-200">
-                <h4 className="text-slate-900 font-bold mb-3 flex items-center gap-2"><CheckCircle2 className="text-accent" size={18} /> Kategori Mitra Prioritas</h4>
-                <ul className="space-y-2 text-sm text-slate-600 font-medium">
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Makanan & Minuman Kemasan</li>
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Fashion & Pakaian Muslim</li>
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Kebutuhan Rumah Tangga</li>
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Alat Tulis & Kantor</li>
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary"></span> Supplier Bahan Baku Resto/Hotel</li>
-                </ul>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 font-medium leading-relaxed">
+                💡 <strong>Program Pemberdayaan UMKM:</strong> Kami memberikan pendampingan sertifikasi halal dan tempat khusus bagi produk khas daerah.
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          {/* Registration Form */}
-          <motion.div 
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-            className="lg:col-span-3"
-          >
-            <div className="bg-white p-8 sm:p-12 rounded-[2rem] border border-slate-200 shadow-xl h-full relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-bl from-primary/5 to-transparent pointer-events-none" />
+          {/* Right Column: Multi-step Interactive Wizard Form */}
+          <div className="lg:col-span-7">
+            <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200/80 shadow-xl space-y-6 relative overflow-hidden">
               
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">Formulir Pengajuan Kemitraan</h2>
-              <p className="text-slate-600 font-medium mb-8">Lengkapi data usaha Anda. Tim kurasi kami akan menghubungi Anda untuk proses kurasi lebih lanjut jika memenuhi kriteria.</p>
-              
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-xl font-extrabold text-slate-900">Formulir Pengajuan Kemitraan</h3>
+                  <p className="text-xs text-slate-500 font-medium">Lengkapi data berikut untuk dihubungi oleh tim merchandising kami.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-8 h-8 rounded-full font-extrabold text-xs flex items-center justify-center ${step === 1 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600'}`}>1</span>
+                  <span className={`w-8 h-8 rounded-full font-extrabold text-xs flex items-center justify-center ${step === 2 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600'}`}>2</span>
+                </div>
+              </div>
+
               {status === "success" && (
-                <div className="mb-8 p-4 rounded-xl bg-accent/10 border border-accent/30 text-accent flex items-start gap-3">
-                  <CheckCircle2 className="shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-bold mb-1">Berhasil Terkirim!</h4>
-                    <p className="text-sm">Terima kasih atas pengajuan Anda. Data Anda telah masuk ke sistem kami dan sedang dalam antrean peninjauan.</p>
-                  </div>
+                <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center gap-3">
+                  <CheckCircle2 size={20} />
+                  <span>Pengajuan kemitraan berhasil dikirim! Tim kami akan menghubungi Anda dalam 3 hari kerja.</span>
                 </div>
               )}
 
               {status === "error" && (
-                <div className="mb-8 p-4 rounded-xl bg-secondary/10 border border-secondary/30 text-secondary flex items-start gap-3">
-                  <AlertCircle className="shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-bold mb-1">Pengiriman Gagal</h4>
-                    <p className="text-sm">{errorMessage}</p>
-                  </div>
+                <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-bold flex items-center gap-3">
+                  <AlertCircle size={20} />
+                  <span>{errorMessage}</span>
                 </div>
               )}
 
-              <form className="space-y-6 relative z-10" onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Nama Usaha / Merek</label>
-                    <input 
-                      type="text" 
-                      name="business_name"
-                      value={formData.business_name}
-                      onChange={handleChange}
-                      required
-                      placeholder="Contoh: Keripik Singkong Barokah" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-medium"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Nama Pemilik / PIC</label>
-                    <input 
-                      type="text" 
-                      name="owner_name"
-                      value={formData.owner_name}
-                      onChange={handleChange}
-                      required
-                      placeholder="Nama lengkap PIC" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-medium"
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Nomor Handphone / WA</label>
-                    <input 
-                      type="tel" 
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      required
-                      placeholder="Nomor WA aktif" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-medium"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Email Resmi</label>
-                    <input 
-                      type="email" 
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="opsional@email.com" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all font-medium"
-                    />
-                  </div>
-                </div>
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {step === 1 ? (
+                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Kategori Kemitraan *</label>
+                      <select
+                        name="category"
+                        value={formData.category}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary outline-none"
+                      >
+                        <option value="Pemasok Barang (Supplier)">Pemasok Barang (Supplier Supermarket)</option>
+                        <option value="Sewa Space / Tenant Store">Sewa Space / Tenant Store Area</option>
+                        <option value="Pemasok Bahan Segar (Fresh Food)">Pemasok Bahan Segar (Buah, Sayur, Daging)</option>
+                        <option value="Kerjasama Event & Sponsorship">Kerjasama Event &amp; Sponsorship</option>
+                      </select>
+                    </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Bentuk Kemitraan</label>
-                  <select 
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all appearance-none cursor-pointer font-medium"
-                  >
-                    <option value="Pemasok Barang (Supplier)">Pemasok Barang (Supplier)</option>
-                    <option value="Sewa Tempat (Tenant)">Sewa Tempat Jualan (Tenant)</option>
-                    <option value="Konsinyasi (Titip Jual)">Konsinyasi (Titip Jual)</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
-                </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Nama Perusahaan / Brand UMKM *</label>
+                      <input
+                        type="text"
+                        name="business_name"
+                        required
+                        value={formData.business_name}
+                        onChange={handleChange}
+                        placeholder="Contoh: PT Berkah Food Nusantara"
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary outline-none"
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Deskripsi Produk/Usaha</label>
-                  <textarea 
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    required
-                    rows={4}
-                    placeholder="Ceritakan secara singkat tentang produk Anda, keunggulannya, estimasi kapasitas produksi, dll..." 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all resize-none font-medium"
-                  ></textarea>
-                </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Nama Pemilik / Penanggung Jawab *</label>
+                      <input
+                        type="text"
+                        name="owner_name"
+                        required
+                        value={formData.owner_name}
+                        onChange={handleChange}
+                        placeholder="Contoh: H. Ahmad Subandi"
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary outline-none"
+                      />
+                    </div>
 
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className="bg-primary hover:bg-primary/90 disabled:bg-primary/50 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(36,42,122,0.2)] hover:shadow-[0_0_25px_rgba(36,42,122,0.4)] hover:-translate-y-1 w-full inline-flex justify-center items-center gap-3"
-                >
-                  {loading ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                  ) : (
-                    <><Send size={18} /> Kirim Pengajuan</>
-                  )}
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (formData.business_name && formData.owner_name) setStep(2);
+                        else alert("Harap isi nama usaha dan penanggung jawab.");
+                      }}
+                      className="w-full py-3.5 bg-primary hover:bg-primary-light text-white font-bold text-xs rounded-2xl transition-all shadow-md shadow-primary/20"
+                    >
+                      Lanjut Ke Kontak &amp; Detail Produk
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Nomor Telepon / WhatsApp *</label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        required
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="Contoh: 081234567890"
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Alamat Email *</label>
+                      <input
+                        type="email"
+                        name="email"
+                        required
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="Contoh: kontak@berkahfood.com"
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Deskripsi Produk / Pengajuan *</label>
+                      <textarea
+                        name="description"
+                        rows={3}
+                        required
+                        value={formData.description}
+                        onChange={handleChange}
+                        placeholder="Jelaskan jenis produk, keunggulan, sertifikasi halal/BPOM, dan kapasitas produksi..."
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary outline-none"
+                      />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setStep(1)}
+                        className="py-3.5 px-5 bg-slate-100 text-slate-600 font-bold text-xs rounded-2xl hover:bg-slate-200 transition-colors"
+                      >
+                        Kembali
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 py-3.5 bg-secondary hover:bg-secondary-light text-white font-bold text-xs rounded-2xl transition-all shadow-md shadow-secondary/20 flex items-center justify-center gap-2"
+                      >
+                        {loading ? "Mengirim..." : "Kirim Pengajuan Kemitraan"}
+                        <Send size={15} />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
               </form>
+
             </div>
-          </motion.div>
+          </div>
+
         </div>
+
+        {/* Partnership FAQ Accordion */}
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="text-center space-y-2">
+            <span className="text-xs font-bold text-primary uppercase tracking-widest">PERTANYAAN UMUM</span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">FAQ Kemitraan</h2>
+          </div>
+
+          <div className="space-y-3">
+            {faqList.map((faq, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div key={idx} className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                  <button
+                    onClick={() => setOpenFaq(isOpen ? null : idx)}
+                    className="w-full p-5 text-left font-bold text-sm text-slate-900 flex items-center justify-between hover:text-primary transition-colors"
+                  >
+                    <span>{faq.q}</span>
+                    <ChevronDown size={18} className={`transition-transform ${isOpen ? 'rotate-180 text-primary' : 'text-slate-400'}`} />
+                  </button>
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="px-5 pb-5 text-xs text-slate-600 font-medium leading-relaxed border-t border-slate-100 pt-3">
+                        {faq.a}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
       </div>
     </div>
   );

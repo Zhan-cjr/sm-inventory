@@ -56,6 +56,12 @@ class CompanyProfileController extends Controller
         return response()->json($testimonials);
     }
 
+    public function memberTiers()
+    {
+        $tiers = \App\Models\MemberTier::orderBy('min_points', 'asc')->get();
+        return response()->json($tiers);
+    }
+
     public function storePartnership(Request $request)
     {
         $validated = $request->validate([

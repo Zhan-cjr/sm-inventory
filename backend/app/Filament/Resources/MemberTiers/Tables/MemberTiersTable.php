@@ -20,6 +20,9 @@ class MemberTiersTable
                     ->searchable()
                     ->badge()
                     ->color(fn ($record) => $record->color_hex ? \Filament\Support\Colors\Color::hex($record->color_hex) : 'primary'),
+                TextColumn::make('badge')
+                    ->label('Badge')
+                    ->searchable(),
                 TextColumn::make('min_points')
                     ->label('Minimal Poin')
                     ->numeric()
@@ -29,6 +32,10 @@ class MemberTiersTable
                     ->suffix('%')
                     ->numeric()
                     ->sortable(),
+                TextColumn::make('perks')
+                    ->label('Jumlah Keuntungan')
+                    ->formatStateUsing(fn ($state) => is_array($state) ? count($state) . ' Keuntungan' : '0 Keuntungan')
+                    ->badge(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

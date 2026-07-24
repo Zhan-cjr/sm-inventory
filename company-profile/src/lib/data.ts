@@ -50,12 +50,6 @@ export const facilities = [
     icon: Dumbbell,
   },
   {
-    id: "padel",
-    name: "Padel Court",
-    description: "Fasilitas lapangan olahraga Padel terkini.",
-    icon: Activity,
-  },
-  {
     id: "kids-arena",
     name: "Arena Bermain Anak",
     description: "Area bermain yang aman, nyaman, dan edukatif.",
@@ -88,7 +82,7 @@ export const branches = [
     address: "Jl. A. Yani No. 1, Pusat Kota",
     lat: -6.914744,
     lng: 107.609810,
-    facilities: ["supermarket", "fashion", "moslem-house", "hotel-syariah", "fitness-center", "padel", "tenant-kuliner"],
+    facilities: ["supermarket", "fashion", "moslem-house", "hotel-syariah", "fitness-center", "tenant-kuliner"],
     openHours: "08:00 - 22:00",
   },
   {

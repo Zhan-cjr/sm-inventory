@@ -297,5 +297,6 @@ Route::prefix('company-profile')->group(function () {
     Route::get('/facilities', [CompanyProfileController::class, 'facilities']);
     Route::get('/articles', [CompanyProfileController::class, 'articles']);
     Route::get('/testimonials', [CompanyProfileController::class, 'testimonials']);
+    Route::get('/member-tiers', [CompanyProfileController::class, 'memberTiers']);
     Route::post('/partnership', [CompanyProfileController::class, 'storePartnership']);
 });
