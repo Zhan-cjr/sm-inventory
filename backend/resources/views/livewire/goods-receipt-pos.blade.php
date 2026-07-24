@@ -153,9 +153,10 @@
     <style>
         .pos-input { padding: 0.375rem 0.5rem; border: 1px solid #d1d5db; width: 100%; border-radius: 0.375rem; background-color: #f9fafb; font-size: 0.875rem; }
         .pos-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
+        .pos-grid-input { padding: 0.25rem 0.35rem !important; font-size: 0.8125rem !important; }
         .pos-label { font-weight: 500; color: #4b5563; font-size: 0.875rem; padding-right: 0.5rem; }
-        .pos-grid-th { background-color: #f3f4f6; border-bottom: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; font-weight: 600; color: #374151; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;}
-        .pos-grid-td { border-bottom: 1px solid #f3f4f6; padding: 0.5rem; background-color: white; font-size: 0.875rem; color: #1f2937; }
+        .pos-grid-th { background-color: #f3f4f6; border-bottom: 1px solid #e5e7eb; padding: 0.5rem 0.35rem; text-align: left; font-weight: 600; color: #374151; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em;}
+        .pos-grid-td { border-bottom: 1px solid #f3f4f6; padding: 0.35rem; background-color: white; font-size: 0.875rem; color: #1f2937; }
         
         .dark .pos-input { background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important; }
         .dark .pos-input:focus { border-color: #60a5fa !important; box-shadow: 0 0 0 1px #60a5fa !important; }
@@ -512,25 +513,25 @@
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead style="position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);">
                 <tr>
-                    <th class="pos-grid-th" style="width: 3rem; text-align: center;">No</th>
-                    @if(in_array('sku', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">SKU</th> @endif
-                    @if(in_array('barcode', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">Barcode</th> @endif
-                    @if(in_array('name', $visibleColumns)) <th class="pos-grid-th" style="min-width: 18rem; width: 30%;">Nama Produk</th> @endif
-                    @if(in_array('qty_ordered', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Qty PO</th> @endif
-                    @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Qty Terima</th> @endif
-                    @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 8.5rem; text-align: right;">Harga Satuan</th> @endif
+                    <th class="pos-grid-th" style="width: 2.5rem; text-align: center;">No</th>
+                    @if(in_array('sku', $visibleColumns)) <th class="pos-grid-th" style="width: 10%;">SKU</th> @endif
+                    @if(in_array('barcode', $visibleColumns)) <th class="pos-grid-th" style="width: 10%;">Barcode</th> @endif
+                    @if(in_array('name', $visibleColumns)) <th class="pos-grid-th" style="min-width: 16rem; width: 25%;">Nama Produk</th> @endif
+                    @if(in_array('qty_ordered', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Qty PO</th> @endif
+                    @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Qty Terima</th> @endif
+                    @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9.5rem; text-align: right;">Harga Satuan</th> @endif
 
-                    @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 7.5rem; text-align: right;">Harga Jual 1</th> @endif
-                    @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Margin 1 (%)</th> @endif
-                    @if(in_array('harga_jual_2', $visibleColumns)) <th class="pos-grid-th" style="width: 7.5rem; text-align: right;">Harga Jual 2</th> @endif
-                    @if(in_array('margin_gol_2', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Margin 2 (%)</th> @endif
-                    @if(in_array('harga_jual_3', $visibleColumns)) <th class="pos-grid-th" style="width: 7.5rem; text-align: right;">Harga Jual 3</th> @endif
-                    @if(in_array('margin_gol_3', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Margin 3 (%)</th> @endif
-                    @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Dis1 (%)</th> @endif
-                    @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Dis2 (%)</th> @endif
-                    @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Dis3 (%)</th> @endif
-                    <th class="pos-grid-th" style="width: 10rem; text-align: right;">Total</th>
-                    <th class="pos-grid-th" style="width: 3rem; text-align: center;"></th>
+                    @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Jual 1</th> @endif
+                    @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 4.25rem; text-align: right;">Margin 1 (%)</th> @endif
+                    @if(in_array('harga_jual_2', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Jual 2</th> @endif
+                    @if(in_array('margin_gol_2', $visibleColumns)) <th class="pos-grid-th" style="width: 4.25rem; text-align: right;">Margin 2 (%)</th> @endif
+                    @if(in_array('harga_jual_3', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Jual 3</th> @endif
+                    @if(in_array('margin_gol_3', $visibleColumns)) <th class="pos-grid-th" style="width: 4.25rem; text-align: right;">Margin 3 (%)</th> @endif
+                    @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 3.5rem; text-align: right;">Dis1 (%)</th> @endif
+                    @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 3.5rem; text-align: right;">Dis2 (%)</th> @endif
+                    @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 3.5rem; text-align: right;">Dis3 (%)</th> @endif
+                    <th class="pos-grid-th" style="width: 9.5rem; text-align: right;">Total</th>
+                    <th class="pos-grid-th" style="width: 2.5rem; text-align: center;"></th>
                 </tr>
             </thead>
             <tbody @keydown="handleGridNav($event)">
