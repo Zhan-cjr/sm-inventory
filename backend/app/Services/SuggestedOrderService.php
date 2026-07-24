@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Product;
 use App\Models\Stock;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class SuggestedOrderService
@@ -12,6 +14,7 @@ class SuggestedOrderService
     const FORECAST_DAYS = 30;
 
     protected array $aiCache = [];
+    protected array $stockCalculationCache = [];
 
     protected function fetchFromAI(string $branchId): array
     {
@@ -19,14 +22,15 @@ class SuggestedOrderService
             return $this->aiCache[$branchId];
         }
 
+        $aiUrl = env('AI_SERVICE_URL', 'http://127.0.0.1:8001');
+
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(10)->get('http://localhost:8001/api/v1/ai/restock-suggestions', [
+            $response = Http::timeout(2)->get($aiUrl . '/api/v1/ai/restock-suggestions', [
                 'branch_id' => $branchId
             ]);
 
             if ($response->successful()) {
                 $data = $response->json()['data'] ?? [];
-                // Index by product_id for quick lookup
                 $indexed = [];
                 foreach ($data as $item) {
                     $indexed[$item['product_id']] = $item;
@@ -35,7 +39,7 @@ class SuggestedOrderService
                 return $indexed;
             }
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('AI Restock Prediction Error: ' . $e->getMessage());
+            Log::warning('AI Restock Service unavailable (' . $aiUrl . '): ' . $e->getMessage() . '. Falling back to database ADS calculation.');
         }
 
         $this->aiCache[$branchId] = [];
@@ -45,16 +49,12 @@ class SuggestedOrderService
     public function calculateForBranch(string $branchId, array $filters = []): array
     {
         $aiData = $this->fetchFromAI($branchId);
-        
-        // Convert to array of values
         $suggestions = array_values($aiData);
 
-        // Apply filters if necessary
         if (!empty($filters['product_id'])) {
             $suggestions = array_filter($suggestions, fn($item) => $item['product_id'] === $filters['product_id']);
         }
         if (!empty($filters['supplier_id'])) {
-            // Need to match supplier_id. AI returns supplier_name but not ID, let's fetch products
             $products = Product::where('supplier_id', $filters['supplier_id'])->pluck('id')->toArray();
             $suggestions = array_filter($suggestions, fn($item) => in_array($item['product_id'], $products));
         }
@@ -64,49 +64,75 @@ class SuggestedOrderService
 
     public function calculateForStock(Stock $stock): array
     {
+        $cacheKey = $stock->id ?? ($stock->branch_id . '_' . $stock->product_id);
+        if (isset($this->stockCalculationCache[$cacheKey])) {
+            return $this->stockCalculationCache[$cacheKey];
+        }
+
         $aiData = $this->fetchFromAI($stock->branch_id);
         
         if (isset($aiData[$stock->product_id])) {
             $aiItem = $aiData[$stock->product_id];
-            return [
+            $result = [
                 'product_id' => $stock->product_id,
-                'supplier_id' => $stock->product->supplier_id,
-                'sku' => $stock->product->sku,
-                'name' => $stock->product->name,
-                'current_qty' => $aiItem['current_qty'],
-                'ads' => $aiItem['ads'],
-                'reorder_point' => $aiItem['reorder_point'],
-                'target_days' => $aiItem['target_days'] ?? 30,
-                'suggested_qty' => $aiItem['suggested_qty'],
+                'supplier_id' => $stock->product->supplier_id ?? null,
+                'sku' => $stock->product->sku ?? '-',
+                'name' => $stock->product->name ?? '-',
+                'current_qty' => (float)$aiItem['current_qty'],
+                'ads' => (float)$aiItem['ads'],
+                'reorder_point' => (float)$aiItem['reorder_point'],
+                'target_days' => (int)($aiItem['target_days'] ?? 30),
+                'suggested_qty' => (float)$aiItem['suggested_qty'],
                 'status' => $aiItem['status'],
-                'lead_time' => $aiItem['lead_time'],
+                'lead_time' => (int)($aiItem['lead_time'] ?? 7),
             ];
+            $this->stockCalculationCache[$cacheKey] = $result;
+            return $result;
         }
 
-        // Fallback if AI doesn't return data for this stock (e.g. no sales history)
+        // Fallback: Smart Database Calculation for ADS & Reorder Point
         $current_qty = (float)$stock->quantity_on_hand;
-        $suggested_qty = 0;
+        $thirtyDaysAgo = Carbon::now()->subDays(30);
+        
+        $sales30Days = (float)DB::table('transaction_items')
+            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            ->where('transactions.branch_id', $stock->branch_id)
+            ->where('transaction_items.product_id', $stock->product_id)
+            ->where('transactions.created_at', '>=', $thirtyDaysAgo)
+            ->sum('transaction_items.quantity');
+
+        $ads = round($sales30Days / 30, 2);
+        $leadTime = (int)($stock->product->lead_time_days ?? 7);
+        $targetDays = (int)($stock->desired_inventory_days ?? 30);
+        $safetyStock = (float)ceil($ads * 3);
+        $reorderPoint = (float)max(1, ceil(($ads * $leadTime) + $safetyStock));
+        $targetQty = (float)ceil($ads * $targetDays);
+        
+        $suggested_qty = max(0, (float)ceil($targetQty - $current_qty));
         $status = 'OK';
         
-        if ($current_qty < 0) {
-            $suggested_qty = abs($current_qty);
+        if ($current_qty <= 0) {
+            $suggested_qty = max(1, abs($current_qty) + ($targetQty > 0 ? $targetQty : 10));
             $status = 'CRITICAL';
-        } else if ($current_qty == 0) {
+        } else if ($current_qty <= $reorderPoint || $suggested_qty > 0) {
             $status = 'REORDER';
         }
 
-        return [
+        $result = [
             'product_id' => $stock->product_id,
-            'supplier_id' => $stock->product->supplier_id,
-            'sku' => $stock->product->sku,
-            'name' => $stock->product->name,
+            'supplier_id' => $stock->product->supplier_id ?? null,
+            'sku' => $stock->product->sku ?? '-',
+            'name' => $stock->product->name ?? '-',
             'current_qty' => $current_qty,
-            'ads' => 0,
-            'reorder_point' => 0,
-            'target_days' => $stock->desired_inventory_days ?? 30,
+            'ads' => $ads,
+            'reorder_point' => $reorderPoint,
+            'target_days' => $targetDays,
             'suggested_qty' => $suggested_qty,
             'status' => $status,
-            'lead_time' => $stock->product->lead_time_days ?? 7,
+            'lead_time' => $leadTime,
         ];
+
+        $this->stockCalculationCache[$cacheKey] = $result;
+        return $result;
     }
 }

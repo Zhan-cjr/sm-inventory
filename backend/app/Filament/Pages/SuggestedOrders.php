@@ -12,7 +12,6 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Illuminate\Database\Eloquent\Builder;
-use Filament\Resources\Components\Tab;
 
 class SuggestedOrders extends Page implements HasTable
 {
@@ -30,7 +29,7 @@ class SuggestedOrders extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
-            \Filament\Actions\Action::make('faq')
+            Action::make('faq')
                 ->label('Cara Membaca Saran AI')
                 ->icon('heroicon-o-information-circle')
                 ->color('info')
@@ -48,26 +47,37 @@ class SuggestedOrders extends Page implements HasTable
                 \App\Models\Stock::query()
                     ->where('is_active', true)
                     ->whereHas('product', fn($q) => $q->where('is_active', true))
-                    ->with(['product', 'branch'])
+                    ->with(['product', 'product.supplier', 'branch'])
             )
             ->columns([
                 TextColumn::make('product.sku')
                     ->label('SKU')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('product.name')
-                    ->label('Produk')
-                    ->searchable(),
+                    ->label('Nama Produk')
+                    ->searchable()
+                    ->sortable()
+                    ->wrap(),
+                TextColumn::make('product.supplier.name')
+                    ->label('Pemasok')
+                    ->searchable()
+                    ->placeholder('-'),
                 TextColumn::make('branch.name')
-                    ->label('Cabang'),
+                    ->label('Cabang')
+                    ->sortable(),
                 TextColumn::make('quantity_on_hand')
                     ->label('Stok Saat Ini')
-                    ->numeric()
-                    ->sortable(),
+                    ->numeric(decimalPlaces: 0)
+                    ->sortable()
+                    ->weight('bold'),
                 TextColumn::make('ads')
                     ->label('ADS (Sales/Hari)')
+                    ->numeric(decimalPlaces: 2)
                     ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['ads']),
                 TextColumn::make('reorder_point')
                     ->label('Titik Pesan (ROP)')
+                    ->numeric(decimalPlaces: 0)
                     ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['reorder_point']),
                 TextColumn::make('target_days')
                     ->label('Target Stok (Hari)')
@@ -76,6 +86,7 @@ class SuggestedOrders extends Page implements HasTable
                     ->label('Saran Pesan')
                     ->weight('bold')
                     ->color('primary')
+                    ->numeric(decimalPlaces: 0)
                     ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['suggested_qty']),
                 TextColumn::make('status')
                     ->label('Status')
@@ -86,34 +97,26 @@ class SuggestedOrders extends Page implements HasTable
                         'OK' => 'success',
                         default => 'gray',
                     })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'CRITICAL' => 'HABIS (CRITICAL)',
+                        'REORDER' => 'PERLU ORDER',
+                        'OK' => 'AMAN',
+                        default => $state,
+                    })
                     ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['status']),
             ])
             ->filters([
                 \Filament\Tables\Filters\Filter::make('perlu_kulakan')
-                    ->label('Perlu Kulakan (Saran > 0)')
+                    ->label('Perlu Kulakan (Saran > 0 / Kritis)')
                     ->toggle()
                     ->default(true)
                     ->query(function (Builder $query) {
-                        $branchId = request('tableFilters.branch_id.value') ?? (auth()->user()->branch_id ?? \App\Models\Branch::first()->id ?? null);
-                        
-                        $query->where(function ($q) use ($branchId) {
-                            // 1. Termasuk dari Fallback Logic (Stok <= 0)
-                            $q->where('quantity_on_hand', '<=', 0);
-                            
-                            // 2. Termasuk dari rekomendasi AI Service
-                            if ($branchId) {
-                                $aiData = app(SuggestedOrderService::class)->calculateForBranch($branchId);
-                                $productIds = collect($aiData)
-                                    ->filter(fn($item) => $item['suggested_qty'] > 0 || $item['status'] !== 'OK')
-                                    ->pluck('product_id');
-                                    
-                                if ($productIds->isNotEmpty()) {
-                                    $q->orWhereIn('product_id', $productIds);
-                                }
-                            }
+                        return $query->where(function ($q) {
+                            $q->where('quantity_on_hand', '<=', 0)
+                              ->orWhereHas('product', function($pq) {
+                                  $pq->where('is_active', true);
+                              });
                         });
-                        
-                        return $query;
                     }),
                 \Filament\Tables\Filters\SelectFilter::make('branch_id')
                     ->label('Cabang')
@@ -170,45 +173,59 @@ class SuggestedOrders extends Page implements HasTable
                     ->action(function (\Illuminate\Support\Collection $records) {
                         if ($records->isEmpty()) return;
 
-                        $firstRecord = $records->first();
-                        
-                        $po = \App\Models\PurchaseOrder::create([
-                            'organization_id' => $firstRecord->product->organization_id,
-                            'branch_id' => $firstRecord->branch_id,
-                            'supplier_id' => $firstRecord->product->supplier_id,
-                            'po_number' => 'PO-' . date('YmdHis'),
-                            'po_date' => now(),
-                            'status' => 'DRAFT',
-                            'total_amount' => 0,
-                            'created_by' => auth()->id(),
-                        ]);
+                        $recordsBySupplier = $records->groupBy(fn($rec) => $rec->product->supplier_id);
+                        $createdPoCount = 0;
+                        $lastPo = null;
 
-                        $totalAmount = 0;
-                        foreach ($records as $record) {
-                            $suggestion = app(SuggestedOrderService::class)->calculateForStock($record);
-                            if ($suggestion['suggested_qty'] <= 0) continue;
-
-                            $costPrice = $record->product->cost_price_tax > 0 ? $record->product->cost_price_tax : $record->product->cost_price;
-                            $subtotal = $suggestion['suggested_qty'] * $costPrice;
-                            \App\Models\PurchaseOrderItem::create([
-                                'purchase_order_id' => $po->id,
-                                'product_id' => $record->product_id,
-                                'quantity_suggested' => $suggestion['suggested_qty'],
-                                'quantity_ordered' => $suggestion['suggested_qty'],
-                                'unit_cost' => $costPrice,
-                                'subtotal' => $subtotal,
+                        foreach ($recordsBySupplier as $supplierId => $supplierRecords) {
+                            if (!$supplierId) continue;
+                            
+                            $firstRecord = $supplierRecords->first();
+                            $po = \App\Models\PurchaseOrder::create([
+                                'organization_id' => $firstRecord->product->organization_id,
+                                'branch_id' => $firstRecord->branch_id,
+                                'supplier_id' => $supplierId,
+                                'po_number' => 'PO-' . date('YmdHis') . '-' . rand(10,99),
+                                'po_date' => now(),
+                                'status' => 'DRAFT',
+                                'total_amount' => 0,
+                                'created_by' => auth()->id(),
                             ]);
-                            $totalAmount += $subtotal;
+
+                            $totalAmount = 0;
+                            foreach ($supplierRecords as $record) {
+                                $suggestion = app(SuggestedOrderService::class)->calculateForStock($record);
+                                $qty = $suggestion['suggested_qty'] > 0 ? $suggestion['suggested_qty'] : 1;
+
+                                $costPrice = $record->product->cost_price_tax > 0 ? $record->product->cost_price_tax : $record->product->cost_price;
+                                $subtotal = $qty * $costPrice;
+                                
+                                \App\Models\PurchaseOrderItem::create([
+                                    'purchase_order_id' => $po->id,
+                                    'product_id' => $record->product_id,
+                                    'quantity_suggested' => $suggestion['suggested_qty'],
+                                    'quantity_ordered' => $qty,
+                                    'unit_cost' => $costPrice,
+                                    'subtotal' => $subtotal,
+                                ]);
+                                $totalAmount += $subtotal;
+                            }
+
+                            $po->update(['total_amount' => $totalAmount]);
+                            $createdPoCount++;
+                            $lastPo = $po;
                         }
 
-                        $po->update(['total_amount' => $totalAmount]);
-
                         \Filament\Notifications\Notification::make()
-                            ->title('Draft Pesanan Pembelian Massal berhasil dibuat')
+                            ->title("{$createdPoCount} Draft Pesanan Pembelian berhasil dibuat berdasarkan Pemasok")
                             ->success()
                             ->send();
 
-                        return redirect()->to(route('filament.admin.resources.purchase-orders.edit', $po));
+                        if ($createdPoCount === 1 && $lastPo) {
+                            return redirect()->to(route('filament.admin.resources.purchase-orders.edit', $lastPo));
+                        }
+
+                        return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
                     }),
             ]);
     }
