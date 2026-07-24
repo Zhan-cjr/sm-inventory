@@ -23,3 +23,6 @@ Schedule::command('app:send-daily-report')->dailyAt('21:30');
 
 // Mengirim peringatan PO pending (lebih dari 2 hari) setiap jam 8 pagi
 Schedule::command('app:remind-pending-po')->dailyAt('08:00');
+
+// Menjalankan analisis pola belanja MBA otomatis setiap jam 2 dini hari
+Schedule::command('ai:train-mba')->dailyAt('02:00');
