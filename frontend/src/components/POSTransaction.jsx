@@ -3358,7 +3358,7 @@ export const POSTransaction = ({
 
           <div className="cart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexShrink: 0 }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}><ShoppingCart size={20} /> Keranjang Belanja</h3>
-            <span className="item-count">{items.length} Items</span>
+            <span className="item-count">{items.length} Items | {items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)} Qty</span>
           </div>
 
           {/* TOP BARCODE SCANNER INPUT AREA */}
