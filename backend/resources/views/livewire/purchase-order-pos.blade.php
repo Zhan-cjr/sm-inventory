@@ -342,23 +342,23 @@
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead style="position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);">
                 <tr>
-                    <th class="pos-grid-th" style="width: 3rem; text-align: center;">No</th>
-                    @if(in_array('sku', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">SKU</th> @endif
-                    @if(in_array('barcode', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">Barcode</th> @endif
-                    @if(in_array('name', $visibleColumns)) <th class="pos-grid-th">Nama Produk</th> @endif
-                    @if(in_array('avg_bln', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Sales 30 HR</th> @endif
-                    @if(in_array('avg_minggu', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Sales 7 HR</th> @endif
-                    @if(in_array('stock', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Stok</th> @endif
-                    @if(in_array('min_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Min</th> @endif
-                    @if(in_array('max_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Max</th> @endif
-                    @if(in_array('qty_saran', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right; background-color: #e0f2fe; color: #0369a1;">Qty Saran</th> @endif
+                    <th class="pos-grid-th" style="width: 2.5rem; text-align: center;">No</th>
+                    @if(in_array('sku', $visibleColumns)) <th class="pos-grid-th" style="width: 8.5rem;">SKU</th> @endif
+                    @if(in_array('barcode', $visibleColumns)) <th class="pos-grid-th" style="width: 9.5rem;">Barcode</th> @endif
+                    @if(in_array('name', $visibleColumns)) <th class="pos-grid-th" style="min-width: 20rem; width: 32%;">Nama Produk</th> @endif
+                    @if(in_array('avg_bln', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Sales 30 HR</th> @endif
+                    @if(in_array('avg_minggu', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Sales 7 HR</th> @endif
+                    @if(in_array('stock', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Stok</th> @endif
+                    @if(in_array('min_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Min</th> @endif
+                    @if(in_array('max_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Max</th> @endif
+                    @if(in_array('qty_saran', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right; background-color: #e0f2fe; color: #0369a1;">Qty Saran</th> @endif
                     @if(in_array('qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Qty Pesan</th> @endif
-                    @if(in_array('unit_cost', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Satuan</th> @endif
-                    @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis1 (%)</th> @endif
-                    @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis2 (%)</th> @endif
-                    @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Dis3 (%)</th> @endif
-                    <th class="pos-grid-th" style="width: 10rem; text-align: right;">Total</th>
-                    <th class="pos-grid-th" style="width: 3rem; text-align: center;"></th>
+                    @if(in_array('unit_cost', $visibleColumns)) <th class="pos-grid-th" style="width: 8.5rem; text-align: right;">Harga Satuan</th> @endif
+                    @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Dis1 (%)</th> @endif
+                    @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Dis2 (%)</th> @endif
+                    @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Dis3 (%)</th> @endif
+                    <th class="pos-grid-th" style="width: 8.5rem; text-align: right;">Total</th>
+                    <th class="pos-grid-th" style="width: 2.5rem; text-align: center;"></th>
                 </tr>
             </thead>
             <tbody @keydown="handleGridNav($event)">
@@ -368,8 +368,8 @@
                         @if(in_array('sku', $visibleColumns)) <td class="pos-grid-td">{{ $item['sku'] }}</td> @endif
                         @if(in_array('barcode', $visibleColumns)) <td class="pos-grid-td">{{ $item['barcode'] }}</td> @endif
                         @if(in_array('name', $visibleColumns)) 
-                            <td class="pos-grid-td" style="font-weight: 500;">
-                                <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2;">
+                            <td class="pos-grid-td" style="font-weight: 500; min-width: 20rem;">
+                                <div style="white-space: normal; word-break: break-word; line-height: 1.35;">
                                     {{ $item['name'] }}
                                 </div>
                             </td> 

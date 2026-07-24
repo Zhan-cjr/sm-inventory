@@ -198,10 +198,10 @@
         <table style="width: 100%; border-collapse: collapse; text-align: left;">
             <thead style="position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);">
                 <tr>
-                    <th class="pos-grid-th" style="width: 3rem; text-align: center;">No</th>
-                    @if(in_array('sku', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">SKU</th> @endif
-                    @if(in_array('barcode', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">Barcode</th> @endif
-                    @if(in_array('name', $visibleColumns)) <th class="pos-grid-th">Nama Produk</th> @endif
+                    <th class="pos-grid-th" style="width: 2.5rem; text-align: center;">No</th>
+                    @if(in_array('sku', $visibleColumns)) <th class="pos-grid-th" style="width: 8.5rem;">SKU</th> @endif
+                    @if(in_array('barcode', $visibleColumns)) <th class="pos-grid-th" style="width: 9.5rem;">Barcode</th> @endif
+                    @if(in_array('name', $visibleColumns)) <th class="pos-grid-th" style="min-width: 20rem; width: 32%;">Nama Produk</th> @endif
                     @if(in_array('stock', $visibleColumns)) <th class="pos-grid-th" style="width: 6rem; text-align: right;">Stok Awal</th> @endif
                     @if(in_array('qty', $visibleColumns)) <th class="pos-grid-th" style="width: 7rem; text-align: right;">Qty Koreksi</th> @endif
                     @if(in_array('new_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 6rem; text-align: right;">Stok Akhir</th> @endif
