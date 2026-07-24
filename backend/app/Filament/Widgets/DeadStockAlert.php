@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Stock;
+use Filament\Actions\Action;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
@@ -66,7 +67,7 @@ class DeadStockAlert extends BaseWidget
                     ->color('danger'),
             ])
             ->actions([
-                Tables\Actions\Action::make('create_promo')
+                Action::make('create_promo')
                     ->label('Buat Diskon Clearance')
                     ->icon('heroicon-o-tag')
                     ->color('warning')
@@ -77,7 +78,7 @@ class DeadStockAlert extends BaseWidget
                             'organization_id' => $orgId,
                             'name' => 'Diskon Obral Clearance: ' . $record->product->name,
                             'promo_type' => 'PERCENTAGE',
-                            'discount_value' => 20, // Default 20% clearance discount
+                            'discount_value' => 20,
                             'applicable_to' => 'PRODUCT',
                             'target_ids' => [$record->product_id],
                             'valid_from' => now(),

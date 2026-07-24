@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Stock;
+use Filament\Actions\Action;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
@@ -56,7 +57,7 @@ class LowStockAlert extends BaseWidget
                     ->formatStateUsing(fn ($state) => $state ?? 10),
             ])
             ->actions([
-                Tables\Actions\Action::make('restock_po')
+                Action::make('restock_po')
                     ->label('Saran Restock AI')
                     ->icon('heroicon-o-shopping-cart')
                     ->color('success')
