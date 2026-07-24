@@ -3353,16 +3353,16 @@ export const POSTransaction = ({
         </div>
       )}
 
-      <div className="pos-main-layout">
-        <main className="pos-cart-container" style={{ position: 'relative', zIndex: 10 }}>
+      <div className="pos-main-layout" style={{ flex: 1, height: 'calc(100vh - 65px)', overflow: 'hidden', minHeight: 0 }}>
+        <main className="pos-cart-container" style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
 
-          <div className="cart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+          <div className="cart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexShrink: 0 }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}><ShoppingCart size={20} /> Keranjang Belanja</h3>
             <span className="item-count">{items.length} Items</span>
           </div>
 
           {/* TOP BARCODE SCANNER INPUT AREA */}
-          <div className="barcode-input-wrapper-top" style={{ marginBottom: '1rem', position: 'relative', zIndex: 9999 }}>
+          <div className="barcode-input-wrapper-top" style={{ marginBottom: '1rem', position: 'relative', zIndex: 9999, flexShrink: 0 }}>
             <div className="input-icon" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)', zIndex: 5 }}>
               <Search size={22} />
             </div>
@@ -3462,7 +3462,7 @@ export const POSTransaction = ({
             )}
           </div>
 
-          <div className="cart-table-wrapper" style={{ flex: 1 }}>
+          <div className="cart-table-wrapper" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
             <table className="modern-table">
               <thead>
                 <tr>
@@ -3511,7 +3511,7 @@ export const POSTransaction = ({
           </div>
 
           {/* BOTTOM SUMMARY BAR */}
-          <div className="bottom-summary-bar fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', background: 'rgba(5, 150, 105, 0.08)', padding: '1rem 1.25rem', borderRadius: '14px', border: '1.5px solid rgba(5, 150, 105, 0.3)' }}>
+          <div className="bottom-summary-bar fade-in" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', background: 'rgba(5, 150, 105, 0.08)', padding: '1rem 1.25rem', borderRadius: '14px', border: '1.5px solid rgba(5, 150, 105, 0.3)' }}>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--border-light)', paddingBottom: '0.5rem' }}>
               <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.95rem', color: 'var(--text-main)' }}>
@@ -3585,7 +3585,7 @@ export const POSTransaction = ({
           </div>
         </main>
 
-        <aside className="pos-functions-sidebar" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <aside className="pos-functions-sidebar" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%', minHeight: 0, overflowY: 'auto' }}>
           <div className="function-grid" style={{ display: 'grid', gap: '8px', gridTemplateColumns: 'repeat(4, 1fr)', alignContent: 'start' }}>
             {/* Row 1: Bayar */}
             <button className={`func-btn payment ${paymentMethod === 'CASH' ? 'active' : ''}`} onClick={() => startPayment('CASH')}><Banknote size={16} />{renderBtnLabel('btn_tunai', 'Tunai', 'F5')}</button>
