@@ -327,7 +327,7 @@
                 Pilih Kolom
             </button>
             <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 12rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
-                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'avg_bln' => 'Rata Jual/Bln', 'avg_minggu' => 'Rata Jual/Mgg', 'stock' => 'Stok', 'min_qty' => 'Min Qty', 'max_qty' => 'Max Qty', 'qty_saran' => 'Qty Saran', 'qty' => 'Qty Pesan', 'unit_cost' => 'Harga Satuan', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
+                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'avg_bln' => 'Sales 30 HR', 'avg_minggu' => 'Sales 7 HR', 'stock' => 'Stok', 'min_qty' => 'Min Qty', 'max_qty' => 'Max Qty', 'qty_saran' => 'Qty Saran', 'qty' => 'Qty Pesan', 'unit_cost' => 'Harga Satuan', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
                     <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                         <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
                         <span class="text-xs">{{ $label }}</span>
@@ -346,8 +346,8 @@
                     @if(in_array('sku', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">SKU</th> @endif
                     @if(in_array('barcode', $visibleColumns)) <th class="pos-grid-th" style="width: 12%;">Barcode</th> @endif
                     @if(in_array('name', $visibleColumns)) <th class="pos-grid-th">Nama Produk</th> @endif
-                    @if(in_array('avg_bln', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Rata/Bln</th> @endif
-                    @if(in_array('avg_minggu', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Rata/Mgg</th> @endif
+                    @if(in_array('avg_bln', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Sales 30 HR</th> @endif
+                    @if(in_array('avg_minggu', $visibleColumns)) <th class="pos-grid-th" style="width: 5.5rem; text-align: right;">Sales 7 HR</th> @endif
                     @if(in_array('stock', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Stok</th> @endif
                     @if(in_array('min_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Min</th> @endif
                     @if(in_array('max_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Max</th> @endif
