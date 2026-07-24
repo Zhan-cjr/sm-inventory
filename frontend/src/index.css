@@ -1,23 +1,23 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg-dark: #0b1121;
-  /* Deep Navy */
-  --bg-card: rgba(11, 17, 33, 0.7);
-  --primary: #242A7A;
-  /* Deep Blue from Logo */
-  --primary-hover: #1b205d;
-  --secondary: #475569;
-  --secondary-hover: #334155;
-  --accent: #9DC31A;
-  /* Lime Green from Logo */
-  --accent-hover: #86a616;
-  --danger: #E60012;
-  /* Vibrant Red from Logo */
-  --danger-hover: #b3000e;
+  --bg-dark: #06111e;
+  /* Deep Slate Navy */
+  --bg-card: rgba(6, 17, 30, 0.85);
+  --primary: #059669;
+  /* Enterprise Emerald */
+  --primary-hover: #047857;
+  --secondary: #334155;
+  --secondary-hover: #1e293b;
+  --accent: #10b981;
+  /* Emerald Mint Glow */
+  --accent-hover: #059669;
+  --danger: #ef4444;
+  /* Vibrant Rose Red */
+  --danger-hover: #dc2626;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --border-light: var(--glass-white-10);
+  --border-light: rgba(255, 255, 255, 0.1);
   /* Theme System Variables */
   --glass-white-02: var(--glass-white-02);
   --glass-white-03: var(--glass-white-03);
@@ -175,20 +175,20 @@
 
 [data-theme="light"] .func-btn {
   font-weight: 700;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  box-shadow: none;
 }
 
 [data-theme="light"] .func-btn:hover {
   transform: translateY(-3px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   filter: brightness(0.95);
 }
 
 [data-theme="light"] .pos-cart-container,
 [data-theme="light"] .pos-functions-sidebar {
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
   background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 [data-theme="light"] .btn-logout-icon {
@@ -198,7 +198,7 @@
 
 [data-theme="light"] .pos-functions-sidebar {
   background: rgba(0, 0, 0, 0.03);
-  box-shadow: -5px 0 25px rgba(22, 101, 52, 0.03);
+  box-shadow: none;
   border-left: 1px solid rgba(22, 101, 52, 0.05);
 }
 
@@ -250,7 +250,7 @@ body {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-white-10);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: none;
 }
 
 /* Micro Animations */
@@ -639,7 +639,8 @@ body {
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
 
 .cart-header {
@@ -1018,17 +1019,20 @@ body {
 /* Floating Search Results */
 .search-results-floating {
   position: absolute;
-  bottom: 80px;
-  left: 1rem;
-  width: 490px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-light);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px var(--glass-black-50);
-  z-index: 1000;
-  overflow: hidden;
-  max-height: 300px;
+  top: 100% !important;
+  bottom: auto !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 2px solid #059669 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4) !important;
+  z-index: 99999 !important;
+  max-height: 320px;
   overflow-y: auto;
+  margin-top: 6px;
 }
 
 .search-item {
