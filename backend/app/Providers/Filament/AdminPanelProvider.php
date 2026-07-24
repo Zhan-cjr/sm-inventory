@@ -31,20 +31,23 @@ class AdminPanelProvider extends PanelProvider
             ->login(\App\Filament\Pages\Auth\CustomLogin::class)
             ->passwordReset(\App\Filament\Pages\Auth\CustomPasswordReset::class)
             ->colors([
-                'primary' => Color::Indigo,
-                'gray'    => Color::Slate,
+                'primary' => Color::Emerald,
+                'gray'    => Color::Zinc,
                 'success' => Color::Emerald,
                 'warning' => Color::Amber,
                 'danger'  => Color::Rose,
                 'info'    => Color::Sky,
             ])
-            ->brandName('SM Inventory')
+            ->brandName('SM Inventory ERP')
             ->brandLogo(fn () => view('filament.brand'))
             ->favicon(asset('favicon.png'))
-            ->font('Plus Jakarta Sans', 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap')
-            ->topNavigation()
+            ->font('Plus Jakarta Sans', 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap')
+            ->sidebarCollapsibleOnDesktop()
+            ->sidebarWidth('17rem')
+            ->maxContentWidth(\Filament\Support\Enums\Width::Full)
             ->spa()
             ->databaseNotifications()
+            ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->navigationGroups([
                 'FILE',
                 'OPERATOR',
@@ -63,6 +66,10 @@ class AdminPanelProvider extends PanelProvider
                     ->sort(3)
                     ->url('/admin/logout-get'),
             ])
+            ->renderHook(
+                'panels::global-search.before',
+                fn (): string => view('filament.components.header-shortcuts')->render(),
+            )
             ->renderHook(
                 'panels::head.end',
                 fn (): string => '<link rel="stylesheet" href="/css/admin-custom.css?v=' . filemtime(public_path('css/admin-custom.css')) . '">' . view('filament.print-styles')->render(),

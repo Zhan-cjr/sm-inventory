@@ -62,6 +62,7 @@ class ProductsTable
             ->columns([
                 ImageColumn::make('image_path')
                     ->label('Foto')
+                    ->disk('public')
                     ->square(),
                 TextColumn::make('sku')
                     ->label('SKU')
