@@ -15,7 +15,7 @@ class LowStockAlert extends BaseWidget
 
     protected static ?int $sort = 5;
     protected int | string | array $columnSpan = 'full';
-    protected static ?string $heading = 'Peringatan Stok Menipis';
+    protected static ?string $heading = 'Peringatan Stok Menipis & Kritis';
 
     public function table(Table $table): Table
     {
@@ -23,6 +23,7 @@ class LowStockAlert extends BaseWidget
 
         $query = Stock::query()
             ->with(['product', 'branch'])
+            ->where('is_active', true)
             ->whereRaw('quantity_on_hand <= COALESCE(min_qty, 10)')
             ->orderBy('quantity_on_hand', 'asc')
             ->limit(10);
@@ -39,19 +40,29 @@ class LowStockAlert extends BaseWidget
                     ->searchable(),
                 Tables\Columns\TextColumn::make('product.name')
                     ->label('Produk')
-                    ->searchable(),
+                    ->searchable()
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('branch.name')
                     ->label('Cabang')
                     ->visible(fn () => auth()->user()->branch_id === null),
                 Tables\Columns\TextColumn::make('quantity_on_hand')
                     ->label('Sisa Stok')
-                    ->numeric()
+                    ->numeric(decimalPlaces: 0)
                     ->badge()
                     ->color('danger'),
                 Tables\Columns\TextColumn::make('min_qty')
                     ->label('Batas Minimum')
-                    ->numeric()
+                    ->numeric(decimalPlaces: 0)
                     ->formatStateUsing(fn ($state) => $state ?? 10),
+            ])
+            ->actions([
+                Tables\Actions\Action::make('restock_po')
+                    ->label('Saran Restock AI')
+                    ->icon('heroicon-o-shopping-cart')
+                    ->color('success')
+                    ->action(function ($record) {
+                        return redirect()->to(route('filament.admin.pages.suggested-orders'));
+                    }),
             ])
             ->paginated(false);
     }
