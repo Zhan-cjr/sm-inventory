@@ -55,15 +55,16 @@ def run_market_basket_analysis():
         basket_sets = basket > 0
         
         # We need at least some transactions to find patterns
-        if len(basket_sets) < 2:
-            return []
+        # Calculate dynamic min_support so retail stores with large catalog don't filter out valid pairs
+        total_tx = len(basket_sets)
+        min_support_val = max(2.0 / total_tx, 0.0005)
 
-        frequent_itemsets = apriori(basket_sets, min_support=0.01, use_colnames=True)
+        frequent_itemsets = apriori(basket_sets, min_support=min_support_val, use_colnames=True)
         
         if frequent_itemsets.empty:
             return []
             
-        rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1.0)
+        rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=0.10)
         
         # Sort by confidence and lift
         rules = rules.sort_values(['confidence', 'lift'], ascending=[False, False])
