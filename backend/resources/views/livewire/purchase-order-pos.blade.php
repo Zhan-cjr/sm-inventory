@@ -490,7 +490,7 @@
 @if($showZeroQtyModal)
     <div class="pos-modal-overlay">
         <div class="pos-modal-card">
-            <div style="display: flex; align-items: flex-start; gap: 1rem;">
+            <div style="display: flex; align-items: flex-start; gap: 1rem; flex-shrink: 0;">
                 <div class="pos-modal-icon-bg">
                     <svg style="width: 24px; height: 24px; min-width: 24px; min-height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
@@ -498,12 +498,29 @@
                 </div>
                 <div style="flex: 1 1 0%;">
                     <h3 class="pos-modal-title">Kuantitas masih 0</h3>
-                    <p class="pos-modal-body">
-                        Qty produk <span class="pos-modal-highlight">"{{ $zeroQtyProductNames }}"</span> masih 0 (kosong).
+                    <p class="pos-modal-body" style="margin-top: 0.25rem;">
+                        Terdapat produk dengan kuantitas 0 (kosong) di keranjang. Anda dapat menghapus semua produk tersebut atau membatalkan untuk mengedit.
                     </p>
                 </div>
             </div>
-            <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+
+            <div class="pos-modal-list-container">
+                <div style="font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 0.5rem;" class="dark:text-gray-400">
+                    Daftar Produk (Qty = 0):
+                </div>
+                <div class="pos-modal-list">
+                    @php
+                        $productsArray = array_filter(array_map('trim', explode(',', $zeroQtyProductNames)));
+                    @endphp
+                    <ul style="margin: 0; padding-left: 1.25rem; list-style-type: disc;">
+                        @foreach($productsArray as $prodName)
+                            <li style="margin-bottom: 0.25rem; word-break: break-word;">{{ $prodName }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+
+            <div class="pos-modal-footer">
                 <button wire:click="$set('showZeroQtyModal', false)" type="button" class="pos-btn-cancel">
                     Cancel
                 </button>
@@ -525,7 +542,7 @@
     .pos-modal-overlay {
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999999;
         display: flex; align-items: center; justify-content: center;
-        background-color: rgba(0, 0, 0, 0.3) !important;
+        background-color: rgba(0, 0, 0, 0.4) !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
         filter: none !important;
@@ -534,7 +551,8 @@
     .pos-modal-card {
         background-color: #ffffff; border-radius: 0.75rem;
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
-        border: 1px solid #e5e7eb; max-width: 28rem; width: 100%; padding: 1.5rem; color: #1f2937;
+        border: 1px solid #e5e7eb; max-width: 32rem; width: 100%; max-height: 85vh; padding: 1.5rem; color: #1f2937;
+        display: flex; flex-direction: column; gap: 1rem;
     }
     .dark .pos-modal-card {
         background-color: #1f2937 !important; border-color: #374151 !important; color: #f3f4f6 !important;
@@ -552,6 +570,39 @@
     .dark .pos-modal-body { color: #d1d5db !important; }
     .pos-modal-highlight { font-weight: 600; color: #111827; }
     .dark .pos-modal-highlight { color: #f9fafb !important; }
+
+    .pos-modal-list-container {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    .pos-modal-list {
+        max-height: 240px;
+        overflow-y: auto;
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+        color: #374151;
+    }
+    .dark .pos-modal-list {
+        background-color: #111827 !important;
+        border-color: #374151 !important;
+        color: #d1d5db !important;
+    }
+    .pos-modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e5e7eb;
+        flex-shrink: 0;
+    }
+    .dark .pos-modal-footer {
+        border-color: #374151 !important;
+    }
     
     .pos-btn-cancel {
         padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; color: #374151;
