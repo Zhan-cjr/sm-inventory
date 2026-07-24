@@ -48,8 +48,8 @@ class ManageMarketBasketRules extends ManageRecords
                     $rulesCount = $this->runDatabaseMarketBasketAnalysis();
 
                     \Filament\Notifications\Notification::make()
-                        ->title('Analisis Pola Belanja (Database Engine) Selesai!')
-                        ->body("Berhasil memperbarui {$rulesCount} pasangan pola produk bundling berdasarkan transaksi penjualan.")
+                        ->title('Analisis Pola Belanja Selesai!')
+                        ->body("Berhasil menyaring {$rulesCount} pasangan pola produk bundling berkualitas tinggi.")
                         ->success()
                         ->send();
                 }),
@@ -93,24 +93,40 @@ class ManageMarketBasketRules extends ManageRecords
         }
 
         $productsMap = Product::pluck('name', 'id')->toArray();
+        
+        // Truncate old rules before populating new high-confidence rules
+        MarketBasketRule::query()->delete();
         $savedCount = 0;
 
         foreach ($pairCounts as $key => $pairFreq) {
-            if ($pairFreq < 2) continue;
+            // Must occur together in at least 3 separate transactions
+            if ($pairFreq < 3) continue;
 
             [$antId, $conId] = explode('___', $key);
 
             if (!isset($productsMap[$antId]) || !isset($productsMap[$conId])) continue;
 
-            $support = round($pairFreq / $totalTransactions, 4);
             $antFreq = $itemCounts[$antId] ?? 1;
-            $conFreq = $itemCounts[$conId] ?? 1;
+            
+            // Antecedent item must have been bought in at least 5 transactions
+            if ($antFreq < 5) continue;
+
+            $support = round($pairFreq / $totalTransactions, 4);
+            
+            // Minimum support threshold 0.2% (0.002)
+            if ($support < 0.002) continue;
 
             $confidence = round($pairFreq / $antFreq, 4);
+            
+            // Minimum confidence threshold 25% (0.25)
+            if ($confidence < 0.25) continue;
+
+            $conFreq = $itemCounts[$conId] ?? 1;
             $conSupport = $conFreq / $totalTransactions;
             $lift = round($confidence / ($conSupport > 0 ? $conSupport : 1), 2);
 
-            if ($confidence >= 0.15 && $lift >= 1.0) {
+            // Lift must be between 1.15 and 50.0 to exclude absurd single-tx spikes
+            if ($lift >= 1.15 && $lift <= 50.0) {
                 MarketBasketRule::updateOrCreate(
                     [
                         'antecedent_id' => $antId,
