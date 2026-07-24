@@ -4,15 +4,12 @@ namespace App\Filament\Resources\MarketBasketRules;
 
 use App\Filament\Resources\MarketBasketRules\Pages\ManageMarketBasketRules;
 use App\Models\MarketBasketRule;
+use App\Models\Promotion;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
-use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -42,36 +39,31 @@ class MarketBasketRuleResource extends Resource
                 TextColumn::make('antecedent_name')
                     ->label('Barang Utama')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->wrap(),
                 TextColumn::make('consequent_name')
                     ->label('Barang Pendamping')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->wrap(),
                 TextColumn::make('support')
                     ->label('Frekuensi (Support)')
-                    ->numeric(
-                        decimalPlaces: 4,
-                    )
+                    ->formatStateUsing(fn ($state) => number_format($state * 100, 2) . '%')
                     ->sortable()
                     ->badge()
                     ->color('info'),
                 TextColumn::make('confidence')
                     ->label('Kepastian (Confidence)')
-                    ->numeric(
-                        decimalPlaces: 2,
-                    )
-                    ->formatStateUsing(fn ($state) => ($state * 100) . '%')
+                    ->formatStateUsing(fn ($state) => number_format($state * 100, 1) . '%')
                     ->sortable()
                     ->badge()
                     ->color('success'),
                 TextColumn::make('lift')
                     ->label('Kekuatan Hubungan (Lift)')
-                    ->numeric(
-                        decimalPlaces: 2,
-                    )
+                    ->numeric(decimalPlaces: 2)
                     ->sortable()
                     ->badge()
-                    ->color('warning'),
+                    ->color(fn ($state) => $state >= 1.5 ? 'success' : ($state >= 1.0 ? 'warning' : 'gray')),
                 TextColumn::make('created_at')
                     ->label('Dianalisis Pada')
                     ->dateTime()
@@ -79,11 +71,39 @@ class MarketBasketRuleResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('confidence', 'desc')
-            ->filters([
-                //
-            ])
             ->actions([
-                // No individual actions
+                Action::make('create_bundling_promo')
+                    ->label('Buat Promo Bundling')
+                    ->icon('heroicon-o-sparkles')
+                    ->color('success')
+                    ->action(function (MarketBasketRule $record) {
+                        $orgId = auth()->user()->organization_id ?? \App\Models\Organization::first()?->id;
+                        
+                        $promo = Promotion::create([
+                            'organization_id' => $orgId,
+                            'name' => 'Paket Bundling: ' . $record->antecedent_name . ' + ' . $record->consequent_name,
+                            'promo_type' => 'BUNDLING',
+                            'discount_value' => 10,
+                            'applicable_to' => 'PRODUCT',
+                            'target_ids' => [$record->antecedent_id, $record->consequent_id],
+                            'valid_from' => now(),
+                            'valid_until' => now()->addDays(30),
+                            'is_active' => true,
+                            'promo_config' => [
+                                'buy_product_id' => $record->antecedent_id,
+                                'get_product_id' => $record->consequent_id,
+                                'buy_qty' => 1,
+                                'get_qty' => 1,
+                            ],
+                        ]);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Draft Promosi Bundling berhasil dibuat!')
+                            ->success()
+                            ->send();
+
+                        return redirect()->to(route('filament.admin.resources.promotions.edit', $promo));
+                    }),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
