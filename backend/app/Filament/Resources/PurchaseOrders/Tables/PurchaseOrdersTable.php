@@ -22,26 +22,41 @@ class PurchaseOrdersTable
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('organization.name')
-                    ->searchable(),
+                    ->label('Organisasi')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('branch.name')
-                    ->searchable(),
+                    ->label('Cabang')
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('supplier.name')
-                    ->searchable(),
+                    ->label('Pemasok')
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('po_number')
-                    ->searchable(),
+                    ->label('No. PO')
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('po_date')
+                    ->label('Tgl PO')
                     ->date()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('expected_delivery_date')
+                    ->label('Tgl Pengiriman')
                     ->date()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('expired_date')
                     ->label('Tgl Kedaluwarsa')
                     ->date()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('status')
+                    ->label('Status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'draft' => 'gray',
@@ -50,7 +65,8 @@ class PurchaseOrdersTable
                         'rejected' => 'danger',
                         default => 'primary',
                     })
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('computed_approver_name')
                     ->label('Diperiksa Oleh')
                     ->state(function ($record) {
@@ -58,7 +74,8 @@ class PurchaseOrdersTable
                         return $latestApproval && $latestApproval->status !== 'pending' 
                             ? $latestApproval->user?->name 
                             : '-';
-                    }),
+                    })
+                    ->toggleable(),
                 TextColumn::make('computed_approval_notes')
                     ->label('Catatan Approval')
                     ->state(function ($record) {
@@ -67,18 +84,24 @@ class PurchaseOrdersTable
                             ? $latestApproval->notes 
                             : '-';
                     })
-                    ->limit(50),
+                    ->limit(50)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('total_amount')
+                    ->label('Total Nominal')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('creator.name')
                     ->label('Dibuat Oleh')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('created_at')
+                    ->label('Dibuat Pada')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
+                    ->label('Diperbarui Pada')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

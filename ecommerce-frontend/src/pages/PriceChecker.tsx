@@ -2,7 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useEcom, Branch } from '../context/EcomContext';
 import { useSearchParams } from 'react-router-dom';
-import { ScanBarcode, AlertCircle, Loader2, Info, Building2, Tag, ChevronDown, MapPin, X, Keyboard, CreditCard, Package, Maximize, Minimize } from 'lucide-react';
+import { 
+  ScanBarcode, 
+  AlertCircle, 
+  Info, 
+  Building2, 
+  Tag, 
+  ChevronDown, 
+  MapPin, 
+  X, 
+  Keyboard, 
+  CreditCard, 
+  Package, 
+  Maximize, 
+  Minimize,
+  Sparkles,
+  Sun,
+  Moon
+} from 'lucide-react';
 import { ProductImage } from '../components/ProductImage';
 import { VirtualKeyboard } from '../components/kiosk/VirtualKeyboard';
 import { VirtualNumpad } from '../components/kiosk/VirtualNumpad';
@@ -25,13 +42,22 @@ const PriceChecker: React.FC = () => {
   const [promoProducts, setPromoProducts] = useState<any[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  // New Kiosk States
+  // Kiosk & Theme States
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('kiosk_theme') as 'dark' | 'light') || 'dark';
+  });
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [bgImageIndex, setBgImageIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('kiosk_theme', newTheme);
+  };
 
   // Background Slideshow
   useEffect(() => {
@@ -86,15 +112,15 @@ const PriceChecker: React.FC = () => {
     fetchPromos();
   }, [activeBranchId]);
 
-  // Keep focus on input
+  // Keep focus on hidden barcode scanner input
   useEffect(() => {
     const focusInterval = setInterval(() => {
-      if (inputRef.current && document.activeElement !== inputRef.current) {
+      if (inputRef.current && document.activeElement !== inputRef.current && !showBranchModal && !showSearchModal && !showMemberModal) {
         inputRef.current.focus();
       }
     }, 1000);
     return () => clearInterval(focusInterval);
-  }, []);
+  }, [showBranchModal, showSearchModal, showMemberModal]);
 
   const resetToIdle = () => {
     setProduct(null);
@@ -107,7 +133,7 @@ const PriceChecker: React.FC = () => {
     if (idleTimer) clearTimeout(idleTimer);
     const timer = setTimeout(() => {
       resetToIdle();
-    }, 15000); // 15 seconds
+    }, 15000);
     setIdleTimer(timer);
   };
 
@@ -122,14 +148,14 @@ const PriceChecker: React.FC = () => {
       
       if (success) {
         oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
+        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
         gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
         oscillator.start();
         oscillator.stop(audioCtx.currentTime + 0.1);
       } else {
         oscillator.type = 'sawtooth';
-        oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); // Low buzz
+        oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
         gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
         oscillator.start();
@@ -163,14 +189,13 @@ const PriceChecker: React.FC = () => {
   const handleSearchManual = async (keyword: string) => {
     setShowSearchModal(false);
     if (!keyword.trim()) return;
-    setBarcode(keyword); // Fallback to simulate barcode change
+    setBarcode(keyword);
     
     setLoading(true);
     setError(null);
     setProduct(null);
 
     try {
-      // First attempt to search by name/sku in products endpoint
       const response = await axios.get('/ecommerce/products', {
         params: {
           search: keyword.trim(),
@@ -178,7 +203,6 @@ const PriceChecker: React.FC = () => {
         }
       });
       if (response.data && response.data.length > 0) {
-        // Just take the first match and run check-price to get full details
         const firstMatch = response.data[0];
         const detailRes = await axios.get('/ecommerce/check-price', {
           params: { barcode: firstMatch.sku || firstMatch.barcode || firstMatch.id, branch_id: activeBranchId }
@@ -242,198 +266,240 @@ const PriceChecker: React.FC = () => {
     }).format(Number(price));
   };
 
+  const isDark = theme === 'dark';
+
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center relative overflow-hidden font-sans select-none">
+    <div className={`min-h-screen ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'} flex flex-col items-center justify-center relative overflow-hidden font-sans select-none transition-colors duration-300`}>
       
-      {/* Background Decor & Slideshow */}
-      <div className="absolute inset-0 z-0 opacity-30 pointer-events-none transition-all duration-1000">
+      {/* Ambient Lighting & Background Effects */}
+      <div className="absolute inset-0 z-0 opacity-40 pointer-events-none transition-all duration-1000">
         {!product && !error && promoProducts.length > 0 ? (
            <div className="absolute inset-0 animate-in fade-in duration-1000">
               <ProductImage 
                 src={promoProducts[bgImageIndex]?.image_url} 
                 alt="Promo Background" 
-                className="w-full h-full object-cover opacity-20 scale-105" 
+                className="w-full h-full object-cover opacity-15 scale-105 filter blur-sm" 
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent"></div>
+              <div className={`absolute inset-0 bg-gradient-to-t ${isDark ? 'from-slate-950 via-slate-950/80' : 'from-slate-100 via-slate-100/80'} to-transparent`}></div>
            </div>
         ) : (
           <>
-            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-brand-blue rounded-full mix-blend-screen filter blur-[100px] animate-pulse"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-brand-green rounded-full mix-blend-screen filter blur-[100px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+            <div className={`absolute top-[-10%] left-[-10%] w-[55%] h-[55%] ${isDark ? 'bg-emerald-600/30' : 'bg-emerald-400/20'} rounded-full mix-blend-screen filter blur-[120px] animate-pulse`}></div>
+            <div className={`absolute bottom-[-10%] right-[-10%] w-[55%] h-[55%] ${isDark ? 'bg-indigo-600/30' : 'bg-indigo-400/20'} rounded-full mix-blend-screen filter blur-[120px] animate-pulse`} style={{ animationDelay: '2s' }}></div>
           </>
         )}
       </div>
 
-      {/* Top Bar for Branch Info & Clock */}
-      <div className="absolute top-0 left-0 right-0 p-6 z-20 flex justify-between items-start text-white/50">
+      {/* Header Bar */}
+      <header className="absolute top-0 left-0 right-0 p-6 z-20 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => setShowBranchModal(true)}
-            className="flex items-center gap-3 bg-white/10 hover:bg-white/20 transition-colors px-4 py-2 rounded-xl backdrop-blur-md border border-white/10 cursor-pointer shadow-lg"
+            className={`flex items-center gap-3 ${isDark ? 'bg-white/10 hover:bg-white/20 border-white/15 text-white' : 'bg-slate-900/10 hover:bg-slate-900/15 border-slate-300 text-slate-900'} transition-all px-5 py-3 rounded-2xl backdrop-blur-xl border cursor-pointer shadow-xl active:scale-95`}
           >
-            <Building2 size={24} className="text-white" />
-            <span className="text-xl font-bold tracking-wide uppercase text-white">{activeBranchName}</span>
-            <ChevronDown size={20} className="text-white/70" />
+            <Building2 size={22} className="text-emerald-500" />
+            <div className="flex flex-col text-left">
+              <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'} font-medium uppercase tracking-wider`}>Lokasi Kiosk</span>
+              <span className="text-lg font-black tracking-wide uppercase leading-tight">{activeBranchName}</span>
+            </div>
+            <ChevronDown size={18} className="opacity-70 ml-1" />
           </button>
-          
+
+          {/* Theme Toggle Button */}
+          <button 
+            onClick={toggleTheme}
+            className={`flex items-center gap-2 ${isDark ? 'bg-white/10 hover:bg-white/20 border-white/15 text-amber-400' : 'bg-slate-900/10 hover:bg-slate-900/15 border-slate-300 text-amber-600'} transition-all p-3.5 rounded-2xl backdrop-blur-xl border cursor-pointer shadow-xl active:scale-95`}
+            title={isDark ? "Mode Terang" : "Mode Gelap"}
+            aria-label="Toggle Theme"
+          >
+            {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+
+          {/* Fullscreen Button */}
           <button 
             onClick={toggleFullscreen}
-            className="bg-white/10 hover:bg-white/20 transition-colors p-3 rounded-xl backdrop-blur-md border border-white/10 cursor-pointer shadow-lg text-white"
+            className={`${isDark ? 'bg-white/10 hover:bg-white/20 border-white/15 text-white' : 'bg-slate-900/10 hover:bg-slate-900/15 border-slate-300 text-slate-900'} transition-all p-3.5 rounded-2xl backdrop-blur-xl border cursor-pointer shadow-xl active:scale-95`}
             title="Toggle Fullscreen"
           >
             {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
           </button>
         </div>
-        
-        <div className="flex flex-col items-end gap-2">
-          <div className="text-sm font-mono tracking-widest uppercase bg-black/30 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/5">
-            Toserba Selamat Kiosk
+
+        {/* Live Clock & Status */}
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 px-4 py-2 rounded-xl text-emerald-500 font-bold text-xs tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            KIOSK ONLINE
           </div>
-          <div className="text-right bg-black/20 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/5">
-            <div className="text-2xl font-bold text-white tracking-wider">
-              {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+          
+          <div className={`flex flex-col items-end ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-slate-900/5 border-slate-200 text-slate-900'} border px-5 py-2.5 rounded-2xl backdrop-blur-xl shadow-lg`}>
+            <div className="text-2xl font-black tracking-wider font-mono">
+              {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </div>
-            <div className="text-xs text-slate-300 uppercase tracking-widest">
+            <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'} uppercase tracking-widest font-semibold`}>
               {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className={`z-10 w-full max-w-5xl px-8 flex flex-col items-center transition-all duration-700 ${(!product && !error && promoProducts.length > 0) ? 'mb-40 md:mb-56' : ''}`}>
+      {/* Main Kiosk Viewport */}
+      <div className={`z-10 w-full max-w-5xl px-6 flex flex-col items-center transition-all duration-700 ${(!product && !error && promoProducts.length > 0) ? 'mb-40 md:mb-52' : ''}`}>
         
+        {/* IDLE SCANNER HUB */}
         {!product && !error && !loading && (
           <div className="text-center animate-in fade-in slide-in-from-bottom-8 duration-700 flex flex-col items-center">
-            <div className="bg-white/10 p-12 rounded-full mb-12 backdrop-blur-md shadow-2xl border border-white/10 relative">
-              <div className="absolute inset-0 bg-brand-blue rounded-full animate-ping opacity-20"></div>
-              <ScanBarcode size={120} className="text-white" strokeWidth={1.5} />
+            
+            {/* Viewfinder Reticle Frame */}
+            <div className="relative mb-10 group cursor-pointer" onClick={() => inputRef.current?.focus()}>
+              <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-[3rem] blur-xl opacity-30 group-hover:opacity-50 transition duration-500"></div>
+              
+              <div className={`relative ${isDark ? 'bg-slate-900/90 border-emerald-500/50 shadow-[0_0_60px_rgba(16,185,129,0.25)]' : 'bg-white/95 border-emerald-500/60 shadow-[0_10px_40px_rgba(16,185,129,0.2)]'} border-2 p-12 md:p-14 rounded-[2.5rem] backdrop-blur-2xl flex flex-col items-center overflow-hidden transition-colors duration-300`}>
+                {/* Pulsing Laser Bar */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_#10b981] animate-[scanLaser_2.5s_ease-in-out_infinite]"></div>
+                
+                <ScanBarcode size={110} className="text-emerald-500 transition-transform group-hover:scale-110 duration-300" strokeWidth={1.5} />
+              </div>
             </div>
-            <h1 className="text-6xl md:text-7xl font-black text-white mb-6 tracking-tight drop-shadow-xl">
-              CEK HARGA
+
+            <h1 className={`text-5xl md:text-7xl font-black ${isDark ? 'text-white' : 'text-slate-900'} mb-5 tracking-tight drop-shadow-2xl`}>
+              CEK HARGA & PROMO
             </h1>
-            <p className="text-2xl text-slate-300 font-medium max-w-2xl leading-relaxed drop-shadow-md mb-12">
-              Arahkan barcode produk ke alat pemindai (scanner) di bawah layar untuk mengetahui harga dan promo terbaru.
+            <p className={`text-xl md:text-2xl ${isDark ? 'text-slate-300' : 'text-slate-600'} font-medium max-w-2xl leading-relaxed drop-shadow-md mb-10`}>
+              Dekatkan barcode produk ke alat pemindai (scanner) di bawah layar untuk melihat harga dan diskon terbaru.
             </p>
             
-            <div className="flex items-center gap-6">
+            {/* Action Triggers */}
+            <div className="flex items-center gap-5 flex-wrap justify-center">
               <button 
                 onClick={() => setShowSearchModal(true)}
-                className="flex items-center gap-3 bg-white/5 border border-white/20 hover:bg-white/10 px-8 py-4 rounded-2xl text-white font-bold tracking-wide transition-colors"
+                className={`flex items-center gap-3 ${isDark ? 'bg-white/10 hover:bg-white/20 border-white/20 text-white' : 'bg-slate-900/10 hover:bg-slate-900/15 border-slate-300 text-slate-900'} border active:scale-95 px-7 py-4 rounded-2xl font-extrabold tracking-wide transition-all shadow-xl backdrop-blur-md`}
               >
-                <Keyboard size={24} />
-                CARI MANUAL
+                <Keyboard size={22} className="text-indigo-500" />
+                CARI MANUAL (KEYBOARD)
               </button>
               <button 
                 onClick={() => setShowMemberModal(true)}
-                className="flex items-center gap-3 bg-brand-green/20 border border-brand-green/40 hover:bg-brand-green/30 px-8 py-4 rounded-2xl text-white font-bold tracking-wide transition-colors"
+                className={`flex items-center gap-3 ${isDark ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-500/40 text-white' : 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30 text-emerald-950'} border active:scale-95 px-7 py-4 rounded-2xl font-extrabold tracking-wide transition-all shadow-xl backdrop-blur-md`}
               >
-                <CreditCard size={24} className="text-brand-green" />
+                <CreditCard size={22} className="text-emerald-500" />
                 CEK POIN MEMBER
               </button>
             </div>
           </div>
         )}
 
+        {/* LOADING STATE */}
         {loading && (
           <div className="flex flex-col items-center animate-in fade-in duration-300">
-            <Loader2 size={100} className="text-brand-blue animate-spin mb-8" />
-            <h2 className="text-3xl font-bold text-white tracking-widest">MENCARI DATA...</h2>
+            <div className="relative mb-6">
+              <div className="w-24 h-24 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles size={32} className="text-emerald-500 animate-pulse" />
+              </div>
+            </div>
+            <h2 className={`text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'} tracking-widest`}>MEMINDAI DATA PRODUK...</h2>
           </div>
         )}
 
+        {/* ERROR STATE */}
         {error && (
-          <div className="bg-red-500/20 backdrop-blur-xl border-2 border-red-500 p-12 rounded-3xl text-center w-full shadow-[0_0_50px_rgba(239,68,68,0.3)] animate-in zoom-in-95 duration-500">
-            <AlertCircle size={100} className="text-red-400 mx-auto mb-8" />
-            <h2 className="text-4xl font-bold text-white mb-4">MOHON MAAF</h2>
-            <p className="text-2xl text-red-100">{error}</p>
+          <div className={`${isDark ? 'bg-rose-950/80 border-rose-500/50 text-rose-200' : 'bg-rose-50 border-rose-300 text-rose-800'} backdrop-blur-2xl border-2 p-10 rounded-[2.5rem] text-center w-full shadow-2xl animate-in zoom-in-95 duration-500`}>
+            <AlertCircle size={80} className="text-rose-500 mx-auto mb-6" />
+            <h2 className={`text-3xl md:text-4xl font-black ${isDark ? 'text-white' : 'text-slate-900'} mb-3`}>BARANG TIDAK DITEMUKAN</h2>
+            <p className="text-xl max-w-xl mx-auto">{error}</p>
           </div>
         )}
 
+        {/* SCANNED PRODUCT CARD RESULT */}
         {product && (
-          <div className="bg-white rounded-[2.5rem] w-full overflow-hidden shadow-[0_30px_100px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-500 flex flex-col md:flex-row relative">
-            {/* Left Image Section */}
-            <div className="md:w-5/12 bg-slate-50 p-12 flex items-center justify-center relative border-r border-slate-100">
+          <div className={`${isDark ? 'bg-slate-900/90 border-white/15 text-white shadow-[0_30px_100px_rgba(0,0,0,0.6)]' : 'bg-white border-slate-200 text-slate-900 shadow-[0_20px_70px_rgba(0,0,0,0.15)]'} border rounded-[2.5rem] w-full overflow-hidden backdrop-blur-2xl animate-in zoom-in-95 duration-500 flex flex-col md:flex-row relative transition-colors duration-300`}>
+            
+            {/* Left Product Image Section */}
+            <div className={`md:w-5/12 ${isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} p-10 flex items-center justify-center relative border-r`}>
               {product.is_promo && (
-                <div className="absolute top-8 left-8 bg-gradient-to-r from-red-600 to-rose-500 text-white px-6 py-2 rounded-full font-black text-lg shadow-lg flex items-center gap-2 z-10 transform -rotate-2">
-                  <Tag size={20} />
-                  PROMO
+                <div className="absolute top-6 left-6 bg-gradient-to-r from-rose-600 to-red-500 text-white px-5 py-2 rounded-full font-black text-base shadow-xl flex items-center gap-2 z-10 transform -rotate-2">
+                  <Tag size={18} />
+                  PROMO HEBOH
                 </div>
               )}
               <ProductImage 
                 src={product.image_url} 
                 alt={product.name} 
-                className="w-full h-auto max-h-[500px] object-contain drop-shadow-2xl transition-transform hover:scale-105 duration-500 rounded-2xl bg-white"
+                className="w-full h-auto max-h-[440px] object-contain drop-shadow-2xl transition-transform hover:scale-105 duration-500 rounded-2xl"
                 fallbackIconSize={100}
               />
             </div>
 
             {/* Right Details Section */}
-            <div className="md:w-7/12 p-12 md:p-16 flex flex-col justify-center">
-              <div className="text-sm font-bold tracking-widest text-brand-blue uppercase mb-4 flex items-center gap-2">
-                <Info size={18} />
-                {product.ecommerce_category || product.category?.name || 'Kategori Umum'}
-              </div>
-              
-              <h1 className="text-4xl md:text-6xl font-black text-slate-800 mb-8 leading-tight line-clamp-3">
-                {product.name}
-              </h1>
+            <div className="md:w-7/12 p-10 md:p-14 flex flex-col justify-between">
+              <div>
+                <div className="text-xs font-black tracking-widest text-emerald-500 uppercase mb-3 flex items-center gap-2">
+                  <Info size={16} />
+                  {product.ecommerce_category || product.category?.name || 'Kategori Produk'}
+                </div>
+                
+                <h1 className={`text-3xl md:text-5xl font-black ${isDark ? 'text-white' : 'text-slate-900'} mb-6 leading-tight line-clamp-3`}>
+                  {product.name}
+                </h1>
 
-              <div className="mb-10">
-                {product.is_promo && product.original_price ? (
-                  <div className="flex flex-col gap-2">
-                    <div className="text-3xl text-slate-400 font-bold line-through decoration-red-500/50 decoration-4">
-                      {product.formatted_original_price || formatPrice(product.original_price)}
+                <div className="mb-8">
+                  {product.is_promo && product.original_price ? (
+                    <div className="flex flex-col gap-1">
+                      <div className={`text-2xl md:text-3xl ${isDark ? 'text-slate-400' : 'text-slate-400'} font-bold line-through decoration-rose-500/60 decoration-4`}>
+                        {product.formatted_original_price || formatPrice(product.original_price)}
+                      </div>
+                      <div className="text-5xl md:text-7xl font-black text-emerald-500 tracking-tight drop-shadow-lg">
+                        {product.formatted_price || formatPrice(product.selling_price)}
+                      </div>
+                      {product.applied_promo && (
+                        <div className={`inline-block mt-3 ${isDark ? 'text-rose-300 bg-rose-950/60 border-rose-800/60' : 'text-rose-700 bg-rose-50 border-rose-200'} font-extrabold text-lg px-5 py-2 rounded-xl border self-start`}>
+                          🏷️ {product.applied_promo.name}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-6xl md:text-8xl font-black text-brand-red tracking-tighter drop-shadow-sm">
+                  ) : (
+                    <div className="text-5xl md:text-7xl font-black text-emerald-500 tracking-tight drop-shadow-lg">
                       {product.formatted_price || formatPrice(product.selling_price)}
                     </div>
-                    {product.applied_promo && (
-                      <div className="inline-block mt-4 text-rose-600 font-bold text-xl bg-rose-50 px-6 py-3 rounded-2xl border border-rose-100 self-start">
-                        {product.applied_promo.name}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-6xl md:text-8xl font-black text-slate-800 tracking-tighter drop-shadow-sm">
-                    {product.formatted_price || formatPrice(product.selling_price)}
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Informational Stock Footer */}
-              <div className="mt-auto pt-8 border-t border-slate-100 flex items-center justify-between text-slate-500 text-lg font-medium">
-                <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-full text-lg font-bold ${product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                  <Package size={24} />
+              <div className={`pt-6 border-t ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-100 text-slate-600'} flex items-center justify-between text-base font-medium`}>
+                <div className={`inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full text-base font-extrabold ${product.stock > 0 ? (isDark ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-emerald-100 text-emerald-800 border border-emerald-200') : (isDark ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' : 'bg-rose-100 text-rose-800 border border-rose-200')}`}>
+                  <Package size={20} />
                   {product.stock > 0 ? `Stok Tersedia: ${product.stock} Unit` : 'Stok Habis'}
                 </div>
-                <span className="text-slate-400">Barcode: {product.barcode}</span>
+                <span className="font-mono text-sm opacity-80">Barcode: {product.barcode}</span>
               </div>
             </div>
             
             {/* Auto-close Progress Bar */}
-            <div className="absolute bottom-0 left-0 right-0 h-2 bg-slate-100">
-              <div className="h-full bg-brand-blue animate-[shrink_15s_linear_forwards]"></div>
+            <div className={`absolute bottom-0 left-0 right-0 h-1.5 ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+              <div className="h-full bg-emerald-500 animate-[shrink_15s_linear_forwards]"></div>
             </div>
           </div>
         )}
 
-        {/* Cross-Selling / Recommended */}
+        {/* CROSS-SELLING PROMO RECOMMENDATIONS */}
         {product && !error && !loading && promoProducts.length > 3 && (
-          <div className="w-full mt-12 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
-            <h3 className="text-white font-bold text-2xl mb-6 tracking-wide drop-shadow-md flex items-center gap-3">
-              <Tag className="text-yellow-400" /> Diskon Spesial Hari Ini
+          <div className="w-full mt-10 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
+            <h3 className={`${isDark ? 'text-white' : 'text-slate-900'} font-extrabold text-xl mb-4 tracking-wide drop-shadow-md flex items-center gap-2`}>
+              <Tag className="text-amber-500" size={20} /> Diskon Spesial Hari Ini
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {promoProducts.slice(0, 3).map((rec: any, idx: number) => (
-                <div key={idx} className="bg-white/10 backdrop-blur-md rounded-2xl p-6 flex items-center gap-6 border border-white/10 shadow-xl transition-transform hover:scale-105">
-                  <ProductImage src={rec.image_url} alt={rec.name} className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-white object-cover shadow-inner flex-shrink-0" fallbackIconSize={32} />
-                  <div className="flex flex-col">
-                    <span className="text-white font-bold text-lg md:text-xl line-clamp-1 mb-1">{rec.name}</span>
+                <div key={idx} className={`${isDark ? 'bg-slate-900/80 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900'} backdrop-blur-xl rounded-2xl p-4 flex items-center gap-4 border shadow-xl transition-all hover:scale-105`}>
+                  <ProductImage src={rec.image_url} alt={rec.name} className="w-20 h-20 rounded-xl bg-white object-cover shadow-inner flex-shrink-0" fallbackIconSize={32} />
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-base line-clamp-1 mb-1">{rec.name}</span>
                     <div className="flex flex-col">
                       {rec.original_price && (
-                        <span className="text-slate-400 line-through text-sm font-semibold">{formatPrice(rec.original_price)}</span>
+                        <span className="text-slate-400 line-through text-xs font-semibold">{formatPrice(rec.original_price)}</span>
                       )}
-                      <span className="text-brand-green font-black text-2xl">{formatPrice(rec.selling_price)}</span>
+                      <span className="text-emerald-500 font-black text-xl">{formatPrice(rec.selling_price)}</span>
                     </div>
                   </div>
                 </div>
@@ -452,8 +518,7 @@ const PriceChecker: React.FC = () => {
           value={barcode}
           onChange={(e) => setBarcode(e.target.value)}
           onBlur={() => {
-            // Keep focus if no modal is open
-            if (!showBranchModal) {
+            if (!showBranchModal && !showSearchModal && !showMemberModal) {
               setTimeout(() => inputRef.current?.focus(), 100);
             }
           }}
@@ -463,35 +528,35 @@ const PriceChecker: React.FC = () => {
         <button type="submit" className="hidden">Scan</button>
       </form>
 
-      {/* Marquee Promo Section */}
+      {/* MARQUEE PROMO BANNER AT BOTTOM */}
       {!product && !error && promoProducts.length > 0 && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-12 pb-6 z-10 overflow-hidden border-t border-white/5">
+        <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${isDark ? 'from-slate-950 via-slate-950/90' : 'from-slate-100 via-slate-100/90'} to-transparent pt-10 pb-5 z-10 overflow-hidden border-t ${isDark ? 'border-white/10' : 'border-slate-300'}`}>
           <div className="flex whitespace-nowrap animate-[marquee_25s_linear_infinite] hover:[animation-play-state:paused]">
             {promoProducts.map((promoItem, idx) => (
-              <div key={`${promoItem.id}-${idx}`} className="flex-shrink-0 w-max inline-flex items-center gap-6 mx-12 bg-white/10 backdrop-blur-md px-10 py-6 rounded-3xl border-2 border-white/10 shadow-2xl">
-                <ProductImage src={promoItem.image_url} alt={promoItem.name} className="w-28 h-28 md:w-32 md:h-32 object-cover rounded-2xl bg-white shadow-inner flex-shrink-0" fallbackIconSize={48} />
+              <div key={`${promoItem.id}-${idx}`} className={`flex-shrink-0 w-max inline-flex items-center gap-5 mx-8 ${isDark ? 'bg-slate-900/90 border-white/15 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-xl'} backdrop-blur-2xl px-8 py-5 rounded-3xl border shadow-2xl`}>
+                <ProductImage src={promoItem.image_url} alt={promoItem.name} className="w-24 h-24 md:w-28 md:h-28 object-cover rounded-2xl bg-white shadow-inner flex-shrink-0" fallbackIconSize={44} />
                 <div className="flex flex-col">
-                  <span className="text-white font-black text-2xl md:text-3xl mb-2 tracking-wide">{promoItem.name}</span>
-                  <div className="flex items-center gap-4">
+                  <span className="font-extrabold text-xl md:text-2xl mb-1 tracking-wide">{promoItem.name}</span>
+                  <div className="flex items-center gap-3">
                     {promoItem.original_price && (
-                      <span className="text-slate-400 line-through text-lg md:text-xl font-semibold">{formatPrice(promoItem.original_price)}</span>
+                      <span className="text-slate-400 line-through text-base md:text-lg font-semibold">{formatPrice(promoItem.original_price)}</span>
                     )}
-                    <span className="text-brand-green font-black text-3xl md:text-5xl drop-shadow-sm">{formatPrice(promoItem.selling_price)}</span>
+                    <span className="text-emerald-500 font-black text-2xl md:text-4xl drop-shadow-sm">{formatPrice(promoItem.selling_price)}</span>
                   </div>
                 </div>
               </div>
             ))}
-            {/* Duplicate for infinite loop effect */}
+            {/* Duplicate for infinite marquee loop */}
             {promoProducts.map((promoItem, idx) => (
-              <div key={`dup-${promoItem.id}-${idx}`} className="flex-shrink-0 w-max inline-flex items-center gap-6 mx-12 bg-white/10 backdrop-blur-md px-10 py-6 rounded-3xl border-2 border-white/10 shadow-2xl">
-                <ProductImage src={promoItem.image_url} alt={promoItem.name} className="w-28 h-28 md:w-32 md:h-32 object-cover rounded-2xl bg-white shadow-inner flex-shrink-0" fallbackIconSize={48} />
+              <div key={`dup-${promoItem.id}-${idx}`} className={`flex-shrink-0 w-max inline-flex items-center gap-5 mx-8 ${isDark ? 'bg-slate-900/90 border-white/15 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-xl'} backdrop-blur-2xl px-8 py-5 rounded-3xl border shadow-2xl`}>
+                <ProductImage src={promoItem.image_url} alt={promoItem.name} className="w-24 h-24 md:w-28 md:h-28 object-cover rounded-2xl bg-white shadow-inner flex-shrink-0" fallbackIconSize={44} />
                 <div className="flex flex-col">
-                  <span className="text-white font-black text-2xl md:text-3xl mb-2 tracking-wide">{promoItem.name}</span>
-                  <div className="flex items-center gap-4">
+                  <span className="font-extrabold text-xl md:text-2xl mb-1 tracking-wide">{promoItem.name}</span>
+                  <div className="flex items-center gap-3">
                     {promoItem.original_price && (
-                      <span className="text-slate-400 line-through text-lg md:text-xl font-semibold">{formatPrice(promoItem.original_price)}</span>
+                      <span className="text-slate-400 line-through text-base md:text-lg font-semibold">{formatPrice(promoItem.original_price)}</span>
                     )}
-                    <span className="text-brand-green font-black text-3xl md:text-5xl drop-shadow-sm">{formatPrice(promoItem.selling_price)}</span>
+                    <span className="text-emerald-500 font-black text-2xl md:text-4xl drop-shadow-sm">{formatPrice(promoItem.selling_price)}</span>
                   </div>
                 </div>
               </div>
@@ -502,11 +567,11 @@ const PriceChecker: React.FC = () => {
 
       {/* Branch Selection Modal */}
       {showBranchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
-          <div className="bg-white max-w-2xl w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-800 text-2xl flex items-center gap-3">
-                <MapPin className="text-brand-blue" size={28} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+          <div className={`${isDark ? 'bg-slate-900 border-white/15 text-white' : 'bg-white border-slate-200 text-slate-900'} border max-w-2xl w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200`}>
+            <div className={`p-6 border-b ${isDark ? 'border-white/10 bg-slate-900/50' : 'border-slate-100 bg-slate-50'} flex justify-between items-center`}>
+              <h3 className="font-extrabold text-2xl flex items-center gap-3">
+                <MapPin className="text-emerald-500" size={28} />
                 Pilih Lokasi Cabang Kiosk
               </h3>
               <button 
@@ -514,7 +579,7 @@ const PriceChecker: React.FC = () => {
                   setShowBranchModal(false);
                   setTimeout(() => inputRef.current?.focus(), 100);
                 }}
-                className="p-2 rounded-xl hover:bg-slate-200 text-slate-500 transition-colors"
+                className={`p-2 rounded-xl ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-200 text-slate-500'} transition-colors`}
               >
                 <X size={24} />
               </button>
@@ -531,14 +596,14 @@ const PriceChecker: React.FC = () => {
                     setProduct(null);
                     setTimeout(() => inputRef.current?.focus(), 100);
                   }}
-                  className={`text-left p-6 rounded-2xl border-2 transition-all ${
+                  className={`text-left p-5 rounded-2xl border-2 transition-all ${
                     activeBranchId === branch.id
-                      ? 'border-brand-blue bg-brand-blue/5 ring-4 ring-brand-blue/10'
-                      : 'border-slate-100 hover:border-brand-blue/30 hover:bg-slate-50'
+                      ? 'border-emerald-500 bg-emerald-500/10 ring-4 ring-emerald-500/20'
+                      : (isDark ? 'border-white/10 hover:border-emerald-500/40 hover:bg-white/5' : 'border-slate-200 hover:border-emerald-500/40 hover:bg-slate-50')
                   }`}
                 >
-                  <h4 className="font-bold text-slate-800 text-xl mb-1">{branch.name}</h4>
-                  <p className="text-sm text-slate-500 leading-relaxed">{branch.address}</p>
+                  <h4 className="font-bold text-xl mb-1">{branch.name}</h4>
+                  <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'} leading-relaxed`}>{branch.address}</p>
                 </button>
               ))}
             </div>
@@ -575,6 +640,12 @@ const PriceChecker: React.FC = () => {
         @keyframes marquee {
           0% { transform: translateX(0%); }
           100% { transform: translateX(-50%); }
+        }
+        @keyframes scanLaser {
+          0% { top: 5%; opacity: 0; }
+          15% { opacity: 1; }
+          85% { opacity: 1; }
+          100% { top: 95%; opacity: 0; }
         }
       `}</style>
     </div>

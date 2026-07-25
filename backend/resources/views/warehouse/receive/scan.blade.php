@@ -7,93 +7,153 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
-    .container {
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 15px;
-        background: var(--bg-color);
-        min-height: 100vh;
-        box-sizing: border-box;
-    }
-    .header-card {
-        background-color: var(--card-bg);
+    .wh-card {
+        background: var(--card-bg);
         border: 1px solid var(--border-color);
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
+        border-radius: 24px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: var(--card-shadow);
     }
-    .header-card h2 {
-        color: var(--text-color);
-        margin: 0 0 5px 0;
-        font-size: 1.2rem;
-    }
-    .header-card p {
-        color: var(--text-color);
-        margin: 0;
-        font-size: 0.9rem;
-        opacity: 0.8;
-    }
-    .alert {
-        padding: 12px;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        font-size: 0.9rem;
-    }
-    .alert-danger {
-        background-color: #fee2e2;
-        color: #991b1b;
-        border: 1px solid #f87171;
-    }
-    .alert-warning {
-        background-color: #fef3c7;
-        color: #92400e;
-        border: 1px solid #fbbf24;
-    }
-    .mode-switch {
+    
+    .wh-header-info {
         display: flex;
-        gap: 10px;
-        margin-bottom: 15px;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    
+    .wh-po-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        padding: 6px 12px;
+        border-radius: 12px;
+        font-weight: 800;
+        font-size: 0.82rem;
+        margin-bottom: 8px;
+    }
+    
+    .wh-draft-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: rgba(99, 102, 241, 0.15);
+        color: #6366f1;
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        padding: 6px 10px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.78rem;
+        margin-bottom: 8px;
+        margin-left: 6px;
+    }
+    
+    .wh-po-title {
+        font-size: 1.3rem;
+        font-weight: 800;
+        margin: 0;
+        letter-spacing: -0.5px;
+    }
+    
+    .wh-po-supplier {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        margin-top: 4px;
+        font-weight: 600;
+    }
+    
+    .wh-progress-badge {
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        padding: 8px 14px;
+        border-radius: 14px;
+        text-align: center;
+    }
+    .wh-progress-val {
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: #10b981;
+    }
+    .wh-progress-lbl {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    /* Segmented Controls */
+    .segmented-switch {
+        display: flex;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        padding: 4px;
+        border-radius: 18px;
+        margin-bottom: 16px;
     }
     .btn-mode {
         flex: 1;
-        padding: 10px;
+        padding: 12px;
         text-align: center;
-        background-color: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        font-weight: bold;
+        background: transparent;
+        border: none;
+        border-radius: 14px;
+        font-weight: 800;
+        font-size: 0.88rem;
         cursor: pointer;
-        color: var(--text-color);
+        color: var(--text-muted);
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
     }
     .btn-mode.active {
-        background-color: var(--header-bg);
-        color: var(--header-text);
-        border-color: var(--header-bg);
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    
+    /* Scanner Container */
+    #camera-section {
+        position: relative;
+        border-radius: 20px;
+        overflow: hidden;
+        border: 2px border-color;
+        margin-bottom: 16px;
     }
     #reader {
         width: 100%;
-        border-radius: 8px;
+        border-radius: 20px;
         overflow: hidden;
         border: 1px solid var(--border-color);
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
         background: var(--card-bg);
     }
     #reader video {
         object-fit: cover;
+        border-radius: 20px;
     }
-    .input-section {
-        margin-bottom: 15px;
-    }
+
     .input-barcode {
         width: 100%;
-        padding: 12px;
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        font-size: 1rem;
+        padding: 14px 16px;
+        border: 2px solid var(--border-color);
+        border-radius: 16px;
+        font-size: 0.95rem;
         box-sizing: border-box;
         background-color: var(--card-bg);
         color: var(--text-color);
+        font-weight: 600;
+        transition: border-color 0.2s;
     }
+    .input-barcode:focus {
+        outline: none;
+        border-color: #10b981;
+    }
+
+    /* Item List Cards */
     .item-list {
         list-style: none;
         padding: 0;
@@ -102,157 +162,285 @@
     .item-card {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 10px;
+        border-radius: 20px;
+        padding: 16px;
+        margin-bottom: 12px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        transition: background-color 0.2s;
-        color: var(--text-color);
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
     }
+    
     .item-card.complete {
-        background-color: #d1fae5;
-        border-color: #34d399;
-        color: #065f46;
+        background-color: rgba(16, 185, 129, 0.1) !important;
+        border-color: rgba(16, 185, 129, 0.4) !important;
     }
     .item-card.over {
-        background-color: #fee2e2;
-        border-color: #f87171;
-        color: #991b1b;
+        background-color: rgba(239, 68, 68, 0.1) !important;
+        border-color: rgba(239, 68, 68, 0.4) !important;
     }
-    html.dark .item-card.complete {
-        background-color: rgba(16, 185, 129, 0.2);
-        border-color: #059669;
-        color: #34d399;
-    }
-    html.dark .item-card.over {
-        background-color: rgba(239, 68, 68, 0.2);
-        border-color: #dc2626;
-        color: #f87171;
-    }
+
     .item-info {
         flex: 1;
+        padding-right: 12px;
     }
     .item-name {
-        font-weight: bold;
+        font-weight: 800;
         font-size: 0.95rem;
+        line-height: 1.3;
+        color: var(--text-color);
+        margin-bottom: 4px;
     }
     .item-barcode {
-        font-size: 0.8rem;
-        color: #6b7280;
-    }
-    .item-qty {
-        font-size: 1.2rem;
-        font-weight: bold;
-    }
-    .btn-submit {
-        width: 100%;
-        padding: 15px;
-        background-color: #059669;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 1.1rem;
-        font-weight: bold;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-    .btn-submit:hover {
-        opacity: 0.9;
-    }
-    .controls {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-    .btn-toggle {
-        flex: 1;
-        padding: 10px;
-        background: #e5e7eb;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
+        font-size: 0.78rem;
+        color: var(--text-muted);
         font-weight: 600;
-        color: #4b5563;
+        font-family: monospace;
     }
-    .btn-toggle.active {
-        background: #3b82f6;
-        color: #fff;
+    
+    .item-status-tag {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 8px;
+        margin-top: 4px;
     }
-    #error-msg {
-        color: #dc2626;
-        font-size: 0.9rem;
-        margin-top: 5px;
+    .item-card.complete .item-status-tag {
+        background: #10b981;
+        color: #ffffff;
+    }
+    .item-card.over .item-status-tag {
+        background: #ef4444;
+        color: #ffffff;
+    }
+
+    .qty-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-qty-step {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-color);
+        color: var(--text-color);
+        font-weight: 800;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .btn-qty-step:active {
+        transform: scale(0.9);
+    }
+    .input-qty {
+        width: 58px;
+        padding: 8px 4px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-color);
+        color: var(--text-color);
         text-align: center;
-        font-weight: bold;
+        font-weight: 800;
+        font-size: 1rem;
     }
-    html.dark textarea {
-        background-color: var(--card-bg);
-        color: var(--text-color);
-        border-color: var(--border-color);
+
+    .btn-submit-all {
+        width: 100%;
+        padding: 16px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 18px;
+        font-size: 1rem;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
     }
-    html.dark input[type="number"] {
-        background-color: var(--card-bg);
-        color: var(--text-color);
-        border-color: var(--border-color);
+    .btn-submit-all:hover {
+        opacity: 0.95;
+        transform: translateY(-1px);
+    }
+
+    #error-msg {
+        color: #ef4444;
+        font-size: 0.88rem;
+        margin-top: 8px;
+        text-align: center;
+        font-weight: 700;
     }
 </style>
 
-<div class="container">
-    <div class="header-card">
-        <h2>Pengecekan Gudang</h2>
-        <p>No PO: {{ $po->po_number }}</p>
+<div>
+    <!-- Header Info Card -->
+    <div class="wh-card">
+        <div class="wh-header-info">
+            <div>
+                <div style="display: flex; align-items: center; flex-wrap: wrap;">
+                    <div class="wh-po-badge">
+                        <span>📋 PO RECEIVING</span>
+                    </div>
+                    <div class="wh-draft-badge" id="draft-saved-indicator" style="display: none;">
+                        <span>💾 Draft Otomatis</span>
+                    </div>
+                </div>
+                <h2 class="wh-po-title">{{ $po->po_number }}</h2>
+                <div class="wh-po-supplier">Supplier: {{ $po->supplier->name ?? 'Umum' }}</div>
+            </div>
+            <div class="wh-progress-badge">
+                <div class="wh-progress-val" id="completed-count-badge">0 / {{ count($items) }}</div>
+                <div class="wh-progress-lbl">SELESAI</div>
+            </div>
+        </div>
     </div>
 
-    <div class="controls">
-        <button id="btn-camera" class="btn-toggle active" onclick="setMode('camera')">Kamera HP</button>
-        <button id="btn-usb" class="btn-toggle" onclick="setMode('usb')">Scanner USB/BT</button>
+    <!-- Mode Switcher -->
+    <div class="segmented-switch">
+        <button id="btn-camera" class="btn-mode active" onclick="setMode('camera')">
+            <span>📷 Kamera HP</span>
+        </button>
+        <button id="btn-usb" class="btn-mode" onclick="setMode('usb')">
+            <span>🔌 Scanner USB/BT</span>
+        </button>
     </div>
 
+    <!-- Camera Viewfinder Section -->
     <div id="camera-section">
         <div id="reader"></div>
     </div>
 
-    <div id="usb-section" style="display: none;" class="input-section">
+    <!-- USB Scanner Section -->
+    <div id="usb-section" style="display: none;" class="wh-card">
         <form onsubmit="event.preventDefault(); submitBarcode();" style="margin:0;">
-            <input type="text" inputmode="numeric" pattern="[0-9]*" id="manual-barcode" class="input-barcode" placeholder="Arahkan kursor kesini, lalu scan barcode..." autocomplete="off">
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="manual-barcode" class="input-barcode" placeholder="Arahkan kursor kesini lalu scan barcode..." autocomplete="off">
         </form>
         <div id="error-msg"></div>
     </div>
 
+    <!-- Items Audit List -->
     <ul class="item-list" id="item-list">
-        <!-- Rendered by JS -->
+        <!-- Rendered dynamically by JS -->
     </ul>
 
-    <form id="submit-form" action="{{ route('warehouse.receive.submit', $po->id) }}" method="POST">
-        @csrf
-        <input type="hidden" name="scanned_items" id="scanned_items_input">
-        <div class="input-section">
-            <textarea name="notes" placeholder="Catatan tambahan (opsional)" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--card-bg); color: var(--text-color); font-family: inherit; resize: none; box-sizing: border-box; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);" rows="3"></textarea>
-        </div>
-        <button type="button" class="btn-submit" onclick="submitCheck()">Simpan Pengecekan</button>
-    </form>
+    <!-- Form Submit Section -->
+    <div class="wh-card">
+        <form id="submit-form" action="{{ route('warehouse.receive.submit', $po->id) }}" method="POST">
+            @csrf
+            <input type="hidden" name="scanned_items" id="scanned_items_input">
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">CATATAN PENGECEKAN (OPSIONAL)</label>
+                <textarea name="notes" oninput="saveLocalDraft()" placeholder="Tuliskan catatan kondisi fisik barang jika ada..." style="width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color); font-family: inherit; resize: none; box-sizing: border-box;" rows="2"></textarea>
+            </div>
+            <button type="button" class="btn-submit-all" onclick="submitCheck()">SIMPAN RESULT PENGECEKAN</button>
+        </form>
+    </div>
 </div>
-
-<!-- Audio for scan feedback -->
-<audio id="beep-ok" src="data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU..." preload="auto"></audio>
-<audio id="beep-err" src="data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU..." preload="auto"></audio>
 
 <script>
     const itemsData = @json($items);
     const scannedState = {};
     const isItemVisible = {};
     const rejectedCheck = @json($rejectedCheck ?? null);
+    const DRAFT_KEY = 'wh_scan_draft_po_{{ $po->id }}';
 
     itemsData.forEach(item => {
         scannedState[item.product_id] = item.qty_scanned || 0;
         isItemVisible[item.product_id] = item.qty_scanned > 0;
     });
 
-    const beepOk = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // short pip
-    const beepErr = new Audio('https://assets.mixkit.co/active_storage/sfx/2955/2955-preview.mp3'); // error buzz
+    const beepOk = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    const beepErr = new Audio('https://assets.mixkit.co/active_storage/sfx/2955/2955-preview.mp3');
+
+    // LOCAL STORAGE DRAFT MANAGEMENT
+    function saveLocalDraft() {
+        try {
+            const notesInput = document.querySelector('textarea[name="notes"]');
+            const draftData = {
+                scannedState: scannedState,
+                isItemVisible: isItemVisible,
+                notes: notesInput ? notesInput.value : '',
+                timestamp: Date.now()
+            };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+            
+            const badge = document.getElementById('draft-saved-indicator');
+            if (badge) badge.style.display = 'inline-flex';
+        } catch (e) {
+            console.error('Failed to save local draft', e);
+        }
+    }
+
+    function clearLocalDraft() {
+        try {
+            localStorage.removeItem(DRAFT_KEY);
+            const badge = document.getElementById('draft-saved-indicator');
+            if (badge) badge.style.display = 'none';
+        } catch (e) {
+            console.error('Failed to clear local draft', e);
+        }
+    }
+
+    function restoreLocalDraft() {
+        try {
+            const rawDraft = localStorage.getItem(DRAFT_KEY);
+            if (rawDraft) {
+                const draft = JSON.parse(rawDraft);
+                if (draft && draft.scannedState) {
+                    let hasRestored = false;
+                    Object.keys(draft.scannedState).forEach(pid => {
+                        const numericPid = isNaN(pid) ? pid : Number(pid);
+                        const val = draft.scannedState[pid];
+                        if (val > 0) {
+                            scannedState[numericPid] = val;
+                            isItemVisible[numericPid] = true;
+                            hasRestored = true;
+                        }
+                    });
+
+                    if (draft.notes) {
+                        const notesInput = document.querySelector('textarea[name="notes"]');
+                        if (notesInput) notesInput.value = draft.notes;
+                    }
+
+                    if (hasRestored) {
+                        const badge = document.getElementById('draft-saved-indicator');
+                        if (badge) badge.style.display = 'inline-flex';
+
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'info',
+                            title: 'Draft Pengecekan Dipulihkan',
+                            text: 'Hasil scan sebelum halaman terefresh telah dimuat kembali.',
+                            showConfirmButton: false,
+                            timer: 3500
+                        });
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Failed to restore local draft', e);
+        }
+    }
+
+    function updateCompletedProgress() {
+        let completed = 0;
+        itemsData.forEach(item => {
+            const scanned = scannedState[item.product_id] || 0;
+            if (scanned === item.qty_po && item.qty_po > 0) {
+                completed++;
+            }
+        });
+        const badge = document.getElementById('completed-count-badge');
+        if (badge) badge.innerText = `${completed} / ${itemsData.length}`;
+    }
 
     function initList() {
         const list = document.getElementById('item-list');
@@ -263,32 +451,32 @@
             const li = document.createElement('li');
             li.id = 'item-' + item.product_id;
             li.className = 'item-card';
-            li.style.display = 'none'; // Sembunyikan secara default
+            li.style.display = 'none';
             
             let inputAttrs = '';
             if (rejectedCheck) {
-                // Jika reject, kunci hanya item yang SUDAH SESUAI (lolos)
                 if (item.qty_scanned === target && target > 0) {
-                    inputAttrs = 'readonly style="background-color: #f3f4f6; cursor: not-allowed; width: 60px; padding: 5px; border-radius: 4px; border: 1px solid #ccc; text-align: right;"';
-                } else {
-                    inputAttrs = 'style="width: 60px; padding: 5px; border-radius: 4px; border: 1px solid #ccc; text-align: right;"';
+                    inputAttrs = 'readonly style="opacity: 0.6; cursor: not-allowed;"';
                 }
-            } else {
-                inputAttrs = 'style="width: 60px; padding: 5px; border-radius: 4px; border: 1px solid #ccc; text-align: right;"';
             }
 
             li.innerHTML = `
                 <div class="item-info">
                     <div class="item-name">${item.name}</div>
-                    <div class="item-barcode">${item.barcode || '-'}</div>
+                    <div class="item-barcode">Barcode: ${item.barcode || '-'}</div>
+                    <div class="item-status-tag" id="tag-${item.product_id}">PENDING</div>
                 </div>
-                <div class="item-qty" style="display: flex; align-items: center; gap: 8px;">
-                    <form onsubmit="event.preventDefault(); returnQtyToBarcode('${item.product_id}');" style="margin:0; display:flex;">
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="input-${item.product_id}" value="${item.qty_scanned > 0 ? item.qty_scanned : ''}" placeholder="0" min="0" ${inputAttrs} onchange="handleManualInput('${item.product_id}', this.value)" onkeydown="handleInputKeydown(event, '${item.product_id}')">
-                    </form>
-                    <span style="font-size: 0.9rem; color: #6b7280; font-weight: bold;">/ ${target}</span>
-                    <button type="button" onclick="confirmDeleteItem('${item.product_id}')" style="background: none; border: none; cursor: pointer; padding: 4px; margin-left: 4px; color: #ef4444;" title="Hapus Item">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="qty-controls">
+                        <button type="button" class="btn-qty-step" onclick="changeQtyStep('${item.product_id}', -1)">-</button>
+                        <form onsubmit="event.preventDefault(); returnQtyToBarcode('${item.product_id}');" style="margin:0;">
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" class="input-qty" id="input-${item.product_id}" value="${item.qty_scanned > 0 ? item.qty_scanned : ''}" placeholder="0" min="0" ${inputAttrs} onchange="handleManualInput('${item.product_id}', this.value)" onkeydown="handleInputKeydown(event, '${item.product_id}')">
+                        </form>
+                        <button type="button" class="btn-qty-step" onclick="changeQtyStep('${item.product_id}', 1)">+</button>
+                    </div>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800;">/ ${target}</span>
+                    <button type="button" onclick="confirmDeleteItem('${item.product_id}')" style="background: none; border: none; cursor: pointer; padding: 4px; color: #ef4444;" title="Hapus Item">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                     </button>
@@ -299,8 +487,22 @@
         });
         
         if (rejectedCheck) {
-            document.getElementById('error-msg').innerHTML = `<div class="alert alert-warning">Pengecekan ini sebelumnya ditolak. Silakan perbaiki kuantitas yang melebihi PO.</div>`;
+            document.getElementById('error-msg').innerHTML = `<div style="color: #f59e0b; padding: 10px; font-weight: 700;">⚠️ Pengecekan ini sebelumnya ditolak. Silakan perbaiki kuantitas yang melebihi PO.</div>`;
         }
+        updateCompletedProgress();
+    }
+
+    function changeQtyStep(productId, delta) {
+        let current = scannedState[productId] || 0;
+        let next = current + delta;
+        if (next < 0) next = 0;
+        scannedState[productId] = next;
+        
+        const inputField = document.getElementById('input-' + productId);
+        if (inputField) inputField.value = next > 0 ? next : '';
+        
+        updateItemUI(productId);
+        saveLocalDraft();
     }
 
     function returnQtyToBarcode(productId) {
@@ -324,12 +526,13 @@
         if (isNaN(val) || val < 0) val = 0;
         scannedState[productId] = val;
         updateItemUI(productId);
+        saveLocalDraft();
     }
 
     window.confirmDeleteItem = function(productId) {
         Swal.fire({
             title: 'Hapus Item?',
-            text: "Anda yakin ingin menghapus item ini dari hasil scan?",
+            text: "Item ini akan dikembalikan ke status belum discan.",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
@@ -345,6 +548,7 @@
                 if (inputField) inputField.value = '';
                 
                 updateItemUI(productId);
+                saveLocalDraft();
                 
                 if (document.getElementById('btn-usb').classList.contains('active')) {
                     document.getElementById('manual-barcode').focus();
@@ -354,24 +558,46 @@
     };
 
     function updateItemUI(productId) {
-        const item = itemsData.find(i => i.product_id === productId);
+        const item = itemsData.find(i => i.product_id === productId || String(i.product_id) === String(productId));
         if (!item) return;
 
-        const scanned = scannedState[productId];
+        const scanned = scannedState[productId] || 0;
         const target = item.qty_po;
-        const li = document.getElementById('item-' + productId);
+        const li = document.getElementById('item-' + item.product_id);
+        const tag = document.getElementById('tag-' + item.product_id);
 
         if (li) {
             li.classList.remove('complete', 'over');
+            if (tag) {
+                if (scanned === target && target > 0) {
+                    tag.innerText = '✅ SESUAI ORDER';
+                    tag.style.background = '#10b981';
+                    tag.style.color = '#ffffff';
+                } else if (scanned > target) {
+                    tag.innerText = '⚠️ MELEBIHI ORDER';
+                    tag.style.background = '#ef4444';
+                    tag.style.color = '#ffffff';
+                } else {
+                    tag.innerText = '⏳ BELUM LENGKAP';
+                    tag.style.background = 'rgba(245, 158, 11, 0.2)';
+                    tag.style.color = '#f59e0b';
+                }
+            }
+
             if (scanned === target && target > 0) li.classList.add('complete');
             if (scanned > target) li.classList.add('over');
             
-            if (isItemVisible[productId]) {
+            if (isItemVisible[item.product_id]) {
                 li.style.display = 'flex';
+                const inputElem = document.getElementById('input-' + item.product_id);
+                if (inputElem && scanned > 0) {
+                    inputElem.value = scanned;
+                }
             } else {
                 li.style.display = 'none';
             }
         }
+        updateCompletedProgress();
     }
 
     function handleScan(barcodeStr) {
@@ -379,11 +605,10 @@
         const barcode = barcodeStr.trim();
         if (!barcode) return;
 
-        // Find item
         const item = itemsData.find(i => i.barcode === barcode);
         if (item) {
             if (rejectedCheck && item.qty_scanned === item.qty_po && item.qty_po > 0) {
-                document.getElementById('error-msg').innerText = 'Barang ini sudah sesuai pada pengecekan sebelumnya dan tidak perlu discan lagi!';
+                document.getElementById('error-msg').innerText = 'Barang ini sudah sesuai pada pengecekan sebelumnya!';
                 beepErr.play().catch(e => {});
                 setTimeout(() => {
                     document.getElementById('error-msg').innerText = '';
@@ -393,21 +618,25 @@
 
             isItemVisible[item.product_id] = true;
             
-            // Move item to the top of the list so the latest scan is always visible
             const li = document.getElementById('item-' + item.product_id);
             if (li) {
                 li.parentNode.prepend(li);
             }
 
+            if (!scannedState[item.product_id] || scannedState[item.product_id] === 0) {
+                scannedState[item.product_id] = 1;
+            }
+
             updateItemUI(item.product_id);
+            saveLocalDraft();
             beepOk.play().catch(e => {});
 
-            // Pindahkan fokus ke input Qty agar user bisa mengetik jumlahnya
             setTimeout(() => {
                 const inputField = document.getElementById('input-' + item.product_id);
                 if (inputField) {
+                    inputField.value = scannedState[item.product_id];
                     inputField.focus();
-                    inputField.select(); // Block angkanya agar jika diketik langsung menimpa
+                    inputField.select();
                 }
             }, 50);
         } else {
@@ -419,7 +648,6 @@
         }
     }
 
-    // USB Scanner Mode
     function submitBarcode() {
         const manualInput = document.getElementById('manual-barcode');
         handleScan(manualInput.value);
@@ -427,7 +655,6 @@
     }
     
     const manualInput = document.getElementById('manual-barcode');
-    // Fallback keydown just in case (e.g. some scanners send Enter without triggering submit)
     manualInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' || e.keyCode === 13) {
             e.preventDefault();
@@ -435,7 +662,6 @@
         }
     });
 
-    // Camera Scanner
     let html5QrcodeScanner;
     function initCamera() {
         if (!html5QrcodeScanner) {
@@ -443,7 +669,7 @@
                 fps: 10, 
                 qrbox: function(viewfinderWidth, viewfinderHeight) {
                     let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-                    let qrboxSize = Math.floor(minEdgeSize * 0.75); // 75% of screen
+                    let qrboxSize = Math.floor(minEdgeSize * 0.75);
                     return { width: qrboxSize, height: qrboxSize };
                 },
                 aspectRatio: 1.0,
@@ -464,7 +690,6 @@
     let lastScanTime = 0;
     function onScanSuccess(decodedText, decodedResult) {
         const now = Date.now();
-        // Prevent duplicate scans within 2 seconds
         if (decodedText === lastScanCode && (now - lastScanTime) < 2000) {
             return;
         }
@@ -478,8 +703,8 @@
     }
 
     function setMode(mode) {
-        document.getElementById('btn-camera').className = 'btn-toggle' + (mode === 'camera' ? ' active' : '');
-        document.getElementById('btn-usb').className = 'btn-toggle' + (mode === 'usb' ? ' active' : '');
+        document.getElementById('btn-camera').className = 'btn-mode' + (mode === 'camera' ? ' active' : '');
+        document.getElementById('btn-usb').className = 'btn-mode' + (mode === 'usb' ? ' active' : '');
         
         if (mode === 'camera') {
             document.getElementById('camera-section').style.display = 'block';
@@ -494,7 +719,6 @@
     }
 
     function submitCheck() {
-        // Sinkronisasi paksa jika user mengetik dan langsung klik simpan tanpa blur
         itemsData.forEach(item => {
             const inputField = document.getElementById('input-' + item.product_id);
             if (inputField && isItemVisible[item.product_id]) {
@@ -509,8 +733,8 @@
             text: "Pastikan semua kuantitas barang sudah sesuai dengan fisik di gudang.",
             icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#059669',
-            cancelButtonColor: '#dc2626',
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#ef4444',
             confirmButtonText: 'Ya, Simpan!',
             cancelButtonText: 'Batal',
             reverseButtons: true
@@ -525,14 +749,18 @@
                         Swal.showLoading();
                     }
                 });
+                // Clear draft on successful submit
+                clearLocalDraft();
                 document.getElementById('scanned_items_input').value = JSON.stringify(scannedState);
                 document.getElementById('submit-form').submit();
             }
         });
     }
 
-    // Init
+    // Init Sequence
     initList();
-    initCamera(); // default mode
+    restoreLocalDraft();
+    itemsData.forEach(item => updateItemUI(item.product_id));
+    initCamera();
 </script>
 @endsection
