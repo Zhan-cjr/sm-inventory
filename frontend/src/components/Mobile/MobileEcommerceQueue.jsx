@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Package, XCircle, CheckCircle, Clock } from 'lucide-react';
+import { 
+  ShoppingBag, 
+  PackageCheck, 
+  Clock, 
+  User, 
+  CreditCard, 
+  Truck, 
+  Store, 
+  CheckCircle2, 
+  XCircle, 
+  AlertCircle 
+} from 'lucide-react';
 
 export function MobileEcommerceQueue({ authToken, user }) {
   const [orders, setOrders] = useState([]);
@@ -74,81 +85,96 @@ export function MobileEcommerceQueue({ authToken, user }) {
   };
 
   return (
-    <div className="mobile-auth-queue">
-      <h3 style={{ marginBottom: '1rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <Package size={20} /> E-Commerce Orders
-      </h3>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', animation: 'fadeIn 0.3s ease-out' }}>
+      
+      {/* Title */}
+      <div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+          Pesanan Online
+        </div>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShoppingBag size={24} color="#6366f1" /> E-Commerce Orders
+        </h2>
+      </div>
 
+      {/* Branch Selector */}
       {showBranchSelector && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Pilih Cabang (Admin Mode)</label>
-          <select 
-            value={selectedBranchId} 
-            onChange={(e) => setSelectedBranchId(e.target.value)}
-            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'var(--bg-elevated)', color: 'white', border: '1px solid var(--border-light)' }}
-          >
-            <option value="">-- Pilih Cabang --</option>
-            {branches.map(b => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', padding: '0.75rem 1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Store size={18} color="#10b981" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Cabang Aktif (Admin)</div>
+            <select 
+              value={selectedBranchId} 
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              style={{ width: '100%', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--text-main)', fontWeight: 700, fontSize: '0.9rem', outline: 'none' }}
+            >
+              <option value="" disabled style={{ background: 'var(--bg-dark)' }}>-- Pilih Cabang --</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id} style={{ background: 'var(--bg-dark)' }}>{b.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
       {loading && orders.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '1rem' }}>
-          <div className="spin" style={{ width: '20px', height: '20px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <div className="spin" style={{ width: '32px', height: '32px', border: '3px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>Memeriksa pesanan e-commerce...</div>
         </div>
       ) : orders.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
-          <Package size={48} style={{ opacity: 0.5, margin: '0 auto 1rem auto' }} />
-          <p>Belum ada pesanan E-Commerce baru.</p>
+        <div className="pwa-card" style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+          <PackageCheck size={48} color="#10b981" style={{ margin: '0 auto 0.75rem' }} />
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 4px', color: 'var(--text-main)' }}>Semua Pesanan Selesai</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Belum ada pesanan online baru dari aplikasi pelanggan.</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           {orders.map(order => (
-            <div key={order.id} style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: '12px', border: '1px solid var(--border-light)', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
-                <span style={{ fontWeight: '700', color: '#3b82f6' }}>Order #{order.id.substring(0, 8).toUpperCase()}</span>
+            <div key={order.id} className="pwa-card" style={{ borderLeft: '4px solid #6366f1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.55rem' }}>
+                <span style={{ fontWeight: 800, color: '#6366f1', fontSize: '0.95rem' }}>
+                  Order #{order.id.substring(0, 8).toUpperCase()}
+                </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={12} /> {new Date(order.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                  <Clock size={13} /> {new Date(order.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.85rem' }}>
                 <div>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0' }}>Pelanggan</p>
-                  <p style={{ fontSize: '0.95rem', color: 'white', margin: '0', fontWeight: 'bold' }}>{order.customer_name}</p>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Pelanggan</div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 700 }}>{order.customer_name}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0' }}>Pengiriman</p>
-                  <p style={{ fontSize: '0.95rem', color: order.delivery_method === 'PICKUP' ? '#10b981' : '#f59e0b', margin: '0', fontWeight: 'bold' }}>
-                    {order.delivery_method === 'PICKUP' ? 'Ambil Sendiri' : 'Kirim Alamat'}
-                  </p>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Metode Ambil</div>
+                  <div style={{ fontSize: '0.88rem', color: order.delivery_method === 'PICKUP' ? '#10b981' : '#f59e0b', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                    <Truck size={14} /> {order.delivery_method === 'PICKUP' ? 'Pick-Up Store' : 'Delivery'}
+                  </div>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '1rem', background: 'var(--bg-elevated)', padding: '0.75rem', borderRadius: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Status Bayar:</span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: order.payment_status === 'PAID' ? '#10b981' : '#f59e0b' }}>
-                    {order.payment_method} - {order.payment_status}
+              <div style={{ marginBottom: '0.85rem', background: 'rgba(255,255,255,0.04)', padding: '0.75rem', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Pembayaran:</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: order.payment_status === 'PAID' ? '#10b981' : '#f59e0b' }}>
+                    {order.payment_method} &bull; {order.payment_status}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Total Amount:</span>
-                  <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'white' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Belanja:</span>
+                  <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981' }}>
                     Rp {parseFloat(order.total_amount).toLocaleString('id-ID')}
                   </span>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '1.25rem' }}>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Daftar Belanja:</p>
-                <div style={{ maxHeight: '150px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.4rem', fontWeight: 600 }}>Daftar Belanja Item:</div>
+                <div style={{ maxHeight: '140px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {order.items?.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                      <span style={{ color: 'white' }}>{item.quantity}x {item.product?.name || 'Produk'}</span>
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                      <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{item.quantity}x {item.product?.name || 'Produk'}</span>
                       <span style={{ color: 'var(--text-muted)' }}>Rp {parseFloat(item.subtotal).toLocaleString('id-ID')}</span>
                     </div>
                   ))}
@@ -160,23 +186,23 @@ export function MobileEcommerceQueue({ authToken, user }) {
                   <>
                     <button 
                       onClick={() => handleAction(order.id, 'reject')}
-                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
+                      style={{ flex: 1, padding: '0.75rem', borderRadius: '14px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
                     >
-                      <XCircle size={18} /> TOLAK
+                      <XCircle size={16} /> TOLAK
                     </button>
                     <button 
                       onClick={() => handleAction(order.id, 'approve')}
-                      style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#10b981', color: 'white', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
+                      style={{ flex: 1, padding: '0.75rem', borderRadius: '14px', border: 'none', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
                     >
-                      <CheckCircle size={18} /> PROSES
+                      <CheckCircle2 size={16} /> PROSES
                     </button>
                   </>
                 ) : (
                   <button 
                     onClick={() => handleAction(order.id, 'complete')}
-                    style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
+                    style={{ flex: 1, padding: '0.75rem', borderRadius: '14px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
                   >
-                    <CheckCircle size={18} /> SELESAI
+                    <CheckCircle2 size={16} /> SELESAI
                   </button>
                 )}
               </div>

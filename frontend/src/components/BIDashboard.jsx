@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
-import { ArrowLeft, BrainCircuit, Activity, Link2 } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, Activity, Link2, Store } from 'lucide-react';
 import { SmartAssistant } from './SmartAssistant';
-
-// Removed mock data
 
 export const BIDashboard = ({ user, authToken, onBack }) => {
   const [heatmapData, setHeatmapData] = useState([]);
@@ -75,95 +72,104 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
   }, [authToken, selectedBranch]);
 
   return (
-    <div style={{ height: '100dvh', width: '100vw', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '1rem', paddingTop: 'max(1.5rem, env(safe-area-inset-top, 20px))', paddingBottom: '100px', backgroundColor: 'var(--bg-main)' }}>
-      <header className="pos-header glassmorphism" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexShrink: 0, marginTop: '0.5rem' }}>
+    <div style={{ height: '100dvh', width: '100vw', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '1rem', paddingTop: 'max(1rem, env(safe-area-inset-top, 20px))', paddingBottom: '100px', backgroundColor: 'var(--bg-dark)', color: 'var(--text-main)' }}>
+      {/* Header */}
+      <header className="pwa-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', padding: '0.85rem 1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={onBack} className="btn-secondary" style={{ padding: '8px', borderRadius: '12px' }}>
+          <button 
+            onClick={onBack} 
+            style={{ padding: '8px 12px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--border-light)', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
             <ArrowLeft size={20} />
           </button>
-          <div style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)', padding: '8px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <BrainCircuit size={24} color="white" />
+          <div style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)', padding: '8px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white' }}>
+            <BrainCircuit size={24} />
           </div>
-          <h2 style={{ fontSize: 'clamp(1.1rem, 4vw, 1.5rem)', fontWeight: 600, lineHeight: 1.2 }}>
+          <h2 style={{ fontSize: 'clamp(1.1rem, 4vw, 1.4rem)', fontWeight: 800, lineHeight: 1.2, margin: 0, color: 'var(--text-main)' }}>
             AI & Business Intelligence
           </h2>
         </div>
       </header>
 
+      {/* Branch Switcher */}
       {showBranchSelector && branches.length > 0 && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <select 
-            value={selectedBranch} 
-            onChange={(e) => setSelectedBranch(e.target.value)}
-            style={{ 
-              width: '100%', 
-              padding: '12px 16px', 
-              borderRadius: '12px', 
-              background: 'rgba(255,255,255,0.05)', 
-              border: '1px solid rgba(255,255,255,0.1)', 
-              color: 'white', 
-              fontSize: '0.9rem',
-              outline: 'none'
-            }}
-          >
-            <option value="" style={{ color: 'black' }}>Semua Cabang (Gabungan)</option>
-            {branches.map(b => (
-              <option key={b.id} value={b.id} style={{ color: 'black' }}>
-                {b.code} - {b.name}
-              </option>
-            ))}
-          </select>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', padding: '0.75rem 1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+          <Store size={18} color="#8b5cf6" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Cabang Analisis</div>
+            <select 
+              value={selectedBranch} 
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              style={{ 
+                width: '100%', 
+                cursor: 'pointer', 
+                border: 'none', 
+                background: 'transparent', 
+                color: 'var(--text-main)', 
+                fontWeight: 700, 
+                fontSize: '0.9rem', 
+                outline: 'none'
+              }}
+            >
+              <option value="" style={{ background: 'var(--bg-dark)', color: 'var(--text-main)' }}>Semua Cabang (Gabungan)</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id} style={{ background: 'var(--bg-dark)', color: 'var(--text-main)' }}>
+                  {b.code} - {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'stretch' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', alignItems: 'stretch' }}>
         
         {/* Main BI Content */}
-        <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* Apriori Recommendations */}
-          <div className="glass-panel" style={{ flex: 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <div style={{ background: 'rgba(236, 72, 153, 0.1)', padding: '6px', borderRadius: '8px' }}>
+          <div className="pwa-card" style={{ flex: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div style={{ background: 'rgba(236, 72, 153, 0.15)', padding: '8px', borderRadius: '12px' }}>
                 <Link2 size={20} color="#ec4899" />
               </div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'white' }}>Customer Behavior: Pola Pembelian Bersamaan</h3>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>Customer Behavior: Pola Pembelian Bersamaan</h3>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem' }}>
               {loading ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Memuat data AI...</div>
               ) : aprioriRules.length === 0 ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Belum cukup data transaksi untuk menemukan pola.</div>
               ) : aprioriRules.map((rule, idx) => (
-                <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div key={idx} style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed var(--border-light)', padding: '1rem', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Membeli</span>
-                    <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>{rule.confidence} korelasi</span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Membeli</span>
+                    <span style={{ fontSize: '0.82rem', color: '#10b981', fontWeight: 700 }}>{rule.confidence} korelasi</span>
                   </div>
-                  <div style={{ color: 'white', fontWeight: 500 }}>{rule.item1}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Cenderung juga membeli:</div>
-                  <div style={{ color: '#38bdf8', fontWeight: 600 }}>{rule.item2}</div>
+                  <div style={{ color: 'var(--text-main)', fontWeight: 700, fontSize: '0.95rem' }}>{rule.item1}</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Cenderung juga membeli:</div>
+                  <div style={{ color: '#38bdf8', fontWeight: 800, fontSize: '0.95rem' }}>{rule.item2}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Activity Heatmap Mock */}
-          <div className="glass-panel" style={{ flex: 1, minHeight: '300px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '6px', borderRadius: '8px' }}>
+          {/* Activity Heatmap */}
+          <div className="pwa-card" style={{ flex: 1, minHeight: '300px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '8px', borderRadius: '12px' }}>
                 <Activity size={20} color="#f59e0b" />
               </div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'white' }}>Heatmap Aktivitas Transaksi</h3>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>Heatmap Aktivitas Transaksi</h3>
             </div>
-            <div style={{ height: 'auto', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.05)', padding: '1rem' }}>
+            <div style={{ height: 'auto', background: 'rgba(255,255,255,0.03)', borderRadius: '14px', display: 'flex', flexDirection: 'column', border: '1px solid var(--border-light)', padding: '1rem' }}>
                
                {/* Label Jam (X-Axis) */}
                <div style={{ display: 'grid', gridTemplateColumns: '40px repeat(12, 1fr)', gap: '4px', marginBottom: '8px' }}>
                   <div></div> {/* Spacer */}
                   {[8,9,10,11,12,13,14,15,16,17,18,19].map(h => (
-                    <div key={h} style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', alignSelf: 'end' }}>
+                    <div key={h} style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', alignSelf: 'end', fontWeight: 600 }}>
                       {h}
                     </div>
                   ))}
@@ -177,7 +183,7 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
                    ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].map((dayName, dIdx) => (
                      <React.Fragment key={`row-${dIdx}`}>
                        {/* Y-Axis Label */}
-                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px' }}>
+                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', fontWeight: 600 }}>
                          {dayName}
                        </div>
                        
@@ -198,7 +204,7 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
                                width: '100%',
                                height: '24px',
                                cursor: 'pointer',
-                               border: selectedCell && selectedCell.dayIndex === dIdx && selectedCell.hourIndex === hIdx ? '1px solid white' : 'none'
+                               border: selectedCell && selectedCell.dayIndex === dIdx && selectedCell.hourIndex === hIdx ? '1px solid var(--text-main)' : 'none'
                              }}
                            ></div>
                          );
@@ -208,30 +214,30 @@ export const BIDashboard = ({ user, authToken, onBack }) => {
                  )}
                </div>
 
-               {/* Info Sel Terpilih (Khusus Mobile) */}
-               <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', minHeight: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               {/* Info Sel Terpilih */}
+               <div style={{ marginTop: '1rem', padding: '0.85rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.25)', minHeight: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                  {selectedCell ? (
                    <div style={{ textAlign: 'center' }}>
-                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Hari {selectedCell.day}, Jam {selectedCell.hour}</div>
-                     <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'white' }}>{selectedCell.value} Transaksi</div>
+                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Hari {selectedCell.day}, Jam {selectedCell.hour}</div>
+                     <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>{selectedCell.value} Transaksi</div>
                    </div>
                  ) : (
-                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Klik kotak di atas untuk melihat detail transaksi.</div>
+                   <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Klik kotak di atas untuk melihat detail transaksi.</div>
                  )}
                </div>
 
-               {/* Legend (Keterangan Warna) */}
-               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sepi</span>
-                  <div style={{ flex: 1, height: '8px', margin: '0 1rem', borderRadius: '4px', background: 'linear-gradient(to right, rgba(59,130,246,0.05), rgba(59,130,246,1))' }}></div>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Ramai</span>
+               {/* Keterangan Warna */}
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.85rem' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Sepi</span>
+                  <div style={{ flex: 1, height: '6px', margin: '0 1rem', borderRadius: '4px', background: 'linear-gradient(to right, rgba(59,130,246,0.1), rgba(59,130,246,1))' }}></div>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Ramai</span>
                </div>
             </div>
           </div>
         </div>
         
         {/* AI Assistant Sidebar */}
-        <div style={{ flex: '1 1 350px', maxWidth: '100%', minHeight: '500px' }}>
+        <div style={{ flex: '1 1 350px', maxWidth: '100%', minHeight: '480px' }}>
           <SmartAssistant user={user} authToken={authToken} />
         </div>
 

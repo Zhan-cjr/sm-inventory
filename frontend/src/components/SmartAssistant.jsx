@@ -3,7 +3,7 @@ import { Send, Bot, User, Loader2 } from 'lucide-react';
 
 export const SmartAssistant = ({ user, authToken }) => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Halo! Saya AI Smart Assistant Anda (dikembangkan oleh Amnal). Ada yang bisa saya bantu terkait laporan penjualan, stok barang, atau rekomendasi produk hari ini?' }
+    { role: 'assistant', content: 'Halo! Saya AI Smart Assistant Anda (dikembangkan oleh Zhan_soft). Ada yang bisa saya bantu terkait laporan penjualan, stok barang, atau rekomendasi produk hari ini?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +27,6 @@ export const SmartAssistant = ({ user, authToken }) => {
     setIsLoading(true);
 
     try {
-      // Endpoint to our Python AI Microservice (proxied via Nginx in production)
       const response = await fetch('/api/v1/ai-proxy/ask', {
         method: 'POST',
         headers: { 
@@ -49,58 +48,87 @@ export const SmartAssistant = ({ user, authToken }) => {
       setMessages(prev => [...prev, { role: 'assistant', content: data.response || data.answer || 'AI memberikan respon kosong' }]);
       
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `DEBUG INFO: ${error.message}` }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `INFO: ${error.message}` }]);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '400px', maxHeight: '500px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem' }}>
-        <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '8px', borderRadius: '8px' }}>
-          <Bot size={20} color="var(--primary)" />
+    <div className="pwa-card" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '420px', maxHeight: '520px' }}>
+      {/* Assistant Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.85rem' }}>
+        <div style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)', padding: '8px', borderRadius: '12px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Bot size={20} />
         </div>
         <div>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'white', margin: 0 }}>Smart Assistant AI</h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Silahkan tanya apa saja.</p>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>Smart Assistant AI</h3>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Silakan tanya laporan atau saran produk.</p>
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* Messages Feed */}
+      <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
         {messages.map((msg, idx) => (
-          <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
-            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: msg.role === 'user' ? 'var(--primary)' : 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              {msg.role === 'user' ? <User size={16} color="white" /> : <Bot size={16} color="white" />}
+          <div key={idx} style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row' }}>
+            <div style={{ 
+              width: '32px', 
+              height: '32px', 
+              borderRadius: '10px', 
+              background: msg.role === 'user' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justify: 'center', 
+              flexShrink: 0,
+              color: 'white'
+            }}>
+              {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
             </div>
-            <div style={{ background: msg.role === 'user' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: 'white', padding: '10px 14px', borderRadius: '12px', borderTopRightRadius: msg.role === 'user' ? '4px' : '12px', borderTopLeftRadius: msg.role === 'assistant' ? '4px' : '12px', maxWidth: '80%', fontSize: '0.9rem', lineHeight: '1.4' }}>
+            <div style={{ 
+              background: msg.role === 'user' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)', 
+              color: 'var(--text-main)', 
+              border: '1px solid var(--border-light)',
+              padding: '10px 14px', 
+              borderRadius: '16px', 
+              borderTopRightRadius: msg.role === 'user' ? '4px' : '16px', 
+              borderTopLeftRadius: msg.role === 'assistant' ? '4px' : '16px', 
+              maxWidth: '82%', 
+              fontSize: '0.88rem', 
+              lineHeight: '1.45',
+              fontWeight: 500
+            }}>
               {msg.content}
             </div>
           </div>
         ))}
         {isLoading && (
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-             <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Bot size={16} color="white" />
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'flex-start' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'white' }}>
+              <Bot size={16} />
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', padding: '10px 14px', borderRadius: '12px', borderTopLeftRadius: '4px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Loader2 size={16} className="animate-spin" /> Sedang menganalisa data...
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: 'var(--text-muted)', padding: '10px 14px', borderRadius: '16px', borderTopLeftRadius: '4px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Loader2 size={16} className="animate-spin" /> Menganalisis data...
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSend} style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-light)' }}>
+      {/* Input Form */}
+      <form onSubmit={handleSend} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid var(--border-light)' }}>
         <input 
           type="text" 
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="Tanyakan sesuatu..."
-          style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', padding: '10px 16px', borderRadius: '20px', outline: 'none' }}
+          placeholder="Tanyakan sesuatu ke AI..."
+          style={{ flex: 1, background: 'rgba(0,0,0,0.1)', border: '1px solid var(--border-light)', color: 'var(--text-main)', padding: '10px 16px', borderRadius: '14px', outline: 'none', fontSize: '0.88rem', fontWeight: 500 }}
           disabled={isLoading}
         />
-        <button type="submit" disabled={isLoading || !input.trim()} style={{ background: 'var(--primary)', border: 'none', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer', opacity: isLoading || !input.trim() ? 0.5 : 1 }}>
+        <button 
+          type="submit" 
+          disabled={isLoading || !input.trim()} 
+          style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', width: '42px', height: '42px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer', opacity: isLoading || !input.trim() ? 0.5 : 1 }}
+        >
           <Send size={18} />
         </button>
       </form>

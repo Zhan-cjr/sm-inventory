@@ -1,5 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { 
+  Camera, 
+  Search, 
+  Barcode, 
+  MapPin, 
+  Layers, 
+  Tag, 
+  X, 
+  RotateCcw, 
+  CheckCircle2, 
+  AlertCircle,
+  Store,
+  ArrowRight,
+  History
+} from 'lucide-react';
 
 export function MobileProductScanner({ user, authToken }) {
   const [scannedProduct, setScannedProduct] = useState(null);
@@ -8,6 +23,8 @@ export function MobileProductScanner({ user, authToken }) {
   const [error, setError] = useState(null);
   const scannerRef = useRef(null);
   const [productsCache, setProductsCache] = useState([]);
+  const [recentScans, setRecentScans] = useState([]);
+  const [manualCode, setManualCode] = useState('');
   
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState(user?.branch_id || '');
@@ -46,7 +63,7 @@ export function MobileProductScanner({ user, authToken }) {
     if (isScanning) {
       scannerRef.current = new Html5QrcodeScanner(
         "reader",
-        { fps: 10, qrbox: { width: 250, height: 100 } },
+        { fps: 15, qrbox: { width: 260, height: 140 } },
         false
       );
 
@@ -68,155 +85,284 @@ export function MobileProductScanner({ user, authToken }) {
   }, [isScanning]);
 
   const handleLookup = (barcode) => {
+    if (!barcode) return;
     setError(null);
     setLoading(true);
 
-    // Cari di local cache dulu agar instan
-    const found = productsCache.find(p => p.barcode === barcode || p.sku === barcode);
+    const term = barcode.trim().toLowerCase();
+    // Cari di local cache dulu
+    const found = productsCache.find(p => 
+      (p.barcode && p.barcode.toLowerCase() === term) || 
+      (p.sku && p.sku.toLowerCase() === term) ||
+      (p.name && p.name.toLowerCase().includes(term))
+    );
     
     if (found) {
       setScannedProduct(found);
-      setLoading(false);
+      // Tambah ke riwayat scan (max 5)
+      setRecentScans(prev => {
+        const filtered = prev.filter(item => item.id !== found.id);
+        return [found, ...filtered].slice(0, 5);
+      });
     } else {
-      // Jika tidak ada di cache cabang ini, mungkin bisa panggil API tambahan
-      // Tapi untuk sekarang kita tampilkan error
-      setError(`Produk dengan barcode ${barcode} tidak ditemukan.`);
+      setError(`Produk "${barcode}" tidak ditemukan di database cabang ini.`);
       setScannedProduct(null);
-      setLoading(false);
     }
+    setLoading(false);
   };
 
-  const formatCurrency = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
+  const formatCurrency = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
 
   return (
-    <div style={{ padding: '1rem', paddingBottom: '6rem', animation: 'fadeIn 0.3s ease-out' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', animation: 'fadeIn 0.3s ease-out' }}>
       
+      {/* Title */}
+      <div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+          Pemeriksaan Produk
+        </div>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+          Cek Harga & Stok
+        </h2>
+      </div>
+
+      {/* Branch Selector */}
       {showBranchSelector && (
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Pilih Cabang (Admin Mode)</label>
-          <select 
-            value={selectedBranchId} 
-            onChange={(e) => setSelectedBranchId(e.target.value)}
-            className="login-input"
-            style={{ width: '100%', cursor: 'pointer', padding: '0.75rem', background: 'var(--bg-card)', color: 'white', border: '1px solid var(--border-light)', borderRadius: '8px' }}
-          >
-            <option value="" disabled>-- Pilih Cabang --</option>
-            {branches.map(b => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-light)', padding: '0.75rem 1rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Store size={18} color="#10b981" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Cabang Aktif (Admin)</div>
+            <select 
+              value={selectedBranchId} 
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              style={{ width: '100%', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--text-main)', fontWeight: 700, fontSize: '0.9rem', outline: 'none' }}
+            >
+              <option value="" disabled style={{ background: 'var(--bg-dark)' }}>-- Pilih Cabang --</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id} style={{ background: 'var(--bg-dark)' }}>{b.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
-      <h2 style={{ marginBottom: '0.5rem', fontSize: '1.5rem', fontWeight: 'bold' }}>Cek Harga & Stok</h2>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.85rem' }}>Scan barcode untuk melihat detail barang.</p>
-
-      {!isScanning && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+      {/* Main Scanner Launcher / Viewfinder */}
+      {!isScanning ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Big Tap to Scan Camera Button */}
           <button 
-            className="btn-primary" 
-            style={{ width: '100%', height: '100px', fontSize: '1.1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
             onClick={() => setIsScanning(true)}
+            style={{ 
+              width: '100%', 
+              padding: '1.75rem 1rem', 
+              borderRadius: '24px', 
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.08) 100%)',
+              border: '2px dashed rgba(16, 185, 129, 0.4)',
+              color: 'var(--text-main)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem',
+              cursor: 'pointer',
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.1)',
+              transition: 'all 0.2s ease'
+            }}
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4h4v4H4z"></path>
-              <path d="M4 16h4v4H4z"></path>
-              <path d="M16 4h4v4h-4z"></path>
-              <path d="M16 16h4v4h-4z"></path>
-              <line x1="12" y1="4" x2="12" y2="20"></line>
-              <line x1="4" y1="12" x2="20" y2="12"></line>
-            </svg>
-            TAP UNTUK SCAN KAMERA
+            <div style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', width: '56px', height: '56px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', boxShadow: '0 6px 18px rgba(16, 185, 129, 0.4)' }}>
+              <Camera size={28} />
+            </div>
+            <div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>TAP UNTUK SCAN BARCODE KAMERA</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>Gunakan kamera HP untuk memindai otomatis</div>
+            </div>
           </button>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card)', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+          {/* Manual Input Search Bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card)', padding: '6px 6px 6px 14px', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+            <Search size={18} color="var(--text-muted)" />
             <input 
               type="text" 
-              className="modern-barcode-input" 
-              style={{ flex: 1, padding: '0.75rem', background: 'transparent' }}
-              placeholder="Atau ketik Barcode manual..."
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              style={{ flex: 1, padding: '0.65rem 0', background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', fontSize: '0.9rem', fontWeight: 600 }}
+              placeholder="Atau ketik Barcode / SKU / Nama Produk..."
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.target.value.trim() !== '') {
-                  handleLookup(e.target.value.trim());
-                  e.target.value = '';
+                if (e.key === 'Enter' && manualCode.trim() !== '') {
+                  handleLookup(manualCode);
                 }
               }}
             />
+            {manualCode && (
+              <button 
+                onClick={() => setManualCode('')}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={16} />
+              </button>
+            )}
             <button 
-              className="btn-secondary" 
-              style={{ padding: '0.75rem 1rem' }}
-              onClick={(e) => {
-                const input = e.currentTarget.previousElementSibling;
-                if (input.value.trim() !== '') {
-                  handleLookup(input.value.trim());
-                  input.value = '';
-                }
-              }}
+              onClick={() => handleLookup(manualCode)}
+              style={{ padding: '0.65rem 1.25rem', borderRadius: '12px', background: '#10b981', border: 'none', color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
             >
-              CARI
+              Cari
             </button>
           </div>
         </div>
-      )}
+      ) : (
+        /* Active Scanner Reticle View */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="scanner-reticle-box">
+            <div className="scanner-laser-line"></div>
+            <div id="reader" style={{ width: '100%', minHeight: '260px' }}></div>
+          </div>
 
-      {isScanning && (
-        <div style={{ marginBottom: '1rem' }}>
-          <div id="reader" style={{ width: '100%', borderRadius: '12px', overflow: 'hidden', border: '2px solid #10b981' }}></div>
           <button 
-            className="btn-secondary" 
-            style={{ width: '100%', marginTop: '1rem', padding: '1rem' }}
             onClick={() => setIsScanning(false)}
+            style={{ width: '100%', padding: '0.9rem', borderRadius: '16px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' }}
           >
-            Batal Scan
+            Batal Pemindaian
           </button>
         </div>
       )}
 
-      {loading && <div style={{ textAlign: 'center', padding: '2rem' }}><div className="spinner"></div></div>}
-
-      {error && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-          {error}
+      {/* Loading Spinner */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <div className="spin" style={{ width: '32px', height: '32px', border: '3px solid #10b981', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto' }}></div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.75rem' }}>Mencari data produk...</div>
         </div>
       )}
 
+      {/* Error Message */}
+      {error && !loading && (
+        <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '1rem 1.25rem', borderRadius: '16px', border: '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <AlertCircle size={22} style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>{error}</div>
+        </div>
+      )}
+
+      {/* Scanned Product Card Sheet */}
       {scannedProduct && !loading && (
-        <div className="glass-panel slide-up" style={{ padding: '1.5rem' }}>
-          <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 'bold', marginBottom: '0.25rem' }}>HASIL PENCARIAN</div>
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', lineHeight: '1.3' }}>{scannedProduct.name}</h3>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Barcode/SKU</span>
-              <span style={{ fontWeight: 'bold' }}>{scannedProduct.barcode || scannedProduct.sku}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Harga Jual Dasar</span>
-              <span style={{ fontWeight: 'bold', color: '#10b981' }}>{formatCurrency(scannedProduct.harga_jual_1)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Sisa Stok (Sistem)</span>
-              <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: (scannedProduct.quantity_on_hand !== undefined ? scannedProduct.quantity_on_hand : scannedProduct.stock_quantity) <= 0 ? '#ef4444' : 'inherit' }}>
-                {scannedProduct.quantity_on_hand !== undefined ? scannedProduct.quantity_on_hand : scannedProduct.stock_quantity} <span style={{ fontSize: '0.8rem', fontWeight: 'normal' }}>{scannedProduct.unit_of_measure}</span>
+        <div className="pwa-card" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '4px 10px', borderRadius: '99px', letterSpacing: '0.5px' }}>
+              PRODUK DITEMUKAN
+            </span>
+            <button 
+              onClick={() => setScannedProduct(null)} 
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 1rem', color: 'var(--text-main)', lineHeight: 1.3 }}>
+            {scannedProduct.name}
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {/* Barcode & SKU */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-light)' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Barcode size={16} /> Barcode / SKU
               </span>
+              <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{scannedProduct.barcode || scannedProduct.sku}</span>
             </div>
+
+            {/* Selling Price */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-light)' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Tag size={16} color="#10b981" /> Harga Jual Utama
+              </span>
+              <span style={{ fontWeight: 900, fontSize: '1.2rem', color: '#10b981' }}>{formatCurrency(scannedProduct.harga_jual_1)}</span>
+            </div>
+
+            {/* Tier Price 2 if exists */}
+            {scannedProduct.harga_jual_2 > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-light)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Harga Grosir (Tier 2)</span>
+                <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{formatCurrency(scannedProduct.harga_jual_2)}</span>
+              </div>
+            )}
+
+            {/* Stock Quantity Status */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-light)' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Layers size={16} /> Sisa Stok Sistem
+              </span>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ 
+                  fontWeight: 900, 
+                  fontSize: '1.1rem', 
+                  color: (scannedProduct.quantity_on_hand !== undefined ? scannedProduct.quantity_on_hand : scannedProduct.stock_quantity) <= 0 
+                    ? '#ef4444' 
+                    : ((scannedProduct.quantity_on_hand !== undefined ? scannedProduct.quantity_on_hand : scannedProduct.stock_quantity) < 5 ? '#f59e0b' : '#10b981')
+                }}>
+                  {scannedProduct.quantity_on_hand !== undefined ? scannedProduct.quantity_on_hand : scannedProduct.stock_quantity}
+                </span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '4px' }}>
+                  {scannedProduct.unit_of_measure || 'Pcs'}
+                </span>
+              </div>
+            </div>
+
+            {/* Rack Location */}
             {scannedProduct.rack_code && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Lokasi Rak</span>
-                <span style={{ fontWeight: 'bold' }}>{scannedProduct.rack_code}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <MapPin size={16} color="#6366f1" /> Lokasi Rak
+                </span>
+                <span style={{ fontWeight: 700, background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1', padding: '2px 10px', borderRadius: '8px', fontSize: '0.85rem' }}>
+                  {scannedProduct.rack_code}
+                </span>
               </div>
             )}
           </div>
-          
+
           <button 
-            className="btn-secondary" 
-            style={{ width: '100%', marginTop: '1.5rem', padding: '0.75rem' }}
             onClick={() => setScannedProduct(null)}
+            style={{ width: '100%', marginTop: '1.25rem', padding: '0.85rem', borderRadius: '14px', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--border-light)', color: 'var(--text-main)', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' }}
           >
-            Tutup
+            Selesai / Scan Selanjutnya
           </button>
         </div>
       )}
+
+      {/* Session Recent Scans Pill History */}
+      {recentScans.length > 0 && (
+        <div className="pwa-card">
+          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <History size={16} /> Riwayat Scan Sesi Ini
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '4px' }}>
+            {recentScans.map((prod, idx) => (
+              <button
+                key={idx}
+                onClick={() => setScannedProduct(prod)}
+                style={{
+                  background: scannedProduct?.id === prod.id ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)',
+                  border: scannedProduct?.id === prod.id ? '1px solid #10b981' : '1px solid var(--border-light)',
+                  padding: '6px 12px',
+                  borderRadius: '12px',
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  color: 'var(--text-main)',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>{prod.name}</span>
+                <span style={{ color: '#10b981', fontWeight: 700 }}>{formatCurrency(prod.harga_jual_1)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

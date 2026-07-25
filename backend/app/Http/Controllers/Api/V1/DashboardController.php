@@ -79,7 +79,23 @@ class DashboardController extends Controller
         
         \Illuminate\Support\Facades\Log::info('Weekly Chart Data', ['last7Days' => $last7Days, 'weeklySales' => $weeklySales]);
 
-        // 5. Stock Health (Low Stock Count)
+        // 5. Comparative Sales (Versus)
+        $yesterdaySales = Transaction::where('branch_id', $branchId)
+            ->whereDate('transaction_date', Carbon::yesterday())
+            ->where('is_voided', false)
+            ->sum('final_amount');
+
+        $sameDayLastWeekSales = Transaction::where('branch_id', $branchId)
+            ->whereDate('transaction_date', Carbon::today()->subWeek())
+            ->where('is_voided', false)
+            ->sum('final_amount');
+
+        $sameDateLastMonthSales = Transaction::where('branch_id', $branchId)
+            ->whereDate('transaction_date', Carbon::today()->subMonthNoOverflow())
+            ->where('is_voided', false)
+            ->sum('final_amount');
+
+        // 6. Stock Health (Low Stock Count)
         $lowStockCount = DB::table('stocks')
             ->where('branch_id', $branchId)
             ->whereColumn('quantity_on_hand', '<=', 'min_qty')
@@ -93,6 +109,9 @@ class DashboardController extends Controller
                 'grossProfit' => (int) $grossProfit,
                 'profitMargin' => round($profitMargin, 2),
                 'lowStockCount' => $lowStockCount,
+                'yesterdaySales' => (int) $yesterdaySales,
+                'sameDayLastWeekSales' => (int) $sameDayLastWeekSales,
+                'sameDateLastMonthSales' => (int) $sameDateLastMonthSales,
             ],
             'topProducts' => $topProducts,
             'weeklyChart' => $last7Days
