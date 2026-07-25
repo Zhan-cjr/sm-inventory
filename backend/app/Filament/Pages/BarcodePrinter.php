@@ -5,14 +5,13 @@ namespace App\Filament\Pages;
 use Filament\Pages\Page;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Get;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\DatePicker;
 use Filament\Actions\Action;
 use App\Models\Product;
 use App\Models\GoodsReceipt;
 use App\Models\Branch;
+use App\Models\Stock;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
@@ -36,6 +35,9 @@ class BarcodePrinter extends Page implements HasForms
     {
         $this->form->fill([
             'branch_id' => auth()->user()->branch_id,
+            'date_type' => 'cetak',
+            'custom_date' => null,
+            'add_product_id' => null,
             'print_items' => []
         ]);
     }
@@ -47,103 +49,171 @@ class BarcodePrinter extends Page implements HasForms
         return $schema
             ->schema([
                 Select::make('branch_id')
-                    ->label('Cabang')
+                    ->label('Cabang Gudang/Toko')
                     ->options(Branch::pluck('name', 'id'))
                     ->default($userBranchId)
                     ->hidden(fn () => $userBranchId !== null)
                     ->live()
                     ->required()
                     ->columnSpan(1),
-                    
+
                 Select::make('date_type')
                     ->label('Tipe Tanggal (Label Tempel)')
                     ->options([
-                        'cetak' => 'Tanggal Cetak',
-                        'expired' => 'Tanggal Expired',
+                        'cetak' => 'Tanggal Cetak Hari Ini',
+                        'expired' => 'Tanggal Expired Produk',
                     ])
                     ->default('cetak')
                     ->live()
                     ->columnSpan(1),
 
-                \Filament\Forms\Components\DatePicker::make('custom_date')
+                DatePicker::make('custom_date')
                     ->label('Pilih Tanggal Expired')
                     ->hidden(fn ($get) => $get('date_type') !== 'expired')
                     ->required(fn ($get) => $get('date_type') === 'expired')
                     ->columnSpan(1),
 
-                Repeater::make('print_items')
-                    ->label('')
-                    ->schema([
-                        Select::make('product_id')
-                            ->label('Produk')
-                            ->searchable()
-                            ->getSearchResultsUsing(function (string $search, $get) use ($userBranchId) {
-                                $branchId = $userBranchId ?? $get('../../branch_id');
-                                return Product::where(function($q) use ($search) {
-                                        $q->where('name', 'like', "%{$search}%")->orWhere('sku', 'like', "%{$search}%");
-                                    })
-                                    ->when($branchId, function($q) use ($branchId) {
-                                        $q->whereHas('stocks', fn($sq) => $sq->where('branch_id', $branchId));
-                                    })
-                                    ->limit(50)->pluck('name', 'id')->toArray();
+                Select::make('add_product_id')
+                    ->label('🔎 Cari & Tambah Produk Ke Antrean (Ketik Nama / SKU / Barcode)')
+                    ->searchable()
+                    ->placeholder('Ketik nama barang, SKU, atau scan barcode...')
+                    ->getSearchResultsUsing(function (string $search, $get) use ($userBranchId) {
+                        $branchId = $userBranchId ?? $get('branch_id');
+                        return Product::where(function($q) use ($search) {
+                                $q->where('name', 'like', "%{$search}%")
+                                  ->orWhere('sku', 'like', "%{$search}%")
+                                  ->orWhere('barcode', 'like', "%{$search}%");
                             })
-                            ->getOptionLabelUsing(fn ($value): ?string => Product::find($value)?->name)
-                            ->live(onBlur: true)
-                            ->afterStateUpdated(function ($state, callable $set, $get) {
-                                if ($state) {
-                                    $product = Product::find($state);
-                                    if ($product) {
-                                        $set('sku', $product->sku);
-                                        $set('barcode', $product->barcode);
-                                        $branchId = $get('../../branch_id');
-                                        if ($branchId) {
-                                            $stock = \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $branchId)->first();
-                                            $set('price', ($stock && $stock->selling_price > 0) ? $stock->selling_price : $product->selling_price);
-                                        } else {
-                                            $set('price', $product->selling_price);
-                                        }
-                                    }
-                                }
+                            ->when($branchId, function($q) use ($branchId) {
+                                $q->whereHas('stocks', fn($sq) => $sq->where('branch_id', $branchId));
                             })
-                            ->required()
-                            ->columnSpan(4),
-                        TextInput::make('sku')
-                            ->label('SKU')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->columnSpan(2),
-                        TextInput::make('barcode')
-                            ->label('Barcode')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->columnSpan(2),
-                        TextInput::make('price')
-                            ->label('Harga Jual')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->columnSpan(2),
-                        TextInput::make('copies')
-                            ->label('Jml Cetak')
-                            ->numeric()
-                            ->default(1)
-                            ->minValue(1)
-                            ->required()
-                            ->columnSpan(2),
-                    ])
-                    ->columns(12)
-                    ->defaultItems(0)
-                    ->addActionLabel('Tambah Produk Manual')
-                    ->columnSpan('full')
+                            ->limit(30)
+                            ->get()
+                            ->mapWithKeys(fn ($p) => [$p->id => "{$p->name} (SKU: {$p->sku} | Barcode: " . ($p->barcode ?? '-') . ")"])
+                            ->toArray();
+                    })
+                    ->getOptionLabelUsing(fn ($value): ?string => Product::find($value)?->name)
+                    ->live()
+                    ->afterStateUpdated(function ($state, callable $set) {
+                        if ($state) {
+                            $this->addProductToQueue($state);
+                            $set('add_product_id', null);
+                        }
+                    })
+                    ->columnSpan('full'),
             ])
             ->columns(3)
             ->statePath('data');
+    }
+
+    public function addProductToQueue($productId, $copies = 1): void
+    {
+        $product = Product::find($productId);
+        if (!$product) return;
+
+        $currentItems = $this->data['print_items'] ?? [];
+        $branchId = $this->data['branch_id'] ?? auth()->user()->branch_id;
+
+        // Check if product already in queue
+        $existingIndex = null;
+        foreach ($currentItems as $idx => $item) {
+            if (($item['product_id'] ?? null) == $product->id) {
+                $existingIndex = $idx;
+                break;
+            }
+        }
+
+        if ($existingIndex !== null) {
+            $currentItems[$existingIndex]['copies'] += $copies;
+        } else {
+            $stock = $branchId ? Stock::where('product_id', $product->id)->where('branch_id', $branchId)->first() : null;
+            $price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $product->selling_price;
+
+            $currentItems[] = [
+                'product_id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku ?? '-',
+                'barcode' => $product->barcode ?? '-',
+                'price' => (float) $price,
+                'copies' => (int) $copies,
+            ];
+        }
+
+        $this->data['print_items'] = $currentItems;
+
+        \Filament\Notifications\Notification::make()
+            ->title("{$product->name} ditambahkan ke antrean")
+            ->success()
+            ->send();
+    }
+
+    public function updateCopies($index, $copies): void
+    {
+        $copies = max(1, (int) $copies);
+        if (isset($this->data['print_items'][$index])) {
+            $this->data['print_items'][$index]['copies'] = $copies;
+        }
+    }
+
+    public function changeCopiesStep($index, $delta): void
+    {
+        if (isset($this->data['print_items'][$index])) {
+            $current = (int) ($this->data['print_items'][$index]['copies'] ?? 1);
+            $next = max(1, $current + $delta);
+            $this->data['print_items'][$index]['copies'] = $next;
+        }
+    }
+
+    public function removeItem($index): void
+    {
+        if (isset($this->data['print_items'][$index])) {
+            $name = $this->data['print_items'][$index]['name'] ?? 'Item';
+            array_splice($this->data['print_items'], $index, 1);
+
+            \Filament\Notifications\Notification::make()
+                ->title("{$name} dihapus dari antrean")
+                ->info()
+                ->send();
+        }
+    }
+
+    public function batchSetCopies(int $count = 1): void
+    {
+        $items = $this->data['print_items'] ?? [];
+        if (empty($items)) {
+            \Filament\Notifications\Notification::make()
+                ->title('Tidak ada item di dalam antrean')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        foreach ($items as &$item) {
+            $item['copies'] = $count;
+        }
+        
+        $this->data['print_items'] = $items;
+
+        \Filament\Notifications\Notification::make()
+            ->title("Jumlah cetak semua produk diubah menjadi {$count}")
+            ->success()
+            ->send();
+    }
+
+    public function clearAll(): void
+    {
+        $this->data['print_items'] = [];
+        \Filament\Notifications\Notification::make()
+            ->title('Semua data antrean berhasil dikosongkan')
+            ->success()
+            ->send();
     }
 
     protected function getHeaderActions(): array
     {
         return [
             Action::make('load_receipt')
-                ->label('Load Data Penerimaan')
+                ->label('Load Data Penerimaan (GR)')
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('info')
                 ->form([
@@ -162,30 +232,23 @@ class BarcodePrinter extends Page implements HasForms
                 ->action(function (array $data) {
                     $receipt = GoodsReceipt::with('items.product')->find($data['goods_receipt_id']);
                     if ($receipt) {
-                        $currentItems = $this->data['print_items'] ?? [];
+                        $countAdded = 0;
                         foreach ($receipt->items as $item) {
                             if ($item->product) {
-                                $branchId = $this->data['branch_id'] ?? auth()->user()->branch_id;
-                                $stock = $branchId ? \App\Models\Stock::where('product_id', $item->product_id)->where('branch_id', $branchId)->first() : null;
-                                $price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $item->product->selling_price;
-                                $currentItems[] = [
-                                    'product_id' => $item->product_id,
-                                    'sku' => $item->product->sku,
-                                    'barcode' => $item->product->barcode,
-                                    'price' => $price,
-                                    'copies' => $item->quantity_received > 0 ? $item->quantity_received : 1,
-                                ];
+                                $copies = $item->quantity_received > 0 ? $item->quantity_received : 1;
+                                $this->addProductToQueue($item->product_id, $copies);
+                                $countAdded++;
                             }
                         }
-                        $this->form->fill([
-                            'branch_id' => $this->data['branch_id'] ?? auth()->user()->branch_id,
-                            'print_items' => $currentItems
-                        ]);
+                        \Filament\Notifications\Notification::make()
+                            ->title("Berhasil memuat {$countAdded} barang dari GR {$receipt->receipt_number}")
+                            ->success()
+                            ->send();
                     }
                 }),
                 
             Action::make('export_excel')
-                ->label('Export Excel')
+                ->label('Export CSV / Excel')
                 ->icon('heroicon-o-document-arrow-down')
                 ->color('success')
                 ->action(function () {
@@ -201,28 +264,23 @@ class BarcodePrinter extends Page implements HasForms
                     $productIds = collect($items)->pluck('product_id')->filter()->unique();
                     $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
 
-                    $csvData = "SKU,Barcode,Nama Barang,Harga Jual\n";
+                    $csvData = "SKU,Barcode,Nama Barang,Harga Jual,Kuantitas\n";
                     foreach ($items as $item) {
                         $product = $products->get($item['product_id'] ?? null);
                         if (!$product) continue;
 
-                        // Secure against commas in product names by wrapping in quotes
                         $name = str_replace('"', '""', $product->name);
                         $sku = $product->sku ?? '';
                         $barcode = $product->barcode ?? '';
-                        $branchId = $this->data['branch_id'] ?? auth()->user()->branch_id;
-                        $stock = $branchId ? \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $branchId)->first() : null;
-                        $price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : ($product->selling_price ?? '');
+                        $price = $item['price'] ?? 0;
                         $copies = (int) ($item['copies'] ?? 1);
                         
-                        for ($i = 0; $i < $copies; $i++) {
-                            $csvData .= "\"{$sku}\",\"{$barcode}\",\"{$name}\",\"{$price}\"\n";
-                        }
+                        $csvData .= "\"{$sku}\",\"{$barcode}\",\"{$name}\",\"{$price}\",\"{$copies}\"\n";
                     }
 
                     return response()->streamDownload(function () use ($csvData) {
                         echo $csvData;
-                    }, 'barcode_print_items.csv', [
+                    }, 'antrean_cetak_barcode.csv', [
                         'Content-Type' => 'text/csv',
                     ]);
                 }),
@@ -232,12 +290,7 @@ class BarcodePrinter extends Page implements HasForms
                 ->color('danger')
                 ->icon('heroicon-o-trash')
                 ->requiresConfirmation()
-                ->action(function () {
-                    $this->form->fill([
-                        'branch_id' => $this->data['branch_id'] ?? auth()->user()->branch_id,
-                        'print_items' => []
-                    ]);
-                }),
+                ->action(fn() => $this->clearAll()),
         ];
     }
     
@@ -251,18 +304,6 @@ class BarcodePrinter extends Page implements HasForms
         return $this->processPrint('print.barcode.pricecard');
     }
 
-    public function clearAll()
-    {
-        $this->form->fill([
-            'branch_id' => $this->data['branch_id'] ?? auth()->user()->branch_id,
-            'print_items' => []
-        ]);
-        \Filament\Notifications\Notification::make()
-            ->title('Semua data berhasil dikosongkan')
-            ->success()
-            ->send();
-    }
-    
     protected function processPrint($routeName)
     {
         $items = $this->data['print_items'] ?? [];
@@ -274,10 +315,7 @@ class BarcodePrinter extends Page implements HasForms
             return;
         }
 
-        // Generate unique session key for this print job
         $sessionKey = (string) Str::uuid();
-        
-        // Cache the queue for 1 hour
         Cache::put('print_queue_' . $sessionKey, $items, now()->addHours(1));
 
         $url = route($routeName, [

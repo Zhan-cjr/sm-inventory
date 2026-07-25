@@ -2,18 +2,21 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Cetak Pricecard Rak</title>
+    <title>Cetak Pricecard Rak - SM INVENTORY</title>
     <style>
         @page {
             margin: 5mm;
-            size: A4;
+            size: A4 portrait;
+        }
+        * {
+            box-sizing: border-box;
         }
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background: #fff;
-            color: #000;
+            font-family: 'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #ffffff;
+            color: #000000;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
@@ -21,28 +24,29 @@
             display: flex;
             flex-wrap: wrap;
             justify-content: flex-start;
-            gap: 5px;
-            padding: 5px;
+            gap: 4mm;
+            padding: 2mm;
         }
         .pricecard {
-            width: 60mm;
-            height: 30mm;
+            width: 62mm;
+            height: 32mm;
             box-sizing: border-box;
-            background: #fff;
+            background: #ffffff;
             position: relative;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             page-break-inside: avoid;
             border-radius: 6px;
-            border: 1px solid #ccc;
+            border: 1px solid #d1d5db;
         }
         
         .header {
             display: flex;
             justify-content: space-between;
             align-items: stretch;
-            height: 8mm;
+            height: 8.5mm;
+            background: #ffffff;
         }
         .logo-container {
             padding: 1mm 2mm;
@@ -52,62 +56,65 @@
             justify-content: flex-start;
         }
         .logo-container img {
-            max-height: 5.5mm;
+            max-height: 6mm;
             max-width: 100%;
             object-fit: contain;
         }
         .store-info {
-            background: #cc0000;
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
             color: #ffffff;
-            border-bottom-left-radius: 8px;
-            padding: 1mm 2mm;
+            border-bottom-left-radius: 10px;
+            padding: 1mm 2.5mm;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            align-items: center;
-            text-align: center;
-            max-width: 55%;
+            align-items: flex-end;
+            text-align: right;
+            max-width: 58%;
         }
         .store-name {
-            font-weight: bold;
-            font-size: 8px;
-            margin-bottom: 1px;
+            font-weight: 800;
+            font-size: 8.5px;
+            line-height: 1.1;
             white-space: nowrap;
             text-transform: uppercase;
+            letter-spacing: 0.2px;
         }
         .store-motto {
             font-size: 4.5px;
             line-height: 1.1;
             white-space: nowrap;
+            opacity: 0.9;
         }
         
         .separator {
-            height: 1px;
-            background: #cc0000;
+            height: 1.5px;
+            background: #dc2626;
             margin: 0 2mm;
         }
         
         .body-content {
             display: flex;
             flex: 1;
-            padding: 1mm 2mm 0 2mm;
+            padding: 1.5mm 2mm 0 2mm;
         }
         .product-info {
             flex: 1;
             display: flex;
             flex-direction: column;
-            padding-right: 1mm;
+            padding-right: 1.5mm;
+            justify-content: space-between;
         }
         .product-name {
-            font-weight: bold;
-            font-size: 8px;
-            line-height: 1.2;
+            font-weight: 800;
+            font-size: 8.5px;
+            line-height: 1.25;
             text-transform: uppercase;
-            color: #111;
-            height: 2.4em; /* Jatah pas 2 baris */
+            color: #0f172a;
+            height: 2.5em;
             display: flex;
             flex-direction: column;
-            justify-content: flex-end; /* Supaya teks menempel ke bawah */
+            justify-content: flex-start;
         }
         .product-name span {
             display: -webkit-box;
@@ -119,35 +126,34 @@
         
         .grey-line {
             height: 1px;
-            background: #ccc;
+            background: #e2e8f0;
             width: 100%;
             flex-shrink: 0;
         }
         
         .product-price {
             display: flex;
-            align-items: flex-start; /* Supaya Rp. sejajar atas dengan angka */
-            flex: 1;
+            align-items: flex-start;
             padding-top: 0.5mm;
             padding-bottom: 0.5mm;
         }
         .price-currency {
             font-weight: 900;
-            font-size: 8px;
-            color: #cc0000;
+            font-size: 9px;
+            color: #dc2626;
             margin-right: 2px;
-            margin-top: 1.5mm; /* Penyesuaian visual agar rata atas dengan angka besar */
+            margin-top: 1mm;
         }
         .price-amount {
             font-weight: 900;
-            font-size: 24px;
-            color: #cc0000;
-            letter-spacing: -1px;
-            line-height: 0.8;
+            font-size: 23px;
+            color: #dc2626;
+            letter-spacing: -0.8px;
+            line-height: 0.85;
         }
         
         .barcode-wrapper {
-            width: 24mm;
+            width: 25mm;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -156,14 +162,15 @@
         }
         .barcode-wrapper svg {
             max-width: 100%;
-            height: 7.5mm;
+            height: 8mm;
         }
         .barcode-text {
-            font-size: 6px;
-            letter-spacing: 1px;
-            margin-top: 1mm;
-            font-family: monospace;
-            font-weight: bold;
+            font-size: 6.5px;
+            letter-spacing: 0.8px;
+            margin-top: 0.8mm;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: 800;
+            color: #1e293b;
         }
         
         .footer {
@@ -172,23 +179,25 @@
             align-items: flex-end;
             height: 4mm;
             padding-right: 2mm;
+            background: #ffffff;
         }
         .print-date {
-            background: #222;
-            color: #fff;
+            background: #0f172a;
+            color: #ffffff;
             padding: 1mm 2mm;
             border-top-right-radius: 6px;
             display: flex;
             align-items: center;
-            font-size: 4px;
-            font-weight: bold;
-            height: 2mm;
+            font-size: 4.5px;
+            font-weight: 800;
+            height: 2.2mm;
+            letter-spacing: 0.3px;
         }
         .print-date svg {
             width: 2mm;
             height: 2mm;
             margin-right: 1mm;
-            fill: #fff;
+            fill: #ffffff;
         }
         .stripes {
             display: flex;
@@ -200,8 +209,8 @@
             width: 2mm;
             transform: skewX(-30deg);
         }
-        .stripe-red { background: #cc0000; width: 2.5mm; }
-        .stripe-grey { background: #b0b0b0; }
+        .stripe-red { background: #dc2626; width: 2.5mm; }
+        .stripe-grey { background: #94a3b8; }
     </style>
 </head>
 <body onload="window.print()">
@@ -230,7 +239,7 @@
                             @if($org && $org->logo_path)
                                 <img src="{{ asset('storage/' . $org->logo_path) }}" alt="Logo">
                             @else
-                                <h1 style="font-size: 10px; margin: 0; color: #cc0000;">{{ $orgName }}</h1>
+                                <h1 style="font-size: 11px; font-weight: 900; margin: 0; color: #dc2626;">{{ $orgName }}</h1>
                             @endif
                         </div>
                         <div class="store-info">
@@ -260,10 +269,10 @@
                         
                         <div class="barcode-wrapper">
                             @if($product->barcode)
-                                {!! $generator->getBarcode($product->barcode, $generator::TYPE_CODE_128, 1, 30) !!}
+                                {!! $generator->getBarcode($product->barcode, $generator::TYPE_CODE_128, 1, 32) !!}
                                 <div class="barcode-text">{{ $product->barcode }}</div>
                             @else
-                                <div style="font-size: 6px; margin-top: 3mm;">No Barcode</div>
+                                <div style="font-size: 6px; margin-top: 3mm; color: #64748b;">No Barcode</div>
                             @endif
                         </div>
                     </div>
