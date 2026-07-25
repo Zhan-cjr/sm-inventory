@@ -5,26 +5,29 @@
     <title>Cetak Label Barcode - Toshiba TEC & Thermal Printer</title>
     <style>
         @page {
-            /* Kertas label thermal 3 kolom: 3 x 32mm = 96mm width, 18mm height per baris/black mark */
+            /* Kertas label thermal 3 kolom: 96mm width x 18mm height per baris/black mark */
             size: 96mm 18mm;
-            margin: 0;
+            margin: 0mm;
         }
         * {
             box-sizing: border-box;
         }
-        body {
+        html, body {
             margin: 0;
             padding: 0;
-            font-family: Arial, Helvetica, sans-serif;
+            width: 96mm;
             background: #ffffff;
             color: #000000;
+            font-family: Arial, Helvetica, sans-serif;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
         
+        /* 17.5mm row height to prevent Chrome subpixel rounding blank page feed at 100% scale */
         .label-row {
             width: 96mm;
-            height: 18mm;
+            height: 17.5mm;
+            max-height: 17.5mm;
             display: flex;
             flex-direction: row;
             page-break-after: always;
@@ -32,67 +35,46 @@
             box-sizing: border-box;
             overflow: hidden;
             background: #ffffff;
+            margin: 0;
+            padding: 0;
         }
 
         .label {
             width: 32mm;
-            height: 18mm;
+            height: 17.5mm;
             box-sizing: border-box;
-            padding: 0;
+            padding: 0.5mm 1mm 0.4mm 1mm;
             overflow: hidden;
             display: flex;
-            flex-direction: row;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            text-align: center;
             background-color: #ffffff;
         }
         
-        .left-section {
-            width: 5.5mm;
-            background: #ffffff;
-            color: #000000;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1mm 0;
-            box-sizing: border-box;
-            border-right: 1px solid #000000;
-        }
-        .branch-text-container {
-            display: flex;
-            flex-direction: row;
-            justify-content: center;
-            align-items: center;
-            gap: 0.5mm;
-            flex-grow: 1;
-        }
-        .branch-line {
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
-            font-size: 5.5px;
-            font-weight: bold;
+        /* Line 1: Full Branch Name (No Truncation) */
+        .branch-header {
+            width: 100%;
+            font-size: 5.6px;
+            font-weight: 800;
+            text-transform: uppercase;
             letter-spacing: 0.2px;
+            text-align: center;
             white-space: nowrap;
-        }
-        .cart-icon {
-            width: 3.5mm;
-            height: 3.5mm;
-            fill: #000000;
-            margin-top: 0.5mm;
-            transform: rotate(-90deg);
+            overflow: hidden;
+            color: #000000;
+            border-bottom: 0.5px solid #000000;
+            padding-bottom: 0.3mm;
+            height: 2.3mm;
+            line-height: 1.1;
         }
 
-        .middle-section {
-            width: 22.5mm;
-            padding: 0.8mm 1mm;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            box-sizing: border-box;
-            background: #ffffff;
-        }
+        /* Line 2: Product Name (Full Width, Max 2 Lines) */
         .product-name {
-            font-size: 5.5px;
-            font-weight: bold;
+            width: 100%;
+            font-size: 6.3px;
+            font-weight: 800;
             line-height: 1.15;
             overflow: hidden;
             display: -webkit-box;
@@ -102,77 +84,86 @@
             text-transform: uppercase;
             text-align: center;
             color: #000000;
+            height: 3.4mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
+        /* Line 3: SVG Barcode & Code Number */
         .barcode-section {
+            width: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            flex-grow: 1;
-            padding: 0.5mm 0;
+            margin-top: 0.2mm;
+            margin-bottom: 0.2mm;
         }
         .barcode-wrapper {
             width: 100%;
-            height: 5.5mm;
+            height: 4.5mm;
             display: flex;
             justify-content: center;
             align-items: center;
         }
         .barcode-wrapper svg {
             width: 100%;
-            max-width: 21mm;
+            max-width: 28mm;
             height: 100%;
         }
         .barcode-number {
-            font-size: 5px;
-            letter-spacing: 1.2px;
-            margin-top: 0.3mm;
+            font-size: 5.2px;
+            letter-spacing: 1px;
+            margin-top: 0.2mm;
             font-weight: bold;
-            font-family: monospace;
+            font-family: 'Courier New', Courier, monospace;
             color: #000000;
+            line-height: 1;
         }
 
-        .price-container {
+        /* Line 4: Footer Bar (Jumbo Price on Left, Date on Right) */
+        .footer-bar {
+            width: 100%;
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-top: 0.5px solid #000000;
+            padding-top: 0.3mm;
+            height: 3.8mm;
+        }
+        .price-box {
+            display: flex;
             align-items: baseline;
-            margin-top: 0.3mm;
         }
         .price-currency {
-            font-size: 6px;
+            font-size: 5.5px;
             font-weight: bold;
             margin-right: 1px;
         }
         .price-amount {
-            font-size: 13.5px;
+            font-size: 11.5px;
             font-weight: 900;
-            letter-spacing: -0.5px;
+            letter-spacing: -0.4px;
             color: #000000;
+            line-height: 1;
         }
-
-        .right-section {
-            width: 4mm;
-            border-left: 1px solid #000000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 1mm 0;
-            box-sizing: border-box;
-            background: #ffffff;
-        }
-        .date-text {
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
-            font-size: 5.5px;
-            font-weight: bold;
+        .date-box {
+            font-size: 5.2px;
+            font-weight: 800;
+            font-family: monospace;
             white-space: nowrap;
             color: #000000;
+            line-height: 1;
+            align-self: flex-end;
+            margin-bottom: 0.2mm;
         }
 
         @media print {
-            body {
-                width: 100%;
+            html, body {
+                width: 96mm;
+                margin: 0;
+                padding: 0;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
@@ -184,24 +175,11 @@
         $generator = new Picqer\Barcode\BarcodeGeneratorSVG();
         $branch = \App\Models\Branch::find($branch_id ?? null);
         $branchName = $branch ? $branch->name : 'Pusat';
-        
-        $branchWords = explode(' ', $branchName);
-        $branchLine1 = '';
-        $branchLine2 = '';
-        if (count($branchWords) > 2) {
-             $branchLine1 = $branchWords[0];
-             $branchLine2 = implode(' ', array_slice($branchWords, 1));
-        } elseif (count($branchWords) == 2) {
-             $branchLine1 = $branchWords[0];
-             $branchLine2 = $branchWords[1];
-        } else {
-             $branchLine1 = $branchName;
-        }
 
         if (($date_type ?? 'cetak') === 'expired' && !empty($custom_date)) {
-            $dateStr = 'EXP: ' . \Carbon\Carbon::parse($custom_date)->format('d/m/Y');
+            $dateStr = 'EXP:' . \Carbon\Carbon::parse($custom_date)->format('d/m/y');
         } else {
-            $dateStr = \Carbon\Carbon::now()->format('d/m/Y');
+            $dateStr = \Carbon\Carbon::now()->format('d/m/y');
         }
 
         // Build flat array of all label items based on copies requested
@@ -230,40 +208,37 @@
                         $barcode = $lbl['barcode']; 
                     @endphp
                     <div class="label">
-                        <div class="left-section">
-                            <div class="branch-text-container">
-                                <div class="branch-line">{{ strtoupper($branchLine1) }}</div>
-                                @if($branchLine2)
-                                    <div class="branch-line">{{ strtoupper($branchLine2) }}</div>
+                        <!-- Line 1: Full Branch Name -->
+                        <div class="branch-header">
+                            {{ $branchName }}
+                        </div>
+
+                        <!-- Line 2: Product Name -->
+                        <div class="product-name">
+                            <span>{{ $product->name }}</span>
+                        </div>
+
+                        <!-- Line 3: Barcode Graphic & Number -->
+                        <div class="barcode-section">
+                            <div class="barcode-wrapper">
+                                @if($barcode)
+                                    {!! $generator->getBarcode($barcode, $generator::TYPE_CODE_128, 1.5, 32) !!}
+                                @else
+                                    <div style="font-size: 5px;">NO BARCODE</div>
                                 @endif
                             </div>
-                            <svg class="cart-icon" viewBox="0 0 24 24">
-                                <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
-                            </svg>
+                            <div class="barcode-number">{{ $barcode }}</div>
                         </div>
 
-                        <div class="middle-section">
-                            <div class="product-name">{{ $product->name }}</div>
-                            
-                            <div class="barcode-section">
-                                <div class="barcode-wrapper">
-                                    @if($barcode)
-                                        {!! $generator->getBarcode($barcode, $generator::TYPE_CODE_128, 2, 38) !!}
-                                    @else
-                                        <div style="font-size: 6px;">No Barcode</div>
-                                    @endif
-                                </div>
-                                <div class="barcode-number">{{ $barcode }}</div>
-                            </div>
-
-                            <div class="price-container">
-                                <span class="price-currency">Rp.</span>
+                        <!-- Line 4: Price Callout (Left) + Date (Right) -->
+                        <div class="footer-bar">
+                            <div class="price-box">
+                                <span class="price-currency">Rp</span>
                                 <span class="price-amount">{{ number_format($product->display_price ?? $product->selling_price, 0, ',', '.') }}</span>
                             </div>
-                        </div>
-
-                        <div class="right-section">
-                            <div class="date-text">{{ $dateStr }}</div>
+                            <div class="date-box">
+                                {{ $dateStr }}
+                            </div>
                         </div>
                     </div>
                 @endforeach

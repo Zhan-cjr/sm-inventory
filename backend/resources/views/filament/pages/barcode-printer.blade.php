@@ -197,7 +197,7 @@
                 <div style="display: flex; gap: 10px; align-items: flex-start;">
                     <span style="background: rgba(16,185,129,0.15); color: #10b981; font-weight: 800; padding: 2px 8px; border-radius: 6px;">3</span>
                     <div>
-                        <strong>Pengaturan Browser Print Dialog</strong>: Pada jendela print browser (Ctrl + P), pastikan Margin diset ke <strong>None / 0mm</strong> dan Skala diset ke <strong>100% (Default)</strong> tanpa Header & Footer.
+                        <strong>Pengaturan Skala & Margin Browser (Skala 100%)</strong>: Pada jendela cetak browser (Ctrl + P), atur Margin ke <strong>None / 0mm</strong> dan Skala ke <strong>100% (Default)</strong>. Tinggi baris CSS telah dipresisikan 17.5mm agar pas 100% tanpa baris kosong di akhir halaman.
                     </div>
                 </div>
             </div>
