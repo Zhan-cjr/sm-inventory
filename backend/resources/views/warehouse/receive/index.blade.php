@@ -162,6 +162,9 @@
     html.dark .ts-control input {
         color: #ffffff !important;
     }
+    .tomselected {
+        display: none !important;
+    }
 </style>
 
 <div>
@@ -306,22 +309,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function filterPOs(supplierId) {
         if (!poTomSelect) return;
-        poTomSelect.clear();
+        poTomSelect.clear(true);
         poTomSelect.clearOptions();
         poTomSelect.addOption({value: '', text: '-- Pilih PO --'});
 
         if (!supplierId) {
             if (lastPoCheck) lastPoCheck.checked = false;
+            poTomSelect.refreshOptions(false);
+            poTomSelect.setValue('', true);
             return;
         }
 
         const filteredPOs = purchaseOrders.filter(po => String(po.supplier_id) === String(supplierId));
         
         filteredPOs.forEach(po => {
-            poTomSelect.addOption({value: po.po_number, text: po.po_number});
+            poTomSelect.addOption({value: String(po.po_number), text: String(po.po_number)});
         });
 
-        handleLastPOCheck();
+        poTomSelect.refreshOptions(false);
+
+        if (filteredPOs.length === 1) {
+            poTomSelect.setValue(String(filteredPOs[0].po_number));
+        } else if (lastPoCheck && lastPoCheck.checked) {
+            handleLastPOCheck();
+        } else {
+            poTomSelect.setValue('', true);
+        }
     }
 
     window.handleLastPOCheck = function() {
@@ -335,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function () {
             
             const filteredPOs = purchaseOrders.filter(po => String(po.supplier_id) === String(supplierId));
             if (filteredPOs.length > 0) {
-                poTomSelect.setValue(filteredPOs[0].po_number);
+                poTomSelect.setValue(String(filteredPOs[0].po_number));
             }
         }
     };
