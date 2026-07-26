@@ -445,8 +445,7 @@
                     $isSearchDisabled = true;
                     $searchDisabledReason = 'Pilih Pemasok terlebih dahulu.';
                 } else {
-                    $supplier = \App\Models\Supplier::find($supplier_id);
-                    if ($supplier && $supplier->gr_requires_po && empty($purchase_order_id)) {
+                    if ($gr_requires_po && empty($purchase_order_id)) {
                         if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
                             $isSearchDisabled = true;
                             $searchDisabledReason = 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';

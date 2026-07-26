@@ -108,6 +108,11 @@ class GoodsReceiptPos extends Component
             $this->loadDraft();
         }
 
+        if ($this->supplier_id) {
+            $supplier = Supplier::find($this->supplier_id);
+            $this->gr_requires_po = (bool) ($supplier?->gr_requires_po);
+        }
+
         $this->calculateTotals();
     }
 
@@ -117,10 +122,17 @@ class GoodsReceiptPos extends Component
     }
 
     public $only_latest_po = false;
+    public $gr_requires_po = false;
 
     public function updatedSupplierId($value)
     {
         $this->recalculateDueDate();
+        if ($value) {
+            $supplier = Supplier::find($value);
+            $this->gr_requires_po = (bool) ($supplier?->gr_requires_po);
+        } else {
+            $this->gr_requires_po = false;
+        }
     }
 
     public function updatedReceiptDate($value)
@@ -211,8 +223,7 @@ class GoodsReceiptPos extends Component
             return;
         }
 
-        $supplier = Supplier::find($this->supplier_id);
-        if ($supplier && $supplier->gr_requires_po && empty($this->purchase_order_id)) {
+        if ($this->gr_requires_po && empty($this->purchase_order_id)) {
             if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
                 $this->searchResults = [];
                 return;
@@ -226,7 +237,7 @@ class GoodsReceiptPos extends Component
 
         if (strlen($value) >= 2) {
             $this->searchResults = Product::query()
-                ->select('products.*')
+                ->select('products.id', 'products.sku', 'products.barcode', 'products.name', 'products.cost_price')
                 ->join('stocks', 'stocks.product_id', '=', 'products.id')
                 ->where('stocks.branch_id', $this->branch_id)
                 ->where('products.is_active', true)
@@ -278,8 +289,7 @@ class GoodsReceiptPos extends Component
             return;
         }
 
-        $supplier = Supplier::find($this->supplier_id);
-        if ($supplier && $supplier->gr_requires_po && empty($this->purchase_order_id)) {
+        if ($this->gr_requires_po && empty($this->purchase_order_id)) {
             if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
                 Notification::make()->title('Penerimaan barang wajib dengan PO untuk Pemasok ini.')->warning()->send();
                 return;
