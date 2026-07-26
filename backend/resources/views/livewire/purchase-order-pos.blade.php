@@ -329,7 +329,6 @@
                 </div>
                 @endforeach
             </div>
-            @endif
         </div>
         <div x-data="{ open: false }" style="position: relative;">
             <button @click="open = !open" class="pos-input bg-white dark:bg-gray-800" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">

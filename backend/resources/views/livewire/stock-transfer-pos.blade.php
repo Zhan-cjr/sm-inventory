@@ -170,7 +170,6 @@
                 </div>
                 @endforeach
             </div>
-            @endif
         </div>
         <div x-data="{ open: false }" style="position: relative;">
             <button @click="open = !open" class="pos-input" style="display: flex; align-items: center; gap: 0.5rem; background: white; cursor: pointer;">
