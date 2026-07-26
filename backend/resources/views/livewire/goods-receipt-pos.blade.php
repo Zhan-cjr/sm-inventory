@@ -438,7 +438,10 @@
             @php
                 $isSearchDisabled = false;
                 $searchDisabledReason = '';
-                if (empty($supplier_id)) {
+                if (empty($branch_id)) {
+                    $isSearchDisabled = true;
+                    $searchDisabledReason = 'Pilih Lokasi Cabang terlebih dahulu.';
+                } elseif (empty($supplier_id)) {
                     $isSearchDisabled = true;
                     $searchDisabledReason = 'Pilih Pemasok terlebih dahulu.';
                 } else {

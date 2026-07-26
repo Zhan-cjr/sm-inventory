@@ -181,8 +181,36 @@ class GoodsReceiptPos extends Component
         }
     }
 
+    public function updatedBranchId($value)
+    {
+        $this->searchResults = [];
+        $this->searchQuery = '';
+        
+        if (!empty($this->cart)) {
+            foreach ($this->cart as $index => $item) {
+                $stock = null;
+                if ($value) {
+                    $stock = Stock::where('product_id', $item['product_id'])->where('branch_id', $value)->first();
+                }
+                $product = Product::find($item['product_id']);
+                
+                $this->cart[$index]['harga_jual_1'] = ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($product?->harga_jual_1 ?? 0);
+                $this->cart[$index]['margin_gol_1'] = ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($product?->margin_gol_1 ?? 0);
+                $this->cart[$index]['harga_jual_2'] = ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($product?->harga_jual_2 ?? 0);
+                $this->cart[$index]['margin_gol_2'] = ($stock && $stock->margin_gol_2 > 0) ? $stock->margin_gol_2 : ($product?->margin_gol_2 ?? 0);
+                $this->cart[$index]['harga_jual_3'] = ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($product?->harga_jual_3 ?? 0);
+                $this->cart[$index]['margin_gol_3'] = ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($product?->margin_gol_3 ?? 0);
+            }
+        }
+    }
+
     public function updatedSearchQuery($value)
     {
+        if (empty($this->branch_id)) {
+            $this->searchResults = [];
+            return;
+        }
+
         if (empty($this->supplier_id)) {
             $this->searchResults = [];
             return;
@@ -202,11 +230,16 @@ class GoodsReceiptPos extends Component
         }
 
         if (strlen($value) >= 2) {
-            $this->searchResults = Product::where('sku', 'LIKE', '%' . $value . '%')
-                ->orWhere('barcode', 'LIKE', '%' . $value . '%')
-                ->orWhere('name', 'LIKE', '%' . $value . '%')
-                ->limit(20)
-                ->get();
+            $this->searchResults = Product::whereHas('stocks', function ($q) {
+                $q->where('branch_id', $this->branch_id);
+            })
+            ->where(function ($q) use ($value) {
+                $q->where('sku', 'LIKE', '%' . $value . '%')
+                  ->orWhere('barcode', 'LIKE', '%' . $value . '%')
+                  ->orWhere('name', 'LIKE', '%' . $value . '%');
+            })
+            ->limit(20)
+            ->get();
         } else {
             $this->searchResults = [];
         }
@@ -214,7 +247,15 @@ class GoodsReceiptPos extends Component
 
     public function selectProduct($productId)
     {
-        $product = Product::find($productId);
+        if (empty($this->branch_id)) {
+            Notification::make()->title('Pilih Lokasi Cabang terlebih dahulu.')->warning()->send();
+            return;
+        }
+
+        $product = Product::whereHas('stocks', function ($q) {
+            $q->where('branch_id', $this->branch_id);
+        })->find($productId);
+
         if ($product) {
             $this->addItemToCart($product);
             $this->searchQuery = '';
@@ -225,6 +266,11 @@ class GoodsReceiptPos extends Component
 
     public function searchProduct()
     {
+        if (empty($this->branch_id)) {
+            Notification::make()->title('Pilih Lokasi Cabang terlebih dahulu.')->warning()->send();
+            return;
+        }
+
         if (empty($this->supplier_id)) {
             Notification::make()->title('Pilih Pemasok terlebih dahulu.')->warning()->send();
             return;
@@ -249,10 +295,16 @@ class GoodsReceiptPos extends Component
         }
 
         if (strlen($this->searchQuery) > 0) {
-            $product = Product::where('sku', $this->searchQuery)
-                ->orWhere('barcode', $this->searchQuery)
-                ->orWhere('name', 'LIKE', '%' . $this->searchQuery . '%')
-                ->first();
+            $queryStr = $this->searchQuery;
+            $product = Product::whereHas('stocks', function ($q) {
+                $q->where('branch_id', $this->branch_id);
+            })
+            ->where(function ($q) use ($queryStr) {
+                $q->where('sku', $queryStr)
+                  ->orWhere('barcode', $queryStr)
+                  ->orWhere('name', 'LIKE', '%' . $queryStr . '%');
+            })
+            ->first();
 
             if ($product) {
                 $this->addItemToCart($product);
@@ -260,7 +312,7 @@ class GoodsReceiptPos extends Component
                 $this->searchResults = [];
                 $this->dispatch('item-added', index: count($this->cart) - 1);
             } else {
-                Notification::make()->title('Produk tidak ditemukan!')->warning()->send();
+                Notification::make()->title('Produk tidak ditemukan untuk cabang ini!')->warning()->send();
             }
         }
     }

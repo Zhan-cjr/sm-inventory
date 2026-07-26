@@ -119,12 +119,22 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
     public function updatedSearchQuery($value)
     {
+        if (empty($this->branch_id)) {
+            $this->searchResults = [];
+            return;
+        }
+
         if (strlen($value) >= 2) {
-            $this->searchResults = Product::where('sku', 'LIKE', '%' . $value . '%')
-                ->orWhere('barcode', 'LIKE', '%' . $value . '%')
-                ->orWhere('name', 'LIKE', '%' . $value . '%')
-                ->limit(20)
-                ->get();
+            $this->searchResults = Product::whereHas('stocks', function ($q) {
+                $q->where('branch_id', $this->branch_id);
+            })
+            ->where(function ($q) use ($value) {
+                $q->where('sku', 'LIKE', '%' . $value . '%')
+                  ->orWhere('barcode', 'LIKE', '%' . $value . '%')
+                  ->orWhere('name', 'LIKE', '%' . $value . '%');
+            })
+            ->limit(20)
+            ->get();
         } else {
             $this->searchResults = [];
         }
