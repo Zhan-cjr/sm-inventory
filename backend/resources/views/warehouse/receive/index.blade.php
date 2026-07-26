@@ -3,9 +3,6 @@
 @section('title', 'Pengecekan Penerimaan Gudang')
 
 @section('content')
-<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-
 <style>
     .wh-card {
         background: var(--card-bg);
@@ -134,36 +131,36 @@
         border: 1px solid rgba(245, 158, 11, 0.3);
     }
 
-    /* TomSelect Custom Dark / Light Overrides */
-    .ts-control {
-        border-radius: 14px !important;
-        padding: 12px 16px !important;
-        background-color: var(--card-bg) !important;
-        color: var(--text-color) !important;
-        border-color: var(--border-color) !important;
-        font-family: inherit !important;
-        font-size: 0.95rem !important;
+    /* Custom Modern Native Select Box */
+    .wh-select {
+        width: 100%;
+        padding: 14px 18px;
+        border-radius: 14px;
+        border: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        font-family: inherit;
+        font-size: 0.95rem;
+        font-weight: 600;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2310b981' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 16px center;
+        background-size: 14px;
+        cursor: pointer;
     }
-    .ts-dropdown {
-        border-radius: 16px !important;
-        background-color: var(--card-bg) !important;
-        color: var(--text-color) !important;
-        border-color: var(--border-color) !important;
-        overflow: hidden !important;
-        box-shadow: var(--card-shadow) !important;
+    .wh-select:focus {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
     }
-    .ts-dropdown .option {
-        padding: 12px 16px !important;
-    }
-    .ts-dropdown .active {
-        background-color: rgba(16, 185, 129, 0.15) !important;
-        color: #10b981 !important;
-    }
-    html.dark .ts-control input {
-        color: #ffffff !important;
-    }
-    .tomselected {
-        display: none !important;
+    .wh-select option {
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        padding: 10px;
     }
 </style>
 
@@ -210,7 +207,7 @@
             @elseif(isset($branches) && count($branches) > 0)
                 <div class="form-group">
                     <label for="branch_id" class="form-label">CABANG GUDANG</label>
-                    <select id="branch_id" name="branch_id" class="form-control">
+                    <select id="branch_id" name="branch_id" class="wh-select" onchange="if(this.value){ window.location.href='?branch_id='+this.value; } else { window.location.href='?'; }">
                         <option value="">-- Semua Cabang --</option>
                         @foreach($branches as $branch)
                             <option value="{{ $branch->id }}" {{ request('branch_id') == $branch->id ? 'selected' : '' }}>{{ $branch->name }}</option>
@@ -221,7 +218,7 @@
 
             <div class="form-group">
                 <label for="supplier_id" class="form-label">SUPPLIER / VENDOR</label>
-                <select id="supplier_id" name="supplier_id" class="form-control">
+                <select id="supplier_id" name="supplier_id" class="wh-select" onchange="filterPOsBySupplier(this.value)">
                     <option value="">-- Pilih Supplier --</option>
                     @foreach($suppliers as $supplier)
                         <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
@@ -237,8 +234,8 @@
 
             <div class="form-group">
                 <label for="po_number" class="form-label">NOMOR PURCHASE ORDER (PO)</label>
-                <select id="po_number" name="po_number" class="form-control" required>
-                    <option value="">-- Pilih PO --</option>
+                <select id="po_number" name="po_number" class="wh-select" required>
+                    <option value="">-- Pilih Supplier Terlebih Dahulu --</option>
                 </select>
             </div>
 
@@ -253,110 +250,64 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const purchaseOrders = @json($purchaseOrders);
+const purchaseOrders = @json($purchaseOrders);
+
+function filterPOsBySupplier(supplierId) {
+    const poSelect = document.getElementById('po_number');
     const lastPoCheck = document.getElementById('last_po_check');
-    let supplierTomSelect = null;
-    let poTomSelect = null;
-    let branchTomSelect = null;
 
-    // Init TomSelect for Branch if present
-    const branchElem = document.getElementById('branch_id');
-    if (branchElem) {
-        branchTomSelect = new TomSelect("#branch_id", {
-            create: false,
-            sortField: {
-                field: "text",
-                direction: "asc"
-            }
-        });
-        branchTomSelect.on('change', function(value) {
-            if (value) {
-                window.location.href = '?branch_id=' + value;
-            } else {
-                window.location.href = '?';
-            }
-        });
+    poSelect.innerHTML = '';
+
+    if (!supplierId) {
+        if (lastPoCheck) lastPoCheck.checked = false;
+        poSelect.innerHTML = '<option value="">-- Pilih Supplier Terlebih Dahulu --</option>';
+        return;
     }
 
-    const supplierElem = document.getElementById('supplier_id');
-    if (supplierElem) {
-        supplierTomSelect = new TomSelect("#supplier_id", {
-            create: false,
-            sortField: {
-                field: "text",
-                direction: "asc"
-            }
-        });
+    const filteredPOs = purchaseOrders.filter(po => String(po.supplier_id).trim() === String(supplierId).trim());
+
+    if (filteredPOs.length === 0) {
+        poSelect.innerHTML = '<option value="">-- Tidak Ada PO Aktif untuk Supplier Ini --</option>';
+        return;
     }
 
-    const poElem = document.getElementById('po_number');
-    if (poElem) {
-        poTomSelect = new TomSelect("#po_number", {
-            create: false,
-            sortField: {
-                field: "text",
-                direction: "asc"
-            }
-        });
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = '-- Pilih PO --';
+    poSelect.appendChild(defaultOpt);
+
+    filteredPOs.forEach(po => {
+        const opt = document.createElement('option');
+        opt.value = po.po_number;
+        opt.textContent = po.po_number;
+        poSelect.appendChild(opt);
+    });
+
+    if (filteredPOs.length === 1) {
+        poSelect.value = filteredPOs[0].po_number;
+    } else if (lastPoCheck && lastPoCheck.checked) {
+        handleLastPOCheck();
     }
+}
 
-    if (supplierTomSelect) {
-        supplierTomSelect.on('change', function(value) {
-            filterPOs(value);
-        });
-    }
+function handleLastPOCheck() {
+    const supplierSelect = document.getElementById('supplier_id');
+    const lastPoCheck = document.getElementById('last_po_check');
+    const poSelect = document.getElementById('po_number');
 
-    function filterPOs(supplierId) {
-        if (!poTomSelect) return;
-        poTomSelect.clear(true);
-        poTomSelect.clearOptions();
-        poTomSelect.addOption({value: '', text: '-- Pilih PO --'});
-
+    if (lastPoCheck && lastPoCheck.checked) {
+        const supplierId = supplierSelect.value;
         if (!supplierId) {
-            if (lastPoCheck) lastPoCheck.checked = false;
-            poTomSelect.refreshOptions(false);
-            poTomSelect.setValue('', true);
+            alert('Pilih supplier terlebih dahulu!');
+            lastPoCheck.checked = false;
             return;
         }
 
-        const filteredPOs = purchaseOrders.filter(po => String(po.supplier_id) === String(supplierId));
-        
-        filteredPOs.forEach(po => {
-            poTomSelect.addOption({value: String(po.po_number), text: String(po.po_number)});
-        });
-
-        poTomSelect.refreshOptions(false);
-
-        if (filteredPOs.length === 1) {
-            poTomSelect.setValue(String(filteredPOs[0].po_number));
-        } else if (lastPoCheck && lastPoCheck.checked) {
-            handleLastPOCheck();
-        } else {
-            poTomSelect.setValue('', true);
+        const filteredPOs = purchaseOrders.filter(po => String(po.supplier_id).trim() === String(supplierId).trim());
+        if (filteredPOs.length > 0) {
+            poSelect.value = filteredPOs[0].po_number;
         }
     }
-
-    window.handleLastPOCheck = function() {
-        if (lastPoCheck && lastPoCheck.checked && supplierTomSelect) {
-            const supplierId = supplierTomSelect.getValue();
-            if (!supplierId) {
-                alert('Pilih supplier terlebih dahulu!');
-                lastPoCheck.checked = false;
-                return;
-            }
-            
-            const filteredPOs = purchaseOrders.filter(po => String(po.supplier_id) === String(supplierId));
-            if (filteredPOs.length > 0) {
-                poTomSelect.setValue(String(filteredPOs[0].po_number));
-            }
-        }
-    };
-
-    // Auto filter if supplier is already selected on page load
-    if (supplierTomSelect && supplierTomSelect.getValue()) {
-        filterPOs(supplierTomSelect.getValue());
-    }
-});
+}
 </script>
 @endsection
