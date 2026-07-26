@@ -159,7 +159,7 @@
                    placeholder="{{ $isSearchDisabled ? $searchDisabledReason : 'Mulai ketik nama produk, SKU, atau scan barcode... lalu tekan Enter' }}"
                    {{ $isSearchDisabled ? 'disabled' : '' }}
                    wire:model.live.debounce.150ms="searchQuery"
-                   @input="highlightedIndex = -1; if ($el.value.length < 2) { $wire.set('searchQuery', '', false); } $nextTick(() => updateHighlight())"
+                   @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
                    @keydown.arrow-down.prevent="moveDown()"
                    @keydown.arrow-up.prevent="moveUp()"
                    @keydown.enter.prevent="selectCurrent()"
