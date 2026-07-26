@@ -206,12 +206,7 @@ class GoodsReceiptPos extends Component
 
     public function updatedSearchQuery($value)
     {
-        if (empty($this->branch_id)) {
-            $this->searchResults = [];
-            return;
-        }
-
-        if (empty($this->supplier_id)) {
+        if (empty($this->branch_id) || empty($this->supplier_id)) {
             $this->searchResults = [];
             return;
         }
@@ -230,16 +225,19 @@ class GoodsReceiptPos extends Component
         }
 
         if (strlen($value) >= 2) {
-            $this->searchResults = Product::whereHas('stocks', function ($q) {
-                $q->where('branch_id', $this->branch_id);
-            })
-            ->where(function ($q) use ($value) {
-                $q->where('sku', 'LIKE', '%' . $value . '%')
-                  ->orWhere('barcode', 'LIKE', '%' . $value . '%')
-                  ->orWhere('name', 'LIKE', '%' . $value . '%');
-            })
-            ->limit(20)
-            ->get();
+            $this->searchResults = Product::query()
+                ->select('products.*')
+                ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                ->where('stocks.branch_id', $this->branch_id)
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($value) {
+                    $q->where('products.barcode', '=', $value)
+                      ->orWhere('products.sku', 'LIKE', $value . '%')
+                      ->orWhere('products.barcode', 'LIKE', $value . '%')
+                      ->orWhere('products.name', 'LIKE', '%' . $value . '%');
+                })
+                ->limit(20)
+                ->get();
         } else {
             $this->searchResults = [];
         }
@@ -252,9 +250,13 @@ class GoodsReceiptPos extends Component
             return;
         }
 
-        $product = Product::whereHas('stocks', function ($q) {
-            $q->where('branch_id', $this->branch_id);
-        })->find($productId);
+        $product = Product::query()
+            ->select('products.*')
+            ->join('stocks', 'stocks.product_id', '=', 'products.id')
+            ->where('stocks.branch_id', $this->branch_id)
+            ->where('products.is_active', true)
+            ->where('products.id', $productId)
+            ->first();
 
         if ($product) {
             $this->addItemToCart($product);
@@ -296,15 +298,17 @@ class GoodsReceiptPos extends Component
 
         if (strlen($this->searchQuery) > 0) {
             $queryStr = $this->searchQuery;
-            $product = Product::whereHas('stocks', function ($q) {
-                $q->where('branch_id', $this->branch_id);
-            })
-            ->where(function ($q) use ($queryStr) {
-                $q->where('sku', $queryStr)
-                  ->orWhere('barcode', $queryStr)
-                  ->orWhere('name', 'LIKE', '%' . $queryStr . '%');
-            })
-            ->first();
+            $product = Product::query()
+                ->select('products.*')
+                ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                ->where('stocks.branch_id', $this->branch_id)
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($queryStr) {
+                    $q->where('products.sku', $queryStr)
+                      ->orWhere('products.barcode', $queryStr)
+                      ->orWhere('products.name', 'LIKE', '%' . $queryStr . '%');
+                })
+                ->first();
 
             if ($product) {
                 $this->addItemToCart($product);
@@ -312,7 +316,7 @@ class GoodsReceiptPos extends Component
                 $this->searchResults = [];
                 $this->dispatch('item-added', index: count($this->cart) - 1);
             } else {
-                Notification::make()->title('Produk tidak ditemukan untuk cabang ini!')->warning()->send();
+                Notification::make()->title('Produk aktif tidak ditemukan untuk cabang ini!')->warning()->send();
             }
         }
     }

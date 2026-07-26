@@ -465,7 +465,7 @@
             <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem; {{ $isSearchDisabled ? 'background-color: #f3f4f6; cursor: not-allowed;' : '' }}"
                    placeholder="{{ $isSearchDisabled ? $searchDisabledReason : 'Scan barcode atau ketik nama produk... tekan Enter' }}"
                    {{ $isSearchDisabled ? 'disabled' : '' }}
-                   wire:model.live.debounce.250ms="searchQuery"
+                   wire:model.live.debounce.300ms="searchQuery"
                    @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
                    @keydown.arrow-down.prevent="moveDown()"
                    @keydown.arrow-up.prevent="moveUp()"

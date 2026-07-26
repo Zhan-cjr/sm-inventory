@@ -296,9 +296,14 @@
                     this.highlightedIndex = -1;
                 }
              }">
-            <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
-                   placeholder="Mulai ketik nama produk, SKU, atau scan barcode... lalu tekan Enter"
-                   wire:model.live.debounce.250ms="searchQuery"
+            @php
+                $isSearchDisabled = empty($branch_id);
+                $searchDisabledReason = 'Pilih Lokasi Cabang terlebih dahulu.';
+            @endphp
+            <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem; {{ $isSearchDisabled ? 'background-color: #f3f4f6; cursor: not-allowed;' : '' }}"
+                   placeholder="{{ $isSearchDisabled ? $searchDisabledReason : 'Mulai ketik nama produk, SKU, atau scan barcode... lalu tekan Enter' }}"
+                   {{ $isSearchDisabled ? 'disabled' : '' }}
+                   wire:model.live.debounce.300ms="searchQuery"
                    @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
                    @keydown.arrow-down.prevent="moveDown()"
                    @keydown.arrow-up.prevent="moveUp()"

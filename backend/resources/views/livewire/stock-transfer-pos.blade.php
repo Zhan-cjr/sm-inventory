@@ -137,9 +137,14 @@
                     this.highlightedIndex = -1;
                 }
              }">
-            <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem;"
-                   placeholder="Scan barcode atau ketik nama produk yang ada di cabang asal... tekan Enter"
-                   wire:model.live.debounce.250ms="searchQuery"
+            @php
+                $isSearchDisabled = empty($from_branch_id);
+                $searchDisabledReason = 'Pilih Cabang Pengirim terlebih dahulu.';
+            @endphp
+            <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem; {{ $isSearchDisabled ? 'background-color: #f3f4f6; cursor: not-allowed;' : '' }}"
+                   placeholder="{{ $isSearchDisabled ? $searchDisabledReason : 'Scan barcode atau ketik nama produk yang ada di cabang asal... tekan Enter' }}"
+                   {{ $isSearchDisabled ? 'disabled' : '' }}
+                   wire:model.live.debounce.300ms="searchQuery"
                    @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
                    @keydown.arrow-down.prevent="moveDown()"
                    @keydown.arrow-up.prevent="moveUp()"
@@ -157,7 +162,7 @@
                         <div style="font-weight: 700; color: #1f2937;" class="dark:text-gray-200">{{ $result->sku }}</div>
                         <div style="font-size: 0.75rem; color: #6b7280;" class="dark:text-gray-400">{{ $result->name }}</div>
                     </div>
-                    <div style="font-weight: 600; color: #10b981;">Stok Asal: {{ $result->stocks->where('branch_id', $from_branch_id)->first()->quantity_on_hand ?? 0 }}</div>
+                    <div style="font-weight: 600; color: #10b981;">Stok Asal: {{ $result->branch_stock ?? ($result->stocks->firstWhere('branch_id', $from_branch_id)->quantity_on_hand ?? 0) }}</div>
                 </div>
                 @endforeach
             </div>

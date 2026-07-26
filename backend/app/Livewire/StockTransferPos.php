@@ -86,15 +86,23 @@ class StockTransferPos extends Component
 
     public function updatedSearchQuery($value)
     {
-        if (strlen($value) >= 2 && $this->from_branch_id) {
-            $this->searchResults = Product::whereHas('stocks', function($q) {
-                    $q->where('branch_id', $this->from_branch_id)
-                      ->where('quantity_on_hand', '>', 0);
-                })
-                ->where(function($q) use ($value) {
-                    $q->where('sku', 'LIKE', '%' . $value . '%')
-                      ->orWhere('barcode', 'LIKE', '%' . $value . '%')
-                      ->orWhere('name', 'LIKE', '%' . $value . '%');
+        if (empty($this->from_branch_id)) {
+            $this->searchResults = [];
+            return;
+        }
+
+        if (strlen($value) >= 2) {
+            $this->searchResults = Product::query()
+                ->select('products.*', 'stocks.quantity_on_hand as branch_stock')
+                ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                ->where('stocks.branch_id', $this->from_branch_id)
+                ->where('stocks.quantity_on_hand', '>', 0)
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($value) {
+                    $q->where('products.barcode', '=', $value)
+                      ->orWhere('products.sku', 'LIKE', $value . '%')
+                      ->orWhere('products.barcode', 'LIKE', $value . '%')
+                      ->orWhere('products.name', 'LIKE', '%' . $value . '%');
                 })
                 ->limit(20)
                 ->get();
@@ -105,7 +113,19 @@ class StockTransferPos extends Component
 
     public function selectProduct($productId)
     {
-        $product = Product::find($productId);
+        if (empty($this->from_branch_id)) {
+            Notification::make()->title('Pilih Cabang Pengirim terlebih dahulu!')->warning()->send();
+            return;
+        }
+
+        $product = Product::query()
+            ->select('products.*')
+            ->join('stocks', 'stocks.product_id', '=', 'products.id')
+            ->where('stocks.branch_id', $this->from_branch_id)
+            ->where('products.is_active', true)
+            ->where('products.id', $productId)
+            ->first();
+
         if ($product) {
             $this->addItemToCart($product);
             $this->searchQuery = '';
@@ -122,14 +142,17 @@ class StockTransferPos extends Component
         }
 
         if (strlen($this->searchQuery) > 0) {
-            $product = Product::whereHas('stocks', function($q) {
-                    $q->where('branch_id', $this->from_branch_id)
-                      ->where('quantity_on_hand', '>', 0);
-                })
-                ->where(function($q) {
-                    $q->where('sku', $this->searchQuery)
-                      ->orWhere('barcode', $this->searchQuery)
-                      ->orWhere('name', 'LIKE', '%' . $this->searchQuery . '%');
+            $queryStr = $this->searchQuery;
+            $product = Product::query()
+                ->select('products.*')
+                ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                ->where('stocks.branch_id', $this->from_branch_id)
+                ->where('stocks.quantity_on_hand', '>', 0)
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($queryStr) {
+                    $q->where('products.sku', $queryStr)
+                      ->orWhere('products.barcode', $queryStr)
+                      ->orWhere('products.name', 'LIKE', '%' . $queryStr . '%');
                 })
                 ->first();
 
@@ -139,7 +162,7 @@ class StockTransferPos extends Component
                 $this->searchResults = [];
                 $this->dispatch('item-added', index: count($this->cart) - 1);
             } else {
-                Notification::make()->title('Produk tidak ditemukan atau stok kosong di cabang pengirim!')->warning()->send();
+                Notification::make()->title('Produk aktif tidak ditemukan atau stok kosong di cabang pengirim!')->warning()->send();
             }
         }
     }

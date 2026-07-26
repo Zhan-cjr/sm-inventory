@@ -104,16 +104,19 @@ class StockAdjustmentPos extends Component
         }
 
         if (strlen($value) >= 2) {
-            $this->searchResults = Product::whereHas('stocks', function ($q) {
-                $q->where('branch_id', $this->branch_id);
-            })
-            ->where(function ($q) use ($value) {
-                $q->where('sku', 'LIKE', '%' . $value . '%')
-                  ->orWhere('barcode', 'LIKE', '%' . $value . '%')
-                  ->orWhere('name', 'LIKE', '%' . $value . '%');
-            })
-            ->limit(20)
-            ->get();
+            $this->searchResults = Product::query()
+                ->select('products.*')
+                ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                ->where('stocks.branch_id', $this->branch_id)
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($value) {
+                    $q->where('products.barcode', '=', $value)
+                      ->orWhere('products.sku', 'LIKE', $value . '%')
+                      ->orWhere('products.barcode', 'LIKE', $value . '%')
+                      ->orWhere('products.name', 'LIKE', '%' . $value . '%');
+                })
+                ->limit(20)
+                ->get();
         } else {
             $this->searchResults = [];
         }
@@ -121,7 +124,19 @@ class StockAdjustmentPos extends Component
 
     public function selectProduct($productId)
     {
-        $product = Product::find($productId);
+        if (empty($this->branch_id)) {
+            Notification::make()->title('Pilih Lokasi Cabang terlebih dahulu!')->warning()->send();
+            return;
+        }
+
+        $product = Product::query()
+            ->select('products.*')
+            ->join('stocks', 'stocks.product_id', '=', 'products.id')
+            ->where('stocks.branch_id', $this->branch_id)
+            ->where('products.is_active', true)
+            ->where('products.id', $productId)
+            ->first();
+
         if ($product) {
             $this->addItemToCart($product);
             $this->searchQuery = '';
@@ -132,10 +147,23 @@ class StockAdjustmentPos extends Component
 
     public function searchProduct()
     {
+        if (empty($this->branch_id)) {
+            Notification::make()->title('Pilih Lokasi Cabang terlebih dahulu!')->warning()->send();
+            return;
+        }
+
         if (strlen($this->searchQuery) > 0) {
-            $product = Product::where('sku', $this->searchQuery)
-                ->orWhere('barcode', $this->searchQuery)
-                ->orWhere('name', 'LIKE', '%' . $this->searchQuery . '%')
+            $queryStr = $this->searchQuery;
+            $product = Product::query()
+                ->select('products.*')
+                ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                ->where('stocks.branch_id', $this->branch_id)
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($queryStr) {
+                    $q->where('products.sku', $queryStr)
+                      ->orWhere('products.barcode', $queryStr)
+                      ->orWhere('products.name', 'LIKE', '%' . $queryStr . '%');
+                })
                 ->first();
 
             if ($product) {
@@ -144,7 +172,7 @@ class StockAdjustmentPos extends Component
                 $this->searchResults = [];
                 $this->dispatch('item-added', index: count($this->cart) - 1);
             } else {
-                Notification::make()->title('Produk tidak ditemukan!')->warning()->send();
+                Notification::make()->title('Produk aktif tidak ditemukan untuk cabang ini!')->warning()->send();
             }
         }
     }
