@@ -770,7 +770,7 @@
             <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
                 <label class="flex items-center gap-2 cursor-pointer whitespace-nowrap">
                     <input type="checkbox" wire:model.live="include_tax" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Include PPN ({{ (float)(\App\Models\Organization::first()->tax_rate ?? 11) }}%)</span>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Include PPN ({{ (float)($taxRate ?? 11) }}%)</span>
                 </label>
             </div>
 
@@ -796,7 +796,7 @@
             </div>
 
             <div style="text-align: right; min-width: max-content;">
-                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN ({{ (float)(\App\Models\Organization::first()->tax_rate ?? 11) }}%)</div>
+                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN ({{ (float)($taxRate ?? 11) }}%)</div>
                 <div class="flex items-center justify-end gap-1">
                     <span style="font-size: 0.75rem; color: #6b7280;">Rp</span>
                     <input onfocus="this.select()" type="number" wire:model.live="tax_amount" class="pos-input" style="width: 6rem; padding: 0.125rem 0.25rem; text-align: right; border-style: dashed; background: transparent;">

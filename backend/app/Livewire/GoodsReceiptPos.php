@@ -52,10 +52,14 @@ class GoodsReceiptPos extends Component
 
     public $searchResults = [];
 
-    public $goodsReceipt;
+    public $only_latest_po = false;
+    public $gr_requires_po = false;
+    public $taxRate = 11;
 
     public function mount($goodsReceipt = null)
     {
+        $this->taxRate = (float) (\App\Models\Organization::first()->tax_rate ?? 11);
+
         if ($goodsReceipt) {
             $this->goodsReceipt = $goodsReceipt;
             $this->receipt_number = $goodsReceipt->receipt_number;
@@ -83,6 +87,7 @@ class GoodsReceiptPos extends Component
                     'sku' => $item->product->sku,
                     'barcode' => $item->product->barcode,
                     'name' => $item->product->name,
+                    'is_taxable' => (bool) ($item->product->is_taxable ?? true),
                     'qty_ordered' => $item->quantity_ordered,
                     'qty_received' => $item->quantity_received,
                     'unit_price' => $item->unit_price,
@@ -120,9 +125,6 @@ class GoodsReceiptPos extends Component
     {
         $this->saveDraft();
     }
-
-    public $only_latest_po = false;
-    public $gr_requires_po = false;
 
     public function updatedSupplierId($value)
     {
@@ -352,6 +354,7 @@ class GoodsReceiptPos extends Component
                 'sku' => $product->sku,
                 'barcode' => $product->barcode,
                 'name' => $product->name,
+                'is_taxable' => (bool) ($product->is_taxable ?? true),
                 'qty_ordered' => 0,
                 'qty_received' => 1,
                 'unit_price' => $costPrice,
@@ -594,8 +597,8 @@ class GoodsReceiptPos extends Component
             $qty = (float) ($item['qty_received'] ?? 0);
             $netPrice = $qty > 0 ? ((float)($item['subtotal'] ?? 0) / $qty) : (float) ($item['unit_price'] ?? 0);
             
-            $product = \App\Models\Product::find($item['product_id']);
-            $costPriceTax = ($this->include_tax && $product && $product->is_taxable) ? round($netPrice * 1.11, 2) : $netPrice;
+            $isTaxable = $item['is_taxable'] ?? true;
+            $costPriceTax = ($this->include_tax && $isTaxable) ? round($netPrice * (1 + ($this->taxRate / 100)), 2) : $netPrice;
 
             if (in_array($field, ['margin_gol_1', 'margin_gol_2', 'margin_gol_3'])) {
                 $gol = substr($field, -1);
@@ -654,8 +657,8 @@ class GoodsReceiptPos extends Component
             $qty = (float) ($item['qty_received'] ?? 0);
             $netPrice = $qty > 0 ? ((float)($item['subtotal'] ?? 0) / $qty) : (float) ($item['unit_price'] ?? 0);
             
-            $product = \App\Models\Product::find($item['product_id']);
-            $costPriceTax = ($this->include_tax && $product && $product->is_taxable) ? round($netPrice * 1.11, 2) : $netPrice;
+            $isTaxable = $item['is_taxable'] ?? true;
+            $costPriceTax = ($this->include_tax && $isTaxable) ? round($netPrice * (1 + ($this->taxRate / 100)), 2) : $netPrice;
             
             foreach([1, 2, 3] as $i) {
                 $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
@@ -691,12 +694,12 @@ class GoodsReceiptPos extends Component
         $netTotal = $this->subtotal - $discountAmount;
 
         if ($this->include_tax) {
-            $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
+            $taxRate = $this->taxRate;
             
             $taxAmount = 0;
             foreach ($this->cart as $item) {
-                $product = \App\Models\Product::find($item['product_id']);
-                if ($product && $product->is_taxable) {
+                $isTaxable = $item['is_taxable'] ?? true;
+                if ($isTaxable) {
                     // Apply proportion of global discount to this item
                     $itemProportion = $this->subtotal > 0 ? ($item['subtotal'] / $this->subtotal) : 0;
                     $itemDiscount = $discountAmount * $itemProportion;
