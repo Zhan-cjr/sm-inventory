@@ -126,7 +126,7 @@ class WarehouseCheckResource extends Resource
                     ->label(fn (WarehouseCheck $record) => $record->status === 'approved' ? 'Proses Jadi GR' : 'Input GR / Faktur Baru')
                     ->icon('heroicon-o-document-plus')
                     ->color('primary')
-                    ->visible(fn (WarehouseCheck $record) => in_array($record->status, ['approved', 'partially_processed', 'processed']))
+                    ->visible(fn (WarehouseCheck $record) => in_array($record->status, ['approved', 'partially_processed']))
                     ->requiresConfirmation()
                     ->modalHeading('Buat Goods Receipt / Input Faktur Supplier')
                     ->modalDescription('Tindakan ini akan membuat Draft Goods Receipt berdasarkan hasil pengecekan gudang yang sudah disahkan ini. Anda dapat memasukkan Nomor Faktur Supplier dan menyesuaikan item pada form setelahnya.')
