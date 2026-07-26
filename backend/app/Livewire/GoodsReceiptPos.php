@@ -918,36 +918,36 @@ class GoodsReceiptPos extends Component
 
     public function render()
     {
-        $purchaseOrdersQuery = PurchaseOrder::where(function ($q) {
-            $q->whereIn('status', ['APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
-              ->whereHas('warehouseChecks', function ($qc) {
-                  $qc->where('status', 'approved');
-              })
-              ->whereHas('items', function ($query) {
-                  $query->whereColumn('quantity_received', '<', 'quantity_ordered');
-              })
-              ->where(function ($sub) {
-                  $sub->whereNull('expired_date')
-                      ->orWhere('expired_date', '>=', now()->toDateString());
-              });
-            
-            if ($this->supplier_id) {
-                $q->where('supplier_id', $this->supplier_id);
-            } else {
-                $q->where('id', null);
-            }
-        });
+        $purchaseOrders = collect();
+        if ($this->supplier_id) {
+            $purchaseOrdersQuery = PurchaseOrder::where(function ($q) {
+                $q->whereIn('status', ['APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
+                  ->whereHas('warehouseChecks', function ($qc) {
+                      $qc->where('status', 'approved');
+                  })
+                  ->whereHas('items', function ($query) {
+                      $query->whereColumn('quantity_received', '<', 'quantity_ordered');
+                  })
+                  ->where(function ($sub) {
+                      $sub->whereNull('expired_date')
+                          ->orWhere('expired_date', '>=', now()->toDateString());
+                  })
+                  ->where('supplier_id', $this->supplier_id);
+            });
 
-        if ($this->purchase_order_id) {
-            $purchaseOrdersQuery->orWhere('id', $this->purchase_order_id);
-        } else if ($this->supplier_id && $this->only_latest_po) {
-            $purchaseOrdersQuery->latest('created_at')->limit(1);
+            if ($this->purchase_order_id) {
+                $purchaseOrdersQuery->orWhere('id', $this->purchase_order_id);
+            } else if ($this->only_latest_po) {
+                $purchaseOrdersQuery->latest('created_at')->limit(1);
+            }
+
+            $purchaseOrders = $purchaseOrdersQuery->get();
         }
 
         return view('livewire.goods-receipt-pos', [
             'branches' => Branch::all(),
             'suppliers' => Supplier::all(),
-            'purchaseOrders' => $purchaseOrdersQuery->get(),
+            'purchaseOrders' => $purchaseOrders,
         ]);
     }
 }
