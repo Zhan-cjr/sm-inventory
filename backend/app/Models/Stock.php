@@ -4,10 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Stock extends Model
 {
-    use HasUuids;
+    use HasUuids, LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     protected static function booted()
     {
@@ -88,5 +98,70 @@ class Stock extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public static function parseIndonesianNumber($value): float
+    {
+        if (is_null($value) || $value === '') {
+            return 0.0;
+        }
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+        $str = (string) $value;
+        if (str_contains($str, ',')) {
+            $str = str_replace('.', '', $str);
+            $str = str_replace(',', '.', $str);
+            return (float) $str;
+        }
+        if (preg_match('/^\d{1,3}(\.\d{3})+$/', $str)) {
+            $str = str_replace('.', '', $str);
+        }
+        return (float) $str;
+    }
+
+    public function setCostPriceAttribute($value)
+    {
+        $this->attributes['cost_price'] = static::parseIndonesianNumber($value);
+    }
+
+    public function setCostPriceTaxAttribute($value)
+    {
+        $this->attributes['cost_price_tax'] = static::parseIndonesianNumber($value);
+    }
+
+    public function setSellingPriceAttribute($value)
+    {
+        $this->attributes['selling_price'] = static::parseIndonesianNumber($value);
+    }
+
+    public function setHargaJual1Attribute($value)
+    {
+        $this->attributes['harga_jual_1'] = static::parseIndonesianNumber($value);
+    }
+
+    public function setHargaJual2Attribute($value)
+    {
+        $this->attributes['harga_jual_2'] = static::parseIndonesianNumber($value);
+    }
+
+    public function setHargaJual3Attribute($value)
+    {
+        $this->attributes['harga_jual_3'] = static::parseIndonesianNumber($value);
+    }
+
+    public function setMarginGol1Attribute($value)
+    {
+        $this->attributes['margin_gol_1'] = static::parseIndonesianNumber($value);
+    }
+
+    public function setMarginGol2Attribute($value)
+    {
+        $this->attributes['margin_gol_2'] = static::parseIndonesianNumber($value);
+    }
+
+    public function setMarginGol3Attribute($value)
+    {
+        $this->attributes['margin_gol_3'] = static::parseIndonesianNumber($value);
     }
 }

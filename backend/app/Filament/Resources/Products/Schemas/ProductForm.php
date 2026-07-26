@@ -139,7 +139,8 @@ class ProductForm
                                             $set("margin_gol_{$i}", str_replace('.', ',', (string)$new_margin));
                                         }
                                     }
-                                    $set('selling_price', $get('harga_jual_1'));
+                                    $price1 = (float) str_replace(',', '.', str_replace('.', '', (string) $get('harga_jual_1')));
+                                    $set('selling_price', $price1);
                                 }),
                             \Filament\Forms\Components\TextInput::make('cost_price_tax')
                                 ->label('Harga Beli + PPN')

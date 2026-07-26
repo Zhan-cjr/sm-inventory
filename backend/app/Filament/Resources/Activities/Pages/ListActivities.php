@@ -13,7 +13,7 @@ class ListActivities extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            // No manual creation allowed for Audit Logs
         ];
     }
 }

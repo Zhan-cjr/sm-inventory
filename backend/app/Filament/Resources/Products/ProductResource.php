@@ -60,6 +60,7 @@ class ProductResource extends Resource
     {
         return [
             RelationManagers\StocksRelationManager::class,
+            RelationManagers\PriceHistoryRelationManager::class,
         ];
     }
 

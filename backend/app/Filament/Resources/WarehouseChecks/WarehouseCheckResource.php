@@ -70,6 +70,7 @@ class WarehouseCheckResource extends Resource
                         'pending' => 'warning',
                         'pending_approval' => 'warning',
                         'approved' => 'success',
+                        'partially_processed' => 'warning',
                         'rejected' => 'danger',
                         'processed' => 'info',
                         default => 'secondary',
@@ -78,6 +79,7 @@ class WarehouseCheckResource extends Resource
                         'pending' => 'Pending',
                         'pending_approval' => 'Menunggu Otorisasi',
                         'approved' => 'Disetujui',
+                        'partially_processed' => 'Dibuat GR Sebagian',
                         'rejected' => 'Ditolak',
                         'processed' => 'Sudah Dibuat GR',
                         default => $state,
@@ -91,8 +93,6 @@ class WarehouseCheckResource extends Resource
                     ->visible(fn () => !auth()->user()->branch_id),
             ])
             ->recordActions([
-                // \Filament\Tables\Actions\ViewAction::make(),
-                
                 Action::make('approve_overqty')
                     ->label('Otorisasi')
                     ->icon('heroicon-o-check-badge')
@@ -123,13 +123,13 @@ class WarehouseCheckResource extends Resource
                     ]),
 
                 Action::make('create_gr')
-                    ->label('Proses Jadi GR')
+                    ->label(fn (WarehouseCheck $record) => $record->status === 'approved' ? 'Proses Jadi GR' : 'Input GR / Faktur Baru')
                     ->icon('heroicon-o-document-plus')
                     ->color('primary')
-                    ->visible(fn (WarehouseCheck $record) => $record->status === 'approved')
+                    ->visible(fn (WarehouseCheck $record) => in_array($record->status, ['approved', 'partially_processed', 'processed']))
                     ->requiresConfirmation()
-                    ->modalHeading('Buat Goods Receipt')
-                    ->modalDescription('Tindakan ini akan membuat Draft Goods Receipt berdasarkan hasil pengecekan gudang ini. Anda akan diarahkan ke form Edit Goods Receipt setelahnya.')
+                    ->modalHeading('Buat Goods Receipt / Input Faktur Supplier')
+                    ->modalDescription('Tindakan ini akan membuat Draft Goods Receipt berdasarkan hasil pengecekan gudang yang sudah disahkan ini. Anda dapat memasukkan Nomor Faktur Supplier dan menyesuaikan item pada form setelahnya.')
                     ->action(function (WarehouseCheck $record) {
                         // Create Draft GR
                         $po = $record->purchaseOrder;
@@ -147,27 +147,46 @@ class WarehouseCheckResource extends Resource
                             'purchase_order_id' => $po->id,
                             'supplier_id' => $po->supplier_id,
                             'branch_id' => $record->branch_id,
-                            'receipt_number' => 'GR-' . date('YmdHis'), // temporary, can be edited
+                            'receipt_number' => 'GR-' . date('YmdHis'),
                             'receipt_date' => now(),
                             'due_date' => now()->addDays($due_days),
                             'received_by' => $record->checker->name,
                             'status' => 'DRAFT',
-                            'total_amount' => 0, // will be calculated
+                            'total_amount' => 0,
                             'include_tax' => $po->include_tax,
                         ]);
 
+                        $existingGrIds = \App\Models\GoodsReceipt::where('warehouse_check_id', $record->id)
+                            ->where('id', '!=', $gr->id)
+                            ->where('status', '!=', 'CANCELLED')
+                            ->pluck('id');
+
                         $total = 0;
+                        $totalScanned = 0;
+                        $totalReceivedSoFar = 0;
+
                         foreach ($record->items as $checkItem) {
+                            $totalScanned += $checkItem->qty_scanned;
+
+                            $alreadyReceived = \App\Models\GoodsReceiptItem::whereIn('goods_receipt_id', $existingGrIds)
+                                ->where('product_id', $checkItem->product_id)
+                                ->sum('quantity_received');
+
+                            $remainingQty = max(0, $checkItem->qty_scanned - $alreadyReceived);
+                            $totalReceivedSoFar += ($alreadyReceived + $remainingQty);
+
+                            // If there are remaining items or it's the first GR
+                            $qtyToInsert = ($existingGrIds->count() > 0) ? $remainingQty : $checkItem->qty_scanned;
+
                             if ($checkItem->qty_scanned > 0) {
-                                // Find PO item to get price
                                 $poItem = $po->items()->where('product_id', $checkItem->product_id)->first();
                                 $price = $poItem ? ($poItem->unit_cost ?? 0) : 0;
-                                $subtotal = $price * $checkItem->qty_scanned;
+                                $subtotal = $price * $qtyToInsert;
                                 
                                 $gr->items()->create([
                                     'product_id' => $checkItem->product_id,
                                     'quantity_ordered' => $checkItem->qty_po,
-                                    'quantity_received' => $checkItem->qty_scanned,
+                                    'quantity_received' => $qtyToInsert,
                                     'unit_price' => $price,
                                     'subtotal' => $subtotal,
                                 ]);
@@ -186,7 +205,9 @@ class WarehouseCheckResource extends Resource
                             'tax_amount' => $taxAmount
                         ]);
 
-                        $record->update(['status' => 'processed']);
+                        // Determine status: if total received across all GRs >= total scanned, mark processed
+                        $newStatus = ($totalScanned > 0 && $totalReceivedSoFar >= $totalScanned) ? 'processed' : 'partially_processed';
+                        $record->update(['status' => $newStatus]);
 
                         return redirect()->to(\App\Filament\Resources\GoodsReceipts\GoodsReceiptResource::getUrl('edit', ['record' => $gr]));
                     }),

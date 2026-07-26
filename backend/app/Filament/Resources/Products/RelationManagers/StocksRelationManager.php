@@ -65,10 +65,10 @@ class StocksRelationManager extends RelationManager
                                         $price = (float) str_replace(',', '.', str_replace('.', '', $harga_jual_state));
                                         if ($taxed_cost > 0 && $price > 0) {
                                             $new_margin = round((($price - $taxed_cost) / $taxed_cost) * 100, 2);
-                                            $set("margin_gol_{$i}", str_replace('.', ',', (string)$new_margin));
                                         }
                                     }
-                                    $set('selling_price', $get('harga_jual_1'));
+                                    $price1 = (float) str_replace(',', '.', str_replace('.', '', (string) $get('harga_jual_1')));
+                                    $set('selling_price', $price1);
                                 }),
                             \Filament\Forms\Components\TextInput::make('cost_price_tax')
                                 ->label('Harga Beli + PPN')

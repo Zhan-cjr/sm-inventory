@@ -13,7 +13,7 @@ class ViewActivity extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make(),
+            // Audit logs are read-only and cannot be edited
         ];
     }
 }

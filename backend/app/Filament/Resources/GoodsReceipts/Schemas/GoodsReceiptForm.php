@@ -28,7 +28,7 @@ class GoodsReceiptForm
                                           ->orWhere('expired_date', '>=', now()->toDateString());
                                     })
                                     ->whereHas('warehouseChecks', function ($qc) {
-                                        $qc->where('status', 'approved');
+                                        $qc->whereIn('status', ['approved', 'partially_processed', 'processed']);
                                     });
                             });
 

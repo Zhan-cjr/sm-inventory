@@ -10,6 +10,18 @@ class Dashboard extends \Filament\Pages\Dashboard
 {
     use HasFiltersForm;
 
+    protected static ?string $title = 'Dashboard';
+
+    public static function getNavigationLabel(): string
+    {
+        return 'Dashboard';
+    }
+
+    public function getTitle(): string|\Illuminate\Contracts\Support\Htmlable
+    {
+        return 'Dashboard';
+    }
+
     public static function canAccess(): bool
     {
         return true; // Allow route resolution to prevent 403
