@@ -4,6 +4,7 @@
 
 @section('content')
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 
 <style>
     .wh-card {
@@ -248,15 +249,18 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 <script>
+document.addEventListener('DOMContentLoaded', function () {
     const purchaseOrders = @json($purchaseOrders);
     const lastPoCheck = document.getElementById('last_po_check');
-    
+    let supplierTomSelect = null;
+    let poTomSelect = null;
+    let branchTomSelect = null;
+
     // Init TomSelect for Branch if present
     const branchElem = document.getElementById('branch_id');
     if (branchElem) {
-        let branchTomSelect = new TomSelect("#branch_id", {
+        branchTomSelect = new TomSelect("#branch_id", {
             create: false,
             sortField: {
                 field: "text",
@@ -264,41 +268,54 @@
             }
         });
         branchTomSelect.on('change', function(value) {
-            window.location.href = '?branch_id=' + value;
+            if (value) {
+                window.location.href = '?branch_id=' + value;
+            } else {
+                window.location.href = '?';
+            }
         });
     }
 
-    let supplierTomSelect = new TomSelect("#supplier_id", {
-        create: false,
-        sortField: {
-            field: "text",
-            direction: "asc"
-        }
-    });
+    const supplierElem = document.getElementById('supplier_id');
+    if (supplierElem) {
+        supplierTomSelect = new TomSelect("#supplier_id", {
+            create: false,
+            sortField: {
+                field: "text",
+                direction: "asc"
+            }
+        });
+    }
 
-    let poTomSelect = new TomSelect("#po_number", {
-        create: false,
-        sortField: {
-            field: "text",
-            direction: "asc"
-        }
-    });
+    const poElem = document.getElementById('po_number');
+    if (poElem) {
+        poTomSelect = new TomSelect("#po_number", {
+            create: false,
+            sortField: {
+                field: "text",
+                direction: "asc"
+            }
+        });
+    }
 
-    supplierTomSelect.on('change', function(value) {
-        filterPOs(value);
-    });
+    if (supplierTomSelect) {
+        supplierTomSelect.on('change', function(value) {
+            filterPOs(value);
+        });
+    }
 
     function filterPOs(supplierId) {
+        if (!poTomSelect) return;
         poTomSelect.clear();
         poTomSelect.clearOptions();
         poTomSelect.addOption({value: '', text: '-- Pilih PO --'});
 
         if (!supplierId) {
-            lastPoCheck.checked = false;
+            if (lastPoCheck) lastPoCheck.checked = false;
             return;
         }
 
-        const filteredPOs = purchaseOrders.filter(po => po.supplier_id === supplierId);
+        const filteredPOs = purchaseOrders.filter(po => String(po.supplier_id) === String(supplierId));
         
         filteredPOs.forEach(po => {
             poTomSelect.addOption({value: po.po_number, text: po.po_number});
@@ -307,8 +324,8 @@
         handleLastPOCheck();
     }
 
-    function handleLastPOCheck() {
-        if (lastPoCheck.checked) {
+    window.handleLastPOCheck = function() {
+        if (lastPoCheck && lastPoCheck.checked && supplierTomSelect) {
             const supplierId = supplierTomSelect.getValue();
             if (!supplierId) {
                 alert('Pilih supplier terlebih dahulu!');
@@ -316,11 +333,17 @@
                 return;
             }
             
-            const filteredPOs = purchaseOrders.filter(po => po.supplier_id === supplierId);
+            const filteredPOs = purchaseOrders.filter(po => String(po.supplier_id) === String(supplierId));
             if (filteredPOs.length > 0) {
                 poTomSelect.setValue(filteredPOs[0].po_number);
             }
         }
+    };
+
+    // Auto filter if supplier is already selected on page load
+    if (supplierTomSelect && supplierTomSelect.getValue()) {
+        filterPOs(supplierTomSelect.getValue());
     }
+});
 </script>
 @endsection
