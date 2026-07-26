@@ -56,9 +56,11 @@ class GoodsReceiptPos extends Component
     public $only_latest_po = false;
     public $gr_requires_po = false;
     public $taxRate = 11;
+    public $purchaseOrdersList;
 
     public function mount($goodsReceipt = null)
     {
+        $this->purchaseOrdersList = collect();
         $this->taxRate = (float) (\App\Models\Organization::first()->tax_rate ?? 11);
 
         if ($goodsReceipt) {
@@ -117,9 +119,41 @@ class GoodsReceiptPos extends Component
         if ($this->supplier_id) {
             $supplier = Supplier::find($this->supplier_id);
             $this->gr_requires_po = (bool) ($supplier?->gr_requires_po);
+            $this->loadAvailablePurchaseOrders();
         }
 
         $this->calculateTotals();
+    }
+
+    public function loadAvailablePurchaseOrders()
+    {
+        if (!$this->supplier_id) {
+            $this->purchaseOrdersList = collect();
+            return;
+        }
+
+        $query = PurchaseOrder::where(function ($q) {
+            $q->whereIn('status', ['APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
+              ->whereHas('warehouseChecks', function ($qc) {
+                  $qc->where('status', 'approved');
+              })
+              ->whereHas('items', function ($query) {
+                  $query->whereColumn('quantity_received', '<', 'quantity_ordered');
+              })
+              ->where(function ($sub) {
+                  $sub->whereNull('expired_date')
+                      ->orWhere('expired_date', '>=', now()->toDateString());
+              })
+              ->where('supplier_id', $this->supplier_id);
+        });
+
+        if ($this->purchase_order_id) {
+            $query->orWhere('id', $this->purchase_order_id);
+        } else if ($this->only_latest_po) {
+            $query->latest('created_at')->limit(1);
+        }
+
+        $this->purchaseOrdersList = $query->get();
     }
 
     public function dehydrate()
@@ -136,6 +170,7 @@ class GoodsReceiptPos extends Component
         } else {
             $this->gr_requires_po = false;
         }
+        $this->loadAvailablePurchaseOrders();
     }
 
     public function updatedReceiptDate($value)
@@ -932,36 +967,14 @@ class GoodsReceiptPos extends Component
 
     public function render()
     {
-        $purchaseOrders = collect();
-        if ($this->supplier_id) {
-            $purchaseOrdersQuery = PurchaseOrder::where(function ($q) {
-                $q->whereIn('status', ['APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
-                  ->whereHas('warehouseChecks', function ($qc) {
-                      $qc->where('status', 'approved');
-                  })
-                  ->whereHas('items', function ($query) {
-                      $query->whereColumn('quantity_received', '<', 'quantity_ordered');
-                  })
-                  ->where(function ($sub) {
-                      $sub->whereNull('expired_date')
-                          ->orWhere('expired_date', '>=', now()->toDateString());
-                  })
-                  ->where('supplier_id', $this->supplier_id);
-            });
-
-            if ($this->purchase_order_id) {
-                $purchaseOrdersQuery->orWhere('id', $this->purchase_order_id);
-            } else if ($this->only_latest_po) {
-                $purchaseOrdersQuery->latest('created_at')->limit(1);
-            }
-
-            $purchaseOrders = $purchaseOrdersQuery->get();
+        if ($this->supplier_id && (is_null($this->purchaseOrdersList) || (is_object($this->purchaseOrdersList) && method_exists($this->purchaseOrdersList, 'isEmpty') && $this->purchaseOrdersList->isEmpty()))) {
+            $this->loadAvailablePurchaseOrders();
         }
 
         return view('livewire.goods-receipt-pos', [
-            'branches' => Branch::all(),
-            'suppliers' => Supplier::all(),
-            'purchaseOrders' => $purchaseOrders,
+            'branches' => Branch::select('id', 'name')->get(),
+            'suppliers' => Supplier::select('id', 'name', 'gr_requires_po')->get(),
+            'purchaseOrders' => $this->purchaseOrdersList ?? collect(),
         ]);
     }
 }
