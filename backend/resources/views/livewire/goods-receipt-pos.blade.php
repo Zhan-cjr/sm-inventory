@@ -388,6 +388,7 @@
         <div style="font-weight: 600; white-space: nowrap; color: #374151;" class="dark:text-gray-300">Cari / Scan Produk</div>
         <div style="flex: 1; position: relative;"
              x-data="{ 
+                localQuery: @entangle('searchQuery').live,
                 highlightedIndex: -1,
                 updateHighlight() {
                     let items = document.querySelectorAll('.search-result-item');
@@ -464,16 +465,19 @@
             <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem; {{ $isSearchDisabled ? 'background-color: #f3f4f6; cursor: not-allowed;' : '' }}"
                    placeholder="{{ $isSearchDisabled ? $searchDisabledReason : 'Scan barcode atau ketik nama produk... tekan Enter' }}"
                    {{ $isSearchDisabled ? 'disabled' : '' }}
-                   wire:model.live.debounce.300ms="searchQuery"
+                   wire:model.live.debounce.150ms="searchQuery"
+                   x-model="localQuery"
                    @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
                    @keydown.arrow-down.prevent="moveDown()"
                    @keydown.arrow-up.prevent="moveUp()"
                    @keydown.enter.prevent="selectCurrent()"
+                   @keydown.escape="localQuery = ''; $wire.set('searchQuery', '')"
                    autofocus>
 
             <!-- Interactive Search Dropdown -->
-            @if(count($searchResults) > 0)
-            <div style="position: absolute; left: 0; right: 0; top: 100%; z-index: 100; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-top: 0.25rem; max-height: 300px; overflow-y: auto;" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
+            <div x-show="localQuery && localQuery.length >= 2 && $wire.searchResults && $wire.searchResults.length > 0"
+                 x-transition.opacity.duration.100ms
+                 style="position: absolute; left: 0; right: 0; top: 100%; z-index: 100; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-top: 0.25rem; max-height: 300px; overflow-y: auto;" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
                 @foreach($searchResults as $index => $result)
                 <div wire:click="selectProduct('{{ $result->id }}')" 
                      class="search-result-item hover:bg-blue-50 dark:hover:bg-gray-700 dark:border-gray-700"
@@ -486,7 +490,6 @@
                 </div>
                 @endforeach
             </div>
-            @endif
         </div>
         <div style="display: flex; gap: 1rem; align-items: center;">
             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer whitespace-nowrap bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-md border border-blue-200 dark:border-blue-800">
