@@ -51,6 +51,7 @@ class GoodsReceiptPos extends Component
     public $grandTotal = 0;
 
     public $searchResults = [];
+    public $goodsReceipt;
 
     public $only_latest_po = false;
     public $gr_requires_po = false;
