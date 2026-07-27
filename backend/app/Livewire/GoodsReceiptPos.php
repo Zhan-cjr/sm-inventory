@@ -281,6 +281,8 @@ class GoodsReceiptPos extends Component
                 ->where('products.is_active', true)
                 ->where(function ($q) use ($value) {
                     $q->where('products.barcode', '=', $value)
+                      ->orWhere('products.sku', '=', $value)
+                      ->orWhereJsonContains('products.metadata->additional_barcodes', $value)
                       ->orWhere('products.sku', 'LIKE', $value . '%')
                       ->orWhere('products.barcode', 'LIKE', $value . '%')
                       ->orWhere('products.name', 'LIKE', '%' . $value . '%');
@@ -354,6 +356,7 @@ class GoodsReceiptPos extends Component
                 ->where(function ($q) use ($queryStr) {
                     $q->where('products.sku', $queryStr)
                       ->orWhere('products.barcode', $queryStr)
+                      ->orWhereJsonContains('products.metadata->additional_barcodes', $queryStr)
                       ->orWhere('products.name', 'LIKE', '%' . $queryStr . '%');
                 })
                 ->first();

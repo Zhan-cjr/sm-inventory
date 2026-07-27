@@ -605,7 +605,11 @@
         const barcode = barcodeStr.trim();
         if (!barcode) return;
 
-        const item = itemsData.find(i => i.barcode === barcode);
+        const item = itemsData.find(i => {
+            if (i.barcode === barcode) return true;
+            if (Array.isArray(i.additional_barcodes) && i.additional_barcodes.includes(barcode)) return true;
+            return false;
+        });
         if (item) {
             if (rejectedCheck && item.qty_scanned === item.qty_po && item.qty_po > 0) {
                 document.getElementById('error-msg').innerText = 'Barang ini sudah sesuai pada pengecekan sebelumnya!';

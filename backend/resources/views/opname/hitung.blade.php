@@ -245,6 +245,7 @@
                      data-name="{{ strtolower($item->product?->name) }}"
                      data-sku="{{ strtolower($item->product?->sku) }}"
                      data-barcode="{{ strtolower($item->product?->barcode ?? '') }}"
+                     data-additional-barcodes="{{ strtolower(isset($item->product?->metadata['additional_barcodes']) && is_array($item->product?->metadata['additional_barcodes']) ? implode(',', $item->product?->metadata['additional_barcodes']) : '') }}"
                      data-item-id="{{ $item->id }}">
                     <div>
                         <div class="product-name">{{ $item->product?->name }}</div>
@@ -566,15 +567,13 @@
         const status = document.getElementById('scan-status');
         let found = null;
 
-        // try exact barcode match first, then SKU, then name contains
-        found = [...productList].find(el =>
-            el.style.display !== 'none' &&
-            el.dataset.barcode === code
-        );
-        if (!found) found = [...productList].find(el =>
-            el.style.display !== 'none' &&
-            el.dataset.sku === code
-        );
+        found = [...productList].find(el => {
+            if (el.style.display === 'none') return false;
+            const bc = (el.dataset.barcode || '').toLowerCase();
+            const sku = (el.dataset.sku || '').toLowerCase();
+            const addBc = (el.dataset.additionalBarcodes || '').toLowerCase().split(',').map(s => s.trim());
+            return bc === code || sku === code || addBc.includes(code);
+        });
 
         // Reset all highlight classes
         productList.forEach(el => el.classList.remove('scan-match', 'highlighted'));

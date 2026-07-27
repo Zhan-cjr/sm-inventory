@@ -89,9 +89,11 @@ class WarehouseCheckController extends Controller
 
         $items = $po->items->map(function($item) use ($previousScans, $alreadyScanned) {
             $remainingQty = max(0, floatval($item->quantity_ordered) - ($alreadyScanned[$item->product_id] ?? 0));
+            $addBarcodes = isset($item->product->metadata['additional_barcodes']) && is_array($item->product->metadata['additional_barcodes']) ? $item->product->metadata['additional_barcodes'] : [];
             return [
                 'product_id' => $item->product_id,
                 'barcode' => $item->product->barcode,
+                'additional_barcodes' => $addBarcodes,
                 'name' => $item->product->name,
                 'qty_po' => $remainingQty,
                 'qty_scanned' => isset($previousScans[$item->product_id]) ? $previousScans[$item->product_id] : 0,

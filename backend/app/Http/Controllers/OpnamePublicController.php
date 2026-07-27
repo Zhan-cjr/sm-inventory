@@ -298,6 +298,7 @@ class OpnamePublicController extends Controller
                     'product_name' => $item->product?->name,
                     'product_sku'  => $item->product?->sku,
                     'barcode'      => $item->product?->barcode,
+                    'additional_barcodes' => isset($item->product?->metadata['additional_barcodes']) && is_array($item->product?->metadata['additional_barcodes']) ? implode(',', $item->product?->metadata['additional_barcodes']) : '',
                     // TIDAK mengirim count1_quantity → pengecek 2 objektif
                 ]),
         ]);
@@ -434,13 +435,14 @@ class OpnamePublicController extends Controller
 
     public function searchProduct(Request $request)
     {
-        $code = $request->query('code');
+        $code = trim($request->query('code'));
         if (!$code) {
             return response()->json(['error' => 'Code required'], 400);
         }
 
         $product = \App\Models\Product::where('sku', $code)
             ->orWhere('barcode', $code)
+            ->orWhereJsonContains('metadata->additional_barcodes', $code)
             ->first();
 
         if (!$product) {
@@ -452,6 +454,7 @@ class OpnamePublicController extends Controller
             'name' => $product->name,
             'sku' => $product->sku,
             'barcode' => $product->barcode,
+            'additional_barcodes' => isset($product->metadata['additional_barcodes']) && is_array($product->metadata['additional_barcodes']) ? $product->metadata['additional_barcodes'] : [],
             'category_name' => $product->category?->name,
         ]);
     }

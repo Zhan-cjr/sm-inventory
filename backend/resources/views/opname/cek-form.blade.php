@@ -253,6 +253,7 @@
                      data-name="{{ strtolower($item['product_name']) }}"
                      data-sku="{{ strtolower($item['product_sku']) }}"
                      data-barcode="{{ strtolower($item['barcode'] ?? '') }}"
+                     data-additional-barcodes="{{ strtolower($item['additional_barcodes'] ?? '') }}"
                      data-item-id="{{ $item['id'] }}">
                     <div>
                         <div class="product-name">{{ $item['product_name'] }}</div>
@@ -633,8 +634,12 @@
         const status = document.getElementById('scan-status');
         let found = null;
 
-        found = [...productItems].find(el => el.dataset.barcode === code);
-        if (!found) found = [...productItems].find(el => el.dataset.sku === code);
+        found = [...productItems].find(el => {
+            const bc = (el.dataset.barcode || '').toLowerCase();
+            const sku = (el.dataset.sku || '').toLowerCase();
+            const addBc = (el.dataset.additionalBarcodes || '').toLowerCase().split(',').map(s => s.trim());
+            return bc === code || sku === code || addBc.includes(code);
+        });
 
         productItems.forEach(el => el.classList.remove('scan-match', 'highlighted'));
 
