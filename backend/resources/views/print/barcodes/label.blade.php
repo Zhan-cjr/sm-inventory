@@ -44,7 +44,7 @@
             height: 17.5mm;
             box-sizing: border-box;
             /* Safe printable inset area to avoid thermal reflective sensor clipping */
-            padding: 1.1mm 1.8mm 0.9mm 1.8mm;
+            padding: 0.8mm 1.5mm 0.6mm 1.5mm;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -59,13 +59,13 @@
             display: flex;
             flex-direction: row;
             align-items: center;
-            height: 4.4mm;
+            height: 4.5mm;
             overflow: hidden;
         }
 
         .cart-badge {
-            width: 3.6mm;
-            height: 3.6mm;
+            width: 3.8mm;
+            height: 3.8mm;
             background-color: #000000;
             border-radius: 1px;
             display: flex;
@@ -76,8 +76,8 @@
         }
 
         .cart-badge svg {
-            width: 2.6mm;
-            height: 2.6mm;
+            width: 2.8mm;
+            height: 2.8mm;
         }
 
         .header-content {
@@ -86,12 +86,12 @@
             flex-direction: column;
             justify-content: center;
             overflow: hidden;
-            width: calc(100% - 4.4mm);
+            width: calc(100% - 4.6mm);
         }
 
         .branch-title {
             width: 100%;
-            font-size: 5px;
+            font-size: 5.8px;
             font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 0.1px;
@@ -107,7 +107,7 @@
 
         .product-title {
             width: 100%;
-            font-size: 5.2px;
+            font-size: 6px;
             font-weight: 800;
             line-height: 1.05;
             margin-top: 0.2mm;
@@ -136,18 +136,18 @@
         .rp-badge {
             background-color: #000000;
             color: #ffffff;
-            font-size: 5px;
+            font-size: 5.8px;
             font-weight: 900;
-            padding: 0.5px 1.5px;
+            padding: 0.5px 2px;
             border-radius: 1px;
-            margin-right: 1mm;
+            margin-right: 1.2mm;
             line-height: 1;
             display: inline-flex;
             align-items: center;
         }
 
         .price-amount {
-            font-size: 11.5px;
+            font-size: 12px;
             font-weight: 900;
             letter-spacing: -0.4px;
             color: #000000;
@@ -165,7 +165,7 @@
 
         .barcode-section svg {
             width: 100%;
-            max-width: 24.5mm; /* Safe printable width to prevent side edge cutting */
+            max-width: 25mm; /* Safe printable width to prevent side edge cutting */
             height: 100%;
         }
 
@@ -175,14 +175,15 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 2.5mm;
+            height: 3.2mm;
             padding-top: 0.1mm;
         }
 
         .barcode-number {
-            font-size: 4.8px;
+            font-size: 7.8px;
             font-weight: 900;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: Arial, Helvetica, sans-serif;
+            letter-spacing: 0.2px;
             color: #000000;
             line-height: 1;
             white-space: nowrap;
@@ -191,7 +192,7 @@
         .date-box {
             display: flex;
             align-items: center;
-            font-size: 4.8px;
+            font-size: 6.5px;
             font-weight: 800;
             font-family: Arial, Helvetica, sans-serif;
             color: #000000;
@@ -200,8 +201,8 @@
         }
 
         .date-box svg {
-            width: 2mm;
-            height: 2mm;
+            width: 2.3mm;
+            height: 2.3mm;
             margin-right: 0.4mm;
             flex-shrink: 0;
         }
