@@ -90,12 +90,16 @@ export function MobileProductScanner({ user, authToken }) {
     setLoading(true);
 
     const term = barcode.trim().toLowerCase();
-    // Cari di local cache dulu
-    const found = productsCache.find(p => 
-      (p.barcode && p.barcode.toLowerCase() === term) || 
-      (p.sku && p.sku.toLowerCase() === term) ||
-      (p.name && p.name.toLowerCase().includes(term))
-    );
+    // Cari di local cache dulu (dukung barcode utama, SKU, multi barcode, dan nama)
+    const found = productsCache.find(p => {
+      const bc = (p.barcode || '').toLowerCase();
+      const sku = (p.sku || '').toLowerCase();
+      const name = (p.name || '').toLowerCase();
+      const addBc = Array.isArray(p.metadata?.additional_barcodes)
+        ? p.metadata.additional_barcodes.map(b => String(b).toLowerCase())
+        : [];
+      return bc === term || sku === term || addBc.includes(term) || name.includes(term);
+    });
     
     if (found) {
       setScannedProduct(found);
