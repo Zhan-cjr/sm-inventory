@@ -156,9 +156,14 @@ class WarehouseCheckResource extends Resource
                             'include_tax' => $po->include_tax,
                         ]);
 
-                        $existingGrIds = \App\Models\GoodsReceipt::where('warehouse_check_id', $record->id)
+                        $existingGrIds = \App\Models\GoodsReceipt::where('status', '!=', 'CANCELLED')
+                            ->where(function ($q) use ($record) {
+                                $q->where('warehouse_check_id', $record->id);
+                                if ($record->purchase_order_id) {
+                                    $q->orWhere('purchase_order_id', $record->purchase_order_id);
+                                }
+                            })
                             ->where('id', '!=', $gr->id)
-                            ->where('status', '!=', 'CANCELLED')
                             ->pluck('id');
 
                         $total = 0;

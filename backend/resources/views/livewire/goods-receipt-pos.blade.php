@@ -723,10 +723,13 @@
                         @endif
                         <td class="pos-grid-td" style="text-align: right; font-weight: 600; color: #111827;" class="dark:text-gray-100">
                             @if($enable_edit_total)
-                                <div x-data="{ raw: @entangle('cart.' . $index . '.subtotal'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); } }">
-                                    <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input font-bold" style="text-align: right;" 
-                                           x-on:keydown.space.prevent="openCalc($event)">
-                                </div>
+                                <input type="number" step="any" id="subtotal-input-{{ $index }}" 
+                                       class="pos-input font-bold" style="text-align: right; width: 100%;" 
+                                       wire:model.lazy="cart.{{ $index }}.subtotal"
+                                       onfocus="this.select()"
+                                       x-on:keydown.space.prevent="openCalc($event)"
+                                       @keydown.arrow-down.prevent="let next = document.getElementById('subtotal-input-{{ $index + 1 }}'); if (next) { next.focus(); $nextTick(() => next.select()); }"
+                                       @keydown.arrow-up.prevent="let prev = document.getElementById('subtotal-input-{{ $index - 1 }}'); if (prev) { prev.focus(); $nextTick(() => prev.select()); }">
                             @else
                                 {{ number_format($item['subtotal'], 2) }}
                             @endif

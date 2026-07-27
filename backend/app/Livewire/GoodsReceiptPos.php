@@ -612,22 +612,23 @@ class GoodsReceiptPos extends Component
             $index = $parts[0];
             $field = $parts[1];
             
-            if ($field === 'subtotal' && $this->enable_edit_total) {
+            if ($field === 'subtotal') {
                 $qty = (float) ($this->cart[$index]['qty_received'] ?? 0);
                 $subtotal = (float) $value;
                 if ($qty > 0) {
-                    $d3 = (float) ($this->cart[$index]['discount_3'] ?? 0) / 100;
-                    $d2 = (float) ($this->cart[$index]['discount_2'] ?? 0) / 100;
-                    $d1 = (float) ($this->cart[$index]['discount_1'] ?? 0) / 100;
-                    $f3 = 1 - $d3; if ($f3 == 0) $f3 = 1;
-                    $f2 = 1 - $d2; if ($f2 == 0) $f2 = 1;
-                    $f1 = 1 - $d1; if ($f1 == 0) $f1 = 1;
-                    $baseTotal = $subtotal / $f3 / $f2 / $f1;
-                    $this->cart[$index]['unit_price'] = round($baseTotal / $qty, 2);
+                    $d1 = ((float) ($this->cart[$index]['discount_1'] ?? 0)) / 100;
+                    $d2 = ((float) ($this->cart[$index]['discount_2'] ?? 0)) / 100;
+                    $d3 = ((float) ($this->cart[$index]['discount_3'] ?? 0)) / 100;
+                    $f1 = (1 - $d1) > 0 ? (1 - $d1) : 1;
+                    $f2 = (1 - $d2) > 0 ? (1 - $d2) : 1;
+                    $f3 = (1 - $d3) > 0 ? (1 - $d3) : 1;
+                    $baseTotal = $subtotal / ($f1 * $f2 * $f3);
+                    $this->cart[$index]['unit_price'] = round($baseTotal / $qty, 4);
+                    $this->cart[$index]['subtotal'] = $subtotal;
                 }
+            } else {
+                $this->recalculateRow($index);
             }
-
-            $this->recalculateRow($index);
             
             $item = $this->cart[$index];
             $qty = (float) ($item['qty_received'] ?? 0);

@@ -39,4 +39,55 @@ class WarehouseCheck extends Model
     {
         return $this->hasMany(WarehouseCheckItem::class);
     }
+
+    public function syncStatus(): void
+    {
+        if (in_array($this->status, ['pending', 'pending_approval', 'rejected'])) {
+            return;
+        }
+
+        $items = $this->items;
+        $totalScanned = (float) $items->sum('qty_scanned');
+        if ($totalScanned <= 0) {
+            return;
+        }
+
+        $grIds = GoodsReceipt::where('status', '!=', 'CANCELLED')
+            ->where(function ($q) {
+                $q->where('warehouse_check_id', $this->id);
+                if ($this->purchase_order_id) {
+                    $q->orWhere('purchase_order_id', $this->purchase_order_id);
+                }
+            })
+            ->pluck('id');
+
+        if ($grIds->isEmpty()) {
+            $newStatus = 'approved';
+        } else {
+            $totalReceivedForCheckItems = 0;
+            foreach ($items as $checkItem) {
+                if ($checkItem->qty_scanned <= 0) {
+                    continue;
+                }
+
+                $alreadyReceived = GoodsReceiptItem::whereIn('goods_receipt_id', $grIds)
+                    ->where('product_id', $checkItem->product_id)
+                    ->sum('quantity_received');
+
+                $totalReceivedForCheckItems += min((float) $checkItem->qty_scanned, (float) $alreadyReceived);
+            }
+
+            if ($totalReceivedForCheckItems >= $totalScanned) {
+                $newStatus = 'processed';
+            } elseif ($totalReceivedForCheckItems > 0) {
+                $newStatus = 'partially_processed';
+            } else {
+                $newStatus = 'approved';
+            }
+        }
+
+        if ($this->status !== $newStatus) {
+            $this->update(['status' => $newStatus]);
+        }
+    }
 }
