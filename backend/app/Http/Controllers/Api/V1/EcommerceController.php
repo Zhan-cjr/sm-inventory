@@ -1732,7 +1732,9 @@ class EcommerceController extends Controller
             ->where('products.is_active', true)
             ->where(function($q) use ($barcode) {
                 $q->where('products.barcode', $barcode)
-                  ->orWhere('products.sku', $barcode);
+                  ->orWhere('products.sku', $barcode)
+                  ->orWhereJsonContains('products.metadata->additional_barcodes', $barcode)
+                  ->orWhere('products.metadata->additional_barcodes', 'LIKE', '%' . $barcode . '%');
             });
 
         if ($branchId) {

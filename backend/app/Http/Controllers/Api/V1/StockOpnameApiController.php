@@ -42,8 +42,13 @@ class StockOpnameApiController extends Controller
             return response()->json(['error' => $validator->errors()->first()], 422);
         }
 
-        // Find the product by barcode or sku
-        $product = Product::where('sku', $request->barcode)->first();
+        // Find the product by barcode, sku, or multibarcode
+        $product = Product::where(function($q) use ($request) {
+            $q->where('barcode', $request->barcode)
+              ->orWhere('sku', $request->barcode)
+              ->orWhereJsonContains('metadata->additional_barcodes', $request->barcode)
+              ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $request->barcode . '%');
+        })->first();
         if (!$product) {
             return response()->json(['error' => 'Produk tidak ditemukan'], 404);
         }

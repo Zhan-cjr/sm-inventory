@@ -440,10 +440,12 @@ class OpnamePublicController extends Controller
             return response()->json(['error' => 'Code required'], 400);
         }
 
-        $product = \App\Models\Product::where('sku', $code)
-            ->orWhere('barcode', $code)
-            ->orWhereJsonContains('metadata->additional_barcodes', $code)
-            ->first();
+        $product = \App\Models\Product::where(function ($q) use ($code) {
+            $q->where('sku', $code)
+              ->orWhere('barcode', $code)
+              ->orWhereJsonContains('metadata->additional_barcodes', $code)
+              ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $code . '%');
+        })->first();
 
         if (!$product) {
             return response()->json(['error' => 'Product not found'], 404);
