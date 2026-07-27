@@ -602,13 +602,19 @@
 
     function handleScan(barcodeStr) {
         document.getElementById('error-msg').innerText = '';
-        const barcode = barcodeStr.trim();
+        const barcode = barcodeStr.trim().toLowerCase();
         if (!barcode) return;
 
         const item = itemsData.find(i => {
-            if (i.barcode === barcode) return true;
-            if (Array.isArray(i.additional_barcodes) && i.additional_barcodes.includes(barcode)) return true;
-            return false;
+            const bc = (i.barcode || '').toLowerCase();
+            const sku = (i.sku || '').toLowerCase();
+            let addBc = [];
+            if (Array.isArray(i.additional_barcodes)) {
+                addBc = i.additional_barcodes.map(b => String(b).trim().toLowerCase());
+            } else if (typeof i.additional_barcodes === 'string') {
+                addBc = i.additional_barcodes.split(',').map(b => b.trim().toLowerCase());
+            }
+            return bc === barcode || sku === barcode || addBc.includes(barcode);
         });
         if (item) {
             if (rejectedCheck && item.qty_scanned === item.qty_po && item.qty_po > 0) {
