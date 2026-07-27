@@ -58,11 +58,85 @@ class ProductForm
                     ->validationMessages([
                         'unique' => 'Barcode ini sudah digunakan oleh produk lain.',
                     ])
+                    ->rules([
+                        function ($get, $record) {
+                            return function (string $attribute, $value, \Closure $fail) use ($get, $record) {
+                                if (blank($value)) return;
+                                $code = trim($value);
+                                $recordId = $record?->id;
+                                $sku = trim($get('sku') ?? '');
+
+                                if (!empty($sku) && strtolower($code) === strtolower($sku)) {
+                                    $fail("Barcode tidak boleh sama dengan SKU produk ini.");
+                                    return;
+                                }
+
+                                $exists = \App\Models\Product::where('id', '!=', $recordId)
+                                    ->where(function ($q) use ($code) {
+                                        $q->where('barcode', $code)
+                                          ->orWhere('sku', $code)
+                                          ->orWhereJsonContains('metadata->additional_barcodes', $code)
+                                          ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $code . '%');
+                                    })->first();
+
+                                if ($exists) {
+                                    $fail("Barcode '{$code}' sudah digunakan oleh produk '{$exists->name}' (SKU/Barcode/Multi Barcode).");
+                                }
+                            };
+                        }
+                    ])
                     ->disabled($isBranchUser),
                 \Filament\Forms\Components\TagsInput::make('metadata.additional_barcodes')
                     ->label('Barcode Tambahan (Multi Barcode)')
                     ->placeholder('Ketik barcode lalu tekan enter')
                     ->splitKeys(['Enter', 'Tab', ','])
+                    ->rules([
+                        function ($get, $record) {
+                            return function (string $attribute, $value, \Closure $fail) use ($get, $record) {
+                                if (empty($value)) return;
+                                $tags = is_array($value) ? $value : array_map('trim', explode(',', (string) $value));
+                                $recordId = $record?->id;
+                                $primaryBarcode = trim($get('barcode') ?? '');
+                                $sku = trim($get('sku') ?? '');
+
+                                $seen = [];
+                                foreach ($tags as $tag) {
+                                    $code = trim($tag);
+                                    if (empty($code)) continue;
+
+                                    $lowerCode = strtolower($code);
+                                    if (in_array($lowerCode, $seen)) {
+                                        $fail("Multi Barcode '{$code}' terduplikasi dalam daftar yang Anda masukkan.");
+                                        return;
+                                    }
+                                    $seen[] = $lowerCode;
+
+                                    if (!empty($primaryBarcode) && strtolower($code) === strtolower($primaryBarcode)) {
+                                        $fail("Multi Barcode '{$code}' tidak boleh sama dengan Barcode Utama produk ini.");
+                                        return;
+                                    }
+
+                                    if (!empty($sku) && strtolower($code) === strtolower($sku)) {
+                                        $fail("Multi Barcode '{$code}' tidak boleh sama dengan SKU produk ini.");
+                                        return;
+                                    }
+
+                                    $exists = \App\Models\Product::where('id', '!=', $recordId)
+                                        ->where(function ($q) use ($code) {
+                                            $q->where('barcode', $code)
+                                              ->orWhere('sku', $code)
+                                              ->orWhereJsonContains('metadata->additional_barcodes', $code)
+                                              ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $code . '%');
+                                        })->first();
+
+                                    if ($exists) {
+                                        $fail("Multi Barcode '{$code}' sudah digunakan oleh produk '{$exists->name}' (SKU/Barcode/Multi Barcode).");
+                                        return;
+                                    }
+                                }
+                            };
+                        }
+                    ])
                     ->disabled($isBranchUser),
                 TextInput::make('name')
                     ->required()

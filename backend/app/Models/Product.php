@@ -47,6 +47,71 @@ class Product extends Model
             }
         });
 
+        static::saving(function ($product) {
+            $productId = $product->id;
+            $sku = trim($product->sku ?? '');
+            $primaryBarcode = trim($product->barcode ?? '');
+
+            // 1. Validasi Barcode Utama
+            if (!empty($primaryBarcode)) {
+                if (!empty($sku) && strtolower($primaryBarcode) === strtolower($sku)) {
+                    throw new \InvalidArgumentException("Barcode utama '{$primaryBarcode}' tidak boleh sama dengan SKU produk ini.");
+                }
+
+                $exists = static::where('id', '!=', $productId)
+                    ->where(function ($q) use ($primaryBarcode) {
+                        $q->where('barcode', $primaryBarcode)
+                          ->orWhere('sku', $primaryBarcode)
+                          ->orWhereJsonContains('metadata->additional_barcodes', $primaryBarcode)
+                          ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $primaryBarcode . '%');
+                    })->first();
+
+                if ($exists) {
+                    throw new \InvalidArgumentException("Barcode '{$primaryBarcode}' sudah digunakan oleh produk '{$exists->name}' (SKU/Barcode/Multi Barcode).");
+                }
+            }
+
+            // 2. Validasi Multi Barcode (metadata.additional_barcodes)
+            $metadata = $product->metadata;
+            if (is_array($metadata) && !empty($metadata['additional_barcodes'])) {
+                $additionalBarcodes = is_array($metadata['additional_barcodes'])
+                    ? $metadata['additional_barcodes']
+                    : array_map('trim', explode(',', (string) $metadata['additional_barcodes']));
+
+                $seen = [];
+                foreach ($additionalBarcodes as $code) {
+                    $code = trim($code);
+                    if (empty($code)) continue;
+
+                    $lowerCode = strtolower($code);
+                    if (in_array($lowerCode, $seen)) {
+                        throw new \InvalidArgumentException("Multi Barcode '{$code}' terduplikasi dalam daftar yang Anda masukkan.");
+                    }
+                    $seen[] = $lowerCode;
+
+                    if (!empty($primaryBarcode) && strtolower($code) === strtolower($primaryBarcode)) {
+                        throw new \InvalidArgumentException("Multi Barcode '{$code}' tidak boleh sama dengan Barcode Utama produk ini.");
+                    }
+
+                    if (!empty($sku) && strtolower($code) === strtolower($sku)) {
+                        throw new \InvalidArgumentException("Multi Barcode '{$code}' tidak boleh sama dengan SKU produk ini.");
+                    }
+
+                    $exists = static::where('id', '!=', $productId)
+                        ->where(function ($q) use ($code) {
+                            $q->where('barcode', $code)
+                              ->orWhere('sku', $code)
+                              ->orWhereJsonContains('metadata->additional_barcodes', $code)
+                              ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $code . '%');
+                        })->first();
+
+                    if ($exists) {
+                        throw new \InvalidArgumentException("Multi Barcode '{$code}' sudah digunakan oleh produk '{$exists->name}' (SKU/Barcode/Multi Barcode).");
+                    }
+                }
+            }
+        });
+
         static::saved(function ($product) {
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             foreach (\App\Models\Branch::pluck('id') as $branchId) {
