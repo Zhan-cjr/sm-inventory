@@ -43,39 +43,74 @@
             width: 32mm;
             height: 17.5mm;
             box-sizing: border-box;
-            padding: 0.5mm 1mm 0.4mm 1mm;
+            /* Safe printable inset area to avoid thermal reflective sensor clipping */
+            padding: 1.1mm 1.8mm 0.9mm 1.8mm;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
-            text-align: center;
             background-color: #ffffff;
         }
         
-        /* Line 1: Full Branch Name (No Truncation) */
-        .branch-header {
+        /* Top Header: Cart Badge + Branch Name & Line + Product Name */
+        .header-section {
             width: 100%;
-            font-size: 5.6px;
-            font-weight: 800;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            height: 4.4mm;
+            overflow: hidden;
+        }
+
+        .cart-badge {
+            width: 3.6mm;
+            height: 3.6mm;
+            background-color: #000000;
+            border-radius: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-right: 0.8mm;
+        }
+
+        .cart-badge svg {
+            width: 2.6mm;
+            height: 2.6mm;
+        }
+
+        .header-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
+            width: calc(100% - 4.4mm);
+        }
+
+        .branch-title {
+            width: 100%;
+            font-size: 5px;
+            font-weight: 900;
             text-transform: uppercase;
-            letter-spacing: 0.2px;
+            letter-spacing: 0.1px;
             text-align: center;
             white-space: nowrap;
             overflow: hidden;
+            text-overflow: ellipsis;
             color: #000000;
             border-bottom: 0.5px solid #000000;
-            padding-bottom: 0.3mm;
-            height: 2.3mm;
-            line-height: 1.1;
+            padding-bottom: 0.2mm;
+            line-height: 1;
         }
 
-        /* Line 2: Product Name (Full Width, Max 2 Lines) */
-        .product-name {
+        .product-title {
             width: 100%;
-            font-size: 6.3px;
+            font-size: 5.2px;
             font-weight: 800;
-            line-height: 1.15;
+            line-height: 1.05;
+            margin-top: 0.2mm;
             overflow: hidden;
             display: -webkit-box;
             -webkit-line-clamp: 2;
@@ -84,63 +119,33 @@
             text-transform: uppercase;
             text-align: center;
             color: #000000;
-            height: 3.4mm;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        /* Line 3: SVG Barcode & Code Number */
-        .barcode-section {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin-top: 0.2mm;
-            margin-bottom: 0.2mm;
-        }
-        .barcode-wrapper {
-            width: 100%;
-            height: 4.5mm;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .barcode-wrapper svg {
-            width: 100%;
-            max-width: 28mm;
-            height: 100%;
-        }
-        .barcode-number {
-            font-size: 5.2px;
-            letter-spacing: 1px;
-            margin-top: 0.2mm;
-            font-weight: bold;
-            font-family: 'Courier New', Courier, monospace;
-            color: #000000;
-            line-height: 1;
         }
 
-        /* Line 4: Footer Bar (Jumbo Price on Left, Date on Right) */
-        .footer-bar {
+        /* Middle Section: Price Badge + Price Amount */
+        .price-section {
             width: 100%;
             display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            border-top: 0.5px solid #000000;
-            padding-top: 0.3mm;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
             height: 3.8mm;
+            margin-top: 0.1mm;
+            margin-bottom: 0.1mm;
         }
-        .price-box {
-            display: flex;
-            align-items: baseline;
+
+        .rp-badge {
+            background-color: #000000;
+            color: #ffffff;
+            font-size: 5px;
+            font-weight: 900;
+            padding: 0.5px 1.5px;
+            border-radius: 1px;
+            margin-right: 1mm;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
         }
-        .price-currency {
-            font-size: 5.5px;
-            font-weight: bold;
-            margin-right: 1px;
-        }
+
         .price-amount {
             font-size: 11.5px;
             font-weight: 900;
@@ -148,15 +153,57 @@
             color: #000000;
             line-height: 1;
         }
-        .date-box {
-            font-size: 5.2px;
-            font-weight: 800;
-            font-family: monospace;
-            white-space: nowrap;
+
+        /* Barcode Graphic */
+        .barcode-section {
+            width: 100%;
+            height: 4.2mm;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .barcode-section svg {
+            width: 100%;
+            max-width: 24.5mm; /* Safe printable width to prevent side edge cutting */
+            height: 100%;
+        }
+
+        /* Footer Bar: Barcode Code (Left) & Calendar Icon + Date (Right) */
+        .footer-section {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 2.5mm;
+            padding-top: 0.1mm;
+        }
+
+        .barcode-number {
+            font-size: 4.8px;
+            font-weight: 900;
+            font-family: 'Courier New', Courier, monospace;
             color: #000000;
             line-height: 1;
-            align-self: flex-end;
-            margin-bottom: 0.2mm;
+            white-space: nowrap;
+        }
+
+        .date-box {
+            display: flex;
+            align-items: center;
+            font-size: 4.8px;
+            font-weight: 800;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #000000;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .date-box svg {
+            width: 2mm;
+            height: 2mm;
+            margin-right: 0.4mm;
+            flex-shrink: 0;
         }
 
         @media print {
@@ -177,9 +224,9 @@
         $branchName = $branch ? $branch->name : 'Pusat';
 
         if (($date_type ?? 'cetak') === 'expired' && !empty($custom_date)) {
-            $dateStr = 'EXP:' . \Carbon\Carbon::parse($custom_date)->format('d/m/y');
+            $dateStr = 'EXP:' . \Carbon\Carbon::parse($custom_date)->format('d/m/Y');
         } else {
-            $dateStr = \Carbon\Carbon::now()->format('d/m/y');
+            $dateStr = \Carbon\Carbon::now()->format('d/m/Y');
         }
 
         // Build flat array of all label items based on copies requested
@@ -208,36 +255,46 @@
                         $barcode = $lbl['barcode']; 
                     @endphp
                     <div class="label">
-                        <!-- Line 1: Full Branch Name -->
-                        <div class="branch-header">
-                            {{ $branchName }}
+                        <!-- Top Header: Cart Badge + Branch Name & Line + Product Name -->
+                        <div class="header-section">
+                            <div class="cart-badge">
+                                <svg viewBox="0 0 24 24" fill="#ffffff">
+                                    <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
+                                </svg>
+                            </div>
+                            <div class="header-content">
+                                <div class="branch-title">
+                                    {{ $branchName }}
+                                </div>
+                                <div class="product-title">
+                                    {{ $product->name }}
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Line 2: Product Name -->
-                        <div class="product-name">
-                            <span>{{ $product->name }}</span>
+                        <!-- Middle Section: Price Badge (Rp) + Jumbo Price -->
+                        <div class="price-section">
+                            <div class="rp-badge">Rp</div>
+                            <div class="price-amount">{{ number_format($product->display_price ?? $product->selling_price, 0, ',', '.') }}</div>
                         </div>
 
-                        <!-- Line 3: Barcode Graphic & Number -->
+                        <!-- Barcode Graphic -->
                         <div class="barcode-section">
-                            <div class="barcode-wrapper">
-                                @if($barcode)
-                                    {!! $generator->getBarcode($barcode, $generator::TYPE_CODE_128, 1.5, 32) !!}
-                                @else
-                                    <div style="font-size: 5px;">NO BARCODE</div>
-                                @endif
-                            </div>
-                            <div class="barcode-number">{{ $barcode }}</div>
+                            @if($barcode)
+                                {!! $generator->getBarcode($barcode, $generator::TYPE_CODE_128, 1.5, 32) !!}
+                            @else
+                                <div style="font-size: 5px;">NO BARCODE</div>
+                            @endif
                         </div>
 
-                        <!-- Line 4: Price Callout (Left) + Date (Right) -->
-                        <div class="footer-bar">
-                            <div class="price-box">
-                                <span class="price-currency">Rp</span>
-                                <span class="price-amount">{{ number_format($product->display_price ?? $product->selling_price, 0, ',', '.') }}</span>
-                            </div>
+                        <!-- Footer: Barcode Code (Left) & Calendar Icon + Date (Right) -->
+                        <div class="footer-section">
+                            <div class="barcode-number">{{ $barcode }}</div>
                             <div class="date-box">
-                                {{ $dateStr }}
+                                <svg viewBox="0 0 24 24" fill="#000000">
+                                    <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zM7 12h5v5H7z"/>
+                                </svg>
+                                <span>{{ $dateStr }}</span>
                             </div>
                         </div>
                     </div>
