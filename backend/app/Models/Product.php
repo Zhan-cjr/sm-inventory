@@ -116,6 +116,7 @@ class Product extends Model
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             foreach (\App\Models\Branch::pluck('id') as $branchId) {
                 \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+                \Illuminate\Support\Facades\Cache::forget('pos_products_json_gz_branch_' . $branchId);
             }
             
             // Broadcast the product update to the POS catalog channel
@@ -126,6 +127,7 @@ class Product extends Model
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             foreach (\App\Models\Branch::pluck('id') as $branchId) {
                 \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+                \Illuminate\Support\Facades\Cache::forget('pos_products_json_gz_branch_' . $branchId);
             }
         });
     }

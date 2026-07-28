@@ -308,17 +308,17 @@ function App() {
   const hasEcommerceAuth = user?.custom_authorizations?.includes('PROCESS_ECOMMERCE');
   const hasSmartOrderAuth = user?.custom_authorizations?.includes('ACCESS_SMART_ORDER');
   const hasBIAIAuth = user?.custom_authorizations?.includes('ACCESS_BI_AI');
-  const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) || 
-                      user?.custom_authorizations?.includes('APPROVE_PO') || 
-                      user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
-                      
+  const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) ||
+    user?.custom_authorizations?.includes('APPROVE_PO') ||
+    user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
+
   const canAccessDashboard = isManagerOrAdmin || hasBIAIAuth;
 
   return (
     <Router>
       <Routes>
         <Route path="/" element={
-          isMobileDevice ? <Navigate to="/mobile" replace /> : (canAccessDashboard ? <Navigate to="/dashboard" replace /> : (user.can_access_pos ? <Navigate to="/pos" replace /> : <div style={{padding:'2rem', textAlign:'center', marginTop:'10vh'}}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{padding:'10px 20px', marginTop:'20px'}}>Logout</button></div>))
+          isMobileDevice ? <Navigate to="/mobile" replace /> : (canAccessDashboard ? <Navigate to="/dashboard" replace /> : (user.can_access_pos ? <Navigate to="/pos" replace /> : <div style={{ padding: '2rem', textAlign: 'center', marginTop: '10vh' }}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px' }}>Logout</button></div>))
         } />
 
         <Route path="/pos" element={
@@ -339,12 +339,12 @@ function App() {
                 lockedTerminalName={deviceInfo?.terminalName}
               />
             </div>
-          ) : <div style={{padding:'2rem', textAlign:'center', marginTop:'10vh'}}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{padding:'10px 20px', marginTop:'20px'}}>Logout</button></div>)
+          ) : <div style={{ padding: '2rem', textAlign: 'center', marginTop: '10vh' }}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px' }}>Logout</button></div>)
         } />
 
         <Route path="/dashboard" element={
           canAccessDashboard ? (
-            <BIDashboard user={user} authToken={token} onBack={() => window.location.href='/mobile'} />
+            <BIDashboard user={user} authToken={token} onBack={() => window.location.href = '/mobile'} />
           ) : <Navigate to="/pos" replace />
         } />
 

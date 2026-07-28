@@ -25,6 +25,7 @@ class Stock extends Model
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             if ($stock->branch_id) {
                 \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $stock->branch_id);
+                \Illuminate\Support\Facades\Cache::forget('pos_products_json_gz_branch_' . $stock->branch_id);
                 
                 // Broadcast stock update
                 event(new \App\Events\StockUpdated($stock));
@@ -35,6 +36,7 @@ class Stock extends Model
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             if ($stock->branch_id) {
                 \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $stock->branch_id);
+                \Illuminate\Support\Facades\Cache::forget('pos_products_json_gz_branch_' . $stock->branch_id);
                 
                 // Broadcast stock update (as 0)
                 $stock->quantity_on_hand = 0;
