@@ -11,7 +11,7 @@ export const initEcho = (token) => {
         broadcaster: 'reverb',
         key: 'eaixn9wuthqzi8mjryhc', // VITE_REVERB_APP_KEY
         // Jika akses via public domain, arahkan websocket host ke domain admin/backend (atau domain poskasir yang sama jika diproxy)
-        wsHost: window.location.hostname.includes('toserbaselamat.id') ? 'admin.toserbaselamat.id' : window.location.hostname,
+        wsHost: window.location.hostname,
         wsPort: 8080,
         wssPort: isHttps ? 443 : 8080, // Production HTTPS biasanya menggunakan port 443 (diproxy Nginx)
         forceTLS: isHttps,
