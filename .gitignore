@@ -4,6 +4,7 @@ desktop-pos/build_dist/
 desktop-pos/node_modules/
 ecommerce-frontend/node_modules/
 frontend/node_modules/
+frontend/dev-dist/
 backend/vendor/
 
 # SECURITY: Pastikan semua file .env rahasia tidak ikut ke push!
