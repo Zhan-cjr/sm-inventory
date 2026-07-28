@@ -92,6 +92,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/app': {
+        target: process.env.VITE_REVERB_SERVER_URL || 'http://reverb:8085',
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+      },
       '/storage': {
         target: process.env.VITE_BACKEND_URL || 'http://backend:8080',
         changeOrigin: true,
@@ -105,6 +111,12 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: process.env.VITE_BACKEND_URL || 'http://backend:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/app': {
+        target: process.env.VITE_REVERB_SERVER_URL || 'http://reverb:8085',
+        ws: true,
         changeOrigin: true,
         secure: false,
       },
