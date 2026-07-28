@@ -33,7 +33,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (str_contains(request()->header('X-Forwarded-Proto', ''), 'https') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
+        if (
+            str_contains(request()->header('X-Forwarded-Proto', ''), 'https') ||
+            (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ||
+            (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ||
+            request()->secure()
+        ) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
 
