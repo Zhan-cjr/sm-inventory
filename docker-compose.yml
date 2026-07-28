@@ -72,6 +72,21 @@ services:
       meilisearch:
         condition: service_started
 
+  # Laravel Reverb WebSocket Server
+  reverb:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sm_reverb
+    restart: unless-stopped
+    command: php artisan reverb:start --host=0.0.0.0 --port=8085
+    ports:
+      - "8085:8085"
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - redis
+
   # AI Service (Python FastAPI)
   ai-service:
     build:
