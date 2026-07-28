@@ -1,0 +1,145 @@
+name: sm-inventory
+
+services:
+  # Database Service (MySQL 8.4)
+  mysql:
+    image: mysql:8.4
+    container_name: sm_mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: sm_inventory
+      MYSQL_USER: sm_user
+      MYSQL_PASSWORD: sm_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Redis Cache & Queue Worker
+  redis:
+    image: redis:7-alpine
+    container_name: sm_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # Meilisearch Engine
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    container_name: sm_meilisearch
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: KunciRahasiaGudangSminventory123!
+    volumes:
+      - meili_data:/meili_data
+
+  # Backend Service (Laravel PHP 8.3)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sm_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: sm_inventory
+      DB_USERNAME: sm_user
+      DB_PASSWORD: sm_password
+      REDIS_HOST: redis
+      MEILISEARCH_HOST: http://meilisearch:7700
+      AI_SERVICE_URL: http://ai-service:8001
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      meilisearch:
+        condition: service_started
+
+  # AI Service (Python FastAPI)
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: sm_ai_service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./ai-service:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: mysql
+      DB_USER: sm_user
+      DB_PASSWORD: sm_password
+      DB_NAME: sm_inventory
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-${GOOGLE_API_KEY:-}}
+      GOOGLE_API_KEY: ${GEMINI_API_KEY:-${GOOGLE_API_KEY:-}}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # Admin & POS Frontend (React + Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sm_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  # Company Profile Landing Page (Next.js)
+  company-profile:
+    build:
+      context: ./company-profile
+      dockerfile: Dockerfile
+    container_name: sm_company_profile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./company-profile:/app
+      - /app/node_modules
+
+  # E-commerce Frontend Store (React + Vite)
+  ecommerce-frontend:
+    build:
+      context: ./ecommerce-frontend
+      dockerfile: Dockerfile
+    container_name: sm_ecommerce_frontend
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./ecommerce-frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+  redis_data:
+  meili_data:

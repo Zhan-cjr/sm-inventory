@@ -22,7 +22,7 @@ class SuggestedOrderService
             return $this->aiCache[$branchId];
         }
 
-        $aiUrl = env('AI_SERVICE_URL', 'http://127.0.0.1:8001');
+        $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
 
         try {
             $response = Http::timeout(2)->get($aiUrl . '/api/v1/ai/restock-suggestions', [

@@ -12,6 +12,8 @@ const getBaseUrl = () => {
 
 export const API_BASE_URL = getBaseUrl();
 
+axios.defaults.baseURL = API_BASE_URL;
+
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
@@ -23,9 +25,9 @@ const api = axios.create({
 export const getImageUrl = (url: string | null): string | null => {
   if (!url) return null;
 
-  // If it points to localhost or 127.0.0.1 on port 8080, make it relative
-  if (url.includes('localhost:8080') || url.includes('127.0.0.1:8080')) {
-    return url.replace(/https?:\/\/(localhost|127\.0\.0\.1):8080/, '');
+  // If the URL contains /storage/, convert it to a relative path starting with /storage/
+  if (url.includes('/storage/')) {
+    return '/storage/' + url.split('/storage/')[1];
   }
 
   return url;

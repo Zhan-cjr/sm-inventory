@@ -53,7 +53,8 @@ class ChatAiWidget extends Component
             // Get user's branch
             $branchId = auth()->user()->branch_id;
             
-            $response = Http::timeout(60)->post('http://localhost:8001/api/v1/ai/ask', [
+            $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
+            $response = Http::timeout(60)->post($aiUrl . '/api/v1/ai/ask', [
                 'question' => $userQuestion,
                 'branch_id' => $branchId, // Pass branch for security
                 'chat_history' => $this->chatHistory, // Pass chat history for context

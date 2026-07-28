@@ -6,32 +6,32 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    port: 5173,
+    port: 8081,
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8080',
         changeOrigin: true,
         secure: false,
       },
       '/storage': {
-        target: 'http://127.0.0.1:8080',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8080',
         changeOrigin: true,
         secure: false,
       }
     }
   },
   preview: {
-    port: 5173,
+    port: 8081,
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8080',
         changeOrigin: true,
         secure: false,
       },
       '/storage': {
-        target: 'http://127.0.0.1:8080',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8080',
         changeOrigin: true,
         secure: false,
       }

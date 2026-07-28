@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 
-const API_BASE_URL = '/api/company-profile';
+const getApiBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:8080/api/company-profile';
+  }
+  return '/api/company-profile';
+};
 export function useCompanyProfile() {
   const [settings, setSettings] = useState<any>(null);
   const [facilities, setFacilities] = useState<any[]>([]);
@@ -11,11 +17,12 @@ export function useCompanyProfile() {
   useEffect(() => {
     async function fetchData() {
       try {
+        const baseUrl = getApiBaseUrl();
         const [settingsRes, facilitiesRes, branchesRes, tiersRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/settings`).catch(() => null),
-          fetch(`${API_BASE_URL}/facilities`).catch(() => null),
-          fetch(`${API_BASE_URL}/branches`).catch(() => null),
-          fetch(`${API_BASE_URL}/member-tiers`).catch(() => null),
+          fetch(`${baseUrl}/settings`).catch(() => null),
+          fetch(`${baseUrl}/facilities`).catch(() => null),
+          fetch(`${baseUrl}/branches`).catch(() => null),
+          fetch(`${baseUrl}/member-tiers`).catch(() => null),
         ]);
 
         if (settingsRes?.ok) setSettings(await settingsRes.json());

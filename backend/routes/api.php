@@ -250,7 +250,8 @@ Route::prefix('v1')->group(function () {
             $user = $request->user();
             $branchId = $user ? $user->branch_id : null;
             
-            $response = \Illuminate\Support\Facades\Http::timeout(60)->post('http://localhost:8001/api/v1/ai/ask', [
+            $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
+            $response = \Illuminate\Support\Facades\Http::timeout(60)->post($aiUrl . '/api/v1/ai/ask', [
                 'question' => $request->input('question') ?? $request->input('query'), 
                 'branch_id' => $branchId,
             ]);

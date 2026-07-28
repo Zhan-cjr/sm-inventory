@@ -9,8 +9,11 @@ from PIL import Image
 load_dotenv()
 
 # Initialize Gemini Model
-genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
-model = genai.GenerativeModel('gemini-3.1-flash-lite')
+api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
+if api_key:
+    genai.configure(api_key=api_key)
+model_name = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+model = genai.GenerativeModel(model_name)
 
 def get_db_connection():
     return mysql.connector.connect(

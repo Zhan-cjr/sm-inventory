@@ -1,15 +1,21 @@
 desktop-pos/build_dist/
 *.sql
+*.sql.gz
 desktop-pos/node_modules/
 ecommerce-frontend/node_modules/
 frontend/node_modules/
 backend/vendor/
 
-# SECURITY: Pastikan semua file .env tidak ikut ke push!
+# SECURITY: Pastikan semua file .env rahasia tidak ikut ke push!
 .env
 .env.*
 **/.env
 **/.env.*
+
+# Izinkan template environment ter-track di Git
+!**/.env.example
+!**/.env.docker
+
 
 # Ignore meilisearch and heavy data
 backend/meilisearch.exe

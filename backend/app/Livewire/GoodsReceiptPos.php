@@ -56,12 +56,10 @@ class GoodsReceiptPos extends Component
     public $only_latest_po = false;
     public $gr_requires_po = false;
     public $taxRate = 11;
-    public $purchaseOrdersList;
 
     public function mount($goodsReceipt = null)
     {
-        $this->purchaseOrdersList = collect();
-        $this->taxRate = (float) (\App\Models\Organization::first()->tax_rate ?? 11);
+        $this->taxRate = (float) (\App\Models\Organization::first()?->tax_rate ?? 11);
 
         if ($goodsReceipt) {
             $this->goodsReceipt = $goodsReceipt;
@@ -127,9 +125,13 @@ class GoodsReceiptPos extends Component
 
     public function loadAvailablePurchaseOrders()
     {
+        // Handled via computed property getPurchaseOrdersProperty()
+    }
+
+    public function getPurchaseOrdersProperty()
+    {
         if (!$this->supplier_id) {
-            $this->purchaseOrdersList = collect();
-            return;
+            return collect();
         }
 
         $query = PurchaseOrder::where(function ($q) {
@@ -153,7 +155,7 @@ class GoodsReceiptPos extends Component
             $query->latest('created_at')->limit(1);
         }
 
-        $this->purchaseOrdersList = $query->get();
+        return $query->get();
     }
 
     public function dehydrate()
@@ -451,9 +453,10 @@ class GoodsReceiptPos extends Component
             $filePath = $this->scan_image->getRealPath();
             $fileContent = fopen($filePath, 'r');
 
+            $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
             $response = \Illuminate\Support\Facades\Http::timeout(120)->attach(
                 'file', $fileContent, $this->scan_image->getClientOriginalName()
-            )->post('http://localhost:8001/api/v1/ai/scan-invoice', [
+            )->post($aiUrl . '/api/v1/ai/scan-invoice', [
                 'supplier_id' => $this->supplier_id
             ]);
 
@@ -971,14 +974,10 @@ class GoodsReceiptPos extends Component
 
     public function render()
     {
-        if ($this->supplier_id && (is_null($this->purchaseOrdersList) || (is_object($this->purchaseOrdersList) && method_exists($this->purchaseOrdersList, 'isEmpty') && $this->purchaseOrdersList->isEmpty()))) {
-            $this->loadAvailablePurchaseOrders();
-        }
-
         return view('livewire.goods-receipt-pos', [
             'branches' => Branch::select('id', 'name')->get(),
             'suppliers' => Supplier::select('id', 'name', 'gr_requires_po')->get(),
-            'purchaseOrders' => $this->purchaseOrdersList ?? collect(),
+            'purchaseOrders' => $this->purchaseOrders,
         ]);
     }
 }

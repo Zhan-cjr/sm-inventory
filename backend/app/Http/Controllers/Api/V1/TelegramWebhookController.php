@@ -78,7 +78,8 @@ class TelegramWebhookController extends Controller
                 $chatHistoryForAi = $chatHistory;
                 $chatHistoryForAi[] = ['role' => 'user', 'content' => $messageText];
 
-                $aiResponse = Http::timeout(60)->post('http://localhost:8001/api/v1/ai/ask', [
+                $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
+                $aiResponse = Http::timeout(60)->post($aiUrl . '/api/v1/ai/ask', [
                     'question' => $messageText,
                     'branch_id' => $branchId,
                     'chat_history' => $chatHistoryForAi, // Kirim history

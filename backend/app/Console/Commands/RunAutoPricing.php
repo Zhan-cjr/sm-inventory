@@ -42,7 +42,7 @@ class RunAutoPricing extends Command
             $this->info("Querying AI Service for pricing suggestions...");
             
             // In a real env, this URL should be in config/env
-            $aiServiceUrl = env('AI_SERVICE_URL', 'http://127.0.0.1:8001');
+            $aiServiceUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
             $response = Http::timeout(60)->get("{$aiServiceUrl}/api/v1/ai/dynamic-pricing");
 
             if (!$response->successful()) {

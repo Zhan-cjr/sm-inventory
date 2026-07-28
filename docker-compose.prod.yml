@@ -1,0 +1,60 @@
+name: sm-inventory-prod
+
+services:
+  # Backend Service (Laravel PHP 8.3)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sm_backend_prod
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      # Ganti IP ini dengan IP VM Database Proxmox Anda (misal: 192.168.1.100)
+      DB_HOST: ${PROD_DB_HOST:-192.168.1.100}
+      DB_PORT: 3306
+      DB_DATABASE: sm_inventory
+      DB_USERNAME: sm_user
+      DB_PASSWORD: ${PROD_DB_PASSWORD:-sm_password}
+      REDIS_HOST: ${PROD_REDIS_HOST:-192.168.1.100}
+      MEILISEARCH_HOST: ${PROD_MEILI_HOST:-http://192.168.1.100:7700}
+
+  # AI Service (Python FastAPI)
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: sm_ai_service_prod
+    restart: always
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./ai-service:/app
+    environment:
+      DB_HOST: ${PROD_DB_HOST:-192.168.1.100}
+      DB_USER: sm_user
+      DB_PASSWORD: ${PROD_DB_PASSWORD:-sm_password}
+      DB_NAME: sm_inventory
+
+  # Admin & POS Frontend (React)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sm_frontend_prod
+    restart: always
+    ports:
+      - "5173:5173"
+
+  # Company Profile Landing Page (Next.js)
+  company-profile:
+    build:
+      context: ./company-profile
+      dockerfile: Dockerfile
+    container_name: sm_company_profile_prod
+    restart: always
+    ports:
+      - "3000:3000"
