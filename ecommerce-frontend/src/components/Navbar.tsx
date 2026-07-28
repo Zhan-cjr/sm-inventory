@@ -148,10 +148,16 @@ const Navbar = () => {
           <div className="md:hidden flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-2">
               <Link to="/" className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg gradient-bg-emerald text-white flex items-center justify-center font-black text-base shadow-xs">
-                  S
-                </div>
-                <span className="text-base font-black text-slate-800">toserba <span className="gradient-text-emerald">Selamat</span></span>
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="h-9 w-auto rounded-xl object-contain" />
+                ) : (
+                  <>
+                    <div className="w-8 h-8 rounded-lg gradient-bg-emerald text-white flex items-center justify-center font-black text-base shadow-xs">
+                      S
+                    </div>
+                    <span className="text-base font-black text-slate-800">toserba <span className="gradient-text-emerald">Selamat</span></span>
+                  </>
+                )}
               </Link>
 
               <button 
