@@ -96,7 +96,7 @@ export default defineConfig({
         secure: false,
       },
       '/app': {
-        target: process.env.VITE_REVERB_SERVER_URL || 'ws://reverb:8085',
+        target: process.env.VITE_REVERB_SERVER_URL || 'http://reverb:8085',
         ws: true,
         changeOrigin: true,
         secure: false,
@@ -121,7 +121,7 @@ export default defineConfig({
         secure: false,
       },
       '/app': {
-        target: process.env.VITE_REVERB_SERVER_URL || 'ws://reverb:8085',
+        target: process.env.VITE_REVERB_SERVER_URL || 'http://reverb:8085',
         ws: true,
         changeOrigin: true,
         secure: false,
