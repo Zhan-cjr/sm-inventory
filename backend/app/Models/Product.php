@@ -113,13 +113,21 @@ class Product extends Model
         });
 
         static::saved(function ($product) {
-            \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
-            foreach (\App\Models\Branch::pluck('id') as $branchId) {
-                \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+            try {
+                \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+                foreach (\App\Models\Branch::pluck('id') as $branchId) {
+                    \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+                }
+            } catch (\Throwable $e) {
+                // Log or ignore cache clearing errors
             }
             
-            // Broadcast the product update to the POS catalog channel
-            event(new \App\Events\ProductUpdated($product));
+            try {
+                // Broadcast the product update to the POS catalog channel
+                event(new \App\Events\ProductUpdated($product));
+            } catch (\Throwable $e) {
+                // Ignore broadcast failures if Reverb / WebSocket server is offline
+            }
         });
 
         static::deleted(function ($product) {
