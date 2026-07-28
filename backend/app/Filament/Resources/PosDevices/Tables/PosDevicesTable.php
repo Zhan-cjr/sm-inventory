@@ -111,18 +111,30 @@ class PosDevicesTable
                             ->placeholder('Pilih Terminal POS Terkunci')
                             ->options(function ($get) {
                                 $branchId = $get('branch_id');
-                                if (!$branchId) {
-                                    return [];
+                                if ($branchId) {
+                                    $terminals = \App\Models\Terminal::where('branch_id', $branchId)->pluck('name', 'id');
+                                    if ($terminals->isNotEmpty()) {
+                                        return $terminals;
+                                    }
                                 }
-                                return \App\Models\Terminal::where('branch_id', $branchId)->pluck('name', 'id');
+                                return \App\Models\Terminal::pluck('name', 'id');
                             })
-                            ->required(),
+                            ->nullable(),
                     ])
                     ->action(function ($record, array $data) {
+                        $terminalId = $data['terminal_id'] ?? null;
+                        if (!$terminalId && !empty($data['branch_id'])) {
+                            $terminal = \App\Models\Terminal::firstOrCreate(
+                                ['branch_id' => $data['branch_id'], 'name' => 'KASSA A'],
+                                ['code' => 'KASSA-A']
+                            );
+                            $terminalId = $terminal->id;
+                        }
+
                         $record->update([
                             'status' => 'APPROVED',
                             'branch_id' => $data['branch_id'],
-                            'terminal_id' => $data['terminal_id'],
+                            'terminal_id' => $terminalId,
                             'approved_at' => now(),
                             'blocked_at' => null,
                         ]);
