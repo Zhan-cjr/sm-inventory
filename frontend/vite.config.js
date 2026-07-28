@@ -100,6 +100,15 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.warn('[Vite Proxy Error /app]:', err.message);
+          });
+          proxy.on('proxyReqWs', (_proxyReq, req, _socket, _options, _head) => {
+            console.log('[Vite Proxy WS Connected /app]:', req.url);
+          });
+        }
       },
       '/storage': {
         target: process.env.VITE_BACKEND_URL || 'http://backend:8080',
@@ -125,6 +134,15 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.warn('[Vite Proxy Error /app]:', err.message);
+          });
+          proxy.on('proxyReqWs', (_proxyReq, req, _socket, _options, _head) => {
+            console.log('[Vite Proxy WS Connected /app]:', req.url);
+          });
+        }
       },
       '/storage': {
         target: process.env.VITE_BACKEND_URL || 'http://backend:8080',
