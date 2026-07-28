@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -8,8 +8,14 @@ RUN npm config set fetch-retries 5 && npm config set fetch-retry-maxtimeout 1200
 
 COPY . .
 
-EXPOSE 3000
-
 RUN npm run build
 
-CMD ["npm", "start"]
+# Stage 2: Serve static files via Nginx
+FROM nginx:alpine
+
+COPY --from=builder /app/out /usr/share/nginx/html
+COPY nginx-static.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 3000
+
+CMD ["nginx", "-g", "daemon off;"]
