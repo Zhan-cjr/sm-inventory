@@ -23,6 +23,7 @@ class Product extends Model
             'additional_barcodes' => isset($this->metadata['additional_barcodes']) ? implode(', ', $this->metadata['additional_barcodes']) : '',
             'product_type' => $this->product_type,
             'is_active' => $this->is_active,
+            'available_branch_ids' => $this->stocks()->pluck('branch_id')->toArray(),
         ];
     }
 

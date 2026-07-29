@@ -125,18 +125,10 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         if (strlen($value) >= 2) {
-            $this->searchResults = Product::query()
-                ->select('products.*')
-                ->join('stocks', 'stocks.product_id', '=', 'products.id')
-                ->where('stocks.branch_id', $this->branch_id)
-                ->where('products.is_active', true)
-                ->where(function ($q) use ($value) {
-                    $q->where('products.barcode', '=', $value)
-                      ->orWhere('products.sku', 'LIKE', $value . '%')
-                      ->orWhere('products.barcode', 'LIKE', $value . '%')
-                      ->orWhere('products.name', 'LIKE', '%' . $value . '%');
-                })
-                ->limit(20)
+            $this->searchResults = Product::search($value)
+                ->whereIn('available_branch_ids', [$this->branch_id])
+                ->where('is_active', true)
+                ->take(20)
                 ->get();
         } else {
             $this->searchResults = [];
@@ -198,16 +190,9 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
         if (strlen($this->searchQuery) > 0) {
             $queryStr = $this->searchQuery;
-            $product = Product::query()
-                ->select('products.*')
-                ->join('stocks', 'stocks.product_id', '=', 'products.id')
-                ->where('stocks.branch_id', $this->branch_id)
-                ->where('products.is_active', true)
-                ->where(function ($q) use ($queryStr) {
-                    $q->where('products.sku', $queryStr)
-                      ->orWhere('products.barcode', $queryStr)
-                      ->orWhere('products.name', 'LIKE', '%' . $queryStr . '%');
-                })
+            $product = Product::search($queryStr)
+                ->whereIn('available_branch_ids', [$this->branch_id])
+                ->where('is_active', true)
                 ->first();
 
             if ($product) {

@@ -1,7 +1,50 @@
 name: sm-inventory-prod
 
+# ============================================================
+# DOCKER COMPOSE PRODUCTION
+# ============================================================
+# Perbedaan dari docker-compose.yml (staging):
+#   - restart: always (auto-restart saat server reboot)
+#   - MySQL TIDAK ada — DB ada di VM Proxmox terpisah
+#   - Redis TIDAK ada — Redis ada di VM Proxmox terpisah
+#   - Meilisearch ada di dalam Docker (production mode)
+#   - Reverb tanpa --debug flag
+#   - Volume bind mount dihapus dari service yang sudah static build
+# ============================================================
+# Sebelum jalankan, pastikan file backend/.env sudah diisi:
+#   DB_HOST=<IP_VM_DATABASE_PROXMOX>
+#   DB_PORT=3306
+#   DB_DATABASE=sm_inventory
+#   DB_USERNAME=sm_user
+#   DB_PASSWORD=<password_production>
+#   REDIS_HOST=<IP_VM_PROXMOX>
+#   MEILISEARCH_HOST=http://<IP_VM_PROXMOX>:7700
+# ============================================================
+# Cara pakai:
+#   docker compose -f docker-compose.prod.yml up -d --build
+# ============================================================
+
 services:
-  # Backend Service (Laravel PHP 8.3)
+
+  # ──────────────────────────────────────────
+  # Meilisearch Engine
+  # ──────────────────────────────────────────
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    container_name: sm_meilisearch_prod
+    restart: always
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_ENV: production
+      MEILI_MASTER_KEY: KunciRahasiaGudangSminventory123!
+    volumes:
+      - meili_data_prod:/meili_data
+
+  # ──────────────────────────────────────────
+  # Backend Laravel (PHP 8.5)
+  # DB dan Redis ada di VM Proxmox
+  # ──────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -9,20 +52,32 @@ services:
     container_name: sm_backend_prod
     restart: always
     ports:
-      - "8000:8000"
+      - "8080:8080"
     volumes:
       - ./backend:/var/www/html
-    environment:
-      # Ganti IP ini dengan IP VM Database Proxmox Anda (misal: 192.168.1.100)
-      DB_HOST: ${PROD_DB_HOST:-192.168.1.100}
-      DB_PORT: 3306
-      DB_DATABASE: sm_inventory
-      DB_USERNAME: sm_user
-      DB_PASSWORD: ${PROD_DB_PASSWORD:-sm_password}
-      REDIS_HOST: ${PROD_REDIS_HOST:-192.168.1.100}
-      MEILISEARCH_HOST: ${PROD_MEILI_HOST:-http://192.168.1.100:7700}
+    env_file:
+      - ./backend/.env
 
+  # ──────────────────────────────────────────
+  # Laravel Reverb WebSocket (tanpa --debug)
+  # ──────────────────────────────────────────
+  reverb:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sm_reverb_prod
+    restart: always
+    command: php artisan reverb:start --host=0.0.0.0 --port=8085
+    ports:
+      - "8085:8085"
+    volumes:
+      - ./backend:/var/www/html
+    env_file:
+      - ./backend/.env
+
+  # ──────────────────────────────────────────
   # AI Service (Python FastAPI)
+  # ──────────────────────────────────────────
   ai-service:
     build:
       context: ./ai-service
@@ -33,23 +88,27 @@ services:
       - "8001:8001"
     volumes:
       - ./ai-service:/app
-    environment:
-      DB_HOST: ${PROD_DB_HOST:-192.168.1.100}
-      DB_USER: sm_user
-      DB_PASSWORD: ${PROD_DB_PASSWORD:-sm_password}
-      DB_NAME: sm_inventory
+    env_file:
+      - ./backend/.env
 
-  # Admin & POS Frontend (React)
+  # ──────────────────────────────────────────
+  # Admin & POS Frontend (React + Vite)
+  # ──────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     container_name: sm_frontend_prod
     restart: always
     ports:
       - "5173:5173"
+    depends_on:
+      - backend
 
-  # Company Profile Landing Page (Next.js)
+  # ──────────────────────────────────────────
+  # Company Profile (Next.js → Nginx static)
+  # Tidak perlu volume mount — sudah static build
+  # ──────────────────────────────────────────
   company-profile:
     build:
       context: ./company-profile
@@ -58,3 +117,21 @@ services:
     restart: always
     ports:
       - "3000:3000"
+
+  # ──────────────────────────────────────────
+  # E-commerce Frontend (React → Nginx static)
+  # Tidak perlu volume mount — sudah static build
+  # ──────────────────────────────────────────
+  ecommerce-frontend:
+    build:
+      context: ./ecommerce-frontend
+      dockerfile: Dockerfile
+    container_name: sm_ecommerce_frontend_prod
+    restart: always
+    ports:
+      - "8081:8081"
+    depends_on:
+      - backend
+
+volumes:
+  meili_data_prod:
