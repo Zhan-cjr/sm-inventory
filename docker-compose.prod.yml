@@ -72,7 +72,7 @@ services:
       dockerfile: Dockerfile.prod
     container_name: sm_queue_worker
     restart: unless-stopped
-    command: php artisan queue:work --tries=3 --timeout=3600
+    command: su -s /bin/bash www-data -c "php artisan queue:work --tries=3 --timeout=3600"
     volumes:
       - ./backend:/var/www/html
     env_file:
