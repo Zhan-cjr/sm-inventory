@@ -64,7 +64,7 @@ class ShiftsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                \App\Filament\Filters\DateFilterHelper::make('created_at'),
             ])
             ->recordActions([
                 ViewAction::make(),
