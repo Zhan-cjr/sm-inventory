@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -10,12 +10,6 @@ COPY . .
 
 RUN npm run build
 
-# Stage 2: Serve static files via Nginx
-FROM nginx:alpine
-
-COPY --from=builder /app/out /usr/share/nginx/html
-COPY nginx-static.conf /etc/nginx/conf.d/default.conf
-
 EXPOSE 3000
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["npm", "start"]
