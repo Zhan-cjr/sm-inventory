@@ -87,6 +87,30 @@ services:
     depends_on:
       - redis
 
+  # Laravel Queue Worker
+  queue-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sm_queue_worker
+    restart: unless-stopped
+    command: php artisan queue:work --tries=3 --timeout=3600
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_DATABASE: ${DB_DATABASE:-sm_inventory}
+      DB_USERNAME: ${DB_USERNAME:-sm_user}
+      DB_PASSWORD: ${DB_PASSWORD:-sm_password}
+      REDIS_HOST: redis
+      MEILISEARCH_HOST: http://meilisearch:7700
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   # AI Service (Python FastAPI)
   ai-service:
     build:
