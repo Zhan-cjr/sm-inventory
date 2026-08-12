@@ -329,13 +329,17 @@ class GoodsReceiptPos extends Component
         }
 
         if (!empty($this->purchase_order_id)) {
-            Notification::make()->title('Tidak dapat menambah barang baru saat menggunakan PO.')->warning()->send();
-            return;
+            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                Notification::make()->title('Tidak dapat menambah barang baru saat menggunakan PO.')->warning()->send();
+                return;
+            }
         }
 
         if (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)) {
-            Notification::make()->title('Tidak dapat menambah barang baru pada penerimaan dari Pengecekan Gudang.')->warning()->send();
-            return;
+            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                Notification::make()->title('Tidak dapat menambah barang baru pada penerimaan dari Pengecekan Gudang.')->warning()->send();
+                return;
+            }
         }
 
         if (strlen($this->searchQuery) > 0) {

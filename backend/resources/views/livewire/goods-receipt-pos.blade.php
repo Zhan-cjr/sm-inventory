@@ -454,11 +454,15 @@
                 }
                 
                 if (!empty($purchase_order_id)) {
-                    $isSearchDisabled = true;
-                    $searchDisabledReason = 'Item dikunci sesuai PO yang dipilih.';
+                    if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                        $isSearchDisabled = true;
+                        $searchDisabledReason = 'Item dikunci sesuai PO yang dipilih.';
+                    }
                 } elseif (!empty($goodsReceipt) && !empty($goodsReceipt->warehouse_check_id)) {
-                    $isSearchDisabled = true;
-                    $searchDisabledReason = 'Item dikunci dari Pengecekan Gudang.';
+                    if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                        $isSearchDisabled = true;
+                        $searchDisabledReason = 'Item dikunci dari Pengecekan Gudang.';
+                    }
                 }
             @endphp
             <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem; {{ $isSearchDisabled ? 'background-color: #f3f4f6; cursor: not-allowed;' : '' }}"
