@@ -6,6 +6,7 @@ services:
     image: redis:7-alpine
     container_name: sm_redis
     restart: unless-stopped
+    command: redis-server --requirepass "redissminventory@100626"
     ports:
       - "6379:6379"
     volumes:
