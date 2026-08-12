@@ -40,7 +40,9 @@ class ItemsRelationManager extends RelationManager
                         }
                         if ($ownerRecord->supplier && $ownerRecord->supplier->gr_requires_po) {
                             if (empty($ownerRecord->purchase_order_id)) {
-                                return true;
+                                if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                                    return true;
+                                }
                             }
                         }
                         return false;
@@ -52,7 +54,9 @@ class ItemsRelationManager extends RelationManager
                         }
                         if ($ownerRecord->supplier && $ownerRecord->supplier->gr_requires_po) {
                             if (empty($ownerRecord->purchase_order_id)) {
-                                return 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';
+                                if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                                    return 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';
+                                }
                             }
                         }
                         return null;
@@ -135,11 +139,14 @@ class ItemsRelationManager extends RelationManager
                                 ->send();
                         } elseif ($ownerRecord->supplier && $ownerRecord->supplier->gr_requires_po) {
                             if (empty($ownerRecord->purchase_order_id)) {
-                                \Filament\Notifications\Notification::make()
-                                    ->warning()
-                                    ->title('Penerimaan barang wajib dengan PO')
-                                    ->body('Pemasok ini diatur wajib menggunakan Purchase Order.')
-                                    ->send();
+                                if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                                    \Filament\Notifications\Notification::make()
+                                        ->warning()
+                                        ->title('Penerimaan barang wajib dengan PO')
+                                        ->body('Pemasok ini diatur wajib menggunakan Purchase Order.')
+                                        ->send();
+                                    $action->halt();
+                                }
                             }
                         }
                     }),
