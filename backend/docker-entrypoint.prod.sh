@@ -12,6 +12,11 @@ if [ ! -L "public/storage" ]; then
     php artisan storage:link || true
 fi
 
+# If arguments are passed, execute them instead
+if [ $# -gt 0 ]; then
+    exec "$@"
+fi
+
 echo "Starting PHP-FPM and Nginx..."
 php-fpm -D
-nginx -g "daemon off;"
+exec nginx -g "daemon off;"
