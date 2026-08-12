@@ -1,137 +1,156 @@
 name: sm-inventory-prod
 
-# ============================================================
-# DOCKER COMPOSE PRODUCTION
-# ============================================================
-# Perbedaan dari docker-compose.yml (staging):
-#   - restart: always (auto-restart saat server reboot)
-#   - MySQL TIDAK ada — DB ada di VM Proxmox terpisah
-#   - Redis TIDAK ada — Redis ada di VM Proxmox terpisah
-#   - Meilisearch ada di dalam Docker (production mode)
-#   - Reverb tanpa --debug flag
-#   - Volume bind mount dihapus dari service yang sudah static build
-# ============================================================
-# Sebelum jalankan, pastikan file backend/.env sudah diisi:
-#   DB_HOST=<IP_VM_DATABASE_PROXMOX>
-#   DB_PORT=3306
-#   DB_DATABASE=sm_inventory
-#   DB_USERNAME=sm_user
-#   DB_PASSWORD=<password_production>
-#   REDIS_HOST=<IP_VM_PROXMOX>
-#   MEILISEARCH_HOST=http://<IP_VM_PROXMOX>:7700
-# ============================================================
-# Cara pakai:
-#   docker compose -f docker-compose.prod.yml up -d --build
-# ============================================================
-
 services:
+  # Redis Cache & Queue Worker
+  redis:
+    image: redis:7-alpine
+    container_name: sm_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
 
-  # ──────────────────────────────────────────
   # Meilisearch Engine
-  # ──────────────────────────────────────────
   meilisearch:
     image: getmeili/meilisearch:v1.12
-    container_name: sm_meilisearch_prod
-    restart: always
+    container_name: sm_meilisearch
+    restart: unless-stopped
     ports:
       - "7700:7700"
     environment:
       MEILI_ENV: production
       MEILI_MASTER_KEY: KunciRahasiaGudangSminventory123!
     volumes:
-      - meili_data_prod:/meili_data
+      - meili_data:/meili_data
 
-  # ──────────────────────────────────────────
-  # Backend Laravel (PHP 8.5)
-  # DB dan Redis ada di VM Proxmox
-  # ──────────────────────────────────────────
+  # Backend Service (Laravel PHP 8.3)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: sm_backend_prod
-    restart: always
+    container_name: sm_backend
+    restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
       - ./backend:/var/www/html
-    env_file:
-      - ./backend/.env
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_DATABASE: ${DB_DATABASE:-sm_inventory}
+      DB_USERNAME: ${DB_USERNAME:-sm_user}
+      DB_PASSWORD: ${DB_PASSWORD:-sm_password}
+      REDIS_HOST: redis
+      MEILISEARCH_HOST: http://meilisearch:7700
+      AI_SERVICE_URL: http://ai-service:8001
+    depends_on:
+      redis:
+        condition: service_started
+      meilisearch:
+        condition: service_started
 
-  # ──────────────────────────────────────────
-  # Laravel Reverb WebSocket (tanpa --debug)
-  # ──────────────────────────────────────────
+  # Laravel Reverb WebSocket Server
   reverb:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: sm_reverb_prod
-    restart: always
+    container_name: sm_reverb
+    restart: unless-stopped
     command: php artisan reverb:start --host=0.0.0.0 --port=8085
     ports:
       - "8085:8085"
     volumes:
       - ./backend:/var/www/html
-    env_file:
-      - ./backend/.env
+    depends_on:
+      - redis
 
-  # ──────────────────────────────────────────
+  # Laravel Queue Worker
+  queue-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sm_queue_worker
+    restart: unless-stopped
+    command: php artisan queue:work --tries=3 --timeout=3600
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_DATABASE: ${DB_DATABASE:-sm_inventory}
+      DB_USERNAME: ${DB_USERNAME:-sm_user}
+      DB_PASSWORD: ${DB_PASSWORD:-sm_password}
+      REDIS_HOST: redis
+      MEILISEARCH_HOST: http://meilisearch:7700
+    depends_on:
+      redis:
+        condition: service_started
+
   # AI Service (Python FastAPI)
-  # ──────────────────────────────────────────
   ai-service:
     build:
       context: ./ai-service
       dockerfile: Dockerfile
-    container_name: sm_ai_service_prod
-    restart: always
+    container_name: sm_ai_service
+    restart: unless-stopped
     ports:
       - "8001:8001"
     volumes:
       - ./ai-service:/app
     env_file:
       - ./backend/.env
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USERNAME:-sm_user}
+      DB_PASSWORD: ${DB_PASSWORD:-sm_password}
+      DB_NAME: ${DB_DATABASE:-sm_inventory}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-${GOOGLE_API_KEY:-}}
+      GOOGLE_API_KEY: ${GEMINI_API_KEY:-${GOOGLE_API_KEY:-}}
 
-  # ──────────────────────────────────────────
   # Admin & POS Frontend (React + Vite)
-  # ──────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.prod
-    container_name: sm_frontend_prod
-    restart: always
+      dockerfile: Dockerfile
+    container_name: sm_frontend
+    restart: unless-stopped
     ports:
       - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
 
-  # ──────────────────────────────────────────
-  # Company Profile (Next.js → Nginx static)
-  # Tidak perlu volume mount — sudah static build
-  # ──────────────────────────────────────────
+  # Company Profile Landing Page (Next.js)
   company-profile:
     build:
       context: ./company-profile
       dockerfile: Dockerfile
-    container_name: sm_company_profile_prod
-    restart: always
+    container_name: sm_company_profile
+    restart: unless-stopped
     ports:
       - "3000:3000"
+    volumes:
+      - ./company-profile:/app
+      - /app/node_modules
 
-  # ──────────────────────────────────────────
-  # E-commerce Frontend (React → Nginx static)
-  # Tidak perlu volume mount — sudah static build
-  # ──────────────────────────────────────────
+  # E-commerce Frontend Store (React + Vite)
   ecommerce-frontend:
     build:
       context: ./ecommerce-frontend
       dockerfile: Dockerfile
-    container_name: sm_ecommerce_frontend_prod
-    restart: always
+    container_name: sm_ecommerce_frontend
+    restart: unless-stopped
     ports:
       - "8081:8081"
+    volumes:
+      - ./ecommerce-frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
 
 volumes:
-  meili_data_prod:
+  redis_data:
+  meili_data:
