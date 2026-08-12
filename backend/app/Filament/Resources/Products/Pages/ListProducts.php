@@ -29,11 +29,6 @@ class ListProducts extends ListRecords
                 ->icon('heroicon-o-building-storefront')
                 ->color('info')
                 ->visible(!$isBranchUser),
-            ExportAction::make('export_products')
-                ->label('Export Excel')
-                ->exporter(\App\Filament\Exports\ProductExporter::class)
-                ->icon('heroicon-o-document-arrow-down')
-                ->color('success'),
             CreateAction::make()
                 ->visible(!$isBranchUser),
         ];

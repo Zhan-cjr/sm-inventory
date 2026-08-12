@@ -190,7 +190,11 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                     ]), true),
                 \Filament\Actions\ExportAction::make()
                     ->exporter(\App\Filament\Exports\StockOpnameItemExporter::class)
-                    ->label('Export CSV')
+                    ->formats([
+                        \Filament\Actions\Exports\Enums\ExportFormat::Csv,
+                        \Filament\Actions\Exports\Enums\ExportFormat::Xlsx,
+                    ])
+                    ->label('Export CSV / Excel')
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-tray')
             ])

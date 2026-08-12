@@ -17,9 +17,10 @@ class StockOpnameItemExporter extends Exporter
         return [
             ExportColumn::make('id')
                 ->label('ID'),
-            ExportColumn::make('session_id'),
-            ExportColumn::make('rack_session_id'),
-            ExportColumn::make('product_id'),
+            ExportColumn::make('session.session_number')->label('No Sesi'),
+            ExportColumn::make('product.sku')->label('SKU'),
+            ExportColumn::make('product.barcode')->label('Barcode'),
+            ExportColumn::make('product.name')->label('Nama Barang'),
             ExportColumn::make('system_quantity'),
             ExportColumn::make('count1_quantity'),
             ExportColumn::make('count1_at'),

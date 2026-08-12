@@ -57,10 +57,10 @@ class ProductExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Your product export has completed and ' . Number::format($export->successful_rows) . ' ' . str('row')->plural($export->successful_rows) . ' exported.';
+        $body = 'Proses export data produk telah selesai. ' . Number::format($export->successful_rows) . ' baris berhasil diexport.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . Number::format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to export.';
+            $body .= ' ' . Number::format($failedRowsCount) . ' baris gagal diexport.';
         }
 
         return $body;

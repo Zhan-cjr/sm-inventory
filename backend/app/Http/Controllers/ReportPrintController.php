@@ -70,6 +70,8 @@ class ReportPrintController extends Controller
                 return $this->printLaporanHpp($request);
             case 'laporan-rekap-tipe-suplier':
                 return $this->printLaporanRekapTipeSuplier($filters);
+            case 'produk':
+                return $this->printProduk($filters);
             default:
                 abort(404, 'Tipe laporan tidak ditemukan');
         }
@@ -515,7 +517,7 @@ class ReportPrintController extends Controller
         $stocks = $query->orderBy('created_at', 'desc')->get();
         $period = $this->getPeriodString($filters);
 
-        $columns = ['Cabang', 'Produk', 'Kategori', 'Sisa Stok', 'Harga Pokok (Rata-rata)', 'Valuasi Stok'];
+        $columns = ['Cabang', 'SKU', 'Barcode', 'Produk', 'Kategori', 'Sisa Stok', 'Harga Pokok (Rata-rata)', 'Valuasi Stok'];
         $rows = [];
         foreach ($stocks as $s) {
             if ($s->quantity_on_hand > 0 && $s->batch_valuation > 0) {
@@ -528,6 +530,8 @@ class ReportPrintController extends Controller
             
             $rows[] = [
                 $s->branch ? $s->branch->name : 'Pusat / Global',
+                $s->product ? $s->product->sku : '-',
+                $s->product ? $s->product->barcode : '-',
                 $s->product ? $s->product->name : '-',
                 ($s->product && $s->product->category) ? $s->product->category->name : '-',
                 $s->quantity_on_hand,
@@ -805,7 +809,7 @@ class ReportPrintController extends Controller
         $items = $query->get();
         $period = $this->getPeriodString($filters);
 
-        $columns = ['SKU', 'Produk', 'Qty Jual', 'Qty Retur', 'Harga Beli', 'Harga Jual', 'Total Beli', 'Total Jual'];
+        $columns = ['SKU', 'Barcode', 'Produk', 'Qty Jual', 'Qty Retur', 'Harga Beli', 'Harga Jual', 'Total Beli', 'Total Jual'];
         $rows = [];
         
         $grouped = [];
@@ -829,6 +833,7 @@ class ReportPrintController extends Controller
             if(!isset($grouped[$product_id])) {
                 $grouped[$product_id] = [
                     'sku' => $i->product ? $i->product->sku : '-',
+                    'barcode' => $i->product ? $i->product->barcode : '-',
                     'name' => $i->product ? $i->product->name : '-',
                     'qty_terjual' => 0,
                     'qty_retur' => 0,
@@ -865,6 +870,7 @@ class ReportPrintController extends Controller
             
             $rows[] = [
                 $g['sku'],
+                $g['barcode'],
                 '<div style="max-width: 150px; word-wrap: break-word; white-space: normal;">' . $g['name'] . '</div>',
                 $g['qty_terjual'],
                 $g['qty_retur'],
@@ -945,7 +951,7 @@ class ReportPrintController extends Controller
         $items = $query->get();
         $period = $this->getPeriodString($filters, 'receipt_date');
 
-        $columns = ['Tanggal', 'Supplier', 'Produk', 'Qty', 'Harga Beli', 'Total'];
+        $columns = ['Tanggal', 'Supplier', 'SKU', 'Barcode', 'Produk', 'Qty', 'Harga Beli', 'Total'];
         $rows = [];
         $t_qty = 0; $t_total = 0;
         foreach($items as $i) {
@@ -955,6 +961,8 @@ class ReportPrintController extends Controller
             $rows[] = [
                 $i->goodsReceipt ? \Carbon\Carbon::parse($i->goodsReceipt->receipt_date)->format('d-m-Y') : '-',
                 ($i->goodsReceipt && $i->goodsReceipt->supplier) ? $i->goodsReceipt->supplier->name : '-',
+                $i->product ? $i->product->sku : '-',
+                $i->product ? $i->product->barcode : '-',
                 $i->product ? $i->product->name : '-',
                 $qty,
                 number_format($i->unit_price, 0, ',', '.'),
@@ -1084,7 +1092,7 @@ class ReportPrintController extends Controller
         $items = $query->orderBy('created_at', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
-        $columns = ['No Sesi', 'Cabang', 'Rak', 'SKU', 'Barang', 'Stok Sistem', 'Hitung 1', 'Hitung 2', 'Akhir', 'S.Plus', 'Nom.Plus', 'S.Minus', 'Nom.Minus'];
+        $columns = ['No Sesi', 'Cabang', 'Rak', 'SKU', 'Barcode', 'Barang', 'Stok Sistem', 'Hitung 1', 'Hitung 2', 'Akhir', 'S.Plus', 'Nom.Plus', 'S.Minus', 'Nom.Minus'];
         $rows = [];
         
         $grandTotalPlus = 0;
@@ -1145,6 +1153,7 @@ class ReportPrintController extends Controller
                 ($i->session && $i->session->branch) ? $i->session->branch->name : 'Pusat',
                 ($i->rackSession && $i->rackSession->rack) ? $i->rackSession->rack->rack_code : '-',
                 $i->product ? $i->product->sku : '-',
+                $i->product ? $i->product->barcode : '-',
                 $i->product ? $i->product->name : '-',
                 (float)$i->system_quantity,
                 $i->count1_quantity !== null ? (float)$i->count1_quantity : '-',
@@ -1202,6 +1211,10 @@ class ReportPrintController extends Controller
         }
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
 
+        if (request()->query('format') === 'excel') {
+            return $this->exportCsv('Daftar Pesanan Pembelian', $columns, $rows);
+        }
+
         return view('print.reports.generic', ['title' => 'Daftar Pesanan Pembelian', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
 
@@ -1236,6 +1249,10 @@ class ReportPrintController extends Controller
         }
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
 
+        if (request()->query('format') === 'excel') {
+            return $this->exportCsv('Daftar Penerimaan Barang', $columns, $rows);
+        }
+
         return view('print.reports.generic', ['title' => 'Daftar Penerimaan Barang', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
 
@@ -1268,6 +1285,10 @@ class ReportPrintController extends Controller
             ];
         }
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
+
+        if (request()->query('format') === 'excel') {
+            return $this->exportCsv('Daftar Retur Pembelian', $columns, $rows);
+        }
 
         return view('print.reports.generic', ['title' => 'Daftar Retur Pembelian', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
@@ -1312,6 +1333,10 @@ class ReportPrintController extends Controller
         }
         $rows[] = ['<strong>TOTAL</strong>', '', '', '<strong>Rp ' . number_format($t_plus, 0, ',', '.') . '</strong>', '<strong>Rp ' . number_format($t_minus, 0, ',', '.') . '</strong>', '', ''];
 
+        if (request()->query('format') === 'excel') {
+            return $this->exportCsv('Daftar Koreksi Stok', $columns, $rows);
+        }
+
         return view('print.reports.generic', ['title' => 'Daftar Koreksi Stok', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
 
@@ -1348,7 +1373,127 @@ class ReportPrintController extends Controller
         }
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
 
+        if (request()->query('format') === 'excel') {
+            return $this->exportCsv('Daftar Stock Transfer', $columns, $rows);
+        }
+
         return view('print.reports.generic', ['title' => 'Daftar Stock Transfer', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+    }
+
+    private function printProduk($filters)
+    {
+        $query = \App\Models\Product::query()->with(['category', 'supplier', 'organization']);
+
+        // Apply TernaryFilter for is_active
+        if (isset($filters['is_active']['value']) && $filters['is_active']['value'] !== '') {
+            // ternary filter returns '1' or '0' string, or 1 / 0 int
+            $query->where('is_active', $filters['is_active']['value']);
+        } elseif (isset($filters['is_active']['isActive']) && $filters['is_active']['isActive'] !== '') {
+            $query->where('is_active', $filters['is_active']['isActive']);
+        }
+
+        // Apply SelectFilter for branch
+        if (isset($filters['branch']['value']) && $filters['branch']['value'] !== '') {
+            $branchId = $filters['branch']['value'];
+            $query->whereHas('stocks', function ($q) use ($branchId) {
+                $q->where('branch_id', $branchId);
+            });
+        }
+        
+        // Apply user branch scope security
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user && $user->branch_id) {
+            $query->whereHas('stocks', function ($q) use ($user) {
+                $q->where('branch_id', $user->branch_id);
+            });
+        }
+
+        // Apply global search if present
+        $search = request()->query('search');
+        if (!empty($search)) {
+            $query->whereIn('id', \App\Models\Product::search($search)->take(1000)->keys());
+        }
+
+        $products = $query->get();
+
+        $columns = [
+            'ID', 'Organisasi', 'SKU', 'Barcode', 'Nama Produk', 'Kategori', 'Sub Kategori', 
+            'Supplier', 'Harga Pokok', 'Harga Pokok (+Pajak)', 'Harga Jual', 
+            'Margin Gol 1', 'Harga Jual 1', 'Qty Min Gol 1',
+            'Margin Gol 2', 'Harga Jual 2', 'Qty Min Gol 2',
+            'Margin Gol 3', 'Harga Jual 3', 'Qty Min Gol 3',
+            'Bisa Pajak?', 'Satuan', 'Titik Pesan Ulang', 'Qty Pesan Ulang', 'Waktu Tunggu (Hari)',
+            'Aktif?', 'E-Commerce Aktif?', 'Kategori E-Commerce', 'Tipe Produk', 'PPOB SKU', 'Berat (Gram)'
+        ];
+
+        $rows = [];
+        foreach($products as $p) {
+            $rows[] = [
+                $p->id,
+                $p->organization->name ?? '',
+                $p->sku,
+                $p->barcode,
+                $p->name,
+                $p->category->name ?? '',
+                $p->sub_category,
+                $p->supplier->name ?? '',
+                $p->cost_price,
+                $p->cost_price_tax,
+                $p->selling_price,
+                $p->margin_gol_1,
+                $p->harga_jual_1,
+                $p->qty_min_gol_1,
+                $p->margin_gol_2,
+                $p->harga_jual_2,
+                $p->qty_min_gol_2,
+                $p->margin_gol_3,
+                $p->harga_jual_3,
+                $p->qty_min_gol_3,
+                $p->is_taxable ? 'Ya' : 'Tidak',
+                $p->unit_of_measure,
+                $p->reorder_point,
+                $p->reorder_qty,
+                $p->lead_time_days,
+                $p->is_active ? 'Ya' : 'Tidak',
+                $p->is_ecommerce_active ? 'Ya' : 'Tidak',
+                $p->ecommerce_category,
+                $p->product_type,
+                $p->ppob_sku,
+                $p->weight_in_grams,
+            ];
+        }
+
+        if (request()->query('format') === 'excel') {
+            return $this->exportCsv('Data Produk', $columns, $rows);
+        }
+
+        // If they ever want HTML print:
+        abort(404, 'Gunakan format excel untuk menu ini.');
+    }
+
+    private function exportCsv($title, $columns, $rows)
+    {
+        $filename = str_replace(' ', '_', strtolower($title)) . '_' . date('Ymd_His') . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+        ];
+
+        $callback = function() use ($columns, $rows) {
+            $file = fopen('php://output', 'w');
+            // Add BOM for UTF-8 Excel support
+            fputs($file, "\xEF\xBB\xBF");
+            fputcsv($file, $columns);
+            foreach ($rows as $row) {
+                $cleanRow = array_map(function($cell) {
+                    return strip_tags($cell);
+                }, $row);
+                fputcsv($file, $cleanRow);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     private function printExpenseList(Request $request)
@@ -1806,7 +1951,8 @@ class ReportPrintController extends Controller
             'transaction_source' => $filters['transaction_source']['value'] ?? 'ALL',
         ];
         
-        $results = $hppPage->getReportData();
+        $hppPage->isReportReady = true;
+        $results = $hppPage->getReportData(true);
         
         if ($activeTab === 'item') {
             $columns = ['Barcode', 'Nama Item', 'Satuan', 'Penjualan', 'HPP', 'Retur', 'HPP Retur', 'Profit', 'Margin %'];

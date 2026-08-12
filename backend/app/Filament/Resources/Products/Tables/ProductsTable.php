@@ -114,7 +114,15 @@ class ProductsTable
                     ->falseLabel('Produk Non Aktif')
                     ->default(true),
             ])
-            ->headerActions([])
+            ->headerActions([
+                \Filament\Actions\ExportAction::make('export_products')
+                    ->label('Export Excel')
+                    ->exporter(\App\Filament\Exports\ProductExporter::class)
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->modalHeading('Pilih Kolom Export')
+                    ->modalSubmitActionLabel('Proses Export'),
+            ])
             ->recordActions([
                 Action::make('kartu_stok')
                     ->label('Kartu Stok')

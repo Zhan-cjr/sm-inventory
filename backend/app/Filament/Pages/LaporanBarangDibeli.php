@@ -55,6 +55,9 @@ class LaporanBarangDibeli extends Page implements HasTable
                 TextColumn::make('product.sku')
                     ->label('SKU')
                     ->searchable(),
+                TextColumn::make('product.barcode')
+                    ->label('Barcode')
+                    ->searchable(),
                 TextColumn::make('product.name')
                     ->label('Nama Barang')
                     ->searchable(),
@@ -95,7 +98,11 @@ class LaporanBarangDibeli extends Page implements HasTable
                     ]), true),
                 ExportAction::make()
                     ->exporter(GoodsReceiptItemExporter::class)
-                    ->label('Export CSV')
+                    ->formats([
+                        \Filament\Actions\Exports\Enums\ExportFormat::Csv,
+                        \Filament\Actions\Exports\Enums\ExportFormat::Xlsx,
+                    ])
+                    ->label('Export CSV / Excel')
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-tray')
             ]);

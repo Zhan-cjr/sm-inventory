@@ -119,6 +119,15 @@ class GoodsReceiptsTable
                         'type' => 'penerimaan-barang',
                         'tableFilters' => $livewire->tableFilters
                     ]), true),
+                \Filament\Actions\Action::make('export_excel')
+                    ->label('Export Excel')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                        'type' => 'penerimaan-barang',
+                        'tableFilters' => $livewire->tableFilters,
+                        'format' => 'excel'
+                    ]), true),
             ]);
     }
 }

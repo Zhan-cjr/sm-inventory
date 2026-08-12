@@ -137,6 +137,58 @@ class RekapitulasiTransaksi extends Page implements HasTable
                         'type' => 'rekapitulasi_transaksi',
                         'tableFilters' => $livewire->tableFilters
                     ]), true),
+                \Filament\Actions\Action::make('export_csv')
+                    ->label('Export CSV')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->action(function (\Filament\Tables\Contracts\HasTable $livewire) {
+                        $filters = $livewire->tableFilters ?? [];
+                        $branchId = $filters['branch_id']['value'] ?? null;
+                        
+                        $query = \App\Models\Branch::query();
+                        if ($branchId) {
+                            $query->where('id', $branchId);
+                        }
+                        
+                        $branches = $query->get();
+                        
+                        $filename = "Rekapitulasi_Transaksi_" . date('Y-m-d') . ".csv";
+
+                        $headers = array(
+                            "Content-type"        => "text/csv",
+                            "Content-Disposition" => "attachment; filename=$filename",
+                            "Pragma"              => "no-cache",
+                            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+                            "Expires"             => "0"
+                        );
+
+                        $callback = function() use($branches, $livewire) {
+                            $file = fopen('php://output', 'w');
+                            fputcsv($file, ['Nama Cabang', 'Penerimaan Brg', 'Retur Pembelian', 'Koreksi Stok (Retur)', 'Penjualan Kasir', 'Retur Penjualan', 'Pengeluaran']);
+
+                            foreach ($branches as $branch) {
+                                $penerimaan = $this->computeMetric($branch, $livewire, 'penerimaan');
+                                $retur_beli = $this->computeMetric($branch, $livewire, 'retur_beli');
+                                $koreksi_retur = $this->computeMetric($branch, $livewire, 'koreksi_retur');
+                                $penjualan = $this->computeMetric($branch, $livewire, 'penjualan');
+                                $retur_jual = $this->computeMetric($branch, $livewire, 'retur_jual');
+                                $pengeluaran = $this->computeMetric($branch, $livewire, 'pengeluaran');
+                                
+                                fputcsv($file, [
+                                    $branch->name, 
+                                    $penerimaan, 
+                                    $retur_beli, 
+                                    $koreksi_retur, 
+                                    $penjualan, 
+                                    $retur_jual, 
+                                    $pengeluaran
+                                ]);
+                            }
+                            fclose($file);
+                        };
+
+                        return response()->stream($callback, 200, $headers);
+                    }),
             ])
             ->paginationPageOptions([10, 25, 50, 'all']);
     }

@@ -154,6 +154,42 @@ class LaporanRekapTipeSuplier extends Page implements HasTable
                         'type' => 'laporan-rekap-tipe-suplier',
                         'tableFilters' => $livewire->tableFilters
                     ]), true),
+                \Filament\Actions\Action::make('export_csv')
+                    ->label('Export CSV')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->action(function (\Filament\Tables\Contracts\HasTable $livewire) {
+                        $data = $livewire->getFilteredTableQuery()->get();
+                        $filename = "Rekap_Tipe_Suplier_" . date('Y-m-d') . ".csv";
+
+                        $headers = array(
+                            "Content-type"        => "text/csv",
+                            "Content-Disposition" => "attachment; filename=$filename",
+                            "Pragma"              => "no-cache",
+                            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+                            "Expires"             => "0"
+                        );
+
+                        $callback = function() use($data) {
+                            $file = fopen('php://output', 'w');
+                            fputcsv($file, ['Tipe Suplier', 'Jual', 'HPP', 'Retur', 'HPP Retur', 'Selisih']);
+
+                            foreach ($data as $row) {
+                                $selisih = ($row->jual - $row->hpp) - ($row->retur - $row->hpp_retur);
+                                fputcsv($file, [
+                                    $row->tipe_suplier, 
+                                    $row->jual, 
+                                    $row->hpp, 
+                                    $row->retur, 
+                                    $row->hpp_retur, 
+                                    $selisih
+                                ]);
+                            }
+                            fclose($file);
+                        };
+
+                        return response()->stream($callback, 200, $headers);
+                    }),
             ])
             ->actions([
                 \Filament\Actions\Action::make('detail')

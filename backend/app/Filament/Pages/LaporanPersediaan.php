@@ -110,7 +110,11 @@ class LaporanPersediaan extends Page implements HasTable
                     ]), true),
                 ExportAction::make()
                     ->exporter(StockExporter::class)
-                    ->label('Export')
+                    ->formats([
+                        \Filament\Actions\Exports\Enums\ExportFormat::Csv,
+                        \Filament\Actions\Exports\Enums\ExportFormat::Xlsx,
+                    ])
+                    ->label('Export CSV / Excel')
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->columnMapping(false)

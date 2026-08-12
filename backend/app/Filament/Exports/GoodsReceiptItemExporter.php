@@ -18,6 +18,7 @@ class GoodsReceiptItemExporter extends Exporter
             ExportColumn::make('goodsReceipt.receipt_number')->label('No Penerimaan'),
             ExportColumn::make('goodsReceipt.supplier.name')->label('Supplier'),
             ExportColumn::make('product.sku')->label('SKU'),
+            ExportColumn::make('product.barcode')->label('Barcode'),
             ExportColumn::make('product.name')->label('Barang'),
             ExportColumn::make('quantity_received')->label('Qty'),
             ExportColumn::make('unit_price')->label('Harga'),
@@ -27,6 +28,12 @@ class GoodsReceiptItemExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        return 'Export completed.';
+        $body = 'Your goods receipt item export has completed and ' . \Illuminate\Support\Number::format($export->successful_rows) . ' ' . str('row')->plural($export->successful_rows) . ' exported.';
+
+        if ($failedRowsCount = $export->getFailedRowsCount()) {
+            $body .= ' ' . \Illuminate\Support\Number::format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to export.';
+        }
+
+        return $body;
     }
 }

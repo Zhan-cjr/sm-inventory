@@ -64,6 +64,9 @@ class LaporanBarangDijual extends Page implements HasTable
                 TextColumn::make('product.sku')
                     ->label('SKU')
                     ->searchable(),
+                TextColumn::make('product.barcode')
+                    ->label('Barcode')
+                    ->searchable(),
                 TextColumn::make('product.name')
                     ->label('Nama Barang')
                     ->searchable(),
@@ -137,7 +140,12 @@ class LaporanBarangDijual extends Page implements HasTable
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-barang-dijual',
                         'tableFilters' => $livewire->tableFilters
-                    ]), true)
+                    ]), true),
+                ExportAction::make()
+                    ->exporter(\App\Filament\Exports\AllSalesItemExporter::class)
+                    ->label('Export CSV')
+                    ->color('success')
+                    ->icon('heroicon-o-arrow-down-tray')
             ]);
     }
 }
