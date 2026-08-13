@@ -15,10 +15,20 @@ class StockAdjustmentExporter extends Exporter
             ExportColumn::make('adjustment_number')->label('No. Koreksi'),
             ExportColumn::make('adjustment_date')->label('Tgl Koreksi'),
             ExportColumn::make('branch.name')->label('Cabang'),
-            ExportColumn::make('reason.name')->label('Alasan'),
+            ExportColumn::make('adjustmentReason.name')->label('Sifat/Alasan'),
             ExportColumn::make('status')->label('Status'),
-            ExportColumn::make('total_value_plus')->label('Total Plus'),
-            ExportColumn::make('total_value_minus')->label('Total Minus'),
+            ExportColumn::make('total_value_plus')
+                ->label('Total Plus')
+                ->state(function ($record) {
+                    $type = $record->adjustmentReason ? $record->adjustmentReason->type : '';
+                    return strtoupper($type) === 'PLUS' ? $record->total_value : null;
+                }),
+            ExportColumn::make('total_value_minus')
+                ->label('Total Minus')
+                ->state(function ($record) {
+                    $type = $record->adjustmentReason ? $record->adjustmentReason->type : '';
+                    return strtoupper($type) === 'MINUS' ? $record->total_value : null;
+                }),
         ];
     }
     public static function getCompletedNotificationBody(Export $export): string
