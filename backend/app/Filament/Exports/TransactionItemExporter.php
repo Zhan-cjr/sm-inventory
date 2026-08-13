@@ -28,6 +28,12 @@ class TransactionItemExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        return 'Export completed.';
+        $body = 'Export Laporan Jasa Terjual selesai. ' . \Illuminate\Support\Number::format($export->successful_rows) . ' baris berhasil diexport.';
+
+        if ($failedRowsCount = $export->getFailedRowsCount()) {
+            $body .= ' ' . \Illuminate\Support\Number::format($failedRowsCount) . ' baris gagal diexport.';
+        }
+
+        return $body;
     }
 }

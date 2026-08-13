@@ -214,7 +214,15 @@ class StockAdjustmentResource extends Resource
                         return strtoupper($type) === 'PLUS' ? $record->total_value : null;
                     })
                     ->numeric()
-                    ->sortable(['total_value']),
+                    ->sortable(['total_value'])
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Summarizer::make()->using(function (\Illuminate\Database\Query\Builder $query) {
+                        return (float) $query->whereExists(function ($q) {
+                            $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                              ->from('adjustment_reasons')
+                              ->whereColumn('adjustment_reasons.id', 'stock_adjustments.adjustment_reason_id')
+                              ->where('type', 'PLUS');
+                        })->sum('total_value');
+                    })->numeric()),
                 TextColumn::make('total_value_minus')
                     ->label('Nominal (-)')
                     ->state(function ($record) {
@@ -222,7 +230,15 @@ class StockAdjustmentResource extends Resource
                         return strtoupper($type) === 'MINUS' ? $record->total_value : null;
                     })
                     ->numeric()
-                    ->sortable(['total_value']),
+                    ->sortable(['total_value'])
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Summarizer::make()->using(function (\Illuminate\Database\Query\Builder $query) {
+                        return (float) $query->whereExists(function ($q) {
+                            $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                              ->from('adjustment_reasons')
+                              ->whereColumn('adjustment_reasons.id', 'stock_adjustments.adjustment_reason_id')
+                              ->where('type', 'MINUS');
+                        })->sum('total_value');
+                    })->numeric()),
                 TextColumn::make('notes')
                     ->label('Catatan')
                     ->limit(50),
@@ -330,17 +346,17 @@ class StockAdjustmentResource extends Resource
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'koreksi-stok',
-                        'tableFilters' => $livewire->tableFilters
+                        'tableFilters' => $livewire->tableFilters,
+                        'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null
                     ]), true),
-                \Filament\Actions\Action::make('export_excel')
+                \Filament\Actions\ExportAction::make('export_excel')
                     ->label('Export Excel')
+                    ->exporter(\App\Filament\Exports\StockAdjustmentExporter::class)
+                    ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx, \Filament\Actions\Exports\Enums\ExportFormat::Csv])
                     ->icon('heroicon-o-document-arrow-down')
                     ->color('success')
-                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
-                        'type' => 'koreksi-stok',
-                        'tableFilters' => $livewire->tableFilters,
-                        'format' => 'excel'
-                    ]), true),
+                    ->modalHeading('Pilih Kolom Export')
+                    ->modalSubmitActionLabel('Proses Export'),
             ]);
     }
 

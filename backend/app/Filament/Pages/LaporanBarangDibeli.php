@@ -64,6 +64,7 @@ class LaporanBarangDibeli extends Page implements HasTable
                 TextColumn::make('quantity_received')
                     ->label('Qty Diterima')
                     ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->sortable(),
                 TextColumn::make('unit_price')
                     ->label('Harga Beli/Satuan')
@@ -75,6 +76,7 @@ class LaporanBarangDibeli extends Page implements HasTable
                 TextColumn::make('subtotal')
                     ->label('Subtotal (Net)')
                     ->money('IDR', true)
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->money('IDR', true))
                     ->sortable(),
             ])
             ->filters([
@@ -94,7 +96,8 @@ class LaporanBarangDibeli extends Page implements HasTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-barang-dibeli',
-                        'tableFilters' => $livewire->tableFilters
+                        'tableFilters' => $livewire->tableFilters,
+                        'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
                 ExportAction::make()
                     ->exporter(GoodsReceiptItemExporter::class)

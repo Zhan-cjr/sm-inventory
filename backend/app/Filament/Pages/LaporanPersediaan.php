@@ -58,6 +58,7 @@ class LaporanPersediaan extends Page implements HasTable
                 TextColumn::make('quantity_on_hand')
                     ->label('Sisa Stok')
                     ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->sortable()
                     ->badge()
                     ->color(fn ($state, Stock $record) => $state <= ($record->reorder_point ?? 0) ? 'danger' : 'success'),
@@ -98,7 +99,8 @@ class LaporanPersediaan extends Page implements HasTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-persediaan',
-                        'tableFilters' => $livewire->tableFilters
+                        'tableFilters' => $livewire->tableFilters,
+                        'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
                 \Filament\Actions\Action::make('cetak_rekap')
                     ->label('Cetak Rekap Total')
@@ -106,15 +108,13 @@ class LaporanPersediaan extends Page implements HasTable
                     ->color('warning')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'rekap-total-stok',
-                        'tableFilters' => $livewire->tableFilters
+                        'tableFilters' => $livewire->tableFilters,
+                        'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
-                ExportAction::make()
-                    ->exporter(StockExporter::class)
-                    ->formats([
-                        \Filament\Actions\Exports\Enums\ExportFormat::Csv,
-                        \Filament\Actions\Exports\Enums\ExportFormat::Xlsx,
-                    ])
-                    ->label('Export CSV / Excel')
+                \Filament\Actions\ExportAction::make()
+                    ->exporter(\App\Filament\Exports\StockExporter::class)
+                    ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx, \Filament\Actions\Exports\Enums\ExportFormat::Csv])
+                    ->label('Export')
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->columnMapping(false)

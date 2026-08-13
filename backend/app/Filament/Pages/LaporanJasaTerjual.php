@@ -74,6 +74,7 @@ class LaporanJasaTerjual extends Page implements HasTable
                 TextColumn::make('quantity')
                     ->label('Qty')
                     ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->sortable(),
                 TextColumn::make('unit_price')
                     ->label('Harga Satuan')
@@ -86,7 +87,10 @@ class LaporanJasaTerjual extends Page implements HasTable
                 TextColumn::make('subtotal')
                     ->label('Subtotal (Net)')
                     ->money('IDR', true)
-                    ->state(fn (TransactionItem $record): float => ($record->unit_price - $record->discount_per_item) * $record->quantity)
+                    ->state(fn (\App\Models\TransactionItem $record): float => ($record->unit_price - $record->discount_per_item) * $record->quantity)
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Summarizer::make()->using(function (\Illuminate\Database\Query\Builder $query) {
+                        return (float) $query->sum(\Illuminate\Support\Facades\DB::raw('(unit_price - discount_per_item) * quantity'));
+                    })->money('IDR', true))
                     ->sortable(),
             ])
             ->filters([
@@ -103,11 +107,13 @@ class LaporanJasaTerjual extends Page implements HasTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-jasa-terjual',
-                        'tableFilters' => $livewire->tableFilters
+                        'tableFilters' => $livewire->tableFilters,
+                        'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
-                ExportAction::make()
-                    ->exporter(TransactionItemExporter::class)
-                    ->label('Export CSV')
+                \Filament\Actions\ExportAction::make()
+                    ->exporter(\App\Filament\Exports\TransactionItemExporter::class)
+                    ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx, \Filament\Actions\Exports\Enums\ExportFormat::Csv])
+                    ->label('Export')
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-tray')
             ]);

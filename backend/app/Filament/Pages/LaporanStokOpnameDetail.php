@@ -54,15 +54,19 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                     ->searchable(),
                 TextColumn::make('system_quantity')
                     ->label('Stok Sistem')
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->numeric(),
                 TextColumn::make('count1_quantity')
                     ->label('Hitung 1')
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->numeric(),
                 TextColumn::make('count2_quantity')
                     ->label('Hitung 2')
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->numeric(),
                 TextColumn::make('final_quantity')
                     ->label('Hasil Akhir')
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->numeric()
                     ->badge()
                     ->color('warning'),
@@ -186,7 +190,8 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-stok-opname-detail',
-                        'tableFilters' => $livewire->tableFilters
+                        'tableFilters' => $livewire->tableFilters,
+                        'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
                 \Filament\Actions\ExportAction::make()
                     ->exporter(\App\Filament\Exports\StockOpnameItemExporter::class)

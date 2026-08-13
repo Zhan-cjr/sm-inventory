@@ -174,11 +174,13 @@ class LaporanStokOpnameRingkas extends Page implements HasTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-stok-opname-ringkas',
-                        'tableFilters' => $livewire->tableFilters
+                        'tableFilters' => $livewire->tableFilters,
+                        'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
                 \Filament\Actions\ExportAction::make()
                     ->exporter(\App\Filament\Exports\StockOpnameSessionExporter::class)
-                    ->label('Export CSV')
+                    ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx, \Filament\Actions\Exports\Enums\ExportFormat::Csv])
+                    ->label('Export')
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-tray')
             ])

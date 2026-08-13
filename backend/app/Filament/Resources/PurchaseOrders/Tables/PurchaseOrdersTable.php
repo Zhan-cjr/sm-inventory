@@ -90,7 +90,7 @@ class PurchaseOrdersTable
                     ->label('Total Nominal')
                     ->numeric()
                     ->sortable()
-                    ->toggleable(),
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric()),
                 TextColumn::make('creator.name')
                     ->label('Dibuat Oleh')
                     ->searchable()
@@ -182,17 +182,17 @@ class PurchaseOrdersTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'pesanan-pembelian',
-                        'tableFilters' => $livewire->tableFilters
+                        'tableFilters' => $livewire->tableFilters,
+                        'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null
                     ]), true),
-                \Filament\Actions\Action::make('export_excel')
+                \Filament\Actions\ExportAction::make('export_excel')
                     ->label('Export Excel')
+                    ->exporter(\App\Filament\Exports\PurchaseOrderExporter::class)
+                    ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx, \Filament\Actions\Exports\Enums\ExportFormat::Csv])
                     ->icon('heroicon-o-document-arrow-down')
                     ->color('success')
-                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
-                        'type' => 'pesanan-pembelian',
-                        'tableFilters' => $livewire->tableFilters,
-                        'format' => 'excel'
-                    ]), true),
+                    ->modalHeading('Pilih Kolom Export')
+                    ->modalSubmitActionLabel('Proses Export'),
             ]);
     }
 }

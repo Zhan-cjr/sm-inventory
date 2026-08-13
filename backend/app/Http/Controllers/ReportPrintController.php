@@ -513,7 +513,13 @@ class ReportPrintController extends Controller
         } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
             $query->where('branch_id', $filters['branch_id']['value']);
         }
-        
+
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->whereHas('product', fn($pq) => $pq->where('sku', 'like', "%{$searchQuery}%")->orWhere('name', 'like', "%{$searchQuery}%")->orWhereHas('category', fn($cq) => $cq->where('name', 'like', "%{$searchQuery}%")));
+            });
+        }
+
         $stocks = $query->orderBy('created_at', 'desc')->get();
         $period = $this->getPeriodString($filters);
 
@@ -804,6 +810,13 @@ class ReportPrintController extends Controller
             });
         }
         
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->where('transaction_number', 'like', "%{$searchQuery}%")
+                  ->orWhereHas('product', fn($pq) => $pq->where('sku', 'like', "%{$searchQuery}%")->orWhere('name', 'like', "%{$searchQuery}%"));
+            });
+        }
+        
         $query->with(['product', 'branch']);
         
         $items = $query->get();
@@ -912,6 +925,13 @@ class ReportPrintController extends Controller
             $q = $this->applyDateFilters($q, $filters, 'transaction_date', 'transaction_date');
         })->whereNotNull('service_id')->with(['service', 'transaction']);
         
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->whereHas('transaction', fn($tq) => $tq->where('receipt_number', 'like', "%{$searchQuery}%")->orWhere('local_transaction_id', 'like', "%{$searchQuery}%"))
+                  ->orWhereHas('service', fn($sq) => $sq->where('code', 'like', "%{$searchQuery}%")->orWhere('name', 'like', "%{$searchQuery}%"));
+            });
+        }
+
         $items = $query->get();
         $period = $this->getPeriodString($filters);
 
@@ -947,6 +967,13 @@ class ReportPrintController extends Controller
                 $q->where('branch_id', $filters['branch_id']['value']);
             }
         })->with(['product', 'goodsReceipt', 'goodsReceipt.supplier']);
+
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->whereHas('goodsReceipt', fn($gq) => $gq->where('receipt_number', 'like', "%{$searchQuery}%")->orWhereHas('supplier', fn($sq) => $sq->where('name', 'like', "%{$searchQuery}%")))
+                  ->orWhereHas('product', fn($pq) => $pq->where('sku', 'like', "%{$searchQuery}%")->orWhere('barcode', 'like', "%{$searchQuery}%")->orWhere('name', 'like', "%{$searchQuery}%"));
+            });
+        }
 
         $items = $query->get();
         $period = $this->getPeriodString($filters, 'receipt_date');
@@ -987,6 +1014,10 @@ class ReportPrintController extends Controller
         
         if (isset($filters['status']['value']) && !empty($filters['status']['value'])) {
             $query->where('status', $filters['status']['value']);
+        }
+        
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where('session_number', 'like', "%{$searchQuery}%");
         }
         
         $sessions = $query->orderBy('created_at', 'desc')->get();
@@ -1088,7 +1119,15 @@ class ReportPrintController extends Controller
         if (isset($filters['status']['value']) && !empty($filters['status']['value'])) {
             $query->where('status', $filters['status']['value']);
         }
-        
+
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->whereHas('session', fn($sq) => $sq->where('session_number', 'like', "%{$searchQuery}%"))
+                  ->orWhereHas('rackSession.rack', fn($rq) => $rq->where('rack_code', 'like', "%{$searchQuery}%"))
+                  ->orWhereHas('product', fn($pq) => $pq->where('sku', 'like', "%{$searchQuery}%")->orWhere('name', 'like', "%{$searchQuery}%"));
+            });
+        }
+
         $items = $query->orderBy('created_at', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
@@ -1191,7 +1230,15 @@ class ReportPrintController extends Controller
         } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
             $query->where('branch_id', $filters['branch_id']['value']);
         }
-        
+
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->where('po_number', 'like', "%{$searchQuery}%")
+                  ->orWhereHas('supplier', fn($sq) => $sq->where('name', 'like', "%{$searchQuery}%"))
+                  ->orWhereHas('branch', fn($bq) => $bq->where('name', 'like', "%{$searchQuery}%"));
+            });
+        }
+
         $orders = $query->orderBy('po_date', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
@@ -1212,7 +1259,7 @@ class ReportPrintController extends Controller
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
 
         if (request()->query('format') === 'excel') {
-            return $this->exportCsv('Daftar Pesanan Pembelian', $columns, $rows);
+            return $this->exportExcelHtml('Daftar Pesanan Pembelian', $period, $columns, $rows);
         }
 
         return view('print.reports.generic', ['title' => 'Daftar Pesanan Pembelian', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
@@ -1228,7 +1275,16 @@ class ReportPrintController extends Controller
         } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
             $query->where('branch_id', $filters['branch_id']['value']);
         }
-        
+
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->where('receipt_number', 'like', "%{$searchQuery}%")
+                  ->orWhereHas('supplier', fn($sq) => $sq->where('name', 'like', "%{$searchQuery}%"))
+                  ->orWhereHas('branch', fn($bq) => $bq->where('name', 'like', "%{$searchQuery}%"))
+                  ->orWhereHas('purchaseOrder', fn($pq) => $pq->where('po_number', 'like', "%{$searchQuery}%"));
+            });
+        }
+
         $receipts = $query->orderBy('receipt_date', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
@@ -1250,7 +1306,7 @@ class ReportPrintController extends Controller
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
 
         if (request()->query('format') === 'excel') {
-            return $this->exportCsv('Daftar Penerimaan Barang', $columns, $rows);
+            return $this->exportExcelHtml('Daftar Penerimaan Barang', $period, $columns, $rows);
         }
 
         return view('print.reports.generic', ['title' => 'Daftar Penerimaan Barang', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
@@ -1266,7 +1322,15 @@ class ReportPrintController extends Controller
         } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
             $query->where('branch_id', $filters['branch_id']['value']);
         }
-        
+
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->where('return_number', 'like', "%{$searchQuery}%")
+                  ->orWhereHas('supplier', fn($sq) => $sq->where('name', 'like', "%{$searchQuery}%"))
+                  ->orWhereHas('branch', fn($bq) => $bq->where('name', 'like', "%{$searchQuery}%"));
+            });
+        }
+
         $returns = $query->orderBy('return_date', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
@@ -1287,7 +1351,7 @@ class ReportPrintController extends Controller
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
 
         if (request()->query('format') === 'excel') {
-            return $this->exportCsv('Daftar Retur Pembelian', $columns, $rows);
+            return $this->exportExcelHtml('Daftar Retur Pembelian', $period, $columns, $rows);
         }
 
         return view('print.reports.generic', ['title' => 'Daftar Retur Pembelian', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
@@ -1303,7 +1367,15 @@ class ReportPrintController extends Controller
         } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
             $query->where('branch_id', $filters['branch_id']['value']);
         }
-        
+
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->where('adjustment_number', 'like', "%{$searchQuery}%")
+                  ->orWhereHas('adjustmentReason', fn($sq) => $sq->where('name', 'like', "%{$searchQuery}%"))
+                  ->orWhereHas('branch', fn($bq) => $bq->where('name', 'like', "%{$searchQuery}%"));
+            });
+        }
+
         $adjustments = $query->orderBy('adjustment_date', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
@@ -1334,7 +1406,7 @@ class ReportPrintController extends Controller
         $rows[] = ['<strong>TOTAL</strong>', '', '', '<strong>Rp ' . number_format($t_plus, 0, ',', '.') . '</strong>', '<strong>Rp ' . number_format($t_minus, 0, ',', '.') . '</strong>', '', ''];
 
         if (request()->query('format') === 'excel') {
-            return $this->exportCsv('Daftar Koreksi Stok', $columns, $rows);
+            return $this->exportExcelHtml('Daftar Koreksi Stok', $period, $columns, $rows);
         }
 
         return view('print.reports.generic', ['title' => 'Daftar Koreksi Stok', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
@@ -1352,6 +1424,14 @@ class ReportPrintController extends Controller
             });
         } elseif (isset($filters['from_branch_id']['value']) && !empty($filters['from_branch_id']['value'])) {
             $query->where('from_branch_id', $filters['from_branch_id']['value']);
+        }
+        
+        if ($searchQuery = request()->input('tableSearchQuery')) {
+            $query->where(function($q) use ($searchQuery) {
+                $q->where('reference_number', 'like', "%{$searchQuery}%")
+                  ->orWhereHas('fromBranch', fn($bq) => $bq->where('name', 'like', "%{$searchQuery}%"))
+                  ->orWhereHas('toBranch', fn($bq) => $bq->where('name', 'like', "%{$searchQuery}%"));
+            });
         }
         
         $transfers = $query->orderBy('transfer_date', 'desc')->get();
@@ -1374,7 +1454,7 @@ class ReportPrintController extends Controller
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>Rp ' . number_format($t_total, 0, ',', '.') . '</strong>', ''];
 
         if (request()->query('format') === 'excel') {
-            return $this->exportCsv('Daftar Stock Transfer', $columns, $rows);
+            return $this->exportExcelHtml('Daftar Stock Transfer', $period, $columns, $rows);
         }
 
         return view('print.reports.generic', ['title' => 'Daftar Stock Transfer', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
@@ -1469,6 +1549,22 @@ class ReportPrintController extends Controller
 
         // If they ever want HTML print:
         abort(404, 'Gunakan format excel untuk menu ini.');
+    }
+
+    private function exportExcelHtml($title, $period, $columns, $rows)
+    {
+        $filename = str_replace(' ', '_', strtolower($title)) . '_' . date('Ymd_His') . '.xls';
+        return response()->streamDownload(function () use ($title, $period, $columns, $rows) {
+            echo view('print.reports.generic', [
+                'title' => $title,
+                'period' => $period,
+                'columns' => $columns,
+                'rows' => $rows
+            ])->render();
+        }, $filename, [
+            'Content-Type' => 'application/vnd.ms-excel',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"'
+        ]);
     }
 
     private function exportCsv($title, $columns, $rows)

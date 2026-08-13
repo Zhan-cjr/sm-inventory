@@ -28,10 +28,10 @@ class GoodsReceiptItemExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Your goods receipt item export has completed and ' . \Illuminate\Support\Number::format($export->successful_rows) . ' ' . str('row')->plural($export->successful_rows) . ' exported.';
+        $body = 'Export Laporan Barang Dibeli selesai. ' . \Illuminate\Support\Number::format($export->successful_rows) . ' baris berhasil diexport.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . \Illuminate\Support\Number::format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to export.';
+            $body .= ' ' . \Illuminate\Support\Number::format($failedRowsCount) . ' baris gagal diexport.';
         }
 
         return $body;

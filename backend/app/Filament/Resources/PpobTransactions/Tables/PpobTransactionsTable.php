@@ -37,6 +37,7 @@ class PpobTransactionsTable
                 TextColumn::make('price')
                     ->label('Harga Modal')
                     ->money('IDR', locale: 'id')
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->money('IDR', locale: 'id'))
                     ->sortable(),
                 TextColumn::make('status')
                     ->label('Status')

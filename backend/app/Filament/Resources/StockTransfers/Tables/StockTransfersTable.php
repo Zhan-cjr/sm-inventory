@@ -30,7 +30,8 @@ class StockTransfersTable
                 TextColumn::make('total_amount')
                     ->label('Nominal')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric()),
                 TextColumn::make('status')
                     ->badge()
                     ->colors([
@@ -116,17 +117,17 @@ class StockTransfersTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'stock-transfer',
-                        'tableFilters' => $livewire->tableFilters
+                        'tableFilters' => $livewire->tableFilters,
+                        'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null
                     ]), true),
-                \Filament\Actions\Action::make('export_excel')
+                \Filament\Actions\ExportAction::make('export_excel')
                     ->label('Export Excel')
+                    ->exporter(\App\Filament\Exports\StockTransferExporter::class)
+                    ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx, \Filament\Actions\Exports\Enums\ExportFormat::Csv])
                     ->icon('heroicon-o-document-arrow-down')
                     ->color('success')
-                    ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
-                        'type' => 'stock-transfer',
-                        'tableFilters' => $livewire->tableFilters,
-                        'format' => 'excel'
-                    ]), true),
+                    ->modalHeading('Pilih Kolom Export')
+                    ->modalSubmitActionLabel('Proses Export'),
             ]);
     }
 }
