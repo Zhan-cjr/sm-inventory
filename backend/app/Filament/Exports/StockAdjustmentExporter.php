@@ -29,6 +29,7 @@ class StockAdjustmentExporter extends Exporter
                     $type = $record->adjustmentReason ? $record->adjustmentReason->type : '';
                     return strtoupper($type) === 'MINUS' ? $record->total_value : null;
                 }),
+            ExportColumn::make('notes')->label('Catatan'),
         ];
     }
     public static function getCompletedNotificationBody(Export $export): string
