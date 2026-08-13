@@ -62,17 +62,21 @@
             <thead>
                 <tr>
                     <th style="width: 25px;" class="text-center">No</th>
+                    <th style="width: 130px;">Barcode</th>
                     <th>SKU / Nama Produk</th>
-                    <th class="text-right" style="width: 100px;">HPP</th>
-                    <th class="text-center" style="width: 80px;">Qty Terjual</th>
-                    <th class="text-right" style="width: 150px;">Subtotal Tagihan</th>
+                    <th class="text-right" style="width: 90px;">Harga Jual</th>
+                    <th class="text-right" style="width: 90px;">HPP (Beli)</th>
+                    <th class="text-center" style="width: 70px;">Qty</th>
+                    <th class="text-right" style="width: 130px;">Subtotal Tagihan</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($selloutItems as $index => $item)
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
+                    <td>{{ $item['barcode'] }}</td>
                     <td><strong>{{ $item['sku'] }}</strong><br>{{ $item['name'] }}</td>
+                    <td class="text-right">Rp {{ number_format($item['selling_price'], 0, ',', '.') }}</td>
                     <td class="text-right">Rp {{ number_format($item['cost_price'], 0, ',', '.') }}</td>
                     <td class="text-center">{{ number_format($item['qty']) }}</td>
                     <td class="text-right">Rp {{ number_format($item['subtotal'], 0, ',', '.') }}</td>

@@ -1834,10 +1834,12 @@ class ReportPrintController extends Controller
             ->map(function ($items) {
                 $first = $items->first();
                 return [
+                    'barcode' => $first->product->barcode ?? '-',
                     'sku' => $first->product->sku ?? '-',
                     'name' => $first->product->name ?? '-',
                     'qty' => $items->sum('quantity'),
                     'cost_price' => $first->product->cost_price ?? 0,
+                    'selling_price' => $first->unit_price ?? ($first->product->price ?? 0),
                     'subtotal' => $items->sum('quantity') * ($first->product->cost_price ?? 0),
                 ];
             })->values();
