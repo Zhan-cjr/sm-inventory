@@ -111,13 +111,26 @@ class LaporanPersediaan extends Page implements HasTable
                         'tableFilters' => $livewire->tableFilters,
                         'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
-                \Filament\Actions\ExportAction::make()
-                    ->exporter(\App\Filament\Exports\StockExporter::class)
-                    ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx, \Filament\Actions\Exports\Enums\ExportFormat::Csv])
-                    ->label('Export')
-                    ->color('success')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->columnMapping(false)
+                \Filament\Actions\ActionGroup::make([
+                    \Filament\Actions\ExportAction::make()
+                        ->label('Export Xlsx (Raw Data)')
+                        ->exporter(\App\Filament\Exports\StockExporter::class)
+                        ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx])
+                        ->icon('heroicon-o-table-cells'),
+                    \Filament\Actions\Action::make('export_xls')
+                        ->label('Export Xls (Format Cetak)')
+                        ->icon('heroicon-o-document-text')
+                        ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                            'type' => 'laporan-persediaan',
+                            'export' => 'xls',
+                            'tableFilters' => $livewire->tableFilters,
+                            'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
+                        ]), true)
+                ])
+                ->label('Export')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('success')
+                ->button(),
             ]);
     }
 }

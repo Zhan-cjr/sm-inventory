@@ -309,11 +309,26 @@ class ArsipReturPenjualanResource extends Resource
                         'type' => 'arsip-transaksi',
                         'tableFilters' => $livewire->tableFilters
                     ]), true),
-                ExportAction::make()
-                    ->exporter(TransactionExporter::class)
-                    ->label('Export CSV')
-                    ->color('success')
-                    ->icon('heroicon-o-arrow-down-tray')
+                \Filament\Actions\ActionGroup::make([
+                    ExportAction::make()
+                        ->exporter(TransactionExporter::class)
+                        ->label('Export CSV (Raw Data)')
+                        ->color('success')
+                        ->icon('heroicon-o-table-cells'),
+                    \Filament\Actions\Action::make('export_xls')
+                        ->label('Export Xls (Format Cetak)')
+                        ->icon('heroicon-o-document-text')
+                        ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                            'type' => 'arsip-transaksi',
+                            'export' => 'xls',
+                            'tableFilters' => $livewire->tableFilters,
+                            'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null
+                        ]), true)
+                ])
+                ->label('Export')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('success')
+                ->button()
             ])
             ->defaultSort('transaction_date', 'desc')
             ->deferLoading()

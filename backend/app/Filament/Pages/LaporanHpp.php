@@ -401,13 +401,14 @@ class LaporanHpp extends Page implements HasForms
                     ]
                 ]))
                 ->openUrlInNewTab(),
-            \Filament\Actions\Action::make('export_csv')
-                ->label('Export Excel (CSV)')
-                ->icon('heroicon-o-document-arrow-down')
-                ->color('success')
-                ->action(function () {
-                    $data = $this->getReportData(true);
-                    $filename = "Laporan_HPP_" . $this->activeTab . "_" . date('Y-m-d') . ".csv";
+            \Filament\Actions\ActionGroup::make([
+                \Filament\Actions\Action::make('export_csv')
+                    ->label('Export Csv (Raw Data)')
+                    ->icon('heroicon-o-table-cells')
+                    ->action(function () {
+                        $data = $this->getReportData(true);
+                        $filename = "Laporan_HPP_" . $this->activeTab . "_" . date('Y-m-d') . ".csv";
+
 
                     $headers = array(
                         "Content-type"        => "text/csv",
@@ -458,6 +459,35 @@ class LaporanHpp extends Page implements HasForms
 
                     return response()->stream($callback, 200, $headers);
                 }),
+                \Filament\Actions\Action::make('export_xls')
+                    ->label('Export Xls (Format Cetak)')
+                    ->icon('heroicon-o-document-text')
+                    ->url(fn () => route('print.report', [
+                        'type' => 'laporan-hpp',
+                        'export' => 'xls',
+                        'activeTab' => $this->activeTab,
+                        'tableFilters' => [
+                            'date_filter' => [
+                                'period' => $this->data['period'] ?? 'today',
+                                'created_from' => $this->data['created_from'] ?? null,
+                                'created_until' => $this->data['created_until'] ?? null,
+                            ],
+                            'branch_id' => [
+                                'value' => $this->data['branch_id'] ?? null
+                            ],
+                            'search' => [
+                                'value' => $this->data['search'] ?? null
+                            ],
+                            'transaction_source' => [
+                                'value' => $this->data['transaction_source'] ?? 'ALL'
+                            ]
+                        ]
+                    ]), true)
+            ])
+            ->label('Export')
+            ->icon('heroicon-o-arrow-down-tray')
+            ->color('success')
+            ->button(),
         ];
     }
 }

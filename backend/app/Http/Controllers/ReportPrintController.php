@@ -13,68 +13,46 @@ class ReportPrintController extends Controller
     {
         $filters = $request->input('tableFilters', []);
 
-        switch ($type) {
-            case 'laporan-penjualan-kasir':
-                return $this->printPenjualanKasir($filters);
-            case 'arsip-transaksi':
-                return $this->printArsipTransaksi($filters);
-            case 'laporan-penjualan':
-                return $this->printLaporanPenjualan($filters);
-            case 'laporan-persediaan':
-                return $this->printLaporanPersediaan($filters);
-            case 'rekap-total-stok':
-                return $this->printRekapTotalStok($filters);
-            case 'laporan-shift-kasir':
-                return $this->printLaporanShiftKasir($filters);
-            case 'laporan-laba-rugi':
-                return $this->printLaporanLabaRugi($filters);
-            case 'laporan-barang-dijual':
-                return $this->printLaporanBarangDijual($filters);
-            case 'laporan-jasa-terjual':
-                return $this->printLaporanJasaTerjual($filters);
-            case 'laporan-barang-dibeli':
-                return $this->printLaporanBarangDibeli($filters);
-            case 'laporan-stok-opname-ringkas':
-                return $this->printLaporanStokOpnameRingkas($filters);
-            case 'laporan-stok-opname-detail':
-                return $this->printLaporanStokOpnameDetail($filters);
-            case 'pesanan-pembelian':
-                return $this->printPesananPembelian($filters);
-            case 'penerimaan-barang':
-                return $this->printPenerimaanBarang($filters);
-            case 'retur-pembelian':
-                return $this->printReturPembelian($filters);
-            case 'koreksi-stok':
-                return $this->printKoreksiStok($filters);
-            case 'stock-transfer':
-                return $this->printStockTransfer($filters);
-            case 'expense_list':
-                return $this->printExpenseList($request);
-            case 'laporan_keuangan':
-                return $this->printLaporanKeuangan($request);
-            case 'jurnal_umum':
-                return $this->printJurnalUmum($request);
-            case 'kontrabon':
-                return $this->printKontrabon($filters);
-            case 'pembayaran-hutang':
-                return $this->printPembayaranHutang($filters);
-            case 'kontrabon-nota':
-                return $this->printKontrabonNota($request);
-            case 'promo-sellout':
-                return $this->printPromoSellout($request);
-            case 'supplier-deductions':
-                return $this->printSupplierDeductions($filters);
-            case 'rekapitulasi_transaksi':
-                return $this->printRekapitulasiTransaksi($request);
-            case 'laporan-hpp':
-                return $this->printLaporanHpp($request);
-            case 'laporan-rekap-tipe-suplier':
-                return $this->printLaporanRekapTipeSuplier($filters);
-            case 'produk':
-                return $this->printProduk($filters);
-            default:
-                abort(404, 'Tipe laporan tidak ditemukan');
+        $response = match ($type) {
+            'laporan-penjualan-kasir' => $this->printPenjualanKasir($filters),
+            'arsip-transaksi' => $this->printArsipTransaksi($filters),
+            'laporan-penjualan' => $this->printLaporanPenjualan($filters),
+            'laporan-persediaan' => $this->printLaporanPersediaan($filters),
+            'rekap-total-stok' => $this->printRekapTotalStok($filters),
+            'laporan-shift-kasir' => $this->printLaporanShiftKasir($filters),
+            'laporan-laba-rugi' => $this->printLaporanLabaRugi($filters),
+            'laporan-barang-dijual' => $this->printLaporanBarangDijual($filters),
+            'laporan-jasa-terjual' => $this->printLaporanJasaTerjual($filters),
+            'laporan-barang-dibeli' => $this->printLaporanBarangDibeli($filters),
+            'laporan-stok-opname-ringkas' => $this->printLaporanStokOpnameRingkas($filters),
+            'laporan-stok-opname-detail' => $this->printLaporanStokOpnameDetail($filters),
+            'pesanan-pembelian' => $this->printPesananPembelian($filters),
+            'penerimaan-barang' => $this->printPenerimaanBarang($filters),
+            'retur-pembelian' => $this->printReturPembelian($filters),
+            'koreksi-stok' => $this->printKoreksiStok($filters),
+            'stock-transfer' => $this->printStockTransfer($filters),
+            'expense_list' => $this->printExpenseList($request),
+            'laporan_keuangan' => $this->printLaporanKeuangan($request),
+            'jurnal_umum' => $this->printJurnalUmum($request),
+            'kontrabon' => $this->printKontrabon($filters),
+            'pembayaran-hutang' => $this->printPembayaranHutang($filters),
+            'kontrabon-nota' => $this->printKontrabonNota($request),
+            'promo-sellout' => $this->printPromoSellout($request),
+            'supplier-deductions' => $this->printSupplierDeductions($filters),
+            'rekapitulasi_transaksi' => $this->printRekapitulasiTransaksi($request),
+            'laporan-hpp' => $this->printLaporanHpp($request),
+            'laporan-rekap-tipe-suplier' => $this->printLaporanRekapTipeSuplier($filters),
+            'produk' => $this->printProduk($filters),
+            default => abort(404, 'Tipe laporan tidak ditemukan'),
+        };
+
+        if ($request->has('export') && $request->export === 'xls') {
+            return response($response->render())
+                ->header('Content-Type', 'application/vnd.ms-excel')
+                ->header('Content-Disposition', 'attachment; filename="laporan-' . $type . '.xls"');
         }
+
+        return $response;
     }
 
     private function applyDateFilters($query, $filters, $dateColumn = 'transaction_date', $filterName = 'date_filter')
@@ -996,7 +974,7 @@ class ReportPrintController extends Controller
                 number_format($i->subtotal, 0, ',', '.')
             ];
         }
-        $rows[] = ['<strong>TOTAL</strong>', '', '', '<strong>'.$t_qty.'</strong>', '', '<strong>'.number_format($t_total, 0, ',', '.').'</strong>'];
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>'.$t_qty.'</strong>', '', '<strong>'.number_format($t_total, 0, ',', '.').'</strong>'];
 
         return view('print.reports.generic', ['title' => 'Laporan Barang Dibeli', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
@@ -2044,11 +2022,12 @@ class ReportPrintController extends Controller
             'period' => $dateFilter['period'] ?? 'today',
             'created_from' => $dateFilter['created_from'] ?? null,
             'created_until' => $dateFilter['created_until'] ?? null,
-            'branch_id' => $filters['branch_id']['value'] ?? auth()->user()->branch_id,
+            'branch_id' => $filters['branch_id']['value'] ?? (auth()->check() ? auth()->user()->branch_id : null),
             'search' => $filters['search']['value'] ?? null,
             'transaction_source' => $filters['transaction_source']['value'] ?? 'ALL',
         ];
         
+        $hppPage->appliedFilters = $hppPage->data;
         $hppPage->isReportReady = true;
         $results = $hppPage->getReportData(true);
         

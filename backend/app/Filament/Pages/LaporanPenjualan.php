@@ -99,11 +99,26 @@ class LaporanPenjualan extends Page implements HasTable
                         'type' => 'laporan-penjualan',
                         'tableFilters' => $livewire->tableFilters
                     ]), true),
-                ExportAction::make()
-                    ->exporter(TransactionExporter::class)
-                    ->label('Export CSV')
-                    ->color('success')
-                    ->icon('heroicon-o-arrow-down-tray')
+                \Filament\Actions\ActionGroup::make([
+                    \Filament\Actions\ExportAction::make()
+                        ->label('Export Xlsx (Raw Data)')
+                        ->exporter(TransactionExporter::class)
+                        ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx])
+                        ->icon('heroicon-o-table-cells'),
+                    \Filament\Actions\Action::make('export_xls')
+                        ->label('Export Xls (Format Cetak)')
+                        ->icon('heroicon-o-document-text')
+                        ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                            'type' => 'laporan-penjualan',
+                            'export' => 'xls',
+                            'tableFilters' => $livewire->tableFilters,
+                            'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
+                        ]), true)
+                ])
+                ->label('Export')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('success')
+                ->button(),
             ]);
     }
 }

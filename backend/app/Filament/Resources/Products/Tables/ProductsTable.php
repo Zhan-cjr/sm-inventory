@@ -115,13 +115,28 @@ class ProductsTable
                     ->default(true),
             ])
             ->headerActions([
-                \Filament\Actions\ExportAction::make('export_products')
-                    ->label('Export Excel')
-                    ->exporter(\App\Filament\Exports\ProductExporter::class)
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('success')
-                    ->modalHeading('Pilih Kolom Export')
-                    ->modalSubmitActionLabel('Proses Export'),
+                \Filament\Actions\ActionGroup::make([
+                    \Filament\Actions\ExportAction::make('export_products')
+                        ->label('Export Xlsx (Raw Data)')
+                        ->exporter(\App\Filament\Exports\ProductExporter::class)
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('success')
+                        ->modalHeading('Pilih Kolom Export')
+                        ->modalSubmitActionLabel('Proses Export'),
+                    \Filament\Actions\Action::make('export_xls')
+                        ->label('Export Xls (Format Cetak)')
+                        ->icon('heroicon-o-document-text')
+                        ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+                            'type' => 'produk',
+                            'export' => 'xls',
+                            'tableFilters' => $livewire->tableFilters,
+                            'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null
+                        ]), true)
+                ])
+                ->label('Export')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('success')
+                ->button(),
             ])
             ->recordActions([
                 Action::make('kartu_stok')

@@ -185,14 +185,29 @@ class PurchaseOrdersTable
                         'tableFilters' => $livewire->tableFilters,
                         'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null
                     ]), true),
-                \Filament\Actions\ExportAction::make('export_excel')
-                    ->label('Export Excel')
+                \Filament\Actions\ActionGroup::make([
+    \Filament\Actions\ExportAction::make('export_excel')
+                    ->label('Export Xlsx (Raw Data)')
                     ->exporter(\App\Filament\Exports\PurchaseOrderExporter::class)
                     ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx, \Filament\Actions\Exports\Enums\ExportFormat::Csv])
                     ->icon('heroicon-o-document-arrow-down')
                     ->color('success')
                     ->modalHeading('Pilih Kolom Export')
                     ->modalSubmitActionLabel('Proses Export'),
+    \Filament\Actions\Action::make('export_xls')
+        ->label('Export Xls (Format Cetak)')
+        ->icon('heroicon-o-document-text')
+        ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
+            'type' => 'pesanan-pembelian',
+            'export' => 'xls',
+            'tableFilters' => $livewire->tableFilters,
+            'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null
+        ]), true)
+])
+->label('Export')
+->icon('heroicon-o-arrow-down-tray')
+->color('success')
+->button(),
             ]);
     }
 }

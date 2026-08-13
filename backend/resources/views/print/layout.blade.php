@@ -66,18 +66,46 @@
         $header_address = $branch ? $branch->address : $org_address;
     @endphp
 
-    <div class="header">
-        <h1 style="margin: 0; font-size: 18px;">{{ $org_name }}</h1>
-        @if($branch_name)
-            <h3 style="margin: 3px 0; font-size: 14px;">{{ $branch_name }}</h3>
-        @endif
-        @if($header_address)
-            <p style="margin: 0 0 10px 0; font-size: 11px;">{{ $header_address }}</p>
-        @endif
-        <hr style="border: 1px solid #000; margin-bottom: 15px;">
-        
-        <h2>@yield('title')</h2>
-    </div>
+    @if(request('export') === 'xls')
+        <table border="0">
+            <tr>
+                <td colspan="10" style="font-size: 20px;"><b>{{ $org_name }}</b></td>
+            </tr>
+            @if($branch_name)
+            <tr>
+                <td colspan="10" style="font-size: 16px;"><b>{{ $branch_name }}</b></td>
+            </tr>
+            @endif
+            @if($header_address)
+            <tr>
+                <td colspan="10" style="font-size: 12px;">{{ $header_address }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td colspan="10"></td>
+            </tr>
+            <tr>
+                <td colspan="10" style="font-size: 16px;"><b>@yield('title')</b></td>
+            </tr>
+            <tr>
+                <td colspan="10"></td>
+            </tr>
+        </table>
+    @else
+        <div class="header">
+            <h1 style="margin: 0; font-size: 18px;">{{ $org_name }}</h1>
+            @if($branch_name)
+                <h3 style="margin: 3px 0; font-size: 14px;">{{ $branch_name }}</h3>
+            @endif
+            @if($header_address)
+                <p style="margin: 0 0 10px 0; font-size: 11px;">{{ $header_address }}</p>
+            @endif
+            <hr style="border: 1px solid #000; margin-bottom: 15px;">
+            
+            <h2>@yield('title')</h2>
+        </div>
+    @endif
+
 
     @yield('content')
 </body>
