@@ -2133,8 +2133,7 @@ class ReportPrintController extends Controller
                 CASE WHEN ti.quantity < 0 THEN ABS(ti.quantity) * COALESCE(NULLIF(p.cost_price_tax, 0), p.cost_price, 0) ELSE 0 END as hpp_retur
             ");
             
-        $query = \Illuminate\Support\Facades\DB::table(\Illuminate\Support\Facades\DB::raw("({$subquery->toSql()}) as sub"))
-            ->mergeBindings($subquery)
+        $query = \Illuminate\Support\Facades\DB::query()->fromSub($subquery, 'sub')
             ->selectRaw("
                 tipe_suplier,
                 SUM(jual) as jual,

@@ -256,8 +256,7 @@ class LaporanRekapTipeSuplier extends Page implements HasTable
                 )) ELSE 0 END as hpp_retur
             ");
 
-        $query = DB::table(DB::raw("({$subquery->toSql()}) as sub"))
-            ->mergeBindings($subquery)
+        $query = DB::query()->fromSub($subquery, 'sub')
             ->where('tipe_suplier', $tipeSuplier)
             ->selectRaw("
                 sku, barcode, product_name,

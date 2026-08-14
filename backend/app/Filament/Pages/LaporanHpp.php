@@ -93,7 +93,13 @@ class LaporanHpp extends Page implements HasForms
                         ->default('ALL'),
                     \Filament\Forms\Components\TextInput::make('search')
                         ->label('Cari Barang / Kategori')
-                        ->placeholder('Ketik pencarian...'),
+                        ->placeholder('Ketik pencarian...')
+                        ->live(debounce: 500)
+                        ->afterStateUpdated(function ($livewire) {
+                            if ($livewire->isReportReady) {
+                                $livewire->processReport();
+                            }
+                        }),
                 ]),
             ])
             ->statePath('data');
@@ -111,6 +117,9 @@ class LaporanHpp extends Page implements HasForms
     {
         $this->activeTab = $tab;
         $this->resetPage(); // Reset pagination on tab switch
+        if ($this->isReportReady) {
+            $this->cachedTotals = $this->calculateGrandTotals();
+        }
     }
 
     protected function getDateRange()
@@ -201,9 +210,8 @@ class LaporanHpp extends Page implements HasForms
             $subquery = $offlineQuery->unionAll($onlineQuery);
         }
 
-        // We wrap the subquery and merge its bindings so we can JOIN on the filtered, reduced result set!
-        $query = DB::table(DB::raw("({$subquery->toSql()}) as t"))
-            ->mergeBindings($subquery)
+        // We wrap the subquery so we can JOIN on the filtered, reduced result set!
+        $query = DB::query()->fromSub($subquery, 't')
             ->leftJoin('products as p', 't.product_id', '=', 'p.id')
             ->leftJoin('categories as c', 'p.category_id', '=', 'c.id')
             ->leftJoin('stocks as st', function($join) {
@@ -233,11 +241,21 @@ class LaporanHpp extends Page implements HasForms
             });
 
         if ($search) {
+            $search = strtolower($search);
             $query->where(function($q) use ($search) {
-                $q->where('p.name', 'LIKE', "%{$search}%")
-                  ->orWhere('p.sku', 'LIKE', "%{$search}%")
-                  ->orWhere('c.name', 'LIKE', "%{$search}%")
-                  ->orWhere('p.sub_category', 'LIKE', "%{$search}%");
+                if ($this->activeTab === 'item') {
+                    $q->where(DB::raw('LOWER(p.name)'), 'LIKE', "%{$search}%")
+                      ->orWhere(DB::raw('LOWER(p.sku)'), 'LIKE', "%{$search}%")
+                      ->orWhere(DB::raw('LOWER(p.barcode)'), 'LIKE', "%{$search}%");
+                } elseif ($this->activeTab === 'category') {
+                    $q->where(DB::raw("LOWER(COALESCE(c.name, 'Tanpa Kategori'))"), 'LIKE', "%{$search}%");
+                } elseif ($this->activeTab === 'subcategory') {
+                    $q->where(DB::raw('LOWER(p.sub_category)'), 'LIKE', "%{$search}%")
+                      ->orWhere(DB::raw("LOWER(COALESCE(c.name, 'Tanpa Kategori'))"), 'LIKE', "%{$search}%");
+                } else {
+                    $q->where(DB::raw('LOWER(p.name)'), 'LIKE', "%{$search}%")
+                      ->orWhere(DB::raw("LOWER(COALESCE(c.name, 'Tanpa Kategori'))"), 'LIKE', "%{$search}%");
+                }
             });
         }
         
