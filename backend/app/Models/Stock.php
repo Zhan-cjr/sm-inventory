@@ -11,6 +11,8 @@ class Stock extends Model
 {
     use HasUuids, LogsActivity;
 
+    protected $touches = ['product'];
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
