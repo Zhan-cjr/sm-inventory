@@ -148,12 +148,19 @@ class ProductForm
                     ->disabled($isBranchUser),
                 Select::make('sub_category')
                     ->label('Sub Kategori')
-                    ->options(function () {
-                        return \App\Models\Product::whereNotNull('sub_category')
+                    ->options(function (\Filament\Forms\Get $get) {
+                        $options = \App\Models\Product::whereNotNull('sub_category')
                             ->where('sub_category', '!=', '')
                             ->distinct()
                             ->pluck('sub_category', 'sub_category')
                             ->toArray();
+                            
+                        $current = $get('sub_category');
+                        if ($current && !isset($options[$current])) {
+                            $options[$current] = $current;
+                        }
+                        
+                        return $options;
                     })
                     ->searchable()
                     ->createOptionForm([
