@@ -121,7 +121,11 @@ class Product extends Model
             }
             
             // Broadcast the product update to the POS catalog channel
-            event(new \App\Events\ProductUpdated($product));
+            try {
+                event(new \App\Events\ProductUpdated($product));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Broadcast error for ProductUpdated: ' . $e->getMessage());
+            }
         });
 
         static::deleted(function ($product) {
