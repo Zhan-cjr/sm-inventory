@@ -39,22 +39,19 @@ class ProductsTable
                     $query->withSum('stocks', 'quantity_on_hand');
                 }
                 
-                // Prioritize exact barcode or sku match in global search if search term exists
+                // Integrate Laravel Scout (Meilisearch) for table search
                 $search = $livewire->getTableSearch();
-                if ($search) {
-                    $query->orderByRaw("CASE WHEN barcode = ? THEN 1 WHEN sku = ? THEN 2 ELSE 3 END", [$search, $search]);
+                if (filled($search)) {
+                    $scoutIds = \App\Models\Product::search($search)->take(1000)->keys();
                     
-                    // Force exact phrase match across the searchable columns
-                    // to prevent Filament's default behavior of splitting words and returning irrelevant results.
-                    $query->where(function ($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%")
-                          ->orWhere('sku', 'like', "%{$search}%")
-                          ->orWhere('barcode', 'like', "%{$search}%")
-                          ->orWhere('metadata->additional_barcodes', 'like', "%{$search}%")
-                          ->orWhereHas('stocks.racks', function ($q2) use ($search) {
-                              $q2->where('rack_code', 'like', "%{$search}%");
-                          });
-                    });
+                    if ($scoutIds->isEmpty()) {
+                        $query->whereRaw('1 = 0'); // Force empty result if Scout finds nothing
+                    } else {
+                        $query->whereIn('products.id', $scoutIds);
+                        // Preserve Meilisearch relevance ordering
+                        $scoutIdsStr = $scoutIds->implode("','");
+                        $query->orderByRaw("FIELD(products.id, '$scoutIdsStr')");
+                    }
                 }
 
                 return $query;
@@ -66,14 +63,14 @@ class ProductsTable
                     ->square(),
                 TextColumn::make('sku')
                     ->label('SKU')
-                    ->searchable()
+                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
                     ->sortable(),
                 TextColumn::make('name')
                     ->label('Nama Produk')
-                    ->searchable()
+                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
                     ->sortable(),
                 TextColumn::make('barcode')
-                    ->searchable()
+                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('cost_price_tax')
                     ->label('Harga Beli (+PPN)')
@@ -93,7 +90,7 @@ class ProductsTable
                     ->label('No Rak')
                     ->badge()
                     ->separator(',')
-                    ->searchable()
+                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
                     ->toggleable(),
                 IconColumn::make('is_active')
                     ->label('Status')
