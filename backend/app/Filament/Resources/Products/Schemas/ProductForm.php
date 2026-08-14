@@ -148,7 +148,7 @@ class ProductForm
                     ->disabled($isBranchUser),
                 Select::make('sub_category')
                     ->label('Sub Kategori')
-                    ->options(function (\Filament\Forms\Get $get) {
+                    ->options(function (\Filament\Schemas\Components\Utilities\Get $get) {
                         $options = \App\Models\Product::whereNotNull('sub_category')
                             ->where('sub_category', '!=', '')
                             ->distinct()
