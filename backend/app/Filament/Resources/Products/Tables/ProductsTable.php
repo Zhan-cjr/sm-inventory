@@ -60,7 +60,13 @@ class ProductsTable
                 ImageColumn::make('image_path')
                     ->label('Foto')
                     ->disk('public')
-                    ->square(),
+                    ->square()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('barcode')
+                    ->label('Barcode')
+                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('sku')
                     ->label('SKU')
                     ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
@@ -69,9 +75,6 @@ class ProductsTable
                     ->label('Nama Produk')
                     ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
                     ->sortable(),
-                TextColumn::make('barcode')
-                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('cost_price_tax')
                     ->label('Harga Beli (+PPN)')
                     ->money('IDR')

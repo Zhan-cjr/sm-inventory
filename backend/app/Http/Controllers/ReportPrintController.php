@@ -1440,7 +1440,7 @@ class ReportPrintController extends Controller
 
     private function printProduk($filters)
     {
-        $query = \App\Models\Product::query()->with(['category', 'supplier', 'organization']);
+        $query = \App\Models\Product::query()->with(['category', 'supplier', 'organization', 'stocks.branch']);
 
         // Apply TernaryFilter for is_active
         if (isset($filters['is_active']['value']) && $filters['is_active']['value'] !== '') {
@@ -1450,29 +1450,39 @@ class ReportPrintController extends Controller
             $query->where('is_active', $filters['is_active']['isActive']);
         }
 
-        // Apply SelectFilter for branch
-        if (isset($filters['branch']['value']) && $filters['branch']['value'] !== '') {
-            $branchId = $filters['branch']['value'];
-            $query->whereHas('stocks', function ($q) use ($branchId) {
-                $q->where('branch_id', $branchId);
-            });
-        }
-        
-        // Apply user branch scope security
         $user = \Illuminate\Support\Facades\Auth::user();
+        $targetBranchId = null;
+
         if ($user && $user->branch_id) {
-            $query->whereHas('stocks', function ($q) use ($user) {
-                $q->where('branch_id', $user->branch_id);
+            $targetBranchId = $user->branch_id;
+        } elseif (isset($filters['branch']['value']) && $filters['branch']['value'] !== '') {
+            $targetBranchId = $filters['branch']['value'];
+        }
+
+        // Apply SelectFilter for branch
+        if ($targetBranchId) {
+            $query->whereHas('stocks', function ($q) use ($targetBranchId) {
+                $q->where('branch_id', $targetBranchId);
             });
         }
 
         // Apply global search if present
-        $search = request()->query('search');
+        $search = request()->query('tableSearchQuery') ?? request()->query('search');
         if (!empty($search)) {
             $query->whereIn('id', \App\Models\Product::search($search)->take(1000)->keys());
         }
 
         $products = $query->get();
+
+        $branchesToDisplay = [];
+        if ($targetBranchId) {
+            $branch = \App\Models\Branch::find($targetBranchId);
+            if ($branch) {
+                $branchesToDisplay[] = $branch;
+            }
+        } else {
+            $branchesToDisplay = \App\Models\Branch::all();
+        }
 
         $columns = [
             'ID', 'Organisasi', 'SKU', 'Barcode', 'Nama Produk', 'Kategori', 'Sub Kategori', 
@@ -1484,9 +1494,13 @@ class ReportPrintController extends Controller
             'Aktif?', 'E-Commerce Aktif?', 'Kategori E-Commerce', 'Tipe Produk', 'PPOB SKU', 'Berat (Gram)'
         ];
 
+        foreach ($branchesToDisplay as $branch) {
+            $columns[] = 'QOH (' . $branch->name . ')';
+        }
+
         $rows = [];
         foreach($products as $p) {
-            $rows[] = [
+            $row = [
                 $p->id,
                 $p->organization->name ?? '',
                 $p->sku,
@@ -1519,13 +1533,27 @@ class ReportPrintController extends Controller
                 $p->ppob_sku,
                 $p->weight_in_grams,
             ];
+
+            foreach ($branchesToDisplay as $branch) {
+                $stock = $p->stocks->firstWhere('branch_id', $branch->id);
+                $row[] = $stock ? $stock->quantity_on_hand : 0;
+            }
+            $rows[] = $row;
         }
 
         if (request()->query('format') === 'excel') {
             return $this->exportCsv('Data Produk', $columns, $rows);
         }
 
-        // If they ever want HTML print:
+        if (request()->query('export') === 'xls') {
+            return view('print.reports.generic', [
+                'title' => 'Data Produk', 
+                'period' => 'Semua Waktu', 
+                'columns' => $columns, 
+                'rows' => $rows
+            ]);
+        }
+
         abort(404, 'Gunakan format excel untuk menu ini.');
     }
 
