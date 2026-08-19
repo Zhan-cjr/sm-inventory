@@ -56,7 +56,10 @@ class WarehouseCheck extends Model
             ->where(function ($q) {
                 $q->where('warehouse_check_id', $this->id);
                 if ($this->purchase_order_id) {
-                    $q->orWhere('purchase_order_id', $this->purchase_order_id);
+                    $q->orWhere(function ($subQ) {
+                        $subQ->where('purchase_order_id', $this->purchase_order_id)
+                             ->whereNull('warehouse_check_id');
+                    });
                 }
             })
             ->pluck('id');

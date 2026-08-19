@@ -160,7 +160,10 @@ class WarehouseCheckResource extends Resource
                             ->where(function ($q) use ($record) {
                                 $q->where('warehouse_check_id', $record->id);
                                 if ($record->purchase_order_id) {
-                                    $q->orWhere('purchase_order_id', $record->purchase_order_id);
+                                    $q->orWhere(function ($subQ) use ($record) {
+                                        $subQ->where('purchase_order_id', $record->purchase_order_id)
+                                             ->whereNull('warehouse_check_id');
+                                    });
                                 }
                             })
                             ->where('id', '!=', $gr->id)

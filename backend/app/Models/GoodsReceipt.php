@@ -67,11 +67,26 @@ class GoodsReceipt extends Model
     protected static function booted()
     {
         static::created(function ($goodsReceipt) {
-            // Sync status Pengecekan Gudang if it exists for this PO
-            if ($goodsReceipt->purchase_order_id) {
-                \App\Models\WarehouseCheck::where('purchase_order_id', $goodsReceipt->purchase_order_id)
-                    ->where('status', '!=', 'processed')
-                    ->update(['status' => 'processed']);
+            if ($goodsReceipt->warehouse_check_id) {
+                $check = \App\Models\WarehouseCheck::find($goodsReceipt->warehouse_check_id);
+                $check?->syncStatus();
+            } elseif ($goodsReceipt->purchase_order_id) {
+                $checks = \App\Models\WarehouseCheck::where('purchase_order_id', $goodsReceipt->purchase_order_id)->get();
+                foreach ($checks as $check) {
+                    $check->syncStatus();
+                }
+            }
+        });
+
+        static::updated(function ($goodsReceipt) {
+            if ($goodsReceipt->warehouse_check_id) {
+                $check = \App\Models\WarehouseCheck::find($goodsReceipt->warehouse_check_id);
+                $check?->syncStatus();
+            } elseif ($goodsReceipt->purchase_order_id) {
+                $checks = \App\Models\WarehouseCheck::where('purchase_order_id', $goodsReceipt->purchase_order_id)->get();
+                foreach ($checks as $check) {
+                    $check->syncStatus();
+                }
             }
         });
     }
