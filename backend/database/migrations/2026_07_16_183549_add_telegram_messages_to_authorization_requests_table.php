@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('authorization_requests', function (Blueprint $table) {
-            $table->json('telegram_messages')->nullable()->after('status');
-        });
+        // Schema::table('authorization_requests', function (Blueprint $table) {
+        //     $table->json('telegram_messages')->nullable()->after('status');
+        // });
     }
 
     /**
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('authorization_requests', function (Blueprint $table) {
-            $table->dropColumn('telegram_messages');
-        });
+        // Schema::table('authorization_requests', function (Blueprint $table) {
+        //     $table->dropColumn('telegram_messages');
+        // });
     }
 };

@@ -29,11 +29,13 @@ class PurchaseOrderForm
                     ->preload(),
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')
+                    ->label('Pemasok Utama')
                     ->required()
                     ->searchable()
                     ->preload()
                     ->live()
                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        $set('supplier_division_id', null);
                         if ($state) {
                             $supplier = \App\Models\Supplier::find($state);
                             if ($supplier && $get('po_date') && $supplier->default_po_expired_days > 0) {
@@ -42,6 +44,19 @@ class PurchaseOrderForm
                             }
                         }
                     }),
+                Select::make('supplier_division_id')
+                    ->label('Divisi / Sub-Supplier')
+                    ->placeholder('Pilih divisi pemasok (Opsional)')
+                    ->options(function (callable $get) {
+                        $supplierId = $get('supplier_id');
+                        if (!$supplierId) {
+                            return [];
+                        }
+                        return \App\Models\SupplierDivision::where('supplier_id', $supplierId)
+                            ->pluck('name', 'id');
+                    })
+                    ->searchable()
+                    ->live(),
                 TextInput::make('po_number')
                     ->required(),
                 DatePicker::make('po_date')

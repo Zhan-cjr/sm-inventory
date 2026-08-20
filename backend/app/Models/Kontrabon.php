@@ -16,6 +16,7 @@ class Kontrabon extends Model
         'tanggal_kontrabon',
         'tanggal_jatuh_tempo',
         'supplier_id',
+        'supplier_division_id',
         'branch_id',
         'total_amount',
         'paid_amount',
@@ -32,6 +33,11 @@ class Kontrabon extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function division()
+    {
+        return $this->belongsTo(SupplierDivision::class, 'supplier_division_id');
     }
 
     public function branch()

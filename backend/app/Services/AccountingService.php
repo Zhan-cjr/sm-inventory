@@ -406,35 +406,6 @@ class AccountingService
                 'debit' => $taxAmount,
                 'credit' => 0,
             ]);
-
-            // OTOMATISASI: Buat record di Manajemen Pajak (Tax Invoices)
-            $supplierName = null;
-            $supplierNpwp = null;
-            if ($receipt->supplier_id) {
-                $supplier = \App\Models\Supplier::find($receipt->supplier_id);
-                $supplierName = $supplier?->name;
-                $supplierNpwp = $supplier?->npwp; // Assuming NPWP might exist, else null
-            }
-
-            \App\Models\TaxInvoice::updateOrCreate(
-                [
-                    'nomor_faktur' => 'FM-' . $receipt->receipt_number,
-                ],
-                [
-                    'organization_id' => $organizationId,
-                    'type' => 'masukan',
-                    'tanggal_faktur' => $receipt->receipt_date ?? now(),
-                    'masa_pajak' => \Carbon\Carbon::parse($receipt->receipt_date ?? now())->format('m-Y'),
-                    'nama_lawan' => $supplierName ?? 'Supplier PO',
-                    'npwp_lawan' => $supplierNpwp,
-                    'dpp' => $inventoryAmount,
-                    'ppn' => $taxAmount,
-                    'status' => 'draft',
-                    'reference_id' => $receipt->id,
-                    'reference_type' => \App\Models\GoodsReceipt::class,
-                ]
-            );
-
         } elseif ($taxAmount > 0) {
             // Jika akun pajak tidak ada, tambahkan kembali ke Persediaan
             $line = JournalEntryLine::where('journal_entry_id', $journal->id)

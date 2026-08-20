@@ -11,8 +11,8 @@ class CreateTaxInvoice extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        if (!isset($data['organization_id'])) {
-            $data['organization_id'] = \Illuminate\Support\Facades\Auth::user()->organization_id ?? 1;
+        if (empty($data['organization_id'])) {
+            $data['organization_id'] = \Illuminate\Support\Facades\Auth::user()->organization_id ?? \App\Models\Organization::first()?->id;
         }
         return $data;
     }

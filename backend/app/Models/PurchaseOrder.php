@@ -22,7 +22,7 @@ class PurchaseOrder extends Model
     }
 
     protected $fillable = [
-        'organization_id', 'branch_id', 'supplier_id', 'po_number', 
+        'organization_id', 'branch_id', 'supplier_id', 'supplier_division_id', 'po_number', 
         'po_date', 'faktur', 'expected_delivery_date', 'status', 
         'total_amount', 'include_tax', 'tax_amount', 'notes', 'created_by',
         'po_expired_days', 'expired_date'
@@ -70,6 +70,11 @@ class PurchaseOrder extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function division(): BelongsTo
+    {
+        return $this->belongsTo(SupplierDivision::class, 'supplier_division_id');
     }
 
     public function creator(): BelongsTo

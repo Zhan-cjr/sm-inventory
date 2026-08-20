@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
 class TaxInvoice extends Model
 {
     use HasUuids;
@@ -38,5 +40,10 @@ class TaxInvoice extends Model
     public function reference()
     {
         return $this->morphTo();
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(TaxInvoiceItem::class);
     }
 }
