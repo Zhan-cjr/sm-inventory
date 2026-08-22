@@ -89,7 +89,7 @@
 
         <!-- QR Code Card -->
         <div class="qr-card">
-            <img :src="getQrUrl()" @error="$event.target.src = '/scanner-gun/qr?url=' + encodeURIComponent(getUrl())" alt="QR Pairing Scanner Gun" style="width: 170px; height: 170px; display: block; margin: 0 auto; border-radius: 6px;" />
+            <img :src="getQrUrl()" x-on:error="$event.target.src = '/scanner-gun/qr?url=' + encodeURIComponent(getUrl())" alt="QR Pairing Scanner Gun" style="width: 170px; height: 170px; display: block; margin: 0 auto; border-radius: 6px;" />
         </div>
 
         <div style="font-size: 11.5px; color: #64748b;">
