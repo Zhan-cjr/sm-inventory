@@ -19,13 +19,21 @@ class ScannerGunController extends Controller
     }
 
     /**
-     * Generate offline SVG QR Code
+     * Generate QR Code dengan fallback aman
      */
     public function qr(Request $request)
     {
         $url = $request->query('url', url('/'));
-        $svg = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(200)->generate($url);
-        return response($svg, 200)->header('Content-Type', 'image/svg+xml');
+        if (class_exists(\SimpleSoftwareIO\QrCode\Facades\QrCode::class)) {
+            try {
+                $svg = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(200)->generate($url);
+                return response($svg, 200)->header('Content-Type', 'image/svg+xml');
+            } catch (\Throwable $e) {
+                // Fallback to QR API
+            }
+        }
+        $qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . urlencode($url);
+        return redirect()->away($qrApiUrl);
     }
 
     /**

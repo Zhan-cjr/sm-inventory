@@ -15,7 +15,7 @@
             return `${this.proto}//${this.ip}${this.port}/scanner-gun?session=${this.sess}`;
         },
         getQrUrl() {
-            return `/scanner-gun/qr?url=${encodeURIComponent(this.getUrl())}`;
+            return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(this.getUrl())}`;
         },
         saveIp() {
             localStorage.setItem('sminventory_laptop_ip', this.ip.trim());
@@ -92,7 +92,7 @@
 
         <!-- QR Code Card -->
         <div class="qr-card">
-            <img :src="getQrUrl()" alt="QR Pairing Scanner Gun" style="width: 170px; height: 170px; display: block; margin: 0 auto;" />
+            <img :src="getQrUrl()" @error="$event.target.src = '/scanner-gun/qr?url=' + encodeURIComponent(getUrl())" alt="QR Pairing Scanner Gun" style="width: 170px; height: 170px; display: block; margin: 0 auto; border-radius: 6px;" />
         </div>
 
         <div style="font-size: 11.5px; color: #64748b;">
@@ -103,9 +103,8 @@
         <div class="pairing-steps">
             <strong>Langkah Mudah:</strong>
             <ol>
-                <li>Pastikan <strong>HP & Laptop terhubung ke jaringan/WiFi yang sama</strong>.</li>
                 <li>Buka kamera HP Anda, lalu sorot QR Code di atas.</li>
-                <li>Arahkan HP ke QR e-Faktur di meja $\rightarrow$ data otomatis masuk ke PC!</li>
+                <li>Arahkan HP ke QR e-Faktur di meja → data otomatis masuk ke PC!</li>
             </ol>
         </div>
     </div>
