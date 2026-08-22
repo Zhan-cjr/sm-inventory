@@ -180,7 +180,7 @@ class TaxInvoiceForm
                     ->collapsible()
                     ->schema([
                         Repeater::make('items')
-                            ->relationship('items')
+                            ->relationship()
                             ->label('Daftar Barang')
                             ->itemLabel(function (array $state): ?string {
                                 if (empty($state['name'])) {

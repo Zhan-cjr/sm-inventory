@@ -20,8 +20,9 @@
         saveIp() {
             localStorage.setItem('sminventory_laptop_ip', this.ip.trim());
         },
-        init() {
-            this.saveIp();
+        startPolling() {
+            if (this.polling) return;
+            this.polling = true;
             if (window.__scannerPollTimer) clearInterval(window.__scannerPollTimer);
             window.__scannerPollTimer = setInterval(() => {
                 fetch(`/scanner-gun/poll?session=${this.sess}`)
@@ -40,10 +41,12 @@
                             }
                         }
                     })
-                    .catch(e => {
-                        // Silent fail if network momentarily disconnects
-                    });
+                    .catch(() => {});
             }, 1500);
+        },
+        init() {
+            this.saveIp();
+            this.startPolling();
         }
      }">
 
