@@ -33,4 +33,10 @@ class EditTaxInvoice extends EditRecord
             DeleteAction::make(),
         ];
     }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        unset($data['scan_qr_url']);
+        return $data;
+    }
 }

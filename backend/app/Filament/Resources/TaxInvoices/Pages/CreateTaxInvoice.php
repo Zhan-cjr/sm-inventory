@@ -11,6 +11,7 @@ class CreateTaxInvoice extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        unset($data['scan_qr_url']);
         if (empty($data['organization_id'])) {
             $data['organization_id'] = \Illuminate\Support\Facades\Auth::user()->organization_id ?? \App\Models\Organization::first()?->id;
         }

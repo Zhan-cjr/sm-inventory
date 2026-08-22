@@ -48,8 +48,7 @@ class TaxInvoiceForm
                                     ->modalCancelActionLabel('Tutup')
                                     ->modalContent(fn () => view('filament.tax-invoices.pairing-modal'))
                             )
-                            ->dehydrated(false)
-                            ->live(debounce: 500)
+                            ->live(onBlur: true)
                             ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                 if (empty($state) || !str_starts_with($state, 'http')) {
                                     return;
@@ -102,7 +101,7 @@ class TaxInvoiceForm
                                             ->warning()
                                             ->persistent()
                                             ->actions([
-                                                Action::make('register_supplier')
+                                                \Filament\Notifications\Actions\Action::make('register_supplier')
                                                     ->label('Daftarkan Pemasok')
                                                     ->button()
                                                     ->color('primary')
