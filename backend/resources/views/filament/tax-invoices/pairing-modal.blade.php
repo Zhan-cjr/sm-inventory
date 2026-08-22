@@ -28,7 +28,7 @@
                     .then(res => res.json())
                     .then(data => {
                         this.connected = !!data.connected;
-                        if (data.code) {
+                        if (data && data.code) {
                             const inputField = document.querySelector('input[name=\'scan_qr_url\']') 
                                 || document.querySelector('input[wire\\:model*=\'scan_qr_url\']')
                                 || document.querySelector('input[placeholder*=\'http://svc.efaktur\']');
@@ -37,18 +37,12 @@
                                 inputField.value = data.code;
                                 inputField.dispatchEvent(new Event('input', { bubbles: true }));
                                 inputField.dispatchEvent(new Event('change', { bubbles: true }));
-
-                                const formEl = inputField.closest('[wire\\:id]');
-                                if (formEl && window.Livewire) {
-                                    const comp = window.Livewire.find(formEl.getAttribute('wire:id'));
-                                    if (comp && typeof comp.set === 'function') {
-                                        comp.set('data.scan_qr_url', data.code);
-                                    }
-                                }
                             }
                         }
                     })
-                    .catch(e => console.error('Poll error', e));
+                    .catch(e => {
+                        // Silent fail if network momentarily disconnects
+                    });
             }, 1500);
         }
      }">
