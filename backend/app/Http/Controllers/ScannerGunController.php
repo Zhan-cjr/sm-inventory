@@ -49,9 +49,13 @@ class ScannerGunController extends Controller
         $session = $request->input('session');
         $code = trim($request->input('code'));
 
-        // Simpan ke Cache selama 60 detik untuk diambil oleh PC
-        Cache::put("scanner_gun_data_{$session}", $code, 60);
-        Cache::put("scanner_gun_active_{$session}", now()->timestamp, 60);
+        try {
+            Cache::store('file')->put("scanner_gun_data_{$session}", $code, 60);
+            Cache::store('file')->put("scanner_gun_active_{$session}", now()->timestamp, 60);
+        } catch (\Throwable $e) {
+            Cache::put("scanner_gun_data_{$session}", $code, 60);
+            Cache::put("scanner_gun_active_{$session}", now()->timestamp, 60);
+        }
 
         return response()->json([
             'status' => 'success',
@@ -70,14 +74,18 @@ class ScannerGunController extends Controller
             return response()->json(['code' => null, 'connected' => false]);
         }
 
-        $code = Cache::pull("scanner_gun_data_{$session}");
-        $lastActive = Cache::get("scanner_gun_active_{$session}");
-        $isConnected = $lastActive && (now()->timestamp - $lastActive <= 15);
+        try {
+            $code = Cache::store('file')->pull("scanner_gun_data_{$session}");
+            $lastActive = Cache::store('file')->get("scanner_gun_active_{$session}");
+            $isConnected = $lastActive && (now()->timestamp - $lastActive <= 15);
 
-        return response()->json([
-            'code' => $code,
-            'connected' => (bool) $isConnected,
-        ]);
+            return response()->json([
+                'code' => $code,
+                'connected' => (bool) $isConnected,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['code' => null, 'connected' => false]);
+        }
     }
 
     /**
@@ -87,7 +95,11 @@ class ScannerGunController extends Controller
     {
         $session = $request->input('session');
         if ($session) {
-            Cache::put("scanner_gun_active_{$session}", now()->timestamp, 30);
+            try {
+                Cache::store('file')->put("scanner_gun_active_{$session}", now()->timestamp, 30);
+            } catch (\Throwable $e) {
+                Cache::put("scanner_gun_active_{$session}", now()->timestamp, 30);
+            }
         }
 
         return response()->json(['status' => 'ok']);
