@@ -92,6 +92,11 @@ class SupplierImporter extends Importer
                 ->example('PT Indofood')
                 ->rules(['required', 'string', 'max:255']),
 
+            ImportColumn::make('npwp')
+                ->label('NPWP')
+                ->example('01.234.567.8-901.000')
+                ->rules(['nullable', 'string', 'max:50']),
+
             ImportColumn::make('contact_person')
                 ->label('Kontak Person')
                 ->example('Budi Santoso')

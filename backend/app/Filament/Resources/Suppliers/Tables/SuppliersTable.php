@@ -24,6 +24,12 @@ class SuppliersTable
                     ->searchable(),
                 TextColumn::make('name')
                     ->searchable(),
+                TextColumn::make('npwp')
+                    ->label('NPWP')
+                    ->searchable()
+                    ->placeholder('-')
+                    ->copyable()
+                    ->tooltip('Klik untuk salin NPWP'),
                 TextColumn::make('contact_person')
                     ->searchable(),
                 TextColumn::make('phone')
