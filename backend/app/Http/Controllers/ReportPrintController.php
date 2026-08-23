@@ -319,7 +319,7 @@ class ReportPrintController extends Controller
             $data[$key]['penjualan'] += $gross_sales;
             $data[$key]['retur'] += $gross_returns;
             
-            $total_discount = ($t->discount_amount ?? 0) + ($t->manual_discount ?? 0) + ($t->promo_discount ?? 0);
+            $total_discount = ($t->manual_discount ?? 0) + ($t->promo_discount ?? 0);
             $data[$key]['diskon'] += $total_discount;
             $data[$key]['jual_netto'] += $t->final_amount;
             
