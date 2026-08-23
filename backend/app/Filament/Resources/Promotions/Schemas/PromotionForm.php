@@ -30,14 +30,37 @@ class PromotionForm
                         Select::make('promo_type')
                             ->label('Jenis Promosi')
                             ->options([
-                                'PERCENTAGE' => 'Diskon Persentase (%)',
-                                'FIXED' => 'Diskon Nominal Rupiah (Rp)',
+                                'PERCENTAGE' => 'Diskon Persentase Fixed',
+                                'FIXED' => 'Diskon Nominal Fixed',
+                                'PERCENTAGE_PER_ITEM' => 'Diskon Persentase Per Item',
+                                'NOMINAL_PER_ITEM' => 'Diskon Nominal Per Item',
                                 'BUNDLING' => 'Beli X Gratis Y (Bundling)',
-                                'FLASH_SALE' => 'Flash Sale (Produk Spesifik)',
                                 'TIERED' => 'Bertingkat (Min. Belanja)',
                             ])
                             ->required()
-                            ->live(),
+                            ->live()
+                            ->helperText(function (callable $get) {
+                                $type = $get('promo_type');
+                                if ($type === 'PERCENTAGE') {
+                                    return 'Diskon akan dipotong berdasarkan persentase dari keseluruhan total keranjang. Contoh: Promo 10%. Belanja total 100.000 diskon 10.000.';
+                                }
+                                if ($type === 'FIXED') {
+                                    return 'Diskon flat nominal untuk KESELURUHAN keranjang belanja. Contoh: Promo Fixed 3.000. Beli 1 Vinda diskon 3.000, beli 5 Vinda total diskon tetap 3.000.';
+                                }
+                                if ($type === 'PERCENTAGE_PER_ITEM') {
+                                    return 'Diskon persentase yang dihitung untuk setiap satuan item. Contoh: Promo 10% untuk Vinda. Jika harga Vinda 10.000, maka akan mendapat diskon 1.000 per pcs.';
+                                }
+                                if ($type === 'NOMINAL_PER_ITEM') {
+                                    return 'Diskon nominal rupiah yang dihitung untuk setiap satuan item. Contoh: Diskon 3.000 per Item. Beli 1 diskon 3.000, Beli 2 total diskon jadi 6.000.';
+                                }
+                                if ($type === 'BUNDLING') {
+                                    return 'Promo beli produk A gratis produk B. Contoh: Beli 2 Susu gratis 1 Gelas.';
+                                }
+                                if ($type === 'TIERED') {
+                                    return 'Diskon bertingkat berdasarkan minimum belanja. Contoh: Belanja 100rb diskon 5rb, belanja 200rb diskon 12rb.';
+                                }
+                                return null;
+                            }),
                         Toggle::make('is_active')
                             ->label('Status Aktif')
                             ->default(true),
@@ -45,15 +68,15 @@ class PromotionForm
                     ->columns(2),
 
                 Section::make('Parameter Nilai Diskon')
-                    ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FIXED', 'FLASH_SALE']))
+                    ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FIXED', 'PERCENTAGE_PER_ITEM', 'NOMINAL_PER_ITEM']))
                     ->schema([
                         TextInput::make('discount_value')
-                            ->label(fn (callable $get) => $get('promo_type') === 'FIXED' ? 'Nilai Diskon (Rupiah)' : 'Persentase Diskon')
+                            ->label(fn (callable $get) => in_array($get('promo_type'), ['FIXED', 'NOMINAL_PER_ITEM']) ? 'Nilai Diskon (Rupiah)' : 'Persentase Diskon')
                             ->required()
                             ->numeric()
-                            ->prefix(fn (callable $get) => $get('promo_type') === 'FIXED' ? 'Rp' : null)
-                            ->suffix(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FLASH_SALE']) ? '%' : null)
-                            ->dehydrateStateUsing(fn ($state, callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FIXED', 'FLASH_SALE']) ? $state : 0),
+                            ->prefix(fn (callable $get) => in_array($get('promo_type'), ['FIXED', 'NOMINAL_PER_ITEM']) ? 'Rp' : null)
+                            ->suffix(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'PERCENTAGE_PER_ITEM']) ? '%' : null)
+                            ->dehydrateStateUsing(fn ($state, callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FIXED', 'PERCENTAGE_PER_ITEM', 'NOMINAL_PER_ITEM']) ? $state : 0),
                         TextInput::make('min_purchase_amount')
                             ->label('Minimal Pembelian')
                             ->numeric()
@@ -67,13 +90,13 @@ class PromotionForm
                                 'PER_ITEM' => 'Per Item / Produk',
                             ])
                             ->default('PER_TRANSACTION')
-                            ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FLASH_SALE']))
+                            ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'PERCENTAGE_PER_ITEM', 'NOMINAL_PER_ITEM']))
                             ->helperText('Pilih apakah batas maksimal diskon berlaku untuk total 1 struk, atau untuk setiap item/produk.'),
                         TextInput::make('max_discount_per_transaction')
                             ->label('Maksimal Diskon (Nominal)')
                             ->numeric()
                             ->prefix('Rp')
-                            ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FLASH_SALE']))
+                            ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'PERCENTAGE_PER_ITEM', 'NOMINAL_PER_ITEM']))
                             ->helperText('Kosongkan jika tidak ada batas maksimal diskon.'),
                     ])
                     ->columns(2),

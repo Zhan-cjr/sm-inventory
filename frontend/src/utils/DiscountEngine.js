@@ -10,6 +10,13 @@ export class DiscountEngine {
 
     if (!items || items.length === 0) return { totalDiscount: 0, appliedPromos: [] };
 
+    // Reset accumulated discountPerItem and promotionId on each render to prevent React mutation accumulation
+    items.forEach(item => {
+      item.discountPerItem = 0;
+      item.discount_per_item = 0; // Clear snake_case artifact
+      item.promotionId = null;
+    });
+
     // Apply base tier discount first
     if (customer && customer.tierDiscountPercent && customer.tierDiscountPercent > 0) {
       const tierDiscountValue = Math.floor(subtotal * (parseFloat(customer.tierDiscountPercent) / 100));
@@ -55,7 +62,7 @@ export class DiscountEngine {
       if (limitType === 'PER_ITEM' && maxDiscount > 0 && (promo.promo_type === 'PERCENTAGE' || promo.promo_type === 'FLASH_SALE')) {
         // Calculate discount per item line and cap it
         discount = eligibleItems.reduce((sum, item) => {
-           let itemDiscount = 0;
+           let itemDiscount = Math.floor((item.quantity * parseFloat(item.unitPrice)) * (discountValue / 100));
            const appliedItemDiscount = Math.min(itemDiscount, maxDiscount);
            item.discountPerItem = (item.discountPerItem || 0) + (appliedItemDiscount / item.quantity);
            item.promotionId = promo.id;
@@ -79,8 +86,9 @@ export class DiscountEngine {
             discount = this.applyBundlingDiscount(eligibleItems, promo);
             break;
 
-          case 'FLASH_SALE':
-            discount = this.applyFlashSaleDiscount(eligibleItems, promo);
+          case 'PERCENTAGE_PER_ITEM':
+          case 'NOMINAL_PER_ITEM':
+            discount = this.applyPerItemDiscount(eligibleItems, promo, promo.promo_type);
             break;
         }
 
@@ -148,12 +156,20 @@ export class DiscountEngine {
     return tier ? Math.floor(amount * (parseFloat(tier.discountPercent) / 100)) : 0;
   }
 
-  applyFlashSaleDiscount(items, promo) {
+  applyPerItemDiscount(items, promo, type) {
     const targetIds = Array.isArray(promo.target_ids) ? promo.target_ids : [];
     const eligible = items.filter(i => targetIds.includes(String(i.productId)));
-    const amount = eligible.reduce((sum, i) => sum + (i.quantity * parseFloat(i.unitPrice)), 0);
+    let discount = 0;
     const discountValue = parseFloat(promo.discount_value || 0);
-    return Math.floor(amount * (discountValue / 100));
+    
+    if (type === 'PERCENTAGE_PER_ITEM') {
+        const amount = eligible.reduce((sum, i) => sum + (i.quantity * parseFloat(i.unitPrice)), 0);
+        discount = Math.floor(amount * (discountValue / 100));
+    } else if (type === 'NOMINAL_PER_ITEM') {
+        const totalQuantity = eligible.reduce((sum, i) => sum + i.quantity, 0);
+        discount = discountValue * totalQuantity;
+    }
+    return discount;
   }
 
   isPromoValid(promo, customer) {
@@ -186,7 +202,7 @@ export class DiscountEngine {
   }
 
   sortPromosByPriority(promos) {
-    const priority = { 'FLASH_SALE': 1, 'BUNDLING': 2, 'TIERED': 3, 'PERCENTAGE': 4, 'FIXED': 5 };
+    const priority = { 'PERCENTAGE_PER_ITEM': 1, 'NOMINAL_PER_ITEM': 2, 'BUNDLING': 3, 'TIERED': 4, 'PERCENTAGE': 5, 'FIXED': 6 };
     return [...promos].sort((a, b) =>
       (priority[a.promo_type] || 99) - (priority[b.promo_type] || 99)
     );

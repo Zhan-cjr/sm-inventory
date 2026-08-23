@@ -199,7 +199,7 @@ class TransactionController extends Controller
                         'product_id' => $item['product_id'],
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unit_price'],
-                        'discount_per_item' => ($item['discount_per_item'] ?? 0) + ($item['discountPerItem'] ?? 0),
+                        'discount_per_item' => min((float)$item['unit_price'], (float)($item['discountPerItem'] ?? $item['discount_per_item'] ?? 0)),
                         'promotion_id' => $item['promotionId'] ?? $item['promotion_id'] ?? null,
                         'original_transaction_id' => $item['originalTransactionId'] ?? $item['original_transaction_id'] ?? null,
                     ]);

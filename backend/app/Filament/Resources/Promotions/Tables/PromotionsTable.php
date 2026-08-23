@@ -33,16 +33,18 @@ class PromotionsTable
                     ->color(fn (string $state): string => match ($state) {
                         'PERCENTAGE' => 'success',
                         'FIXED' => 'info',
+                        'PERCENTAGE_PER_ITEM' => 'success',
+                        'NOMINAL_PER_ITEM' => 'info',
                         'BUNDLING' => 'warning',
-                        'FLASH_SALE' => 'danger',
                         'TIERED' => 'primary',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'PERCENTAGE' => 'Persentase (%)',
-                        'FIXED' => 'Nominal Rupiah (Rp)',
+                        'PERCENTAGE' => 'Persentase Fixed',
+                        'FIXED' => 'Nominal Fixed',
+                        'PERCENTAGE_PER_ITEM' => 'Persentase Per Item',
+                        'NOMINAL_PER_ITEM' => 'Nominal Per Item',
                         'BUNDLING' => 'Bundling (Beli X Gratis Y)',
-                        'FLASH_SALE' => 'Flash Sale',
                         'TIERED' => 'Diskon Bertingkat',
                         default => $state,
                     })
@@ -53,7 +55,7 @@ class PromotionsTable
                         if (in_array($record->promo_type, ['BUNDLING', 'TIERED'])) {
                             return '-';
                         }
-                        if ($record->promo_type === 'FIXED') {
+                        if (in_array($record->promo_type, ['FIXED', 'NOMINAL_PER_ITEM'])) {
                             return 'Rp ' . number_format($state, 0, ',', '.');
                         }
                         return number_format($state, 0) . '%';

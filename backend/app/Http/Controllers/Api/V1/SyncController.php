@@ -166,7 +166,7 @@ class SyncController extends Controller
                             'service_id' => $isService ? $item['productId'] : null,
                             'quantity' => $item['quantity'],
                             'unit_price' => $item['unitPrice'],
-                            'discount_per_item' => ($item['manualDiscount'] ?? 0) + ($item['discountPerItem'] ?? 0),
+                            'discount_per_item' => min((float)$item['unitPrice'], (float)(($item['manualDiscount'] ?? 0) + ($item['discountPerItem'] ?? $item['discount_per_item'] ?? 0))),
                             'promotion_id' => $item['promotionId'] ?? $item['promotion_id'] ?? null,
                             'original_transaction_id' => $item['originalTransactionId'] ?? null,
                         ]);
