@@ -39,7 +39,7 @@ class TaxInvoiceForm
                             ->autofocus()
                             ->extraInputAttributes([
                                 'id' => 'scan_qr_input_field',
-                                'autofocus' => 'autofocus',
+                                'x-init' => '$nextTick(() => { $el.focus(); setTimeout(() => $el.focus(), 100); setTimeout(() => $el.focus(), 300); })',
                                 'tabindex' => '1',
                             ])
                             ->suffixAction(
