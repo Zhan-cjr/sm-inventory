@@ -33,29 +33,10 @@ class TaxInvoiceForm
                     ->schema([
                         TextInput::make('scan_qr_url')
                             ->label('URL Validasi / Hasil Scan QR')
-                            ->placeholder('Arahkan scanner fisik atau tempel hasil scan QR...')
+                            ->placeholder('Arahkan barcode/QR scanner fisik ke kotak ini...')
                             ->helperText('Sistem akan langsung membaca data faktur dan mengisi seluruh formulir secara otomatis.')
                             ->prefixIcon('heroicon-o-camera')
                             ->autofocus()
-                            ->extraInputAttributes([
-                                'id' => 'scan_qr_input_field',
-                                'x-init' => '$nextTick(() => {
-                                    $el.focus();
-                                    setTimeout(() => $el.focus(), 150);
-                                    const sess = "SCAN_' . substr(md5(auth()->id() ?? 'guest'), 0, 6) . '";
-                                    if (window.__scannerGlobalPollTimer) clearInterval(window.__scannerGlobalPollTimer);
-                                    window.__scannerGlobalPollTimer = setInterval(() => {
-                                        fetch("/scanner-gun/poll?session=" + sess)
-                                            .then(r => r.json())
-                                            .then(d => {
-                                                if (d && d.code) {
-                                                    $wire.set("data.scan_qr_url", d.code);
-                                                }
-                                            }).catch(() => {});
-                                    }, 1200);
-                                })',
-                                'tabindex' => '1',
-                            ])
                             ->suffixAction(
                                 Action::make('connect_phone_gun')
                                     ->label('Hubungkan Scanner HP')
