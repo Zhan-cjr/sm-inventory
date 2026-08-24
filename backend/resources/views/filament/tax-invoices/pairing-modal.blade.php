@@ -30,9 +30,13 @@
                     .then(data => {
                         this.connected = !!data.connected;
                         if (data && data.code) {
+                            if (window.Livewire) {
+                                const comp = Livewire.first();
+                                if (comp) comp.set('data.scan_qr_url', data.code);
+                            }
                             const inputField = document.querySelector('input[name=\'scan_qr_url\']') 
                                 || document.querySelector('input[wire\\:model*=\'scan_qr_url\']')
-                                || document.querySelector('input[placeholder*=\'http://svc.efaktur\']');
+                                || document.querySelector('input[placeholder*=\'scan\']');
                             
                             if (inputField) {
                                 inputField.value = data.code;

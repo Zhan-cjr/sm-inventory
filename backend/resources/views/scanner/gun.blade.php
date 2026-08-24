@@ -154,7 +154,8 @@
                 document.getElementById('torchBtn').textContent = isTorchOn ? '🔦' : '💡';
                 document.getElementById('torchBtn').style.background = isTorchOn ? '#eab308' : 'rgba(17,24,39,0.85)';
             } catch (e) {
-                alert('Lampu flash tidak didukung pada browser/perangkat ini.');
+                // If browser does not support torch, gracefully hide the button
+                document.getElementById('torchBtn').style.display = 'none';
             }
         }
 
