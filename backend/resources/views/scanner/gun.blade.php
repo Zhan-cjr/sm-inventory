@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Wireless Scanner Gun - SM Inventory</title>
-    <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,21 +11,22 @@
         .header { padding: 10px 14px; background: #111827; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f2937; }
         .logo { font-weight: 800; font-size: 14px; color: #38bdf8; }
         .session-badge { font-size: 11px; background: #0284c7; padding: 3px 8px; border-radius: 999px; font-weight: 700; }
-        .viewport-wrapper { position: relative; width: 100%; height: 320px; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        #videoFeed { width: 100%; height: 100%; object-fit: cover; display: none; }
-        #previewImg { width: 100%; height: 100%; object-fit: contain; display: none; }
-        .viewport-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #94a3b8; font-size: 13px; text-align: center; padding: 20px; }
-        .reticle { position: absolute; width: 230px; height: 230px; border: 2px solid rgba(56, 189, 248, 0.7); border-radius: 16px; box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.5); pointer-events: none; z-index: 10; }
-        .laser-sweep { position: absolute; top: 0; left: 0; right: 0; height: 2.5px; background: linear-gradient(90deg, transparent, #ef4444, #f87171, #ef4444, transparent); box-shadow: 0 0 10px #ef4444; animation: sweep 2s infinite ease-in-out; }
-        @keyframes sweep { 0%, 100% { top: 8%; } 50% { top: 92%; } }
+        .viewport-wrapper { position: relative; width: 100%; height: 340px; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        #videoFeed { width: 100%; height: 100%; object-fit: cover; }
+        .reticle { position: absolute; width: 250px; height: 250px; border: 2px solid rgba(56, 189, 248, 0.9); border-radius: 18px; box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); pointer-events: none; z-index: 10; transition: border-color 0.2s; }
+        .reticle.found { border-color: #22c55e; box-shadow: 0 0 0 4000px rgba(34, 197, 94, 0.2); }
+        .laser-sweep { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, #ef4444, #f87171, #ef4444, transparent); box-shadow: 0 0 12px #ef4444; animation: sweep 1.8s infinite ease-in-out; }
+        @keyframes sweep { 0%, 100% { top: 6%; } 50% { top: 94%; } }
+        .torch-btn { position: absolute; top: 12px; right: 12px; z-index: 20; background: rgba(17, 24, 39, 0.8); border: 1px solid #374151; color: #f8fafc; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; backdrop-filter: blur(4px); }
         .controls { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; flex-grow: 1; }
         .status-card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; }
-        .btn-snap { background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%); color: #fff; border: none; border-radius: 10px; padding: 14px; font-size: 15px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3); display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-live { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 8px; padding: 9px; font-size: 12px; font-weight: 600; cursor: pointer; }
-        .log-box { background: #000; border: 1px solid #1f2937; border-radius: 8px; padding: 8px 12px; max-height: 110px; overflow-y: auto; font-size: 11px; font-family: monospace; }
+        .status-dot.scanning { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .log-box { background: #000; border: 1px solid #1f2937; border-radius: 8px; padding: 8px 12px; max-height: 120px; overflow-y: auto; font-size: 11px; font-family: monospace; }
         .log-item { padding: 3px 0; border-bottom: 1px solid #111827; color: #94a3b8; }
         .log-item.success { color: #4ade80; }
+        .tips-text { font-size: 11.5px; color: #64748b; text-align: center; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -34,55 +34,51 @@
         <div class="logo">⚡ WIRELESS SCANNER GUN</div>
         <div class="session-badge">SESI: {{ $session }}</div>
     </div>
-    <div class="viewport-wrapper" onclick="triggerCamera()">
+
+    <div class="viewport-wrapper">
         <video id="videoFeed" playsinline autoplay muted></video>
-        <img id="previewImg" alt="Pratinjau Foto" />
-        <div class="viewport-placeholder" id="placeholderView">
-            <span style="font-size: 40px;">📸</span>
-            <span style="font-weight: 700; color: #f8fafc;">Sentuh untuk Buka Kamera</span>
-            <span style="font-size: 11px; color: #64748b;">Arahkan ke QR Faktur Pajak di meja</span>
-        </div>
-        <div class="reticle"><div class="laser-sweep"></div></div>
+        <button type="button" class="torch-btn" id="torchBtn" onclick="toggleTorch()" title="Nyalakan Senter">💡</button>
+        <div class="reticle" id="reticleBox"><div class="laser-sweep"></div></div>
     </div>
+
     <div class="controls">
         <div class="status-card">
-            <div class="status-dot"></div>
+            <div class="status-dot scanning" id="statusDot"></div>
             <div>
-                <div style="font-weight: 700; font-size: 13px;" id="statusTitle">Siap Menembak Faktur</div>
-                <div style="font-size: 11px; color: #94a3b8;" id="statusSubtitle">Tekan tombol biru di bawah atau ketuk layar</div>
+                <div style="font-weight: 700; font-size: 13px;" id="statusTitle">🔍 Memindai QR Code...</div>
+                <div style="font-size: 11px; color: #94a3b8;" id="statusSubtitle">Arahkan kotak ke QR e-Faktur di meja</div>
             </div>
         </div>
 
-        <input type="file" id="cameraSnapInput" accept="image/*" capture="environment" style="display:none;" onchange="processSnappedImage(this)">
-        <button class="btn-snap" onclick="triggerCamera()">
-            📸 TEMBAK FAKTUR PAJAK (SCAN)
-        </button>
-        <button class="btn-live" id="btnStartLive" onclick="startCameraStream()">
-            ▶️ Coba Mode Kamera Live Stream
-        </button>
+        <div class="tips-text">
+            💡 <strong>Tips:</strong> Nyalakan tombol lampu di atas jika ruangan redup atau ada bayangan pada kertas faktur.
+        </div>
 
         <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Histori Tembakan (<span id="scanCount">0</span> Faktur)</div>
         <div class="log-box" id="logBox"><div class="log-item">Menunggu tembakan pertama...</div></div>
     </div>
+
+    <canvas id="hiddenCanvas" style="display: none;"></canvas>
+
     <script>
         const SESSION_ID = @json($session);
         const video = document.getElementById('videoFeed');
-        const previewImg = document.getElementById('previewImg');
-        const placeholderView = document.getElementById('placeholderView');
-        let scanCount = 0, lastScannedText = '', lastScanTime = 0, zxingReader = null;
+        const reticleBox = document.getElementById('reticleBox');
+        const canvas = document.getElementById('hiddenCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        let scanCount = 0, lastScannedText = '', lastScanTime = 0, mediaTrack = null, isTorchOn = false;
+        let isProcessing = false, nativeDetector = null;
 
-        if (window.ZXing) { zxingReader = new ZXing.BrowserQRCodeReader(); }
-
-        function triggerCamera() {
-            document.getElementById('cameraSnapInput').click();
+        if ('BarcodeDetector' in window) {
+            try { nativeDetector = new BarcodeDetector({ formats: ['qr_code'] }); } catch(e) {}
         }
 
         function playFeedback() {
             try {
                 const ac = new (window.AudioContext || window.webkitAudioContext)();
                 const o = ac.createOscillator(), g = ac.createGain();
-                o.type = 'sine'; o.frequency.setValueAtTime(1400, ac.currentTime);
-                g.gain.setValueAtTime(0.3, ac.currentTime);
+                o.type = 'sine'; o.frequency.setValueAtTime(1600, ac.currentTime);
+                g.gain.setValueAtTime(0.35, ac.currentTime);
                 g.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + 0.12);
                 o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.12);
             } catch (e) {}
@@ -106,6 +102,9 @@
             lastScannedText = decodedText; lastScanTime = now; scanCount++;
             playFeedback();
 
+            reticleBox.classList.add('found');
+            setTimeout(() => reticleBox.classList.remove('found'), 1200);
+
             document.getElementById('scanCount').textContent = scanCount;
             document.getElementById('statusTitle').textContent = '✅ Berhasil Ditembak ke PC!';
             document.getElementById('statusSubtitle').textContent = 'Data langsung terisi di layar PC.';
@@ -118,107 +117,89 @@
             sendToPc(decodedText);
 
             setTimeout(() => {
-                document.getElementById('statusTitle').textContent = 'Siap Tembak Faktur Berikutnya';
-                document.getElementById('statusSubtitle').textContent = 'Arahkan HP ke QR e-Faktur berikutnya';
-            }, 2500);
+                document.getElementById('statusTitle').textContent = '🔍 Memindai QR Code...';
+                document.getElementById('statusSubtitle').textContent = 'Arahkan kotak ke QR e-Faktur di meja';
+            }, 2000);
         }
 
-        async function processSnappedImage(input) {
-            if (!input.files || input.files.length === 0) return;
-            const file = input.files[0];
-            document.getElementById('statusTitle').textContent = '⏳ Membaca QR Code...';
-            document.getElementById('statusSubtitle').textContent = 'Sedang menganalisis piksel...';
+        async function scanLoop() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA && !isProcessing) {
+                isProcessing = true;
+                let foundCode = null;
 
-            const imgUrl = URL.createObjectURL(file);
-            placeholderView.style.display = 'none';
-            video.style.display = 'none';
-            previewImg.src = imgUrl;
-            previewImg.style.display = 'block';
-
-            let decoded = null;
-
-            // 1. Native BarcodeDetector (Paling Akurat di Android Chrome)
-            if ('BarcodeDetector' in window) {
-                try {
-                    const detector = new BarcodeDetector({ formats: ['qr_code'] });
-                    const bitmap = await createImageBitmap(file);
-                    const barcodes = await detector.detect(bitmap);
-                    if (barcodes.length > 0 && barcodes[0].rawValue) {
-                        decoded = barcodes[0].rawValue;
-                    }
-                } catch (e) {}
-            }
-
-            // 2. jsQR Multi-Scale Fallback
-            if (!decoded) {
-                try {
-                    decoded = await decodeWithJsQr(imgUrl);
-                } catch (e) {}
-            }
-
-            // 3. ZXing Fallback
-            if (!decoded && zxingReader) {
-                try {
-                    const res = await zxingReader.decodeFromImageUrl(imgUrl);
-                    if (res && res.getText()) decoded = res.getText();
-                } catch (e) {}
-            }
-
-            if (decoded) {
-                onSuccessfulScan(decoded);
-            } else {
-                document.getElementById('statusTitle').textContent = '❌ QR Belum Terdeteksi';
-                document.getElementById('statusSubtitle').textContent = 'Pastikan foto QR code fokus dan tidak blur.';
-            }
-
-            input.value = '';
-        }
-
-        function decodeWithJsQr(imgUrl) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                    const scales = [1000, 600, img.width];
-                    for (let maxDim of scales) {
-                        let w = img.width, h = img.height;
-                        if (w > maxDim || h > maxDim) {
-                            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-                            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+                // 1. Hardware Accelerated Native BarcodeDetector (Android Chrome GPU)
+                if (nativeDetector) {
+                    try {
+                        const barcodes = await nativeDetector.detect(video);
+                        if (barcodes.length > 0 && barcodes[0].rawValue) {
+                            foundCode = barcodes[0].rawValue;
                         }
-                        const c = document.createElement('canvas');
-                        c.width = w; c.height = h;
-                        const ctx = c.getContext('2d');
-                        ctx.drawImage(img, 0, 0, w, h);
-                        const idata = ctx.getImageData(0, 0, w, h);
-                        if (window.jsQR) {
-                            const code = jsQR(idata.data, w, h, { inversionAttempts: "attemptBoth" });
-                            if (code && code.data) return resolve(code.data);
+                    } catch(e) {}
+                }
+
+                // 2. High Resolution Multi-Pass jsQR Fallback
+                if (!foundCode && window.jsQR) {
+                    try {
+                        const vw = video.videoWidth, vh = video.videoHeight;
+                        if (vw > 0 && vh > 0) {
+                            canvas.width = vw; canvas.height = vh;
+                            ctx.drawImage(video, 0, 0, vw, vh);
+                            const imgData = ctx.getImageData(0, 0, vw, vh);
+                            const code = jsQR(imgData.data, vw, vh, { inversionAttempts: "attemptBoth" });
+                            if (code && code.data) foundCode = code.data;
                         }
-                    }
-                    resolve(null);
-                };
-                img.onerror = () => resolve(null);
-                img.src = imgUrl;
-            });
+                    } catch(e) {}
+                }
+
+                if (foundCode) onSuccessfulScan(foundCode);
+                isProcessing = false;
+            }
+            requestAnimationFrame(scanLoop);
         }
 
-        async function startCameraStream() {
+        async function initCamera() {
             try {
-                if (zxingReader) {
-                    await zxingReader.decodeFromVideoDevice(undefined, 'videoFeed', (result) => {
-                        if (result) onSuccessfulScan(result.getText());
-                    });
-                    placeholderView.style.display = 'none';
-                    previewImg.style.display = 'none';
-                    video.style.display = 'block';
-                    document.getElementById('statusTitle').textContent = 'Kamera Live Stream Aktif';
-                    document.getElementById('btnStartLive').style.display = 'none';
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1920, min: 1280 },
+                        height: { ideal: 1080, min: 720 },
+                        focusMode: { ideal: "continuous" },
+                        advanced: [{ focusMode: "continuous" }]
+                    },
+                    audio: false
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                mediaTrack = stream.getVideoTracks()[0];
+
+                video.onloadedmetadata = () => {
+                    video.play();
+                    requestAnimationFrame(scanLoop);
+                };
+
+                // Check torch capability
+                if (mediaTrack && mediaTrack.getCapabilities && mediaTrack.getCapabilities().torch) {
+                    document.getElementById('torchBtn').style.display = 'flex';
                 }
             } catch (err) {
-                document.getElementById('statusTitle').textContent = 'Gunakan Mode Tombol Tembak';
+                document.getElementById('statusTitle').textContent = '⚠️ Izin Kamera Diperlukan';
+                document.getElementById('statusSubtitle').textContent = 'Izinkan akses kamera pada browser HP Anda.';
             }
         }
 
+        async function toggleTorch() {
+            if (!mediaTrack) return;
+            try {
+                isTorchOn = !isTorchOn;
+                await mediaTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] });
+                document.getElementById('torchBtn').textContent = isTorchOn ? '🔦' : '💡';
+                document.getElementById('torchBtn').style.background = isTorchOn ? '#eab308' : 'rgba(17,24,39,0.8)';
+            } catch (e) {}
+        }
+
+        window.addEventListener('DOMContentLoaded', initCamera);
         setInterval(() => { fetch('/scanner-gun/heartbeat', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ session: SESSION_ID }) }).catch(() => {}); }, 5000);
     </script>
 </body>
