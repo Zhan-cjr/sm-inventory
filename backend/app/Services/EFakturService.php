@@ -45,38 +45,7 @@ class EFakturService
             throw new Exception('Format QR Code e-Faktur tidak dikenali.');
         }
 
-        // Standard DJP Raw Hash Format:
-        // [0] NPWP Penjual (15/16 digit)
-        // [1] Nomor Faktur
-        // [2] Tanggal Faktur (DD-MM-YYYY atau DD/MM/YYYY)
-        // [3] DPP
-        // [4] PPN
-        // [5] PPNBM (opsional)
-        // [6] Status Approval (opsional)
-        $npwpPenjual = preg_replace('/[^0-9]/', '', $parts[0] ?? '');
-        $nomorFaktur = trim($parts[1] ?? '');
-        $rawTanggal = trim($parts[2] ?? '');
-        $rawDpp = trim($parts[3] ?? '0');
-        $rawPpn = trim($parts[4] ?? '0');
-        $rawPpnbm = trim($parts[5] ?? '0');
-        $statusApproval = trim($parts[6] ?? 'APPROVED');
-
-        // Parse Date
-        $tanggalFaktur = null;
-        $masaPajak = '';
-        if (!empty($rawTanggal)) {
-            try {
-                $cleanDate = str_replace('/', '-', $rawTanggal);
-                $carbonDate = Carbon::parse($cleanDate);
-                $tanggalFaktur = $carbonDate->format('Y-m-d');
-                $masaPajak = $carbonDate->format('m-Y');
-            } catch (Exception $e) {
-                $tanggalFaktur = now()->format('Y-m-d');
-                $masaPajak = now()->format('m-Y');
-            }
-        }
-
-        // Parse Numbers (Indonesian currency format: 1.469.394,00 -> 1469394.00)
+        // Helper currency parser
         $parseCurrency = function (string $val): float {
             $clean = preg_replace('/[^0-9,\.]/', '', $val);
             if (str_contains($clean, ',') && str_contains($clean, '.')) {
@@ -88,19 +57,86 @@ class EFakturService
             return (float) $clean;
         };
 
-        $dpp = $parseCurrency($rawDpp);
-        $ppn = $parseCurrency($rawPpn);
-        $ppnbm = $parseCurrency($rawPpnbm);
+        // 1. Find Date Index (e.g. 18-05-2026 or 18/05/2026)
+        $dateIdx = -1;
+        $tanggalFaktur = null;
+        $masaPajak = '';
+
+        foreach ($parts as $idx => $part) {
+            if (preg_match('/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/', $part, $m)) {
+                $dateIdx = $idx;
+                try {
+                    $cleanDate = str_replace('/', '-', $part);
+                    $carbonDate = Carbon::parse($cleanDate);
+                    $tanggalFaktur = $carbonDate->format('Y-m-d');
+                    $masaPajak = $carbonDate->format('m-Y');
+                } catch (\Exception $e) {
+                    $tanggalFaktur = now()->format('Y-m-d');
+                    $masaPajak = now()->format('m-Y');
+                }
+                break;
+            }
+        }
+
+        $namaPenjual = '';
+        $npwpPenjual = '';
+        $nomorFaktur = '';
+        $dpp = 0.0;
+        $ppn = 0.0;
+        $ppnbm = 0.0;
+        $statusApproval = 'APPROVED';
+
+        if ($dateIdx !== -1) {
+            // Nomor Faktur is immediately before Date
+            if ($dateIdx > 0) {
+                $nomorFaktur = preg_replace('/[^0-9A-Za-z\.\-]/', '', $parts[$dateIdx - 1]);
+            }
+
+            // DPP, PPN, PPNBM are immediately after Date
+            if (isset($parts[$dateIdx + 1])) {
+                $dpp = $parseCurrency($parts[$dateIdx + 1]);
+            }
+            if (isset($parts[$dateIdx + 2])) {
+                $ppn = $parseCurrency($parts[$dateIdx + 2]);
+            }
+            if (isset($parts[$dateIdx + 3])) {
+                $ppnbm = $parseCurrency($parts[$dateIdx + 3]);
+            }
+            if (isset($parts[$dateIdx + 4])) {
+                $statusApproval = trim($parts[$dateIdx + 4]);
+            }
+
+            // Look at parts before ($dateIdx - 1) for Penjual info
+            $prefixParts = array_slice($parts, 0, $dateIdx - 1);
+            if (count($prefixParts) >= 2) {
+                // In standard 10-field DJP: [NamaPenjual, NpwpPenjual, NamaPembeli, NpwpPembeli]
+                $namaPenjual = trim($prefixParts[0]);
+                $npwpPenjual = preg_replace('/[^0-9]/', '', $prefixParts[1]);
+            } elseif (count($prefixParts) === 1) {
+                if (preg_match('/^\d{15,16}$/', preg_replace('/[^0-9]/', '', $prefixParts[0]))) {
+                    $npwpPenjual = preg_replace('/[^0-9]/', '', $prefixParts[0]);
+                } else {
+                    $namaPenjual = trim($prefixParts[0]);
+                }
+            }
+        } else {
+            // Fallback to sequential index
+            $namaPenjual = trim($parts[0] ?? '');
+            $npwpPenjual = preg_replace('/[^0-9]/', '', $parts[1] ?? '');
+            $nomorFaktur = trim($parts[4] ?? $parts[1] ?? '');
+            $dpp = $parseCurrency($parts[6] ?? $parts[3] ?? '0');
+            $ppn = $parseCurrency($parts[7] ?? $parts[4] ?? '0');
+        }
 
         return [
             'success' => true,
             'header' => [
                 'nomor_faktur' => $nomorFaktur,
                 'full_nomor_faktur' => $nomorFaktur,
-                'tanggal_faktur' => $tanggalFaktur,
-                'masa_pajak' => $masaPajak,
+                'tanggal_faktur' => $tanggalFaktur ?: now()->format('Y-m-d'),
+                'masa_pajak' => $masaPajak ?: now()->format('m-Y'),
                 'npwp_penjual' => $npwpPenjual,
-                'nama_penjual' => '',
+                'nama_penjual' => $namaPenjual,
                 'alamat_penjual' => '',
                 'npwp_lawan' => '',
                 'nama_lawan' => '',
@@ -108,7 +144,7 @@ class EFakturService
                 'dpp' => $dpp,
                 'ppn' => $ppn,
                 'ppnbm' => $ppnbm,
-                'status_approval' => $statusApproval ?: 'Faktur Valid',
+                'status_approval' => $statusApproval ?: 'APPROVED',
                 'status_faktur' => 'Valid',
             ],
             'items' => [],
