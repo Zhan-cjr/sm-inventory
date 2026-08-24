@@ -33,9 +33,15 @@ class TaxInvoiceForm
                     ->schema([
                         TextInput::make('scan_qr_url')
                             ->label('URL Validasi / Hasil Scan QR')
-                            ->placeholder('Contoh: http://svc.efaktur.pajak.go.id/validasi/faktur/013005533092000/0400002634182924/...')
-                            ->helperText('Sistem akan langsung mengambil data XML dari server DJP dan mengisi seluruh form & rincian barang di bawah secara otomatis.')
+                            ->placeholder('Arahkan scanner fisik atau tempel hasil scan QR...')
+                            ->helperText('Sistem akan langsung membaca data faktur dan mengisi seluruh formulir secara otomatis.')
                             ->prefixIcon('heroicon-o-camera')
+                            ->autofocus()
+                            ->extraInputAttributes([
+                                'id' => 'scan_qr_input_field',
+                                'autofocus' => 'autofocus',
+                                'tabindex' => '1',
+                            ])
                             ->suffixAction(
                                 Action::make('connect_phone_gun')
                                     ->label('Hubungkan Scanner HP')
