@@ -9,16 +9,117 @@ use Exception;
 class EFakturService
 {
     /**
-     * Fetch and parse DJP e-Faktur QR XML from given URL
+     * Fetch and parse DJP e-Faktur QR from given URL or raw delimited QR string
      *
-     * @param string $url
+     * @param string $rawInput
      * @return array
      * @throws Exception
      */
-    public function fetchAndParse(string $url): array
+    public function fetchAndParse(string $rawInput): array
     {
-        $url = trim($url);
+        $rawInput = trim($rawInput);
 
+        if (empty($rawInput)) {
+            throw new Exception('Data hasil scan kosong.');
+        }
+
+        // Format 1: Raw Delimited Text (Contoh: #0019907658406000#04002600189429075#18-05-2026#1.469.394,00#176.326,00#0,00#APPROVED)
+        if (str_contains($rawInput, '#') || !str_starts_with($rawInput, 'http')) {
+            return $this->parseRawDelimitedQr($rawInput);
+        }
+
+        // Format 2: URL DJP Validation
+        return $this->fetchFromDjpUrl($rawInput);
+    }
+
+    /**
+     * Parse raw delimited QR format from physical scanner gun
+     */
+    protected function parseRawDelimitedQr(string $raw): array
+    {
+        // Split by '#' or ';' or '|'
+        $delimiter = str_contains($raw, '#') ? '#' : (str_contains($raw, ';') ? ';' : '|');
+        $parts = array_values(array_filter(array_map('trim', explode($delimiter, $raw)), fn($v) => $v !== ''));
+
+        if (count($parts) < 3) {
+            throw new Exception('Format QR Code e-Faktur tidak dikenali.');
+        }
+
+        // Standard DJP Raw Hash Format:
+        // [0] NPWP Penjual (15/16 digit)
+        // [1] Nomor Faktur
+        // [2] Tanggal Faktur (DD-MM-YYYY atau DD/MM/YYYY)
+        // [3] DPP
+        // [4] PPN
+        // [5] PPNBM (opsional)
+        // [6] Status Approval (opsional)
+        $npwpPenjual = preg_replace('/[^0-9]/', '', $parts[0] ?? '');
+        $nomorFaktur = trim($parts[1] ?? '');
+        $rawTanggal = trim($parts[2] ?? '');
+        $rawDpp = trim($parts[3] ?? '0');
+        $rawPpn = trim($parts[4] ?? '0');
+        $rawPpnbm = trim($parts[5] ?? '0');
+        $statusApproval = trim($parts[6] ?? 'APPROVED');
+
+        // Parse Date
+        $tanggalFaktur = null;
+        $masaPajak = '';
+        if (!empty($rawTanggal)) {
+            try {
+                $cleanDate = str_replace('/', '-', $rawTanggal);
+                $carbonDate = Carbon::parse($cleanDate);
+                $tanggalFaktur = $carbonDate->format('Y-m-d');
+                $masaPajak = $carbonDate->format('m-Y');
+            } catch (Exception $e) {
+                $tanggalFaktur = now()->format('Y-m-d');
+                $masaPajak = now()->format('m-Y');
+            }
+        }
+
+        // Parse Numbers (Indonesian currency format: 1.469.394,00 -> 1469394.00)
+        $parseCurrency = function (string $val): float {
+            $clean = preg_replace('/[^0-9,\.]/', '', $val);
+            if (str_contains($clean, ',') && str_contains($clean, '.')) {
+                $clean = str_replace('.', '', $clean);
+                $clean = str_replace(',', '.', $clean);
+            } elseif (str_contains($clean, ',')) {
+                $clean = str_replace(',', '.', $clean);
+            }
+            return (float) $clean;
+        };
+
+        $dpp = $parseCurrency($rawDpp);
+        $ppn = $parseCurrency($rawPpn);
+        $ppnbm = $parseCurrency($rawPpnbm);
+
+        return [
+            'success' => true,
+            'header' => [
+                'nomor_faktur' => $nomorFaktur,
+                'full_nomor_faktur' => $nomorFaktur,
+                'tanggal_faktur' => $tanggalFaktur,
+                'masa_pajak' => $masaPajak,
+                'npwp_penjual' => $npwpPenjual,
+                'nama_penjual' => '',
+                'alamat_penjual' => '',
+                'npwp_lawan' => '',
+                'nama_lawan' => '',
+                'alamat_lawan' => '',
+                'dpp' => $dpp,
+                'ppn' => $ppn,
+                'ppnbm' => $ppnbm,
+                'status_approval' => $statusApproval ?: 'Faktur Valid',
+                'status_faktur' => 'Valid',
+            ],
+            'items' => [],
+        ];
+    }
+
+    /**
+     * Fetch XML from DJP Validation URL
+     */
+    protected function fetchFromDjpUrl(string $url): array
+    {
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
             throw new Exception('Format URL QR Code tidak valid.');
         }

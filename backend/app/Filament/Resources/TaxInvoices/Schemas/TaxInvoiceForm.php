@@ -50,7 +50,7 @@ class TaxInvoiceForm
                             )
                             ->live(onBlur: true)
                             ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                if (empty($state) || !str_starts_with($state, 'http')) {
+                                if (empty($state)) {
                                     return;
                                 }
 
@@ -76,28 +76,45 @@ class TaxInvoiceForm
                                     // Notification for approval
                                     $statusApproval = $h['status_approval'] ?? 'Faktur Valid';
                                     
-                                    // Check Supplier matching
+                                    // Robust Supplier matching (15-digit vs 16-digit NPWP & name matching)
                                     $cleanNpwp = preg_replace('/[^0-9]/', '', $h['npwp_penjual']);
-                                    $supplier = Supplier::where('npwp', 'like', "%{$cleanNpwp}%")
-                                        ->orWhere('name', 'like', "%{$h['nama_penjual']}%")
-                                        ->first();
+                                    $cleanNpwp15 = strlen($cleanNpwp) === 16 && str_starts_with($cleanNpwp, '0') ? substr($cleanNpwp, 1) : $cleanNpwp;
+                                    $cleanNpwp16 = strlen($cleanNpwp) === 15 ? '0' . $cleanNpwp : $cleanNpwp;
+
+                                    $supplier = Supplier::where(function ($q) use ($cleanNpwp, $cleanNpwp15, $cleanNpwp16) {
+                                        $q->whereRaw("REGEXP_REPLACE(npwp, '[^0-9]', '') IN (?, ?, ?)", [$cleanNpwp, $cleanNpwp15, $cleanNpwp16])
+                                          ->orWhere('npwp', 'like', "%{$cleanNpwp15}%");
+                                    })->first();
+
+                                    if (!$supplier && !empty($h['nama_penjual'])) {
+                                        $supplier = Supplier::where('name', 'like', "%{$h['nama_penjual']}%")->first();
+                                    }
 
                                     if ($supplier) {
+                                        // Ensure supplier name and registered NPWP are set in the form
+                                        if (empty($h['nama_penjual'])) {
+                                            $set('nama_lawan', $supplier->name);
+                                        }
+                                        if (empty($h['npwp_penjual']) && !empty($supplier->npwp)) {
+                                            $set('npwp_lawan', $supplier->npwp);
+                                        }
+
                                         Notification::make()
                                             ->title('e-Faktur Berhasil Dimuat')
                                             ->body("Status: {$statusApproval}. Pemasok terhubung: {$supplier->name}")
                                             ->success()
                                             ->send();
                                     } else {
+                                        $displayName = !empty($h['nama_penjual']) ? $h['nama_penjual'] : ('Pemasok NPWP ' . $h['npwp_penjual']);
                                         $createSupplierUrl = SupplierResource::getUrl('create') . '?' . http_build_query([
-                                            'name' => $h['nama_penjual'],
+                                            'name' => $displayName,
                                             'npwp' => $h['npwp_penjual'],
-                                            'address' => $h['alamat_penjual'],
+                                            'address' => $h['alamat_penjual'] ?? '',
                                         ]);
 
                                         Notification::make()
                                             ->title('Pemasok Belum Terdaftar')
-                                            ->body("Faktur valid dari '{$h['nama_penjual']}' (NPWP: {$h['npwp_penjual']}), namun pemasok belum ada di data master.")
+                                            ->body("Faktur valid dengan NPWP '{$h['npwp_penjual']}', namun pemasok belum ada di data master.")
                                             ->warning()
                                             ->persistent()
                                             ->actions([

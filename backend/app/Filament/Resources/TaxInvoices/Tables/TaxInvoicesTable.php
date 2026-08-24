@@ -105,16 +105,27 @@ class TaxInvoicesTable
                         'draft' => 'Draft',
                         'reported' => 'Dilaporkan',
                     ]),
+                \Filament\Tables\Filters\Filter::make('tanggal_faktur')
+                    ->form([
+                        \Filament\Forms\Components\DatePicker::make('dari_tanggal')->label('Dari Tanggal'),
+                        \Filament\Forms\Components\DatePicker::make('sampai_tanggal')->label('Sampai Tanggal'),
+                    ])
+                    ->query(function ($query, array $data) {
+                        return $query
+                            ->when($data['dari_tanggal'], fn ($q, $date) => $q->whereDate('tanggal_faktur', '>=', $date))
+                            ->when($data['sampai_tanggal'], fn ($q, $date) => $q->whereDate('tanggal_faktur', '<=', $date));
+                    }),
             ])
+            ->defaultSort('tanggal_faktur', 'desc')
             ->headerActions([
                 Action::make('export_excel_rekap')
                     ->label('Ekspor Rekap Excel')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
-                    ->action(function () {
+                    ->action(function ($livewire) {
                         $filename = 'Rekap_Faktur_Pajak_' . now()->format('Ymd_His') . '.csv';
 
-                        return new StreamedResponse(function () {
+                        return new StreamedResponse(function () use ($livewire) {
                             $handle = fopen('php://output', 'w');
                             // Add BOM for Excel UTF-8 recognition
                             fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
@@ -131,7 +142,9 @@ class TaxInvoicesTable
                                 'JUMLAH_PPN',
                             ]);
 
-                            TaxInvoice::orderBy('tanggal_faktur', 'desc')->chunk(200, function ($invoices) use ($handle) {
+                            // Query respects active table filters and search
+                            $exportQuery = clone $livewire->getFilteredTableQuery();
+                            $exportQuery->orderBy('tanggal_faktur', 'desc')->chunk(200, function ($invoices) use ($handle) {
                                 foreach ($invoices as $inv) {
                                     $parts = explode('-', $inv->masa_pajak ?? '');
                                     $masa = $parts[0] ?? (int) ($inv->tanggal_faktur?->format('m') ?? 1);
