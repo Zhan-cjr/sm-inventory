@@ -37,8 +37,13 @@ class EFakturService
      */
     protected function parseRawDelimitedQr(string $raw): array
     {
-        // Split by '#' or ';' or '|'
-        $delimiter = str_contains($raw, '#') ? '#' : (str_contains($raw, ';') ? ';' : '|');
+        // Format 1: Raw XML String in QR
+        if (str_contains($raw, '<resValidateFakturKd>') || str_contains($raw, '</nomorFaktur>')) {
+            return $this->parseXmlString($raw);
+        }
+
+        // Split by '#', ';', '|', or tab
+        $delimiter = str_contains($raw, '#') ? '#' : (str_contains($raw, ';') ? ';' : (str_contains($raw, '|') ? '|' : "\t"));
         $parts = array_values(array_filter(array_map('trim', explode($delimiter, $raw)), fn($v) => $v !== ''));
 
         if (count($parts) < 3) {
@@ -57,16 +62,16 @@ class EFakturService
             return (float) $clean;
         };
 
-        // 1. Find Date Index (e.g. 18-05-2026 or 18/05/2026)
+        // 1. Find Date Index (e.g. 18-05-2026 or 18/05/2026 or 2026-05-18 or 18.05.2026)
         $dateIdx = -1;
         $tanggalFaktur = null;
         $masaPajak = '';
 
         foreach ($parts as $idx => $part) {
-            if (preg_match('/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/', $part, $m)) {
+            if (preg_match('/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})$/', $part) || preg_match('/^(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})$/', $part)) {
                 $dateIdx = $idx;
                 try {
-                    $cleanDate = str_replace('/', '-', $part);
+                    $cleanDate = str_replace(['/', '.'], '-', $part);
                     $carbonDate = Carbon::parse($cleanDate);
                     $tanggalFaktur = $carbonDate->format('Y-m-d');
                     $masaPajak = $carbonDate->format('m-Y');
@@ -108,24 +113,38 @@ class EFakturService
 
             // Look at parts before ($dateIdx - 1) for Penjual info
             $prefixParts = array_slice($parts, 0, $dateIdx - 1);
-            if (count($prefixParts) >= 2) {
-                // In standard 10-field DJP: [NamaPenjual, NpwpPenjual, NamaPembeli, NpwpPembeli]
-                $namaPenjual = trim($prefixParts[0]);
-                $npwpPenjual = preg_replace('/[^0-9]/', '', $prefixParts[1]);
-            } elseif (count($prefixParts) === 1) {
-                if (preg_match('/^\d{15,16}$/', preg_replace('/[^0-9]/', '', $prefixParts[0]))) {
-                    $npwpPenjual = preg_replace('/[^0-9]/', '', $prefixParts[0]);
-                } else {
-                    $namaPenjual = trim($prefixParts[0]);
+            if (!empty($prefixParts)) {
+                // Find any 15/16 digit token in prefix (NPWP Penjual is always the 1st NPWP)
+                foreach ($prefixParts as $p) {
+                    $digitsOnly = preg_replace('/[^0-9]/', '', $p);
+                    if (strlen($digitsOnly) >= 15 && strlen($digitsOnly) <= 16 && empty($npwpPenjual)) {
+                        $npwpPenjual = $digitsOnly;
+                    } elseif (!preg_match('/^\d+$/', $p) && empty($namaPenjual)) {
+                        $namaPenjual = trim($p);
+                    }
                 }
             }
         } else {
-            // Fallback to sequential index
-            $namaPenjual = trim($parts[0] ?? '');
-            $npwpPenjual = preg_replace('/[^0-9]/', '', $parts[1] ?? '');
-            $nomorFaktur = trim($parts[4] ?? $parts[1] ?? '');
-            $dpp = $parseCurrency($parts[6] ?? $parts[3] ?? '0');
-            $ppn = $parseCurrency($parts[7] ?? $parts[4] ?? '0');
+            // Fallback: Smart classification by token types
+            $numericTokens = [];
+            foreach ($parts as $p) {
+                $digits = preg_replace('/[^0-9]/', '', $p);
+                if (strlen($digits) >= 15 && strlen($digits) <= 16 && empty($npwpPenjual)) {
+                    $npwpPenjual = $digits;
+                } elseif (strlen($digits) >= 13 && strlen($digits) <= 17 && empty($nomorFaktur)) {
+                    $nomorFaktur = $p;
+                } elseif (!preg_match('/^\d+$/', $p) && !in_array(strtoupper($p), ['APPROVED', 'REJECTED', 'VALID']) && empty($namaPenjual)) {
+                    $namaPenjual = $p;
+                } elseif (str_contains($p, ',') || str_contains($p, '.')) {
+                    $numericTokens[] = $parseCurrency($p);
+                }
+            }
+            if (!empty($numericTokens)) {
+                rsort($numericTokens);
+                $dpp = $numericTokens[0] ?? 0;
+                $ppn = $numericTokens[1] ?? 0;
+                $ppnbm = $numericTokens[2] ?? 0;
+            }
         }
 
         return [
@@ -149,6 +168,21 @@ class EFakturService
             ],
             'items' => [],
         ];
+    }
+
+    /**
+     * Parse directly from raw XML string
+     */
+    protected function parseXmlString(string $xmlContent): array
+    {
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($xmlContent, 'SimpleXMLElement', LIBXML_NOCDATA);
+
+        if ($xml === false) {
+            throw new Exception('Gagal membaca XML dari QR code.');
+        }
+
+        return $this->extractDataFromXmlObject($xml);
     }
 
     /**
@@ -188,12 +222,18 @@ class EFakturService
             throw new Exception('Gagal membaca format XML dari respon server DJP.');
         }
 
-        // Parse Header
+        return $this->extractDataFromXmlObject($xml);
+    }
+
+    /**
+     * Extract structured invoice data from SimpleXMLElement
+     */
+    protected function extractDataFromXmlObject(\SimpleXMLElement $xml): array
+    {
         $nomorFaktur = (string) ($xml->nomorFaktur ?? '');
         $kdJenis = (string) ($xml->kdJenisTransaksi ?? '01');
         $fgPengganti = (string) ($xml->fgPengganti ?? '0');
         
-        // Full standard 16 digit format if needed
         $fullNomorFaktur = $nomorFaktur;
         if (strlen($nomorFaktur) === 16) {
             $fullNomorFaktur = substr($nomorFaktur, 0, 3) . '.' . substr($nomorFaktur, 3, 3) . '-' . substr($nomorFaktur, 6, 2) . '.' . substr($nomorFaktur, 8);
@@ -204,8 +244,7 @@ class EFakturService
         $masaPajak = '';
         if (!empty($rawTanggal)) {
             try {
-                // Usually DD/MM/YYYY or DD-MM-YYYY
-                $cleanDate = str_replace('/', '-', $rawTanggal);
+                $cleanDate = str_replace(['/', '.'], '-', $rawTanggal);
                 $carbonDate = Carbon::parse($cleanDate);
                 $tanggalFaktur = $carbonDate->format('Y-m-d');
                 $masaPajak = $carbonDate->format('m-Y');
@@ -262,8 +301,8 @@ class EFakturService
                 'dpp' => $jumlahDpp,
                 'ppn' => $jumlahPpn,
                 'ppnbm' => $jumlahPpnbm,
-                'status_approval' => $statusApproval,
-                'status_faktur' => $statusFaktur,
+                'status_approval' => $statusApproval ?: 'APPROVED',
+                'status_faktur' => $statusFaktur ?: 'Valid',
             ],
             'items' => $items,
         ];
