@@ -58,6 +58,12 @@ class TaxInvoicesTable
                     ->label('Tgl Faktur')
                     ->date('d/m/Y')
                     ->sortable(),
+                TextColumn::make('created_at')
+                    ->label('Tgl Input')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->color('gray')
+                    ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('masa_pajak')
                     ->label('Masa')
                     ->badge()
@@ -105,15 +111,38 @@ class TaxInvoicesTable
                         'draft' => 'Draft',
                         'reported' => 'Dilaporkan',
                     ]),
-                \Filament\Tables\Filters\Filter::make('tanggal_faktur')
+                \Filament\Tables\Filters\Filter::make('filter_tanggal')
+                    ->label('Rentang Tanggal')
                     ->form([
-                        \Filament\Forms\Components\DatePicker::make('dari_tanggal')->label('Dari Tanggal'),
-                        \Filament\Forms\Components\DatePicker::make('sampai_tanggal')->label('Sampai Tanggal'),
+                        \Filament\Forms\Components\Select::make('basis_tanggal')
+                            ->label('Filter Berdasarkan')
+                            ->options([
+                                'created_at' => 'Tanggal Input Sistem (Waktu Admin Scan)',
+                                'tanggal_faktur' => 'Tanggal Lembar Faktur Pajak',
+                            ])
+                            ->default('created_at')
+                            ->required(),
+                        \Filament\Forms\Components\DatePicker::make('dari_tanggal')
+                            ->label('Dari Tanggal'),
+                        \Filament\Forms\Components\DatePicker::make('sampai_tanggal')
+                            ->label('Sampai Tanggal'),
                     ])
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        $basisLabel = ($data['basis_tanggal'] ?? 'created_at') === 'created_at' ? 'Tgl Input' : 'Tgl Faktur';
+                        if ($data['dari_tanggal'] ?? null) {
+                            $indicators[] = "{$basisLabel} dari " . \Carbon\Carbon::parse($data['dari_tanggal'])->format('d/m/Y');
+                        }
+                        if ($data['sampai_tanggal'] ?? null) {
+                            $indicators[] = "{$basisLabel} sampai " . \Carbon\Carbon::parse($data['sampai_tanggal'])->format('d/m/Y');
+                        }
+                        return $indicators;
+                    })
                     ->query(function ($query, array $data) {
+                        $col = ($data['basis_tanggal'] ?? 'created_at') === 'tanggal_faktur' ? 'tanggal_faktur' : 'created_at';
                         return $query
-                            ->when($data['dari_tanggal'], fn ($q, $date) => $q->whereDate('tanggal_faktur', '>=', $date))
-                            ->when($data['sampai_tanggal'], fn ($q, $date) => $q->whereDate('tanggal_faktur', '<=', $date));
+                            ->when($data['dari_tanggal'], fn ($q, $date) => $q->whereDate($col, '>=', $date))
+                            ->when($data['sampai_tanggal'], fn ($q, $date) => $q->whereDate($col, '<=', $date));
                     }),
             ])
             ->defaultSort('tanggal_faktur', 'desc')
