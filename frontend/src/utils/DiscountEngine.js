@@ -101,7 +101,7 @@ export class DiscountEngine {
             let remainingDiscount = discount;
             eligibleItems.forEach((item, index) => {
                 const itemBase = item.quantity * parseFloat(item.unitPrice);
-                const portion = Math.floor((itemBase / baseAmount) * discount);
+                const portion = baseAmount > 0 ? Math.floor((itemBase / baseAmount) * discount) : Math.floor(discount / eligibleItems.length);
                 const applied = (index === eligibleItems.length - 1) ? remainingDiscount : portion;
                 item.discountPerItem = (item.discountPerItem || 0) + (applied / item.quantity);
                 item.promotionId = promo.id;
@@ -135,7 +135,7 @@ export class DiscountEngine {
     let matchedCount = Infinity; // Find how many times the whole bundle can be satisfied
     
     for (const rule of promo.promo_config.rules) {
-      const item = items.find(i => i.productId === rule.productId);
+      const item = items.find(i => String(i.productId) === String(rule.productId));
       if (!item || item.quantity < rule.minQty) {
         matchedCount = 0;
         break;
@@ -157,16 +157,14 @@ export class DiscountEngine {
   }
 
   applyPerItemDiscount(items, promo, type) {
-    const targetIds = Array.isArray(promo.target_ids) ? promo.target_ids : [];
-    const eligible = items.filter(i => targetIds.includes(String(i.productId)));
     let discount = 0;
     const discountValue = parseFloat(promo.discount_value || 0);
     
     if (type === 'PERCENTAGE_PER_ITEM') {
-        const amount = eligible.reduce((sum, i) => sum + (i.quantity * parseFloat(i.unitPrice)), 0);
+        const amount = items.reduce((sum, i) => sum + (i.quantity * parseFloat(i.unitPrice)), 0);
         discount = Math.floor(amount * (discountValue / 100));
     } else if (type === 'NOMINAL_PER_ITEM') {
-        const totalQuantity = eligible.reduce((sum, i) => sum + i.quantity, 0);
+        const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
         discount = discountValue * totalQuantity;
     }
     return discount;
