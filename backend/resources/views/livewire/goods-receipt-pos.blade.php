@@ -615,7 +615,8 @@
                             <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right; font-weight: 700; color: {{ ($item['qty_ordered'] > 0 && $item['qty_received'] != $item['qty_ordered']) ? '#ef4444' : '#2563eb' }};" 
                                    wire:model.lazy="cart.{{ $index }}.qty_received"
                                    wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.space.prevent="openCalc($event)">
+                                   x-on:keydown.space.prevent="openCalc($event)"
+                                   {{ (!empty($goodsReceipt) && !empty($goodsReceipt->warehouse_check_id)) ? 'disabled' : '' }}>
                         </td>
                         @endif
                         @if(in_array('unit_price', $visibleColumns))

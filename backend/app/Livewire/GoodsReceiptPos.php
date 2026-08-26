@@ -293,6 +293,20 @@ class GoodsReceiptPos extends Component
             return;
         }
 
+        if (!empty($this->purchase_order_id)) {
+            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                Notification::make()->title('Tidak dapat menambah barang baru saat menggunakan PO.')->warning()->send();
+                return;
+            }
+        }
+
+        if (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)) {
+            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                Notification::make()->title('Tidak dapat menambah barang baru pada penerimaan dari Pengecekan Gudang.')->warning()->send();
+                return;
+            }
+        }
+
         $product = Product::query()
             ->select('products.*')
             ->join('stocks', 'stocks.product_id', '=', 'products.id')
@@ -430,6 +444,20 @@ class GoodsReceiptPos extends Component
         if (!$this->supplier_id) {
             Notification::make()->title('Pilih Supplier Terlebih Dahulu')->warning()->send();
             return;
+        }
+
+        if (!empty($this->purchase_order_id)) {
+            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                Notification::make()->title('Tidak dapat menambah barang melalui scan AI saat menggunakan PO.')->warning()->send();
+                return;
+            }
+        }
+
+        if (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)) {
+            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                Notification::make()->title('Tidak dapat menambah barang melalui scan AI pada penerimaan dari Pengecekan Gudang.')->warning()->send();
+                return;
+            }
         }
 
         $this->scan_loading = true;

@@ -93,6 +93,89 @@ class WarehouseCheckResource extends Resource
                     ->visible(fn () => !auth()->user()->branch_id),
             ])
             ->recordActions([
+                Action::make('view_items')
+                    ->label('Lihat')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+                    ->modalHeading('Detail Pengecekan Gudang')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup')
+                    ->mountUsing(function ($form, WarehouseCheck $record) {
+                        // Empty because we render directly in content
+                    })
+                    ->form([
+                        \Filament\Forms\Components\Placeholder::make('items')
+                            ->hiddenLabel()
+                            ->content(function (WarehouseCheck $record) {
+                                $record->load('items.product');
+                                $data = [];
+                                foreach ($record->items as $item) {
+                                    $po = floatval($item->qty_po) == intval($item->qty_po) ? number_format($item->qty_po, 0) : number_format($item->qty_po, 2);
+                                    $scanned = floatval($item->qty_scanned) == intval($item->qty_scanned) ? number_format($item->qty_scanned, 0) : number_format($item->qty_scanned, 2);
+                                    $data[] = [
+                                        'id' => $item->id,
+                                        'barcode' => $item->product ? $item->product->barcode : '-',
+                                        'name' => $item->product ? $item->product->name : (\Illuminate\Support\Facades\DB::table('products')->where('id', $item->product_id)->value('name') ?? 'Unknown'),
+                                        'po' => $po,
+                                        'scanned' => $scanned,
+                                        'is_over' => $item->qty_scanned > $item->qty_po
+                                    ];
+                                }
+                                $jsonItems = htmlspecialchars(json_encode($data), ENT_QUOTES, 'UTF-8');
+                                
+                                $html = <<<HTML
+<div x-data="{
+    page: 1,
+    perPage: 10,
+    items: {$jsonItems},
+    get totalPages() { return Math.ceil(this.items.length / this.perPage); },
+    get paginatedItems() {
+        let start = (this.page - 1) * this.perPage;
+        return this.items.slice(start, start + this.perPage);
+    }
+}" style="border: 1px solid #e5e7eb; border-radius: 0.5rem; overflow: hidden; font-family: inherit; font-size: 0.875rem;">
+    <div style="overflow-x: auto; min-width: 600px;">
+        <div style="display: grid; grid-template-columns: 20% 50% 15% 15%; background-color: #f9fafb; border-bottom: 1px solid #e5e7eb; color: #374151;">
+            <div style="padding: 0.75rem 1rem; font-weight: 600;">Barcode</div>
+            <div style="padding: 0.75rem 1rem; font-weight: 600;">Nama Barang</div>
+            <div style="padding: 0.75rem 1rem; font-weight: 600; text-align: center;">Sisa PO</div>
+            <div style="padding: 0.75rem 1rem; font-weight: 600; text-align: center;">Qty Fisik</div>
+        </div>
+        <div>
+            <template x-for="item in paginatedItems" :key="item.id">
+                <div style="display: grid; grid-template-columns: 20% 50% 15% 15%; border-bottom: 1px solid #f3f4f6; color: #4b5563; align-items: center;">
+                    <div style="padding: 0.5rem 1rem;" x-text="item.barcode"></div>
+                    <div style="padding: 0.5rem 1rem; font-weight: 500; color: #111827;" x-text="item.name"></div>
+                    <div style="padding: 0.5rem 1rem; text-align: center;" x-text="item.po"></div>
+                    <div style="padding: 0.5rem 1rem; text-align: center; font-weight: bold;" 
+                        :style="item.is_over ? 'color: #dc2626;' : ''" x-text="item.scanned"></div>
+                </div>
+            </template>
+        </div>
+    </div>
+    
+    <div x-show="totalPages > 1" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-size: 0.875rem; border-top: 1px solid #e5e7eb; color: #374151;">
+        <div>
+            Halaman <span style="font-weight: 600;" x-text="page"></span> dari <span style="font-weight: 600;" x-text="totalPages"></span>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="button" @click="if(page > 1) page--" :disabled="page == 1" 
+                style="padding: 0.25rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background-color: white; cursor: pointer; color: #374151;"
+                x-bind:style="page == 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''">
+                Prev
+            </button>
+            <button type="button" @click="if(page < totalPages) page++" :disabled="page == totalPages" 
+                style="padding: 0.25rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background-color: white; cursor: pointer; color: #374151;"
+                x-bind:style="page == totalPages ? 'opacity: 0.5; cursor: not-allowed;' : ''">
+                Next
+            </button>
+        </div>
+    </div>
+</div>
+HTML;
+                                return new \Illuminate\Support\HtmlString($html);
+                            }),
+                    ]),
                 Action::make('approve_overqty')
                     ->label('Otorisasi')
                     ->icon('heroicon-o-check-badge')
