@@ -174,7 +174,13 @@ const ProductDetailModal = () => {
                     <li>Tipe Promo: <strong>Paket Bundling</strong> (Diskon Rp {parseFloat(product.applied_promo.promo_config?.bundleDiscount || 0).toLocaleString('id-ID')})</li>
                   )}
                   {parseFloat(product.applied_promo.min_purchase_amount || 0) > 0 && (
-                    <li>Min. Belanja: <strong>Rp {parseFloat(product.applied_promo.min_purchase_amount).toLocaleString('id-ID')}</strong></li>
+                    <li>
+                      {['NOMINAL_PER_ITEM', 'PERCENTAGE_PER_ITEM'].includes(product.applied_promo.promo_type) ? (
+                        <>Min. Pembelian: <strong>{parseFloat(product.applied_promo.min_purchase_amount)} Pcs</strong></>
+                      ) : (
+                        <>Min. Belanja: <strong>Rp {parseFloat(product.applied_promo.min_purchase_amount).toLocaleString('id-ID')}</strong></>
+                      )}
+                    </li>
                   )}
                   {parseFloat(product.applied_promo.max_discount_per_transaction || 0) > 0 && (
                     <li>Maks. Diskon: <strong>Rp {parseFloat(product.applied_promo.max_discount_per_transaction).toLocaleString('id-ID')}</strong> ({product.applied_promo.promo_config?.discount_limit_type === 'PER_ITEM' ? 'Per Item' : 'Per Transaksi'})</li>
@@ -188,7 +194,9 @@ const ProductDetailModal = () => {
                   {(product.applied_promo.promo_config?.start_time || product.applied_promo.promo_config?.end_time) && (
                     <li>Jam Berlaku: <strong>{product.applied_promo.promo_config?.start_time || '00:00'} - {product.applied_promo.promo_config?.end_time || '23:59'}</strong></li>
                   )}
-                  <li>Berakhir pada: <strong>{new Date(product.applied_promo.valid_until).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></li>
+                  {product.applied_promo.valid_until && !isNaN(new Date(product.applied_promo.valid_until).getTime()) && (
+                    <li>Berakhir pada: <strong>{new Date(product.applied_promo.valid_until).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></li>
+                  )}
                 </ul>
               </div>
             )}

@@ -209,12 +209,12 @@ class EcommerceController extends Controller
                     $product->applied_promo = $cleanPromo;
                     
                     $discount = 0;
-                    if ($promo->promo_type === 'PERCENTAGE' || $promo->promo_type === 'FLASH_SALE') {
+                    if ($promo->promo_type === 'PERCENTAGE' || $promo->promo_type === 'PERCENTAGE_PER_ITEM' || $promo->promo_type === 'FLASH_SALE') {
                         $discount = ($product->selling_price * $promo->discount_value) / 100;
                         if ($promo->max_discount_per_transaction > 0 && $discount > $promo->max_discount_per_transaction) {
                             $discount = $promo->max_discount_per_transaction;
                         }
-                    } elseif ($promo->promo_type === 'FIXED') {
+                    } elseif ($promo->promo_type === 'FIXED' || $promo->promo_type === 'NOMINAL_PER_ITEM') {
                         $discount = $promo->discount_value;
                     }
                     

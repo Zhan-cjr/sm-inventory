@@ -446,7 +446,7 @@ export const POSTransaction = ({
       let echoInstance = null;
       try {
         echoInstance = initEcho(authToken);
-        
+
         // Listen for Stock Updates
         echoInstance.private(`branch.${branchId}.stock`)
           .listen('.stock.updated', (e) => {
@@ -457,22 +457,22 @@ export const POSTransaction = ({
                   const updatedStockData = { ...p, stock: e.quantity_on_hand };
                   // If stock table overrides the price for this branch, apply it
                   if (e.selling_price !== null && e.selling_price !== undefined && parseFloat(e.selling_price) > 0) {
-                      updatedStockData.selling_price = e.selling_price;
+                    updatedStockData.selling_price = e.selling_price;
                   }
                   return updatedStockData;
                 }
                 return p;
               });
-              
-              idbCache.set('pos_cached_products', updated).catch(() => {});
+
+              idbCache.set('pos_cached_products', updated).catch(() => { });
               return updated;
             });
-            
+
             // Perbarui juga harga keranjang jika dipengaruhi harga cabang (stock override)
             if (e.selling_price !== null && e.selling_price !== undefined && parseFloat(e.selling_price) > 0) {
               setItems(prevItems => prevItems.map(item => {
                 if (item.productId === e.product_id) {
-                    return { ...item, unitPrice: parseFloat(e.selling_price) };
+                  return { ...item, unitPrice: parseFloat(e.selling_price) };
                 }
                 return item;
               }));
@@ -500,17 +500,18 @@ export const POSTransaction = ({
                   }
                   return p;
                 });
-                idbCache.set('pos_cached_products', updated).catch(() => {});
+                idbCache.set('pos_cached_products', updated).catch(() => { });
                 return updated;
               });
-              
+
+              // [REVISI] Sesuai permintaan: harga global JANGAN otomatis menimpa keranjang. Patokan utama adalah harga Stok Cabang.
               // Jika produk tersebut ada di keranjang, perbarui harganya di keranjang
-              setItems(prevItems => prevItems.map(item => {
+              /* setItems(prevItems => prevItems.map(item => {
                 if (item.productId === e.product.id) {
-                    return { ...item, unitPrice: parseFloat(e.product.selling_price) };
+                  return { ...item, unitPrice: parseFloat(e.product.selling_price) };
                 }
                 return item;
-              }));
+              })); */
             }
           });
 
@@ -551,216 +552,216 @@ export const POSTransaction = ({
     const fetchCatalog = () => {
       fetch('/api/v1/products', {
         headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
       })
-      .then(data => {
-        if (Array.isArray(data)) {
-          setDbProducts(prev => {
-            const services = prev.filter(p => p.is_service);
-            return [...data, ...services];
-          });
-          idbCache.set('pos_cached_products', data);
-        }
-      })
-      .catch(async err => {
-        console.warn('Failed to load products, using cache:', err);
-        const parsed = await idbCache.get('pos_cached_products');
-        if (parsed && Array.isArray(parsed)) {
-          setDbProducts(prev => {
-            const services = prev.filter(p => p.is_service);
-            return [...parsed, ...services];
-          });
-        }
-      });
-
-    fetch('/api/v1/promotions', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        setDbPromos(data);
-        discountEngine.current = new DiscountEngine(data);
-        safeSetItem('pos_cached_promotions', JSON.stringify(data));
-      })
-      .catch(err => {
-        console.error('Failed to load promotions:', err);
-        const cached = localStorage.getItem('pos_cached_promotions');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            setDbPromos(parsed);
-            discountEngine.current = new DiscountEngine(parsed);
-          } catch (e) { }
-        }
-      });
-
-    fetch('/api/v1/banks', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        setBanks(data);
-        safeSetItem('pos_cached_banks', JSON.stringify(data));
-      })
-      .catch(err => {
-        console.error('Failed to load banks:', err);
-        const cached = localStorage.getItem('pos_cached_banks');
-        if (cached) {
-          try { setBanks(JSON.parse(cached)); } catch (e) { }
-        }
-      });
-
-    fetch('/api/v1/branches', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        if (Array.isArray(data)) {
-          const activeBranch = data.find(b => b.id === branchId) || data[0];
-          if (activeBranch) {
-            setBranchSettings(activeBranch);
-            safeSetItem('pos_cached_branch_settings', JSON.stringify(activeBranch));
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(data => {
+          if (Array.isArray(data)) {
+            setDbProducts(prev => {
+              const services = prev.filter(p => p.is_service);
+              return [...data, ...services];
+            });
+            idbCache.set('pos_cached_products', data);
           }
-        }
-      })
-      .catch(err => {
-        console.error('Failed to load branch settings:', err);
-        const cached = localStorage.getItem('pos_cached_branch_settings');
-        if (cached) {
-          try { setBranchSettings(JSON.parse(cached)); } catch (e) { }
-        }
-      });
+        })
+        .catch(async err => {
+          console.warn('Failed to load products, using cache:', err);
+          const parsed = await idbCache.get('pos_cached_products');
+          if (parsed && Array.isArray(parsed)) {
+            setDbProducts(prev => {
+              const services = prev.filter(p => p.is_service);
+              return [...parsed, ...services];
+            });
+          }
+        });
 
-    fetch('/api/v1/pos-settings', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
+      fetch('/api/v1/promotions', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
       })
-      .then(data => {
-        setPosSettings(data);
-        safeSetItem('pos_cached_settings', JSON.stringify(data));
-      })
-      .catch(err => {
-        console.error('Failed to load pos settings:', err);
-        const cached = localStorage.getItem('pos_cached_settings');
-        if (cached) {
-          try { setPosSettings(JSON.parse(cached)); } catch (e) { }
-        }
-      });
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(data => {
+          setDbPromos(data);
+          discountEngine.current = new DiscountEngine(data);
+          safeSetItem('pos_cached_promotions', JSON.stringify(data));
+        })
+        .catch(err => {
+          console.error('Failed to load promotions:', err);
+          const cached = localStorage.getItem('pos_cached_promotions');
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              setDbPromos(parsed);
+              discountEngine.current = new DiscountEngine(parsed);
+            } catch (e) { }
+          }
+        });
 
-    // Refresh user settings (e.g. allow_minus_stock) on load
-    fetch('/api/v1/user', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
+      fetch('/api/v1/banks', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
       })
-      .then(data => {
-        if (data.user) {
-          // Merge with existing pos_user to preserve token and other local properties
-          const existingUser = JSON.parse(localStorage.getItem('pos_user') || '{}');
-          const updatedUser = { ...existingUser, ...data.user };
-          safeSetItem('pos_user', JSON.stringify(updatedUser));
-        }
-      })
-      .catch(err => console.error('Failed to refresh user profile:', err));
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(data => {
+          setBanks(data);
+          safeSetItem('pos_cached_banks', JSON.stringify(data));
+        })
+        .catch(err => {
+          console.error('Failed to load banks:', err);
+          const cached = localStorage.getItem('pos_cached_banks');
+          if (cached) {
+            try { setBanks(JSON.parse(cached)); } catch (e) { }
+          }
+        });
 
-    fetch('/api/v1/customers', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
+      fetch('/api/v1/branches', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
       })
-      .then(data => {
-        setCustomers(data);
-        safeSetItem('pos_cached_customers', JSON.stringify(data));
-      })
-      .catch(err => {
-        console.error('Failed to load customers:', err);
-        const cached = localStorage.getItem('pos_cached_customers');
-        if (cached) {
-          try { setCustomers(JSON.parse(cached)); } catch (e) { }
-        }
-      });
-
-    // Fetch Apriori Rules for AI Upselling
-    fetch(`/api/v1/bi/apriori?branch_id=${branchId}`, {
-      headers: { 'Authorization': `Bearer ${authToken}`, 'Accept': 'application/json' }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          console.log('[AI Upsell] Rules loaded:', data);
-          setAprioriRules(data);
-        }
-      })
-      .catch(err => console.error('[AI Upsell] Failed to load apriori rules:', err));
-
-    fetch('/api/v1/services', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        if (Array.isArray(data)) {
-          const servicesAsProducts = data.map(s => ({
-            id: s.id,
-            sku: s.code,
-            barcode: s.code,
-            name: s.name + ' (Jasa)',
-            selling_price: s.price,
-            category_id: null,
-            is_service: true
-          }));
-          setDbProducts(prev => {
-            const productsOnly = prev.filter(p => !p.is_service);
-            return [...productsOnly, ...servicesAsProducts];
-          });
-          safeSetItem('pos_cached_services', JSON.stringify(data));
-        }
-      })
-      .catch(err => {
-        console.warn('Failed to load services, using cache:', err);
-        const cached = localStorage.getItem('pos_cached_services');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed)) {
-              const servicesAsProducts = parsed.map(s => ({
-                id: s.id,
-                sku: s.code,
-                barcode: s.code,
-                name: s.name + ' (Jasa)',
-                selling_price: s.price,
-                category_id: null,
-                is_service: true
-              }));
-              setDbProducts(prev => {
-                const productsOnly = prev.filter(p => !p.is_service);
-                return [...productsOnly, ...servicesAsProducts];
-              });
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(data => {
+          if (Array.isArray(data)) {
+            const activeBranch = data.find(b => b.id === branchId) || data[0];
+            if (activeBranch) {
+              setBranchSettings(activeBranch);
+              safeSetItem('pos_cached_branch_settings', JSON.stringify(activeBranch));
             }
-          } catch (e) { }
-        }
-      });
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load branch settings:', err);
+          const cached = localStorage.getItem('pos_cached_branch_settings');
+          if (cached) {
+            try { setBranchSettings(JSON.parse(cached)); } catch (e) { }
+          }
+        });
+
+      fetch('/api/v1/pos-settings', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(data => {
+          setPosSettings(data);
+          safeSetItem('pos_cached_settings', JSON.stringify(data));
+        })
+        .catch(err => {
+          console.error('Failed to load pos settings:', err);
+          const cached = localStorage.getItem('pos_cached_settings');
+          if (cached) {
+            try { setPosSettings(JSON.parse(cached)); } catch (e) { }
+          }
+        });
+
+      // Refresh user settings (e.g. allow_minus_stock) on load
+      fetch('/api/v1/user', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(data => {
+          if (data.user) {
+            // Merge with existing pos_user to preserve token and other local properties
+            const existingUser = JSON.parse(localStorage.getItem('pos_user') || '{}');
+            const updatedUser = { ...existingUser, ...data.user };
+            safeSetItem('pos_user', JSON.stringify(updatedUser));
+          }
+        })
+        .catch(err => console.error('Failed to refresh user profile:', err));
+
+      fetch('/api/v1/customers', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(data => {
+          setCustomers(data);
+          safeSetItem('pos_cached_customers', JSON.stringify(data));
+        })
+        .catch(err => {
+          console.error('Failed to load customers:', err);
+          const cached = localStorage.getItem('pos_cached_customers');
+          if (cached) {
+            try { setCustomers(JSON.parse(cached)); } catch (e) { }
+          }
+        });
+
+      // Fetch Apriori Rules for AI Upselling
+      fetch(`/api/v1/bi/apriori?branch_id=${branchId}`, {
+        headers: { 'Authorization': `Bearer ${authToken}`, 'Accept': 'application/json' }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            console.log('[AI Upsell] Rules loaded:', data);
+            setAprioriRules(data);
+          }
+        })
+        .catch(err => console.error('[AI Upsell] Failed to load apriori rules:', err));
+
+      fetch('/api/v1/services', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(data => {
+          if (Array.isArray(data)) {
+            const servicesAsProducts = data.map(s => ({
+              id: s.id,
+              sku: s.code,
+              barcode: s.code,
+              name: s.name + ' (Jasa)',
+              selling_price: s.price,
+              category_id: null,
+              is_service: true
+            }));
+            setDbProducts(prev => {
+              const productsOnly = prev.filter(p => !p.is_service);
+              return [...productsOnly, ...servicesAsProducts];
+            });
+            safeSetItem('pos_cached_services', JSON.stringify(data));
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to load services, using cache:', err);
+          const cached = localStorage.getItem('pos_cached_services');
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed)) {
+                const servicesAsProducts = parsed.map(s => ({
+                  id: s.id,
+                  sku: s.code,
+                  barcode: s.code,
+                  name: s.name + ' (Jasa)',
+                  selling_price: s.price,
+                  category_id: null,
+                  is_service: true
+                }));
+                setDbProducts(prev => {
+                  const productsOnly = prev.filter(p => !p.is_service);
+                  return [...productsOnly, ...servicesAsProducts];
+                });
+              }
+            } catch (e) { }
+          }
+        });
     };
 
     fetchCatalog();
@@ -901,14 +902,14 @@ export const POSTransaction = ({
     setInputValue(val);
     if (!isSubtotalMode && val.length > 1) {
       const lowerVal = val.toLowerCase();
-      
+
       // Check for exact barcode or sku match first (isolated result)
-      const exactMatches = dbProducts.filter(p => 
-        p.barcode?.toLowerCase() === lowerVal || 
+      const exactMatches = dbProducts.filter(p =>
+        p.barcode?.toLowerCase() === lowerVal ||
         p.sku.toLowerCase() === lowerVal ||
         (p.metadata && Array.isArray(p.metadata.additional_barcodes) && p.metadata.additional_barcodes.some(b => String(b).toLowerCase() === lowerVal))
       );
-      
+
       if (exactMatches.length > 0) {
         setSearchResults(exactMatches);
         setHighlightedIndex(-1);
@@ -982,8 +983,8 @@ export const POSTransaction = ({
       }
 
       const searchCode = isScale ? scaleItemCode : barcode;
-      const product = dbProducts.find(p => 
-        p.sku === searchCode || 
+      const product = dbProducts.find(p =>
+        p.sku === searchCode ||
         p.barcode === searchCode ||
         (p.metadata && Array.isArray(p.metadata.additional_barcodes) && p.metadata.additional_barcodes.includes(searchCode))
       );
@@ -1360,16 +1361,16 @@ export const POSTransaction = ({
       const addedId = String(product.id).toLowerCase();
       // Find a rule involving the added product
       const rule = aprioriRules.find(r => String(r.product_id_1).toLowerCase() === addedId || String(r.product_id_2).toLowerCase() === addedId);
-      
+
       if (rule) {
         const recId = String(rule.product_id_1).toLowerCase() === addedId ? String(rule.product_id_2).toLowerCase() : String(rule.product_id_1).toLowerCase();
         const recName = String(rule.product_id_1).toLowerCase() === addedId ? rule.item2 : rule.item1;
-        
+
         // Check if the recommended product is already in the cart
         // We use the existing 'items' state plus we know 'product.id' is just added.
         // If recId is NOT in the current cart, and recId is NOT the product just added
         const alreadyInCart = items.some(i => String(i.productId).toLowerCase() === recId) || addedId === recId;
-        
+
         if (!alreadyInCart) {
           console.log('[AI Upsell] Match found! Recommending:', recName);
           setAlertMsg({ text: `💡 AI Upsell: Konsumen biasanya juga membeli ${recName} (Peluang ${rule.confidence}).`, type: 'info', persist: true });
@@ -2386,10 +2387,10 @@ export const POSTransaction = ({
               <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Banyak Huruf (Kolom)</label>
-                  <input 
-                    type="number" 
-                    className="modern-barcode-input" 
-                    value={localPrinterSettings.columns || 32} 
+                  <input
+                    type="number"
+                    className="modern-barcode-input"
+                    value={localPrinterSettings.columns || 32}
                     onChange={(e) => setLocalPrinterSettings(p => ({ ...p, columns: parseInt(e.target.value) || 32 }))}
                     style={{ width: '100%', padding: '0.5rem' }}
                   />
@@ -2397,10 +2398,10 @@ export const POSTransaction = ({
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Tambahkan Feed</label>
-                  <input 
-                    type="number" 
-                    className="modern-barcode-input" 
-                    value={localPrinterSettings.feedLines || 0} 
+                  <input
+                    type="number"
+                    className="modern-barcode-input"
+                    value={localPrinterSettings.feedLines || 0}
                     onChange={(e) => setLocalPrinterSettings(p => ({ ...p, feedLines: parseInt(e.target.value) || 0 }))}
                     style={{ width: '100%', padding: '0.5rem' }}
                   />
@@ -2409,11 +2410,11 @@ export const POSTransaction = ({
               </div>
 
               <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Nama Printer Target (Opsional)</label>
-              <input 
-                type="text" 
-                className="modern-barcode-input" 
+              <input
+                type="text"
+                className="modern-barcode-input"
                 placeholder="Biarkan kosong untuk default"
-                value={localPrinterSettings.printerName || ''} 
+                value={localPrinterSettings.printerName || ''}
                 onChange={(e) => setLocalPrinterSettings(p => ({ ...p, printerName: e.target.value }))}
                 style={{ width: '100%', padding: '0.5rem', marginBottom: '1.5rem' }}
               />

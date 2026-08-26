@@ -114,9 +114,6 @@ services:
     restart: unless-stopped
     ports:
       - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
 
@@ -129,9 +126,6 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    volumes:
-      - ./company-profile:/app
-      - /app/node_modules
 
   # E-commerce Frontend Store (React + Vite)
   ecommerce-frontend:
@@ -142,9 +136,6 @@ services:
     restart: unless-stopped
     ports:
       - "8081:8081"
-    volumes:
-      - ./ecommerce-frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
 

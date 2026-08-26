@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar, Tag, ArrowRight, Newspaper, Search, Share2, X, Clock } from "lucide-react";
-
+import Link from "next/link";
 interface Article {
   id: number;
   title: string;
@@ -53,7 +53,6 @@ export default function NewsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("Semua");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://admin.toserbaselamat.id/api/company-profile'}/articles`)
@@ -179,20 +178,21 @@ export default function NewsPage() {
                         {article.title}
                       </h3>
 
-                      <p className="text-slate-600 text-xs font-medium leading-relaxed line-clamp-3">
-                        {article.content}
-                      </p>
+                      <div 
+                        className="text-slate-600 text-xs font-medium leading-relaxed line-clamp-3 prose-sm prose-p:my-0"
+                        dangerouslySetInnerHTML={{ __html: article.content }}
+                      />
                     </div>
                   </div>
 
                   <div className="p-6 pt-0">
-                    <button
-                      onClick={() => setSelectedArticle(article)}
+                    <Link
+                      href={`/news/${article.slug}`}
                       className="w-full py-3 bg-slate-100 hover:bg-primary hover:text-white text-slate-800 font-bold text-xs rounded-2xl transition-colors flex items-center justify-center gap-2"
                     >
                       <span>Baca Artikel Lengkap</span>
                       <ArrowRight size={15} />
-                    </button>
+                    </Link>
                   </div>
                 </motion.div>
               );
@@ -201,42 +201,6 @@ export default function NewsPage() {
         )}
 
       </div>
-
-      {/* Article Detail Modal */}
-      <AnimatePresence>
-        {selectedArticle && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-2xl relative border border-slate-200 max-h-[85vh] overflow-y-auto custom-scrollbar">
-              <button onClick={() => setSelectedArticle(null)} className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors">
-                <X size={18} />
-              </button>
-
-              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary font-bold text-[10px] uppercase tracking-wider inline-block mb-3">
-                {selectedArticle.type}
-              </span>
-
-              <h2 className="text-2xl font-black text-slate-900 mb-3">{selectedArticle.title}</h2>
-              <p className="text-xs text-slate-400 font-semibold mb-6 flex items-center gap-2">
-                <Calendar size={14} /> Dipublikasikan {new Date(selectedArticle.published_at || selectedArticle.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-
-              <div className="space-y-4 text-slate-700 text-sm font-medium leading-relaxed mb-8">
-                <p>{selectedArticle.content}</p>
-                <p>Kunjungi cabang Toserba Selamat terdekat di kota Anda atau gunakan fitur Belanja Online untuk mendapatkan keuntungannya sekarang juga!</p>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                <button onClick={() => setSelectedArticle(null)} className="py-2.5 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors">
-                  Tutup
-                </button>
-                <a href="http://shopping.toserbaselamat.id" target="_blank" rel="noreferrer" className="py-2.5 px-6 bg-secondary text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2">
-                  Lihat Promo Belanja Online <ArrowRight size={14} />
-                </a>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
     </div>
   );
