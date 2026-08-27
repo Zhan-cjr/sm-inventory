@@ -32,6 +32,14 @@
                 <td class="separator">:</td>
                 <td>{{ \Carbon\Carbon::parse($kontrabon->tanggal_jatuh_tempo)->format('d-m-Y') }}</td>
             </tr>
+            @if(isset($minDate) && isset($maxDate))
+            <tr>
+                <td colspan="3"></td>
+                <td class="label" style="text-align: right;">Periode Cut-Off</td>
+                <td class="separator">:</td>
+                <td>{{ $minDate }} s/d {{ $maxDate }}</td>
+            </tr>
+            @endif
         </table>
 
         @if($kontrabon->goodsReceipts->count() > 0)
@@ -62,24 +70,34 @@
             <thead>
                 <tr>
                     <th style="width: 25px;" class="text-center">No</th>
-                    <th style="width: 130px;">Barcode</th>
+                    <th style="width: 100px;">Barcode</th>
                     <th>SKU / Nama Produk</th>
-                    <th class="text-right" style="width: 90px;">Harga Jual</th>
-                    <th class="text-right" style="width: 90px;">HPP (Beli)</th>
-                    <th class="text-center" style="width: 70px;">Qty</th>
-                    <th class="text-right" style="width: 130px;">Subtotal Tagihan</th>
+                    <th class="text-right" style="width: 75px;">HPP (Beli)</th>
+                    <th class="text-right" style="width: 75px;">Harga Jual</th>
+                    <th class="text-center" style="width: 45px;">Qty Jual</th>
+                    <th class="text-center" style="width: 45px;">Qty Retur</th>
+                    <th class="text-center" style="width: 45px;">Qty Net</th>
+                    <th class="text-right" style="width: 75px;">Total Jual</th>
+                    <th class="text-right" style="width: 75px;">Total Beli HPP</th>
+                    <th class="text-right" style="width: 75px;">Total Retur (HPP)</th>
+                    <th class="text-right" style="width: 85px;">Subtotal Tagihan</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($selloutItems as $index => $item)
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
-                    <td>{{ $item['barcode'] }}</td>
-                    <td><strong>{{ $item['sku'] }}</strong><br>{{ $item['name'] }}</td>
-                    <td class="text-right">Rp {{ number_format($item['selling_price'], 0, ',', '.') }}</td>
-                    <td class="text-right">Rp {{ number_format($item['cost_price'], 0, ',', '.') }}</td>
-                    <td class="text-center">{{ number_format($item['qty']) }}</td>
-                    <td class="text-right">Rp {{ number_format($item['subtotal'], 0, ',', '.') }}</td>
+                    <td style="font-size: 8pt;">{{ $item['barcode'] }}</td>
+                    <td style="font-size: 8pt;"><strong>{{ $item['sku'] }}</strong><br>{{ $item['name'] }}</td>
+                    <td class="text-right" style="font-size: 8pt;">Rp {{ number_format($item['cost_price'], 0, ',', '.') }}</td>
+                    <td class="text-right" style="font-size: 8pt;">Rp {{ number_format($item['selling_price'], 0, ',', '.') }}</td>
+                    <td class="text-center" style="font-size: 8pt;">{{ number_format($item['qty_jual']) }}</td>
+                    <td class="text-center" style="font-size: 8pt;">{{ number_format($item['qty_retur']) }}</td>
+                    <td class="text-center" style="font-size: 8pt; font-weight: bold;">{{ number_format($item['qty_jual_net']) }}</td>
+                    <td class="text-right" style="font-size: 8pt;">Rp {{ number_format($item['total_jual'], 0, ',', '.') }}</td>
+                    <td class="text-right" style="font-size: 8pt;">Rp {{ number_format($item['total_beli_hpp'], 0, ',', '.') }}</td>
+                    <td class="text-right" style="font-size: 8pt;">Rp {{ number_format($item['total_retur_hpp'], 0, ',', '.') }}</td>
+                    <td class="text-right" style="font-size: 8pt; font-weight: bold;">Rp {{ number_format($item['subtotal'], 0, ',', '.') }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -109,6 +127,25 @@
         @endif
 
         <table class="summary-box" style="margin-top: 15px;">
+            @if(isset($selloutItems) && $selloutItems->count() > 0)
+            @php
+                $sumTotalJual = collect($selloutItems)->sum('total_jual');
+                $sumTotalReturJual = collect($selloutItems)->sum('total_retur_jual');
+                $netSales = $sumTotalJual - $sumTotalReturJual;
+            @endphp
+            <tr>
+                <td class="label" style="font-size: 10pt;">TOTAL JUAL</td>
+                <td class="value" style="font-size: 10pt;">Rp {{ number_format($sumTotalJual, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td class="label" style="font-size: 10pt;">TOTAL RETUR JUAL</td>
+                <td class="value" style="font-size: 10pt;">Rp {{ number_format($sumTotalReturJual, 0, ',', '.') }}</td>
+            </tr>
+            <tr>
+                <td class="label" style="font-size: 10pt;">NET SALES</td>
+                <td class="value" style="font-size: 10pt; font-weight: bold;">Rp {{ number_format($netSales, 0, ',', '.') }}</td>
+            </tr>
+            @endif
             <tr>
                 <td class="label" style="font-size: 12pt;">TOTAL TAGIHAN BERSIH</td>
                 <td class="value" style="font-size: 12pt; font-weight: bold;">Rp {{ number_format($kontrabon->total_amount, 0, ',', '.') }}</td>

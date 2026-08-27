@@ -43,6 +43,7 @@ class ReportPrintController extends Controller
             'laporan-hpp' => $this->printLaporanHpp($request),
             'laporan-rekap-tipe-suplier' => $this->printLaporanRekapTipeSuplier($filters),
             'produk' => $this->printProduk($filters),
+            'laporan-ppob' => $this->printLaporanPpob($filters),
             default => abort(404, 'Tipe laporan tidak ditemukan'),
         };
 
@@ -1928,29 +1929,47 @@ class ReportPrintController extends Controller
         $organizationId = auth()->user()?->organization_id ?? \App\Models\Organization::first()?->id;
         $organization = \App\Models\Organization::find($organizationId);
         
-        // Aggregate Consignment Sellout if applicable
         $selloutItems = \App\Models\TransactionItem::with('product')
             ->where('kontrabon_id', $kontrabon->id)
             ->get()
             ->groupBy('product_id')
             ->map(function ($items) {
                 $first = $items->first();
+                $qtyJual = $items->where('quantity', '>', 0)->sum('quantity');
+                $qtyRetur = abs($items->where('quantity', '<', 0)->sum('quantity'));
+                $qtyJualNet = $qtyJual - $qtyRetur;
+                
+                $hargaJual = $first->unit_price ?? ($first->product->price ?? 0);
+                $hpp = $first->product->cost_price ?? 0;
+                
                 return [
                     'barcode' => $first->product->barcode ?? '-',
                     'sku' => $first->product->sku ?? '-',
                     'name' => $first->product->name ?? '-',
-                    'qty' => $items->sum('quantity'),
-                    'cost_price' => $first->product->cost_price ?? 0,
-                    'selling_price' => $first->unit_price ?? ($first->product->price ?? 0),
-                    'subtotal' => $items->sum('quantity') * ($first->product->cost_price ?? 0),
+                    'qty_jual' => $qtyJual,
+                    'qty_retur' => $qtyRetur,
+                    'qty_jual_net' => $qtyJualNet,
+                    'cost_price' => $hpp,
+                    'selling_price' => $hargaJual,
+                    'total_jual' => $qtyJual * $hargaJual,
+                    'total_beli_hpp' => $qtyJual * $hpp,
+                    'total_retur_hpp' => $qtyRetur * $hpp,
+                    'total_retur_jual' => $qtyRetur * $hargaJual,
+                    'subtotal' => $qtyJualNet * $hpp,
                 ];
             })->values();
+
+        $dates = \App\Models\Transaction::whereHas('items', function ($q) use ($kontrabon) {
+            $q->where('kontrabon_id', $kontrabon->id);
+        })->selectRaw('MIN(transaction_date) as min_date, MAX(transaction_date) as max_date')->first();
 
         return view('print.documents.kontrabon-nota', [
             'kontrabon' => $kontrabon,
             'organization' => $organization,
             'selloutItems' => $selloutItems,
-            'title' => 'Nota Kontrabon'
+            'title' => 'Nota Kontrabon',
+            'minDate' => $dates->min_date ? \Carbon\Carbon::parse($dates->min_date)->format('d-m-Y') : null,
+            'maxDate' => $dates->max_date ? \Carbon\Carbon::parse($dates->max_date)->format('d-m-Y') : null,
         ]);
     }
 
@@ -2235,5 +2254,96 @@ class ReportPrintController extends Controller
             'fpRow', 'fpHakPpn', 'fpMargin',
             'totalJual', 'totalHpp', 'totalRetur', 'totalHppRetur', 'totalSelisih'
         ));
+    }
+
+    private function printLaporanPpob($filters)
+    {
+        $query = \App\Models\PpobTransaction::with(['transaction.branch'])->latest();
+
+        $query = $this->applyDateFilters($query, $filters, 'created_at');
+
+        if (!empty($filters['branch_id'])) {
+            $branchId = $filters['branch_id']['value'] ?? $filters['branch_id'];
+            $query->whereHas('transaction', function($q) use ($branchId) {
+                $q->where('branch_id', $branchId);
+            });
+        }
+        
+        $user = auth()->user();
+        if ($user && $user->branch_id) {
+            $query->whereHas('transaction', function($q) use ($user) {
+                $q->where('branch_id', $user->branch_id);
+            });
+        }
+
+        if (!empty($filters['provider'])) {
+            $provider = $filters['provider']['value'] ?? $filters['provider'];
+            $query->where('provider', $provider);
+        }
+
+        if (!empty($filters['status'])) {
+            $status = $filters['status']['value'] ?? $filters['status'];
+            $query->where('status', $status);
+        }
+
+        $records = $query->get();
+        $period = $this->getPeriodString($filters, 'transaction_date');
+
+        $columns = [
+            'Tanggal', 'No. Struk', 'Ref ID', 'No. Tujuan', 'Nama Customer', 
+            'SKU Provider', 'Provider', 'Harga Modal', 'Harga Jual', 'Laba', 'Status', 'SN / Token', 'Keterangan'
+        ];
+        
+        $rows = [];
+        $totalHargaModal = 0;
+        $totalHargaJual = 0;
+        $totalLaba = 0;
+
+        foreach ($records as $r) {
+            $isFailed = strtolower($r->status ?? '') === 'gagal';
+            $hargaJual = 0;
+            
+            if (!$isFailed) {
+                $hargaJual = $r->transaction ? $r->transaction->final_amount : ($r->ecommerceOrder ? $r->ecommerceOrder->total_amount : 0);
+            }
+            
+            $laba = $isFailed ? 0 : ($hargaJual - $r->price);
+            $hargaModal = $isFailed ? 0 : $r->price;
+            
+            $totalHargaModal += $hargaModal;
+            $totalHargaJual += $hargaJual;
+            $totalLaba += $laba;
+
+            $rows[] = [
+                $r->created_at ? $r->created_at->format('d M Y, H:i') : '-',
+                $r->transaction ? $r->transaction->receipt_number : '-',
+                $r->ref_id ?? '-',
+                $r->customer_no ?? '-',
+                $r->customer_name ?? '-',
+                $r->buyer_sku_code ?? '-',
+                strtoupper($r->provider ?? '-'),
+                number_format($hargaModal, 0, ',', '.'),
+                number_format($hargaJual, 0, ',', '.'),
+                number_format($laba, 0, ',', '.'),
+                ucfirst($r->status ?? '-'),
+                $r->sn ?? '-',
+                $r->message ?? '-'
+            ];
+        }
+
+        $rows[] = [
+            '<strong>TOTAL</strong>', '', '', '', '', '', '', 
+            '<strong>' . number_format($totalHargaModal, 0, ',', '.') . '</strong>', 
+            '<strong>' . number_format($totalHargaJual, 0, ',', '.') . '</strong>', 
+            '<strong>' . number_format($totalLaba, 0, ',', '.') . '</strong>', 
+            '', '', ''
+        ];
+
+        return view('print.reports.generic', [
+            'title' => 'Laporan Transaksi PPOB',
+            'period' => $period,
+            'columns' => $columns,
+            'rows' => $rows
+        ]);
     }
 }
