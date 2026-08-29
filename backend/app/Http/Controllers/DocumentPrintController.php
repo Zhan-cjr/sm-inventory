@@ -74,7 +74,7 @@ class DocumentPrintController extends Controller
                 $title = 'Bukti Pengeluaran Kas';
                 break;
             case 'tax-invoice':
-                $documents = \App\Models\TaxInvoice::with(['organization'])
+                $documents = \App\Models\TaxInvoice::with(['organization', 'items'])
                     ->whereIn('id', $ids)->get();
                 $viewName = 'print.documents.tax-invoice';
                 $title = 'Faktur Pajak';

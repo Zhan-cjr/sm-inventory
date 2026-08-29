@@ -13,6 +13,17 @@ class EditTaxInvoice extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            \Filament\Actions\Action::make('view_items_modal')
+                ->label('Lihat Rincian Barang')
+                ->icon('heroicon-o-queue-list')
+                ->color('primary')
+                ->modalHeading(fn (\App\Models\TaxInvoice $record) => "Rincian Faktur Pajak: {$record->nomor_faktur}")
+                ->modalWidth('5xl')
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('Tutup')
+                ->modalContent(fn (\App\Models\TaxInvoice $record) => view('filament.tax-invoices.modal-detail', [
+                    'record' => $record->load('items')
+                ])),
             \Filament\Actions\Action::make('print')
                 ->label('Cetak')
                 ->icon('heroicon-o-printer')
@@ -21,5 +32,11 @@ class EditTaxInvoice extends EditRecord
                 ->openUrlInNewTab(),
             DeleteAction::make(),
         ];
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        unset($data['scan_qr_url']);
+        return $data;
     }
 }

@@ -13,6 +13,7 @@ class PurchaseReturn extends Model
         'organization_id',
         'branch_id',
         'supplier_id',
+        'supplier_division_id',
         'goods_receipt_id',
         'return_number',
         'return_date',
@@ -40,6 +41,11 @@ class PurchaseReturn extends Model
     public function supplier()
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function division()
+    {
+        return $this->belongsTo(SupplierDivision::class, 'supplier_division_id');
     }
 
     public function goodsReceipt()

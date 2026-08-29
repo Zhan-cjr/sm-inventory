@@ -13,7 +13,7 @@ class GoodsReceipt extends Model
     use HasUuids;
 
     protected $fillable = [
-        'warehouse_check_id', 'purchase_order_id', 'supplier_id', 'branch_id', 
+        'warehouse_check_id', 'purchase_order_id', 'supplier_id', 'supplier_division_id', 'branch_id', 
         'receipt_number', 'receipt_date', 'received_by', 'faktur_image',
         'faktur_supplier', 'total_amount', 'include_tax', 'tax_amount', 'status', 'notes',
         'due_date', 'payment_status', 'paid_amount', 'payment_method'
@@ -42,6 +42,11 @@ class GoodsReceipt extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function division(): BelongsTo
+    {
+        return $this->belongsTo(SupplierDivision::class, 'supplier_division_id');
     }
 
     public function branch(): BelongsTo

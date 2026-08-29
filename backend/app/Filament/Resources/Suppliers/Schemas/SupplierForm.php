@@ -35,14 +35,25 @@ class SupplierForm
                     })
                     ->unique(ignoreRecord: true),
                 TextInput::make('name')
+                    ->label('Nama Pemasok')
+                    ->default(fn () => request()->query('name'))
                     ->required(),
-                TextInput::make('contact_person'),
+                TextInput::make('npwp')
+                    ->label('NPWP Pemasok')
+                    ->placeholder('Contoh: 01.300.553.3-092.000')
+                    ->default(fn () => request()->query('npwp'))
+                    ->maxLength(50),
+                TextInput::make('contact_person')
+                    ->label('Contact Person (Pusat)'),
                 TextInput::make('phone')
+                    ->label('No. Telepon / HP')
                     ->tel(),
                 TextInput::make('email')
                     ->label('Email address')
                     ->email(),
                 Textarea::make('address')
+                    ->label('Alamat Kantor Pusat')
+                    ->default(fn () => request()->query('address'))
                     ->columnSpanFull(),
                 TextInput::make('default_due_days')
                     ->label('Jatuh Tempo Default (Hari)')

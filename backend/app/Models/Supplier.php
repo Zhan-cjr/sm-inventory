@@ -12,7 +12,7 @@ class Supplier extends Model
     use HasUuids;
 
     protected $fillable = [
-        'organization_id', 'code', 'name', 'contact_person', 
+        'organization_id', 'code', 'name', 'npwp', 'contact_person', 
         'phone', 'email', 'address', 'is_active', 'default_due_days', 'default_po_expired_days', 'payment_method', 'is_consignment', 'gr_requires_po'
     ];
 
@@ -25,6 +25,11 @@ class Supplier extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function divisions(): HasMany
+    {
+        return $this->hasMany(SupplierDivision::class);
     }
 
     public function products(): HasMany

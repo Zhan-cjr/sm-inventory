@@ -20,6 +20,7 @@
         "midtrans/midtrans-php": "^2.6",
         "picqer/php-barcode-generator": "^3.2",
         "predis/predis": "*",
+        "simplesoftwareio/simple-qrcode": "^4.2",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-permission": "^7.4"
     },

@@ -40,7 +40,11 @@ class KontrabonResource extends Resource
                             ->disabled(),
                         \Filament\Forms\Components\Select::make('supplier_id')
                             ->relationship('supplier', 'name')
-                            ->label('Pemasok')
+                            ->label('Pemasok Utama')
+                            ->disabled(),
+                        \Filament\Forms\Components\Select::make('supplier_division_id')
+                            ->relationship('division', 'name')
+                            ->label('Divisi / Sub-Supplier')
                             ->disabled(),
                          \Filament\Forms\Components\TextInput::make('total_amount')
                             ->label('Total Tagihan')
@@ -83,6 +87,7 @@ class KontrabonResource extends Resource
                 Tables\Columns\TextColumn::make('tanggal_kontrabon')->label('Tgl Kontrabon')->date()->sortable(),
                 Tables\Columns\TextColumn::make('tanggal_jatuh_tempo')->label('Jatuh Tempo')->date()->sortable(),
                 Tables\Columns\TextColumn::make('supplier.name')->label('Pemasok')->searchable(),
+                Tables\Columns\TextColumn::make('division.name')->label('Divisi')->searchable()->placeholder('-'),
                 Tables\Columns\TextColumn::make('total_amount')->label('Total Tagihan')->money('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('paid_amount')->label('Sudah Dibayar')->money('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('status')->badge()

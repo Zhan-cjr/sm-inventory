@@ -40,6 +40,16 @@ class GoodsReceiptForm
                     ->disabledOn('edit')
                     ->searchable()
                     ->preload()
+                    ->live()
+                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        if ($state) {
+                            $po = \App\Models\PurchaseOrder::find($state);
+                            if ($po) {
+                                $set('supplier_id', $po->supplier_id);
+                                $set('supplier_division_id', $po->supplier_division_id);
+                            }
+                        }
+                    })
                     ->required(function (\Filament\Forms\Get $get) {
                         $supplierId = $get('supplier_id');
                         if ($supplierId) {
@@ -50,11 +60,13 @@ class GoodsReceiptForm
                     }),
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')
+                    ->label('Pemasok Utama')
                     ->required()
                     ->searchable()
                     ->preload()
                     ->live()
                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        $set('supplier_division_id', null);
                         if ($state) {
                             $supplier = \App\Models\Supplier::find($state);
                             if ($supplier && $get('receipt_date')) {
@@ -63,6 +75,19 @@ class GoodsReceiptForm
                             }
                         }
                     }),
+                Select::make('supplier_division_id')
+                    ->label('Divisi / Sub-Supplier')
+                    ->placeholder('Pilih divisi pemasok (Opsional)')
+                    ->options(function (callable $get) {
+                        $supplierId = $get('supplier_id');
+                        if (!$supplierId) {
+                            return [];
+                        }
+                        return \App\Models\SupplierDivision::where('supplier_id', $supplierId)
+                            ->pluck('name', 'id');
+                    })
+                    ->searchable()
+                    ->live(),
                 Select::make('branch_id')
                     ->relationship('branch', 'name')
                     ->required()

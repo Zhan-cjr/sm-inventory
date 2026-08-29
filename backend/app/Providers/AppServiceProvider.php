@@ -42,6 +42,10 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
 
+        \Illuminate\Support\Facades\Gate::before(function ($user, $ability) {
+            return $user->hasRole(['superadmin', 'super_admin', 'super-admin']) ? true : null;
+        });
+
         ini_set('memory_limit', '512M');
         
         \Filament\Tables\Table::configureUsing(function (\Filament\Tables\Table $table): void {

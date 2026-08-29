@@ -31,11 +31,28 @@ class PurchaseReturnForm
                 
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')
-                    ->label('Supplier')
+                    ->label('Pemasok Utama')
                     ->searchable()
                     ->live()
-                    ->afterStateUpdated(function ($set) { $set('goods_receipt_id', null); })
+                    ->afterStateUpdated(function ($set) { 
+                        $set('goods_receipt_id', null); 
+                        $set('supplier_division_id', null);
+                    })
                     ->required(),
+                    
+                Select::make('supplier_division_id')
+                    ->label('Divisi / Sub-Supplier')
+                    ->placeholder('Pilih divisi pemasok (Opsional)')
+                    ->options(function (Get $get) {
+                        $supplierId = $get('supplier_id');
+                        if (!$supplierId) {
+                            return [];
+                        }
+                        return \App\Models\SupplierDivision::where('supplier_id', $supplierId)
+                            ->pluck('name', 'id');
+                    })
+                    ->searchable()
+                    ->live(),
                     
                 Select::make('goods_receipt_id')
                     ->label('Referensi Penerimaan Barang (GR)')
