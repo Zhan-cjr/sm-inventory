@@ -244,9 +244,9 @@ class ShiftController extends Controller
             $tx_returns = 0;
             foreach ($tx->items as $item) {
                 if ($item->quantity > 0) {
-                    $tx_sales += ($item->quantity * ($item->unit_price - $item->discount_per_item));
+                    $tx_sales += ($item->quantity * $item->unit_price);
                 } else {
-                    $tx_returns += (abs($item->quantity) * ($item->unit_price - $item->discount_per_item));
+                    $tx_returns += (abs($item->quantity) * $item->unit_price);
                 }
             }
             $tx_sales -= ($tx->manual_discount + $tx->promo_discount);

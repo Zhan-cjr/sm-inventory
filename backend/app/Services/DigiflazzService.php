@@ -2,10 +2,11 @@
 
 namespace App\Services;
 
+use App\Contracts\PpobProviderInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class DigiflazzService
+class DigiflazzService implements PpobProviderInterface
 {
     protected $username;
     protected $apiKey;
@@ -57,7 +58,7 @@ class DigiflazzService
         }
     }
 
-    public function topup($buyerSkuCode, $customerNo, $refId)
+    public function topup(string $buyerSkuCode, string $customerNo, string $refId, array $additionalInfo = [])
     {
         $payload = [
             'username' => $this->username,
@@ -79,5 +80,11 @@ class DigiflazzService
                 ]
             ];
         }
+    }
+
+    public function checkStatus(string $skuCode, string $customerNo, string $refId)
+    {
+        // Digiflazz check status uses the exact same payload as topup
+        return $this->topup($skuCode, $customerNo, $refId);
     }
 }

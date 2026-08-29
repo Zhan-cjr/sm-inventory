@@ -30,6 +30,11 @@ class PpobTransactionResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'ref_id';
 
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return PpobTransactionForm::configure($schema);
@@ -52,11 +57,24 @@ class PpobTransactionResource extends Resource
         ];
     }
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getEloquentQuery();
+        
+        $user = auth()->user();
+        if ($user && $user->branch_id) {
+            $query->whereHas('transaction', function($q) use ($user) {
+                $q->where('branch_id', $user->branch_id);
+            });
+        }
+        
+        return $query;
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => ListPpobTransactions::route('/'),
-            'create' => CreatePpobTransaction::route('/create'),
             'view' => ViewPpobTransaction::route('/{record}'),
             'edit' => EditPpobTransaction::route('/{record}/edit'),
         ];

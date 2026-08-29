@@ -182,10 +182,19 @@ class ProductForm
                     ->required()
                     ->live()
                     ->disabled($isBranchUser),
-                TextInput::make('ppob_sku')
-                    ->label('Kode SKU Digiflazz (PPOB SKU)')
+                Select::make('ppob_provider')
+                    ->label('Provider PPOB')
+                    ->options([
+                        'digiflazz' => 'Digiflazz',
+                        'ama' => 'AMA',
+                    ])
+                    ->default('digiflazz')
                     ->visible(fn ($get) => $get('product_type') === 'digital')
-                    ->helperText('Contoh: xld10 (Lihat daftar harga di Digiflazz)')
+                    ->disabled($isBranchUser),
+                TextInput::make('ppob_sku')
+                    ->label('Kode SKU Provider (PPOB SKU)')
+                    ->visible(fn ($get) => $get('product_type') === 'digital')
+                    ->helperText('Contoh: xld10 (Lihat daftar harga di Digiflazz atau AMA)')
                     ->disabled($isBranchUser),
                 Select::make('supplier_id')
                     ->relationship('supplier', 'name')

@@ -48,10 +48,15 @@ class PosCatalogController extends Controller
             try {
                 // Cache Miss & Got Lock: Query Database
                 $products = \App\Models\Product::query()
-                    ->join('stocks', 'products.id', '=', 'stocks.product_id')
-                    ->where('stocks.branch_id', $branchId)
+                    ->leftJoin('stocks', function($join) use ($branchId) {
+                        $join->on('products.id', '=', 'stocks.product_id')
+                             ->where('stocks.branch_id', '=', $branchId);
+                    })
                     ->where('products.is_active', true)
-                    ->where('stocks.is_active', true)
+                    ->where(function($query) {
+                        $query->where('stocks.is_active', true)
+                              ->orWhere('products.product_type', 'digital');
+                    })
                     ->select([
                         'products.*',
                         'stocks.cost_price as branch_cost_price',
@@ -67,6 +72,9 @@ class PosCatalogController extends Controller
                     ])
                     ->get()
                     ->map(function ($product) {
+                        if ($product->product_type === 'digital') {
+                            $product->quantity_on_hand = 999999; // Unlimited stock for digital
+                        }
                         if ($product->branch_selling_price !== null && $product->branch_selling_price > 0) {
                             $product->selling_price = $product->branch_selling_price;
                         }

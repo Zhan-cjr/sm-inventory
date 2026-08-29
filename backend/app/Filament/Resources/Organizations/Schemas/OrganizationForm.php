@@ -14,7 +14,9 @@ class OrganizationForm
     {
         return $schema
             ->components([
-                Section::make('Informasi Utama & Operasional')
+                \Filament\Schemas\Components\Tabs::make('Pengaturan Perusahaan')->tabs([
+                    \Filament\Schemas\Components\Tabs\Tab::make('Utama')->icon('heroicon-o-building-office-2')->schema([
+                        Section::make('Informasi Utama & Operasional')
                     ->description('Pengaturan profil perusahaan, nama cabang utama, dan loyalitas poin.')
                     ->schema([
                         Grid::make(2)->schema([
@@ -63,7 +65,24 @@ class OrganizationForm
                                 ->columnSpanFull(),
                         ])
                     ]),
-                Section::make('Pengaturan WhatsApp Gateway')
+                ]),
+                \Filament\Schemas\Components\Tabs\Tab::make('PPOB')->icon('heroicon-o-device-phone-mobile')->schema([
+                        Section::make('Pengaturan PPOB')
+                    ->description('Pilih provider PPOB mana saja yang aktif untuk memproses transaksi produk digital.')
+                    ->schema([
+                        \Filament\Forms\Components\CheckboxList::make('active_ppob_providers')
+                            ->label('Provider PPOB Aktif')
+                            ->options([
+                                'digiflazz' => 'Digiflazz',
+                                'ama' => 'AMA',
+                            ])
+                            ->default(['digiflazz'])
+                            ->columns(2)
+                            ->helperText('Transaksi ke provider yang tidak dicentang di sini akan otomatis ditolak oleh sistem.'),
+                    ]),
+                ]),
+                \Filament\Schemas\Components\Tabs\Tab::make('WhatsApp')->icon('heroicon-o-chat-bubble-left-right')->schema([
+                        Section::make('Pengaturan WhatsApp Gateway')
                     ->description('Pilih layanan WhatsApp Gateway yang digunakan untuk mengirim notifikasi pesanan dan OTP reset kata sandi.')
                     ->schema([
                         Grid::make(2)->schema([
@@ -100,7 +119,9 @@ class OrganizationForm
                                 ->columnSpanFull(),
                         ])
                     ]),
-                Section::make('Pengaturan Persetujuan (Approval Settings)')
+                ]),
+                \Filament\Schemas\Components\Tabs\Tab::make('Approval')->icon('heroicon-o-check-badge')->schema([
+                        Section::make('Pengaturan Persetujuan (Approval Settings)')
                     ->description('Tentukan batas-batas transaksi yang membutuhkan persetujuan Manajer/Supervisor.')
                     ->schema([
                         Grid::make(2)->schema([
@@ -121,7 +142,9 @@ class OrganizationForm
                                 ->columnSpanFull(),
                         ])
                     ]),
-                Section::make('Notifikasi Grup Telegram (Opsional)')
+                ]),
+                \Filament\Schemas\Components\Tabs\Tab::make('Notifikasi')->icon('heroicon-o-bell')->schema([
+                        Section::make('Notifikasi Grup Telegram (Opsional)')
                     ->description('Masukkan Chat ID dari Grup Telegram untuk mengirim notifikasi persetujuan ke dalam grup secara spesifik. Kosongkan jika hanya ingin mengirim notifikasi ke personal chat supervisor.')
                     ->schema([
                         Grid::make(2)->schema([
@@ -147,7 +170,9 @@ class OrganizationForm
                                 ->nullable()
                                 ->columnSpanFull(),
                         ])
-                    ])
-            ]);
+                    ]),
+                ]),
+            ])
+        ]);
     }
 }

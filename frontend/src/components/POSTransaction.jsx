@@ -3274,15 +3274,17 @@ export const POSTransaction = ({
             </div>
 
             <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-              <div className="barcode-input-wrapper" style={{ flex: 1, maxWidth: '300px' }}>
-                <div className="input-icon"><Search size={20} /></div>
+              <div className="barcode-input-wrapper" style={{ flex: 1, maxWidth: '300px', position: 'relative' }}>
+                <div className="input-icon" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                  <Search size={18} />
+                </div>
                 <input
                   type="text"
                   className="barcode-input"
                   placeholder="Cari No Tujuan/SN..."
                   value={ppobSearchQuery}
                   onChange={(e) => setPpobSearchQuery(e.target.value)}
-                  style={{ paddingLeft: '2.5rem' }}
+                  style={{ paddingLeft: '2.5rem', width: '100%', boxSizing: 'border-box' }}
                 />
               </div>
               <button className="btn-secondary" onClick={fetchPpobTransactions} disabled={isFetchingPpobTransactions}>
@@ -3292,60 +3294,74 @@ export const POSTransaction = ({
 
             <div className="table-container" style={{ maxHeight: '60vh', overflowY: 'auto', background: 'var(--bg-card)', borderRadius: '0.5rem', border: '1px solid var(--border-light)' }}>
               {isFetchingPpobTransactions ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Memuat data...</div>
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                  <RotateCcw size={32} className="spin" style={{ opacity: 0.5 }} />
+                  <span>Memuat data...</span>
+                </div>
               ) : (
-                <table className="pos-table" style={{ width: '100%' }}>
-                  <thead>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead style={{ backgroundColor: 'var(--bg-hover)', borderBottom: '2px solid var(--border-light)', position: 'sticky', top: 0, zIndex: 1 }}>
                     <tr>
-                      <th style={{ textAlign: 'left', padding: '0.75rem' }}>Waktu</th>
-                      <th style={{ textAlign: 'left', padding: '0.75rem' }}>Produk</th>
-                      <th style={{ textAlign: 'left', padding: '0.75rem' }}>No Tujuan</th>
-                      <th style={{ textAlign: 'center', padding: '0.75rem' }}>Status</th>
-                      <th style={{ textAlign: 'left', padding: '0.75rem' }}>SN / Token</th>
-                      <th style={{ textAlign: 'center', padding: '0.75rem' }}>Aksi</th>
+                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>Waktu</th>
+                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>Produk</th>
+                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>No Tujuan</th>
+                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)', textAlign: 'center' }}>Status</th>
+                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>SN / Token</th>
+                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)', textAlign: 'center' }}>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {ppobTransactions
-                      .filter(tx => tx.ppob_transactions?.some(p => p.customer_no?.includes(ppobSearchQuery) || p.sn?.includes(ppobSearchQuery)))
-                      .map(tx => {
+                    {(() => {
+                      const filteredTxs = ppobTransactions.filter(tx => tx.ppob_transactions?.some(p => p.customer_no?.includes(ppobSearchQuery) || p.sn?.includes(ppobSearchQuery)));
+                      
+                      if (filteredTxs.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan="6" style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                                <Search size={48} style={{ opacity: 0.1 }} />
+                                <span>{ppobTransactions.length === 0 ? 'Tidak ada transaksi PPOB hari ini' : 'Tidak ada transaksi yang sesuai pencarian'}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return filteredTxs.map(tx => {
                         return tx.ppob_transactions.map(ppob => (
-                          <tr key={ppob.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                            <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>{new Date(tx.created_at).toLocaleTimeString('id-ID')}</td>
-                            <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>{tx.items.find(i => i.product?.ppob_sku === ppob.buyer_sku_code)?.product?.name || ppob.buyer_sku_code}</td>
-                            <td style={{ padding: '0.75rem', fontSize: '0.85rem', fontWeight: 'bold' }}>{ppob.customer_no}</td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                          <tr key={ppob.id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                            <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
+                            <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{tx.items.find(i => i.product?.ppob_sku === ppob.buyer_sku_code)?.product?.name || ppob.buyer_sku_code}</td>
+                            <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: 600 }}>{ppob.customer_no}</td>
+                            <td style={{ padding: '1rem', textAlign: 'center' }}>
                               <span style={{
-                                padding: '0.2rem 0.5rem',
-                                borderRadius: '4px',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '9999px',
                                 fontSize: '0.75rem',
+                                fontWeight: 600,
                                 background: ppob.status === 'Gagal' ? '#ef444420' : (ppob.status === 'Sukses' ? '#10b98120' : '#f59e0b20'),
                                 color: ppob.status === 'Gagal' ? '#ef4444' : (ppob.status === 'Sukses' ? '#10b981' : '#f59e0b')
                               }}>
                                 {ppob.status}
                               </span>
                             </td>
-                            <td style={{ padding: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            <td style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                               {ppob.sn || '-'}
                             </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                            <td style={{ padding: '1rem', textAlign: 'center', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                               {ppob.status === 'Pending' && (
-                                <button className="btn-secondary" style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }} onClick={() => handleCheckPpobStatus(ppob.id)}>
-                                  <RotateCcw size={12} style={{ marginRight: '0.2rem' }} /> Cek
+                                <button className="btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', borderRadius: '6px' }} onClick={() => handleCheckPpobStatus(ppob.id)}>
+                                  <RotateCcw size={14} style={{ marginRight: '0.3rem' }} /> Cek
                                 </button>
                               )}
-                              <button className="btn-success" style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem' }} onClick={() => { setIsPpobMenuOpen(false); handleReprintPpob(tx); }}>
-                                <Printer size={12} style={{ marginRight: '0.2rem' }} /> Print
+                              <button className="btn-success" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', borderRadius: '6px' }} onClick={() => { setIsPpobMenuOpen(false); handleReprintPpob(tx); }}>
+                                <Printer size={14} style={{ marginRight: '0.3rem' }} /> Print
                               </button>
                             </td>
                           </tr>
                         ));
-                      })}
-                    {ppobTransactions.length === 0 && (
-                      <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Tidak ada transaksi PPOB hari ini</td>
-                      </tr>
-                    )}
+                      });
+                    })()}
                   </tbody>
                 </table>
               )}

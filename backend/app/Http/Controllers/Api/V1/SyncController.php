@@ -177,8 +177,17 @@ class SyncController extends Controller
                                 $customerNo = $item['customerNo'] ?? null;
                                 if ($customerNo) {
                                     $refId = $tx->receipt_number . '-' . strtoupper(substr(uniqid(), -4));
-                                    $digiflazzService = new \App\Services\DigiflazzService();
-                                    $res = $digiflazzService->topup($product->ppob_sku, $customerNo, $refId);
+                                    
+                                    $user = auth()->user();
+                                    $additionalInfo = $user ? [$user->organization_id ?? 'Toko', $user->name] : [];
+                                    
+                                    try {
+                                        $ppobService = \App\Services\PpobServiceManager::make($product->ppob_provider);
+                                        $res = $ppobService->topup($product->ppob_sku, $customerNo, $refId, $additionalInfo);
+                                    } catch (\Exception $e) {
+                                        \Illuminate\Support\Facades\Log::error('PPOB Service Error: ' . $e->getMessage());
+                                        $res = ['data' => ['status' => 'Gagal', 'message' => $e->getMessage()]];
+                                    }
 
                                     $status = 'Pending';
                                     if (isset($res['data']['status'])) {
@@ -189,6 +198,7 @@ class SyncController extends Controller
                                     
                                     \App\Models\PpobTransaction::create([
                                         'transaction_id' => $tx->id,
+                                        'provider' => $product->ppob_provider ?? 'digiflazz',
                                         'ref_id' => $refId,
                                         'customer_no' => $customerNo,
                                         'customer_name' => $customerName,

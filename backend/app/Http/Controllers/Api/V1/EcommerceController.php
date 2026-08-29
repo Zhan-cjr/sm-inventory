@@ -1263,11 +1263,13 @@ class EcommerceController extends Controller
                         $product = \App\Models\Product::find($item->product_id);
                         if ($product && $product->ppob_sku) {
                             try {
-                                $digiflazz = new \App\Services\DigiflazzService();
-                                // delivery_address stores the target number
+                                $user = $order->customer;
+                                $additionalInfo = $user ? ['Ecommerce', $user->name] : ['Ecommerce', 'Customer'];
+                                
                                 $refId = $order->id . '-' . strtoupper(substr(uniqid(), -4));
-                                $res = $digiflazz->topup($product->ppob_sku, $order->delivery_address, $refId);
-                                \Log::info('PPOB Digiflazz Topup Triggered from Ecommerce: ' . json_encode($res));
+                                $ppobService = \App\Services\PpobServiceManager::make($product->ppob_provider);
+                                $res = $ppobService->topup($product->ppob_sku, $order->delivery_address, $refId, $additionalInfo);
+                                \Log::info('PPOB Topup Triggered from Ecommerce: ' . json_encode($res));
                                 
                                 $status = 'Pending';
                                 if (isset($res['data']['status'])) {
@@ -1276,6 +1278,7 @@ class EcommerceController extends Controller
                                 
                                 \App\Models\PpobTransaction::create([
                                     'ecommerce_order_id' => $order->id,
+                                    'provider' => $product->ppob_provider ?? 'digiflazz',
                                     'ref_id' => $refId,
                                     'customer_no' => $order->delivery_address,
                                     'customer_name' => $order->customer_name,

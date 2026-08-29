@@ -224,8 +224,17 @@ class TransactionController extends Controller
                         $customerNo = $item['customer_no'] ?? null;
                         if ($customerNo) {
                             $refId = $transaction->receipt_number . '-' . strtoupper(substr(uniqid(), -4));
-                            $digiflazzService = new \App\Services\DigiflazzService();
-                            $res = $digiflazzService->topup($product->ppob_sku, $customerNo, $refId);
+                            
+                            $user = auth()->user();
+                            $additionalInfo = $user ? [$user->organization_id ?? 'Toko', $user->name] : [];
+                            
+                            try {
+                                $ppobService = \App\Services\PpobServiceManager::make($product->ppob_provider);
+                                $res = $ppobService->topup($product->ppob_sku, $customerNo, $refId, $additionalInfo);
+                            } catch (\Exception $e) {
+                                \Illuminate\Support\Facades\Log::error('PPOB Service Error: ' . $e->getMessage());
+                                $res = ['data' => ['status' => 'Gagal', 'message' => $e->getMessage()]];
+                            }
 
                             $status = 'Pending';
                             if (isset($res['data']['status'])) {
@@ -236,6 +245,7 @@ class TransactionController extends Controller
                             
                             \App\Models\PpobTransaction::create([
                                 'transaction_id' => $transaction->id,
+                                'provider' => $product->ppob_provider ?? 'digiflazz',
                                 'ref_id' => $refId,
                                 'customer_no' => $customerNo,
                                 'customer_name' => $customerName,
@@ -293,14 +303,16 @@ class TransactionController extends Controller
         if (!$transaction || !$transaction->ppobTransactions) return;
 
         $hasPending = false;
-        $digiflazz = null;
+        $ppobServices = [];
 
         foreach ($transaction->ppobTransactions as $ppob) {
             if ($ppob->status === 'Pending') {
-                if (!$digiflazz) $digiflazz = new \App\Services\DigiflazzService();
+                if (!isset($ppobServices[$ppob->provider])) {
+                    $ppobServices[$ppob->provider] = \App\Services\PpobServiceManager::make($ppob->provider);
+                }
                 $hasPending = true;
 
-                $res = $digiflazz->topup($ppob->buyer_sku_code, $ppob->customer_no, $ppob->ref_id);
+                $res = $ppobServices[$ppob->provider]->topup($ppob->buyer_sku_code, $ppob->customer_no, $ppob->ref_id);
 
                 if (isset($res['data'])) {
                     $newStatus = $res['data']['status'] ?? 'Pending';
@@ -417,8 +429,8 @@ class TransactionController extends Controller
             ]);
         }
 
-        $digiflazz = new \App\Services\DigiflazzService();
-        $res = $digiflazz->topup($ppob->buyer_sku_code, $ppob->customer_no, $ppob->ref_id);
+        $ppobService = \App\Services\PpobServiceManager::make($ppob->provider);
+        $res = $ppobService->checkStatus($ppob->buyer_sku_code, $ppob->customer_no, $ppob->ref_id);
 
         if (isset($res['data'])) {
             $newStatus = $res['data']['status'] ?? 'Pending';

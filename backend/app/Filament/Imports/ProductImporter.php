@@ -258,8 +258,14 @@ class ProductImporter extends Importer
                 ->example('Minuman')
                 ->rules(['nullable', 'string', 'max:255']),
 
+            ImportColumn::make('ppob_provider')
+                ->label('Provider PPOB')
+                ->example('digiflazz atau ama')
+                ->rules(['nullable', 'string', 'max:255'])
+                ->fillRecordUsing(fn ($record, $state) => $record->ppob_provider = $state ?: 'digiflazz'),
+
             ImportColumn::make('ppob_sku')
-                ->label('SKU PPOB (Digiflazz)')
+                ->label('SKU PPOB')
                 ->example('TELKOMSEL50')
                 ->rules(['nullable', 'string', 'max:255'])
                 ->fillRecordUsing(fn ($record, $state) => $record->ppob_sku = $state),

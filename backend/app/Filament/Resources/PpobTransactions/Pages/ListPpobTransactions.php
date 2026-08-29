@@ -13,7 +13,7 @@ class ListPpobTransactions extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            // Create action removed as PPOB transactions are only from POS
         ];
     }
 }

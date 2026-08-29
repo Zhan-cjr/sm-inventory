@@ -66,6 +66,7 @@ Route::prefix('v1')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/devices/handshake', [PosDeviceController::class, 'handshake']);
     Route::post('/webhook/digiflazz', [\App\Http\Controllers\Api\DigiflazzWebhookController::class, 'handle']);
+    Route::get('/webhook/ama', [\App\Http\Controllers\Api\AmaWebhookController::class, 'handle']);
     Route::post('/webhook/telegram', [\App\Http\Controllers\Api\V1\TelegramWebhookController::class, 'handle']);
 
     // Protected Routes

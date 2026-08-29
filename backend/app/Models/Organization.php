@@ -17,7 +17,8 @@ class Organization extends Model
         'wa_gateway_type', 'wa_gateway_token', 'wa_gateway_domain', 'wa_gateway_sender',
         'allow_minus_stock', 'po_approval_limit', 'po_approval_max_qty_enabled', 'stock_adjustment_approval_amount_limit',
         'telegram_group_po_approval', 'telegram_group_stock_correction', 'telegram_group_warehouse_check', 'telegram_group_daily_report',
-        'scale_barcode_enabled', 'scale_barcode_prefix', 'scale_barcode_item_code_length', 'scale_barcode_weight_length', 'scale_barcode_weight_decimal_places'
+        'scale_barcode_enabled', 'scale_barcode_prefix', 'scale_barcode_item_code_length', 'scale_barcode_weight_length', 'scale_barcode_weight_decimal_places',
+        'active_ppob_providers'
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class Organization extends Model
         'ecommerce_banner_images' => 'array',
         'po_approval_max_qty_enabled' => 'boolean',
         'tax_rate' => 'decimal:2',
+        'active_ppob_providers' => 'array',
     ];
 
     protected static function booted()
