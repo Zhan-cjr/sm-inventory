@@ -74,8 +74,8 @@ return new class extends Migration
             $table->integer('quantity_on_hand')->default(0);
             $table->integer('quantity_reserved')->default(0);
             $table->date('last_count_date')->nullable();
-            $table->integer('min_qty')->default(10);
-            $table->integer('max_qty')->default(500);
+            $table->integer('min_qty')->default(3);
+            $table->integer('max_qty')->default(15);
             $table->integer('version')->default(1); // Optimistic locking
             $table->timestamps();
             

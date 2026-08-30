@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::table('stocks', function (Blueprint $table) {
             $table->decimal('quantity_on_hand', 12, 2)->default(0)->change();
             $table->decimal('quantity_reserved', 12, 2)->default(0)->change();
-            $table->decimal('min_qty', 12, 2)->default(10)->change();
-            $table->decimal('max_qty', 12, 2)->default(500)->change();
+            $table->decimal('min_qty', 12, 2)->default(3)->change();
+            $table->decimal('max_qty', 12, 2)->default(15)->change();
         });
 
         Schema::table('transaction_items', function (Blueprint $table) {
