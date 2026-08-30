@@ -38,7 +38,7 @@ class StatsOverview extends BaseWidget
             
         // Low Stock Count
         $lowStock = Stock::where('is_active', true)
-            ->whereRaw('quantity_on_hand <= COALESCE(min_qty, 10)')
+            ->whereRaw('quantity_on_hand <= COALESCE(min_qty, 3)')
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->count();
 

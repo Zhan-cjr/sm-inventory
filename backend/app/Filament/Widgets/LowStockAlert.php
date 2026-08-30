@@ -25,7 +25,7 @@ class LowStockAlert extends BaseWidget
         $query = Stock::query()
             ->with(['product', 'branch'])
             ->where('is_active', true)
-            ->whereRaw('quantity_on_hand <= COALESCE(min_qty, 10)')
+            ->whereRaw('quantity_on_hand <= COALESCE(min_qty, 3)')
             ->orderBy('quantity_on_hand', 'asc')
             ->limit(10);
 

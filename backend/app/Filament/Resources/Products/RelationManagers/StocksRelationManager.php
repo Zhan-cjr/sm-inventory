@@ -188,12 +188,12 @@ class StocksRelationManager extends RelationManager
                     ->label('Min. Stok')
                     ->required()
                     ->numeric()
-                    ->default(10),
+                    ->default(3),
                 TextInput::make('max_qty')
                     ->label('Max. Stok')
                     ->required()
                     ->numeric()
-                    ->default(500),
+                    ->default(15),
                 TextInput::make('lead_time')
                     ->label('Lead Time (Hari)')
                     ->helperText('Waktu pengiriman dari supplier')
