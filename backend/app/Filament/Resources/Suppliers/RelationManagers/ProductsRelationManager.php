@@ -103,7 +103,7 @@ class ProductsRelationManager extends RelationManager
                         \Filament\Forms\Components\Select::make('new_supplier_id')
                             ->label('Pilih Pemasok Tujuan')
                             ->options(function () {
-                                return \App\Models\Supplier::pluck('name', 'id');
+                                return \App\Models\Supplier::where('is_active', true)->pluck('name', 'id');
                             })
                             ->required()
                             ->searchable()
@@ -143,7 +143,7 @@ class ProductsRelationManager extends RelationManager
                             \Filament\Forms\Components\Select::make('new_supplier_id')
                                 ->label('Pilih Pemasok Tujuan')
                                 ->options(function () {
-                                    return \App\Models\Supplier::pluck('name', 'id');
+                                    return \App\Models\Supplier::where('is_active', true)->pluck('name', 'id');
                                 })
                                 ->required()
                                 ->searchable()

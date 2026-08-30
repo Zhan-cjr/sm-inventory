@@ -114,7 +114,7 @@ class ProductsTable
             ->filters([
                 \Filament\Tables\Filters\SelectFilter::make('supplier_id')
                     ->label('Pemasok')
-                    ->relationship('supplier', 'name'),
+                    ->relationship('supplier', 'name', fn ($query) => $query->where('is_active', true)),
                 \Filament\Tables\Filters\SelectFilter::make('supplier_division_id')
                     ->label('Sub Divisi Pemasok')
                     ->relationship('supplierDivision', 'name'),

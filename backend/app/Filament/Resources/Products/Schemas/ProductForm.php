@@ -197,7 +197,11 @@ class ProductForm
                     ->helperText('Contoh: xld10 (Lihat daftar harga di Digiflazz atau AMA)')
                     ->disabled($isBranchUser),
                 Select::make('supplier_id')
-                    ->relationship('supplier', 'name')
+                    ->relationship(
+                        name: 'supplier', 
+                        titleAttribute: 'name', 
+                        modifyQueryUsing: fn ($query, $record) => $query->where('is_active', true)->when($record && $record->supplier_id, fn ($q) => $q->orWhere('id', $record->supplier_id))
+                    )
                     ->searchable()
                     ->preload()
                     ->live()
