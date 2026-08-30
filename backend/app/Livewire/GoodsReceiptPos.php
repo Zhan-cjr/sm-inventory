@@ -1081,7 +1081,11 @@ class GoodsReceiptPos extends Component
     {
         return view('livewire.goods-receipt-pos', [
             'branches' => Branch::select('id', 'name')->get(),
-            'suppliers' => Supplier::select('id', 'name', 'gr_requires_po')->get(),
+            'suppliers' => Supplier::where('is_active', true)
+                ->when($this->supplier_id, fn($q) => $q->orWhere('id', $this->supplier_id))
+                ->select('id', 'name', 'gr_requires_po')
+                ->orderBy('name', 'asc')
+                ->get(),
             'purchaseOrders' => $this->purchaseOrders,
         ]);
     }

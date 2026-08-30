@@ -573,7 +573,10 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     {
         return view('livewire.purchase-order-pos', [
             'branches' => Branch::all(),
-            'suppliers' => Supplier::all(),
+            'suppliers' => Supplier::where('is_active', true)
+                ->when($this->supplier_id, fn($q) => $q->orWhere('id', $this->supplier_id))
+                ->orderBy('name', 'asc')
+                ->get(),
             'topHistory' => PurchaseOrder::where('status', 'DRAFT')->latest()->limit(10)->get()
         ]);
     }

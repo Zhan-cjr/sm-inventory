@@ -28,7 +28,11 @@ class PurchaseOrderForm
                     ->searchable()
                     ->preload(),
                 Select::make('supplier_id')
-                    ->relationship('supplier', 'name')
+                    ->relationship(
+                        name: 'supplier', 
+                        titleAttribute: 'name', 
+                        modifyQueryUsing: fn ($query, $record) => $query->where('is_active', true)->when($record && $record->supplier_id, fn ($q) => $q->orWhere('id', $record->supplier_id))
+                    )
                     ->label('Pemasok Utama')
                     ->required()
                     ->searchable()

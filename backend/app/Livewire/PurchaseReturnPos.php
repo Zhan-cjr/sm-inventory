@@ -352,7 +352,10 @@ class PurchaseReturnPos extends Component
 
         return view('livewire.purchase-return-pos', [
             'branches' => Branch::all(),
-            'suppliers' => Supplier::all(),
+            'suppliers' => Supplier::where('is_active', true)
+                ->when($this->supplier_id, fn($q) => $q->orWhere('id', $this->supplier_id))
+                ->orderBy('name', 'asc')
+                ->get(),
             'goodsReceipts' => $goodsReceiptsQuery->get(),
         ]);
     }

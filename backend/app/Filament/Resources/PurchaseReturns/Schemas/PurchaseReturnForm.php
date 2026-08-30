@@ -30,7 +30,11 @@ class PurchaseReturnForm
                     ->default(fn () => auth()->user()->branch_id ?? null),
                 
                 Select::make('supplier_id')
-                    ->relationship('supplier', 'name')
+                    ->relationship(
+                        name: 'supplier', 
+                        titleAttribute: 'name', 
+                        modifyQueryUsing: fn ($query, $record) => $query->where('is_active', true)->when($record && $record->supplier_id, fn ($q) => $q->orWhere('id', $record->supplier_id))
+                    )
                     ->label('Pemasok Utama')
                     ->searchable()
                     ->live()
