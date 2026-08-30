@@ -23,6 +23,8 @@ class Product extends Model
             'additional_barcodes' => isset($this->metadata['additional_barcodes']) ? implode(', ', $this->metadata['additional_barcodes']) : '',
             'product_type' => $this->product_type,
             'is_active' => $this->is_active,
+            'supplier_id' => $this->supplier_id,
+            'supplier_division_id' => $this->supplier_division_id,
             'available_branch_ids' => $this->stocks()->pluck('branch_id')->toArray(),
         ];
     }
@@ -139,7 +141,7 @@ class Product extends Model
 
     protected $fillable = [
         'organization_id', 'sku', 'barcode', 'name', 
-        'category_id', 'sub_category', 'supplier_id', 'cost_price', 
+        'category_id', 'sub_category', 'supplier_id', 'supplier_division_id', 'cost_price', 
         'cost_price_tax',
         'selling_price', 'margin_gol_1', 'harga_jual_1', 'qty_min_gol_1',
         'margin_gol_2', 'harga_jual_2', 'qty_min_gol_2',
@@ -188,6 +190,11 @@ class Product extends Model
     public function supplier(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function supplierDivision(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(SupplierDivision::class, 'supplier_division_id');
     }
 
     public function assemblies()

@@ -27,6 +27,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     public $branch_id;
     public $notes;
     public $supplier_id;
+    public $supplier_division_id;
     public $include_tax = false;
     public $tax_amount = 0;
     public $cetak_nota = false;
@@ -63,6 +64,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             $this->branch_id = $purchaseOrder->branch_id;
             $this->notes = $purchaseOrder->notes;
             $this->supplier_id = $purchaseOrder->supplier_id;
+            $this->supplier_division_id = $purchaseOrder->supplier_division_id;
             $this->include_tax = $purchaseOrder->include_tax;
             $this->tax_amount = $purchaseOrder->tax_amount;
 
@@ -137,6 +139,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
     public function updatedSupplierId($value)
     {
+        $this->supplier_division_id = null;
         $this->cart = [];
         $this->calculateTotals();
         
@@ -317,7 +320,10 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
         if ($method === 'sales') {
             $service = app(\App\Services\SuggestedOrderService::class);
-            $suggestions = $service->calculateForBranch($this->branch_id, ['supplier_id' => $this->supplier_id]);
+            $suggestions = $service->calculateForBranch($this->branch_id, [
+                'supplier_id' => $this->supplier_id,
+                'supplier_division_id' => $this->supplier_division_id,
+            ]);
             
             foreach ($suggestions as $suggestion) {
                 if ($suggestion['suggested_qty'] > 0) {
@@ -332,7 +338,12 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             // Min-Max Method: Query ONLY items registered in stocks for THIS branch
             $branchStocks = \App\Models\Stock::where('branch_id', $this->branch_id)
                 ->where('is_active', true)
-                ->whereHas('product', fn($q) => $q->where('supplier_id', $this->supplier_id)->where('is_active', true))
+                ->whereHas('product', function ($q) {
+                    $q->where('supplier_id', $this->supplier_id)->where('is_active', true);
+                    if ($this->supplier_division_id) {
+                        $q->where('supplier_division_id', $this->supplier_division_id);
+                    }
+                })
                 ->with('product')
                 ->get();
 
@@ -501,6 +512,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             'organization_id' => $organization->id,
             'branch_id' => empty($this->branch_id) ? null : $this->branch_id,
             'supplier_id' => $this->supplier_id,
+            'supplier_division_id' => empty($this->supplier_division_id) ? null : $this->supplier_division_id,
             'po_number' => $this->po_number,
             'po_date' => $this->po_date,
             'expired_date' => empty($this->expired_date) ? null : $this->expired_date,

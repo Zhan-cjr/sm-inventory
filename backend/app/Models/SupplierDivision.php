@@ -34,4 +34,9 @@ class SupplierDivision extends Model
     {
         return $this->hasMany(GoodsReceipt::class, 'supplier_division_id');
     }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class, 'supplier_division_id');
+    }
 }

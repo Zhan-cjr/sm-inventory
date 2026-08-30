@@ -227,8 +227,17 @@
                         $selectedSupplier = collect($suppliers)->firstWhere('id', $supplier_id);
                     @endphp
                     <tr>
-                        <td class="pos-label">Nama Kontak</td>
-                        <td><div class="pos-input" style="background-color: transparent; border-color: transparent; padding-left: 0;">{{ $selectedSupplier ? $selectedSupplier->name : '-' }}</div></td>
+                        <td class="pos-label">Sub Divisi</td>
+                        <td>
+                            <select wire:model.live="supplier_division_id" class="pos-input dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700" style="width: 100%;">
+                                <option value="">-- Semua Sub Divisi --</option>
+                                @if($selectedSupplier && $selectedSupplier->divisions)
+                                    @foreach($selectedSupplier->divisions as $div)
+                                        <option value="{{ $div->id }}">{{ $div->name }}</option>
+                                    @endforeach
+                                @endif
+                            </select>
+                        </td>
                     </tr>
                     <tr>
                         <td class="pos-label">Alamat</td>

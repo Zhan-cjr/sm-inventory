@@ -95,6 +95,15 @@ class ProductsTable
                     ->separator(',')
                     ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
                     ->toggleable(),
+                TextColumn::make('supplier.name')
+                    ->label('Pemasok')
+                    ->sortable()
+                    ->toggleable(),
+                TextColumn::make('supplierDivision.name')
+                    ->label('Sub Divisi')
+                    ->placeholder('-')
+                    ->sortable()
+                    ->toggleable(),
                 IconColumn::make('is_active')
                     ->label('Status')
                     ->boolean(),
@@ -103,6 +112,12 @@ class ProductsTable
                     ->disabled(fn () => auth()->user()->branch_id !== null),
             ])
             ->filters([
+                \Filament\Tables\Filters\SelectFilter::make('supplier_id')
+                    ->label('Pemasok')
+                    ->relationship('supplier', 'name'),
+                \Filament\Tables\Filters\SelectFilter::make('supplier_division_id')
+                    ->label('Sub Divisi Pemasok')
+                    ->relationship('supplierDivision', 'name'),
                 \Filament\Tables\Filters\SelectFilter::make('branch')
                     ->label('Cabang')
                     ->relationship('stocks.branch', 'name')

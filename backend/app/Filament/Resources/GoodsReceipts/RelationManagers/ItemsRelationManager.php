@@ -68,7 +68,16 @@ class ItemsRelationManager extends RelationManager
                     ->label('Qty Diterima')
                     ->required()
                     ->numeric()
-                    ->default(0),
+                    ->default(0)
+                    ->disabled(function (\Livewire\Component $livewire) {
+                        $ownerRecord = $livewire->ownerRecord;
+                        if ($ownerRecord && (!empty($ownerRecord->purchase_order_id) || !empty($ownerRecord->warehouse_check_id))) {
+                            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }),
                 TextInput::make('unit_price')
                     ->label('Harga Satuan')
                     ->required()

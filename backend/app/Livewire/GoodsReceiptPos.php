@@ -31,6 +31,7 @@ class GoodsReceiptPos extends Component
     public $branch_id;
     public $notes;
     public $supplier_id;
+    public $supplier_division_id;
     public $payment_method = 'tempo';
     public $purchase_order_id;
     public $include_tax = true;
@@ -70,6 +71,7 @@ class GoodsReceiptPos extends Component
             $this->branch_id = $goodsReceipt->branch_id;
             $this->notes = $goodsReceipt->notes;
             $this->supplier_id = $goodsReceipt->supplier_id;
+            $this->supplier_division_id = $goodsReceipt->supplier_division_id;
             $this->payment_method = $goodsReceipt->payment_method ?? 'tempo';
             $this->purchase_order_id = $goodsReceipt->purchase_order_id;
             $this->include_tax = $goodsReceipt->include_tax;
@@ -137,7 +139,7 @@ class GoodsReceiptPos extends Component
         $query = PurchaseOrder::where(function ($q) {
             $q->whereIn('status', ['APPROVED', 'approved', 'PARTIALLY_RECEIVED', 'partially_received'])
               ->whereHas('warehouseChecks', function ($qc) {
-                  $qc->where('status', 'approved');
+                  $qc->whereIn('status', ['approved', 'partially_processed']);
               })
               ->whereHas('items', function ($query) {
                   $query->whereColumn('quantity_received', '<', 'quantity_ordered');
@@ -165,6 +167,7 @@ class GoodsReceiptPos extends Component
 
     public function updatedSupplierId($value)
     {
+        $this->supplier_division_id = null;
         $this->recalculateDueDate();
         if ($value) {
             $supplier = Supplier::find($value);
@@ -196,36 +199,117 @@ class GoodsReceiptPos extends Component
             $po = PurchaseOrder::with('items.product')->find($value);
             if ($po) {
                 $this->supplier_id = $po->supplier_id;
+                $this->supplier_division_id = $po->supplier_division_id;
                 $this->recalculateDueDate();
                 
+                $warehouseCheck = \App\Models\WarehouseCheck::where('purchase_order_id', $po->id)
+                    ->whereIn('status', ['approved', 'partially_processed', 'processed'])
+                    ->with('items.product')
+                    ->latest()
+                    ->first();
+
+                $existingGrIds = \App\Models\GoodsReceipt::where('status', '!=', 'CANCELLED')
+                    ->where(function ($q) use ($warehouseCheck, $po) {
+                        if ($warehouseCheck) {
+                            $q->where('warehouse_check_id', $warehouseCheck->id);
+                        }
+                        $q->orWhere('purchase_order_id', $po->id);
+                    })
+                    ->when($this->goodsReceipt, fn($q) => $q->where('id', '!=', $this->goodsReceipt->id))
+                    ->pluck('id');
+
                 $this->cart = [];
-                foreach ($po->items as $item) {
-                    $remainingQty = $item->quantity_ordered - $item->quantity_received;
-                    if ($remainingQty <= 0) {
-                        continue; // Skip if already fully received
-                    }
 
-                    $stock = null;
-                    if ($this->branch_id) {
-                        $stock = Stock::where('product_id', $item->product_id)->where('branch_id', $this->branch_id)->first();
-                    }
+                if ($warehouseCheck && $warehouseCheck->items->count() > 0) {
+                    foreach ($warehouseCheck->items as $checkItem) {
+                        if (!$checkItem->product || $checkItem->qty_scanned <= 0) continue;
 
-                    $this->cart[] = [
-                        'product_id' => $item->product_id,
-                        'sku' => $item->product->sku,
-                        'barcode' => $item->product->barcode,
-                        'name' => $item->product->name,
-                        'qty_ordered' => $item->quantity_ordered,
-                        'qty_received' => $remainingQty, // Default to remaining qty
-                        'unit_price' => $item->unit_cost,
-                        'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($item->product->harga_jual_1 ?? 0),
-                        'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($item->product->margin_gol_1 ?? 0),
-                        'discount_1' => $item->discount_1,
-                        'discount_2' => $item->discount_2,
-                        'discount_3' => $item->discount_3,
-                        'subtotal' => $remainingQty * $item->unit_cost // Subtotal uses remaining qty
-                    ];
+                        $alreadyReceived = \App\Models\GoodsReceiptItem::whereIn('goods_receipt_id', $existingGrIds)
+                            ->where('product_id', $checkItem->product_id)
+                            ->sum('quantity_received');
+
+                        $remainingQty = max(0, (float) $checkItem->qty_scanned - (float) $alreadyReceived);
+                        if ($existingGrIds->count() > 0 && $remainingQty <= 0) {
+                            continue;
+                        }
+
+                        $qtyToDefault = ($existingGrIds->count() > 0) ? $remainingQty : (float) $checkItem->qty_scanned;
+
+                        $stock = null;
+                        if ($this->branch_id) {
+                            $stock = Stock::where('product_id', $checkItem->product_id)->where('branch_id', $this->branch_id)->first();
+                        }
+
+                        $poItem = $po->items->firstWhere('product_id', $checkItem->product_id);
+                        $unitPrice = $poItem ? (float) ($poItem->unit_cost ?? 0) : 0;
+                        $disc1 = $poItem ? (float) ($poItem->discount_1 ?? 0) : 0;
+                        $disc2 = $poItem ? (float) ($poItem->discount_2 ?? 0) : 0;
+                        $disc3 = $poItem ? (float) ($poItem->discount_3 ?? 0) : 0;
+
+                        $this->cart[] = [
+                            'product_id' => $checkItem->product_id,
+                            'sku' => $checkItem->product->sku,
+                            'barcode' => $checkItem->product->barcode,
+                            'name' => $checkItem->product->name,
+                            'qty_ordered' => (float) $checkItem->qty_po,
+                            'qty_received' => (float) $qtyToDefault,
+                            'unit_price' => $unitPrice,
+                            'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($checkItem->product->harga_jual_1 ?? 0),
+                            'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($checkItem->product->margin_gol_1 ?? 0),
+                            'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($checkItem->product->harga_jual_2 ?? 0),
+                            'margin_gol_2' => ($stock && $stock->margin_gol_2 > 0) ? $stock->margin_gol_2 : ($checkItem->product->margin_gol_2 ?? 0),
+                            'harga_jual_3' => ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($checkItem->product->harga_jual_3 ?? 0),
+                            'margin_gol_3' => ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($checkItem->product->margin_gol_3 ?? 0),
+                            'discount_1' => $disc1,
+                            'discount_2' => $disc2,
+                            'discount_3' => $disc3,
+                            'subtotal' => 0,
+                        ];
+                        $this->recalculateRow(count($this->cart) - 1);
+                    }
+                } else {
+                    foreach ($po->items as $item) {
+                        if (!$item->product) continue;
+
+                        $alreadyReceived = \App\Models\GoodsReceiptItem::whereIn('goods_receipt_id', $existingGrIds)
+                            ->where('product_id', $item->product_id)
+                            ->sum('quantity_received');
+
+                        $remainingQty = max(0, (float) $item->quantity_ordered - (float) $alreadyReceived);
+                        if ($existingGrIds->count() > 0 && $remainingQty <= 0) {
+                            continue;
+                        }
+
+                        $qtyToDefault = ($existingGrIds->count() > 0) ? $remainingQty : (float) $item->quantity_ordered;
+
+                        $stock = null;
+                        if ($this->branch_id) {
+                            $stock = Stock::where('product_id', $item->product_id)->where('branch_id', $this->branch_id)->first();
+                        }
+
+                        $this->cart[] = [
+                            'product_id' => $item->product_id,
+                            'sku' => $item->product->sku,
+                            'barcode' => $item->product->barcode,
+                            'name' => $item->product->name,
+                            'qty_ordered' => (float) $item->quantity_ordered,
+                            'qty_received' => (float) $qtyToDefault,
+                            'unit_price' => (float) ($item->unit_cost ?? 0),
+                            'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($item->product->harga_jual_1 ?? 0),
+                            'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($item->product->margin_gol_1 ?? 0),
+                            'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($item->product->harga_jual_2 ?? 0),
+                            'margin_gol_2' => ($stock && $stock->margin_gol_2 > 0) ? $stock->margin_gol_2 : ($item->product->margin_gol_2 ?? 0),
+                            'harga_jual_3' => ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($item->product->harga_jual_3 ?? 0),
+                            'margin_gol_3' => ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($item->product->margin_gol_3 ?? 0),
+                            'discount_1' => (float) ($item->discount_1 ?? 0),
+                            'discount_2' => (float) ($item->discount_2 ?? 0),
+                            'discount_3' => (float) ($item->discount_3 ?? 0),
+                            'subtotal' => 0,
+                        ];
+                        $this->recalculateRow(count($this->cart) - 1);
+                    }
                 }
+
                 $this->include_tax = $po->include_tax;
                 $this->tax_amount = $po->tax_amount;
                 $this->calculateTotals();
@@ -417,6 +501,12 @@ class GoodsReceiptPos extends Component
 
     public function updateRow($index, $field, $value)
     {
+        if ($field === 'qty_received' && (!empty($this->purchase_order_id) || (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)))) {
+            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                Notification::make()->title('Qty terima disinkronkan dari Cek Gudang / PO dan tidak dapat diubah secara manual.')->warning()->send();
+                return;
+            }
+        }
         $this->cart[$index][$field] = $value;
         $this->recalculateRow($index);
         $this->calculateTotals();
@@ -839,6 +929,7 @@ class GoodsReceiptPos extends Component
             $data = [
                 'purchase_order_id' => $this->purchase_order_id,
                 'supplier_id' => $this->supplier_id,
+                'supplier_division_id' => empty($this->supplier_division_id) ? null : $this->supplier_division_id,
                 'branch_id' => $this->branch_id,
                 'receipt_number' => $this->receipt_number,
                 'receipt_date' => $this->receipt_date,

@@ -200,6 +200,21 @@ class ProductForm
                     ->relationship('supplier', 'name')
                     ->searchable()
                     ->preload()
+                    ->live()
+                    ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null))
+                    ->disabled($isBranchUser),
+                Select::make('supplier_division_id')
+                    ->label('Sub Divisi Pemasok')
+                    ->placeholder('Tanpa Sub Divisi (Pemasok Global)')
+                    ->options(function (callable $get) {
+                        $supplierId = $get('supplier_id');
+                        if (!$supplierId) {
+                            return [];
+                        }
+                        return \App\Models\SupplierDivision::where('supplier_id', $supplierId)
+                            ->pluck('name', 'id');
+                    })
+                    ->searchable()
                     ->disabled($isBranchUser),
                 TextInput::make('weight_in_grams')
                     ->label('Berat (Gram)')

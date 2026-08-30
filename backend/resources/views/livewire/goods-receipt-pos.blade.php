@@ -366,8 +366,17 @@
                         $selectedSupplier = collect($suppliers)->firstWhere('id', $supplier_id);
                     @endphp
                     <tr>
-                        <td class="pos-label">Nama Kontak</td>
-                        <td><div class="pos-input dark:text-gray-200" style="background-color: transparent; border-color: transparent; padding-left: 0;">{{ $selectedSupplier ? $selectedSupplier->name : '-' }}</div></td>
+                        <td class="pos-label">Sub Divisi</td>
+                        <td>
+                            <select wire:model.live="supplier_division_id" class="pos-input dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700" style="width: 100%;" :disabled="!!purchase_order_id">
+                                <option value="">-- Semua Sub Divisi --</option>
+                                @if($selectedSupplier && $selectedSupplier->divisions)
+                                    @foreach($selectedSupplier->divisions as $div)
+                                        <option value="{{ $div->id }}">{{ $div->name }}</option>
+                                    @endforeach
+                                @endif
+                            </select>
+                        </td>
                     </tr>
                     <tr>
                         <td class="pos-label">Alamat</td>
@@ -616,7 +625,7 @@
                                    wire:model.lazy="cart.{{ $index }}.qty_received"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.space.prevent="openCalc($event)"
-                                   {{ (!empty($goodsReceipt) && !empty($goodsReceipt->warehouse_check_id)) ? 'disabled' : '' }}>
+                                   {{ (!empty($purchase_order_id) || (!empty($goodsReceipt) && !empty($goodsReceipt->warehouse_check_id))) ? 'disabled' : '' }}>
                         </td>
                         @endif
                         @if(in_array('unit_price', $visibleColumns))

@@ -71,6 +71,18 @@ class GoodsReceipt extends Model
 
     protected static function booted()
     {
+        static::saving(function ($goodsReceipt) {
+            if (!$goodsReceipt->warehouse_check_id && $goodsReceipt->purchase_order_id) {
+                $check = \App\Models\WarehouseCheck::where('purchase_order_id', $goodsReceipt->purchase_order_id)
+                    ->whereIn('status', ['approved', 'partially_processed', 'processed'])
+                    ->latest()
+                    ->first();
+                if ($check) {
+                    $goodsReceipt->warehouse_check_id = $check->id;
+                }
+            }
+        });
+
         static::created(function ($goodsReceipt) {
             if ($goodsReceipt->warehouse_check_id) {
                 $check = \App\Models\WarehouseCheck::find($goodsReceipt->warehouse_check_id);
@@ -84,6 +96,18 @@ class GoodsReceipt extends Model
         });
 
         static::updated(function ($goodsReceipt) {
+            if ($goodsReceipt->warehouse_check_id) {
+                $check = \App\Models\WarehouseCheck::find($goodsReceipt->warehouse_check_id);
+                $check?->syncStatus();
+            } elseif ($goodsReceipt->purchase_order_id) {
+                $checks = \App\Models\WarehouseCheck::where('purchase_order_id', $goodsReceipt->purchase_order_id)->get();
+                foreach ($checks as $check) {
+                    $check->syncStatus();
+                }
+            }
+        });
+
+        static::deleted(function ($goodsReceipt) {
             if ($goodsReceipt->warehouse_check_id) {
                 $check = \App\Models\WarehouseCheck::find($goodsReceipt->warehouse_check_id);
                 $check?->syncStatus();

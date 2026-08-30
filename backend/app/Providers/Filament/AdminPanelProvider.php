@@ -71,6 +71,10 @@ class AdminPanelProvider extends PanelProvider
                 fn (): string => view('filament.components.header-shortcuts')->render(),
             )
             ->renderHook(
+                'panels::content.before',
+                fn (): string => view('filament.components.multi-tabs')->render(),
+            )
+            ->renderHook(
                 'panels::head.end',
                 fn (): string => '<link rel="stylesheet" href="/css/admin-custom.css?v=' . filemtime(public_path('css/admin-custom.css')) . '">' . view('filament.print-styles')->render(),
             )

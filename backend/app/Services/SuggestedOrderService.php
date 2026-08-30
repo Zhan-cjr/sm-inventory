@@ -54,7 +54,12 @@ class SuggestedOrderService
             ->whereHas('product', fn($q) => $q->where('is_active', true));
 
         if (!empty($filters['supplier_id'])) {
-            $query->whereHas('product', fn($q) => $q->where('supplier_id', $filters['supplier_id']));
+            $query->whereHas('product', function ($q) use ($filters) {
+                $q->where('supplier_id', $filters['supplier_id']);
+                if (!empty($filters['supplier_division_id'])) {
+                    $q->where('supplier_division_id', $filters['supplier_division_id']);
+                }
+            });
         }
 
         if (!empty($filters['product_id'])) {
