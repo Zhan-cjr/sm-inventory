@@ -200,7 +200,12 @@ class ProductForm
                     ->relationship(
                         name: 'supplier', 
                         titleAttribute: 'name', 
-                        modifyQueryUsing: fn ($query, $record) => $query->where('is_active', true)->when($record && $record->supplier_id, fn ($q) => $q->orWhere('id', $record->supplier_id))
+                        modifyQueryUsing: fn ($query, $record) => $query->where(function ($q) use ($record) {
+                            $q->where('is_active', true);
+                            if ($record && $record->supplier_id) {
+                                $q->orWhere('id', $record->supplier_id);
+                            }
+                        })
                     )
                     ->searchable()
                     ->preload()
