@@ -249,31 +249,6 @@ class AccountingService
                     'credit'           => $taxAmount,
                 ]);
             }
-
-            // OTOMATISASI: Buat record di Manajemen Pajak (Tax Invoices)
-            $dppTaxable = round($taxAmount / ($taxRate / 100), 2);
-            $customerName = null;
-            if ($transaction->customer_id) {
-                $customerName = \App\Models\Customer::find($transaction->customer_id)?->name;
-            }
-
-            \App\Models\TaxInvoice::updateOrCreate(
-                [
-                    'nomor_faktur' => 'FK-' . $transaction->receipt_number,
-                ],
-                [
-                    'organization_id' => $transaction->organization_id,
-                    'type' => 'keluaran',
-                    'tanggal_faktur' => $transaction->transaction_date,
-                    'masa_pajak' => \Carbon\Carbon::parse($transaction->transaction_date)->format('m-Y'),
-                    'nama_lawan' => $customerName ?? 'Pelanggan POS',
-                    'dpp' => $dppTaxable,
-                    'ppn' => $taxAmount,
-                    'status' => 'draft',
-                    'reference_id' => $transaction->id,
-                    'reference_type' => Transaction::class,
-                ]
-            );
         }
 
         // ── 8. Diskon (self-balancing memo, tidak ganggu balance) ────────────

@@ -31,6 +31,11 @@ class StocksRelationManager extends RelationManager
                     ->label('SKU')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('product.barcode')
+                    ->label('Barcode')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('-'),
                 Tables\Columns\TextColumn::make('product.name')
                     ->label('Nama Barang')
                     ->searchable()
@@ -58,7 +63,8 @@ class StocksRelationManager extends RelationManager
                                 }
                                 return $query->whereHas('product', function($q) use ($search) {
                                         $q->where('name', 'like', "%{$search}%")
-                                          ->orWhere('sku', 'like', "%{$search}%");
+                                          ->orWhere('sku', 'like', "%{$search}%")
+                                          ->orWhere('barcode', 'like', "%{$search}%");
                                     })
                                     ->limit(30)
                                     ->get()

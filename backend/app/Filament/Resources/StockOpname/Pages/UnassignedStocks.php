@@ -40,6 +40,11 @@ class UnassignedStocks extends Page implements HasTable
                     ->label('SKU')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('product.barcode')
+                    ->label('Barcode')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('-'),
                 Tables\Columns\TextColumn::make('product.name')
                     ->label('Nama Barang')
                     ->searchable()
