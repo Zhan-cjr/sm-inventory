@@ -77,7 +77,20 @@ class SyncController extends Controller
                         }
                     }
 
-                    $txDate = $txData['transactionDate'] ?? $txData['transaction_date'] ?? $txData['date'] ?? now();
+                    $rawDate = $txData['transactionDate'] ?? $txData['transaction_date'] ?? $txData['createdAt'] ?? $txData['created_at'] ?? $txData['date'] ?? null;
+                    if ($rawDate) {
+                        try {
+                            $parsedDate = \Carbon\Carbon::parse($rawDate)->setTimezone('Asia/Jakarta');
+                            $txDate = $parsedDate->format('Y-m-d H:i:s');
+                            $createdAt = $parsedDate->format('Y-m-d H:i:s');
+                        } catch (\Exception $e) {
+                            $txDate = now()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s');
+                            $createdAt = now()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s');
+                        }
+                    } else {
+                        $txDate = now()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s');
+                        $createdAt = now()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s');
+                    }
 
                     $paymentMethod = $txData['paymentMethod'] ?? 'CASH';
                     $paymentDetails = null;
@@ -112,6 +125,7 @@ class SyncController extends Controller
                         'sync_status' => 'SYNCED',
                         'local_transaction_id' => $txData['localId'],
                         'receipt_number' => $txData['receipt_number'] ?? ('SMI-' . strtoupper(substr(uniqid(), -6))),
+                        'created_at' => $createdAt,
                     ]);
 
                     if (isset($txData['payments']) && is_array($txData['payments'])) {

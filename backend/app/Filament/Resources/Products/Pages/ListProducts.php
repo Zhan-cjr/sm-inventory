@@ -29,6 +29,7 @@ class ListProducts extends ListRecords
                 ->icon('heroicon-o-building-storefront')
                 ->color('info')
                 ->visible(!$isBranchUser),
+            \App\Filament\Actions\QuickCreateProductAction::make(),
             CreateAction::make()
                 ->visible(!$isBranchUser),
         ];

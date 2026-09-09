@@ -98,6 +98,7 @@ class UserForm
                                         'ACCESS_BI_AI' => 'Akses Menu BI & AI (Mobile)',
                                         'TOGGLE_SUPPLIER_GR_PO' => 'Ubah Wajib PO di Pemasok',
                                         'BYPASS_GR_PO_REQUIRED' => 'Bypass Wajib PO (Penerimaan Barang)',
+                                        'QUICK_CREATE_PRODUCT' => 'Tambah Produk Cepat (Batch & Paste Teks)',
                                     ])
                                     ->columns(2)
                                     ->helperText('Centang izin khusus untuk backend, berlaku spesifik untuk user ini (termasuk Admin/Superadmin wajib dicentang).'),

@@ -1675,7 +1675,19 @@ export const POSTransaction = ({
         transaction_type: isReturnMode ? 'RETURN' : 'SALES',
       };
 
-      const localTx = await storeLocalTransaction(transaction);
+      let localTx = null;
+      try {
+        localTx = await storeLocalTransaction(transaction);
+        if (!localTx) {
+          throw new Error('Gagal menyimpan transaksi ke penyimpanan lokal (IndexedDB). Transaksi DIBATALKAN.');
+        }
+      } catch (err) {
+        console.error('CRITICAL: Local transaction storage failed:', err);
+        setAlertMsg({ text: `TRANSAKSI GAGAL: ${err.message}. Struk DILARANG dicetak!`, type: 'error', persist: true });
+        setIsProcessing(false);
+        return;
+      }
+
       let syncResult = null;
       if (isOnline) {
         syncResult = await syncTransactions();
@@ -2701,17 +2713,23 @@ export const POSTransaction = ({
 
         <div className="pos-user-status">
           {pendingCount > 0 && (
-            <div className={`sync-status mr-4 ${!isOnline ? 'warning-pulse' : ''}`} style={{
-              background: !isOnline ? 'rgba(230, 0, 18, 0.2)' : 'rgba(36, 42, 122, 0.1)',
-              border: !isOnline ? '1px solid var(--danger)' : '1px solid var(--primary)',
-              padding: '4px 12px',
-              borderRadius: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              color: !isOnline ? 'var(--danger)' : 'var(--primary)',
-              fontWeight: 'bold'
-            }}>
+            <div 
+              className={`sync-status mr-4 ${!isOnline ? 'warning-pulse' : ''}`} 
+              onClick={() => syncTransactions()}
+              title="Klik untuk paksa sinkronisasi antrean ke server"
+              style={{
+                background: !isOnline ? 'rgba(230, 0, 18, 0.2)' : 'rgba(36, 42, 122, 0.1)',
+                border: !isOnline ? '1px solid var(--danger)' : '1px solid var(--primary)',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: !isOnline ? 'var(--danger)' : 'var(--primary)',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
               <RefreshCw size={18} className={syncStatus === 'syncing' ? 'spin' : ''} />
               <span>Antrean: {pendingCount} {!isOnline && <span style={{ fontSize: '0.7rem' }}>(OFFLINE - sync otomatis)</span>}</span>
             </div>

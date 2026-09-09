@@ -56,28 +56,47 @@ export const useOfflineSync = (branchId, authToken) => {
   }, []);
 
   const storeLocalTransaction = useCallback(async (transaction) => {
-    if (!db.current) return null;
+    if (!db.current) {
+      try {
+        const reconnect = await new Promise((resolve, reject) => {
+          const req = indexedDB.open('PosDatabase', 2);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        db.current = reconnect;
+      } catch (e) {
+        console.error('Failed to reconnect to IndexedDB during checkout:', e);
+        throw new Error('Penyimpanan lokal browser (IndexedDB) terputus. Transaksi DIBATALKAN & struk dilarang dicetak.');
+      }
+    }
 
+    const nowIso = new Date().toISOString();
     const localTx = {
       localId: `${branchId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       branchId,
       ...transaction,
+      transactionDate: transaction.transactionDate || transaction.transaction_date || nowIso,
+      transaction_date: transaction.transaction_date || transaction.transactionDate || nowIso,
       syncStatus: 'PENDING',
-      createdAt: new Date().toISOString()
+      createdAt: nowIso
     };
 
     return new Promise((resolve, reject) => {
-      const tx = db.current.transaction('transactions', 'readwrite');
-      const store = tx.objectStore('transactions');
-      
-      const req = store.add(localTx);
-      req.onerror = () => reject(req.error);
-      
-      tx.oncomplete = () => {
-        setPendingCount(prev => prev + 1);
-        resolve(localTx);
-      };
-      tx.onerror = () => reject(tx.error);
+      try {
+        const tx = db.current.transaction('transactions', 'readwrite');
+        const store = tx.objectStore('transactions');
+        
+        const req = store.add(localTx);
+        req.onerror = (e) => reject(new Error('Gagal menyimpan ke IndexedDB: ' + (e.target?.error?.message || 'Error')));
+        
+        tx.oncomplete = () => {
+          setPendingCount(prev => prev + 1);
+          resolve(localTx);
+        };
+        tx.onerror = (e) => reject(new Error('Penyimpanan transaksi lokal dibatalkan: ' + (e.target?.error?.message || 'Error')));
+      } catch (err) {
+        reject(new Error('Gagal membuka transaksi IndexedDB: ' + err.message));
+      }
     });
   }, [branchId]);
 
