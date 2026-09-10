@@ -119,10 +119,21 @@ export const POSTransaction = ({
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [isProcessing, setIsProcessing] = useState(false);
   const [alertMsg, setAlertMsg] = useState(null);
+  const [pwpUpsellPrompt, setPwpUpsellPrompt] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [serverOffset, setServerOffset] = useState(parseInt(localStorage.getItem('pos_server_offset') || '0'));
   const [currentTime, setCurrentTime] = useState(new Date(Date.now() + serverOffset));
   const barcodeInput = useRef(null);
+
+  // Auto dismiss PWP upsell prompt after 15 seconds
+  useEffect(() => {
+    if (pwpUpsellPrompt) {
+      const timer = setTimeout(() => {
+        setPwpUpsellPrompt(null);
+      }, 15000);
+      return () => clearTimeout(timer);
+    }
+  }, [pwpUpsellPrompt]);
 
   // New State for enhancements
   const [queuedDiscount, setQueuedDiscount] = useState(null);
@@ -1356,8 +1367,150 @@ export const POSTransaction = ({
       }, ...items]);
     }
 
-    // AI Upsell Recommendation Logic
-    if (aprioriRules && aprioriRules.length > 0) {
+    // Dismiss PWP / Bundling banner if this scanned product is the recommended product itself
+    if (pwpUpsellPrompt && String(pwpUpsellPrompt.rewardProduct?.id) === String(product.id)) {
+      setPwpUpsellPrompt(null);
+    }
+
+    // PWP (Subsidi Silang / Tebus Murah) & BUNDLING Notification & Upsell Prompt
+    let promoMatched = false;
+    if (dbPromos && dbPromos.length > 0 && dbProducts && dbProducts.length > 0) {
+      const addedId = String(product.id);
+      const now = new Date();
+
+      // 1. Cek Promo PWP (Subsidi Silang)
+      const pwpPromos = dbPromos.filter(p => {
+        if (!p.is_active || p.promo_type !== 'PWP') return false;
+        const from = new Date(p.valid_from);
+        const until = new Date(p.valid_until);
+        if (from > now || until < now) return false;
+        return String(p.promo_config?.pwp_trigger_product_id) === addedId;
+      });
+
+      if (pwpPromos.length > 0) {
+        for (const promo of pwpPromos) {
+          const rewardId = String(promo.promo_config?.pwp_reward_product_id);
+          const rewardProd = dbProducts.find(p => String(p.id) === rewardId);
+          if (rewardProd) {
+            const maxAllowed = promo.promo_config?.pwp_max_reward_per_transaction 
+              ? parseInt(promo.promo_config.pwp_max_reward_per_transaction, 10) 
+              : Infinity;
+            const currentRewardInCart = items.find(i => String(i.productId) === rewardId);
+            const currentRewardQty = currentRewardInCart ? currentRewardInCart.quantity : 0;
+
+            if (currentRewardQty < maxAllowed) {
+              const normalPrice = parseFloat(rewardProd.selling_price || 0);
+              const discType = promo.promo_config?.pwp_discount_type || 'SPECIAL_PRICE';
+              const discVal = parseFloat(promo.promo_config?.pwp_discount_value || 0);
+
+              let finalPrice = normalPrice;
+              let hemat = 0;
+              let hematText = '';
+
+              if (discType === 'SPECIAL_PRICE') {
+                finalPrice = discVal;
+                hemat = Math.max(0, normalPrice - discVal);
+                hematText = hemat > 0 ? `Hemat Rp ${Math.round(hemat).toLocaleString('id-ID')}` : '';
+              } else if (discType === 'DISCOUNT_NOMINAL') {
+                finalPrice = Math.max(0, normalPrice - discVal);
+                hemat = discVal;
+                hematText = `Hemat Rp ${Math.round(discVal).toLocaleString('id-ID')}`;
+              } else if (discType === 'DISCOUNT_PERCENT') {
+                finalPrice = Math.max(0, normalPrice * (1 - (discVal / 100)));
+                hemat = normalPrice - finalPrice;
+                hematText = `Diskon ${discVal}%`;
+              }
+
+              setPwpUpsellPrompt({
+                type: 'PWP',
+                promoId: promo.id,
+                promoName: promo.name,
+                triggerName: product.name,
+                rewardProduct: rewardProd,
+                rewardNormalPrice: normalPrice,
+                rewardFinalPrice: finalPrice,
+                hematText: hematText,
+                hematAmount: hemat
+              });
+              promoMatched = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // 2. Cek Promo Bundling (Beli X Gratis Y / Paket Diskon)
+      if (!promoMatched) {
+        const bundlingPromos = dbPromos.filter(p => {
+          if (!p.is_active || p.promo_type !== 'BUNDLING') return false;
+          const from = new Date(p.valid_from);
+          const until = new Date(p.valid_until);
+          if (from > now || until < now) return false;
+
+          const rules = p.promo_config?.rules || [];
+          if (rules.length > 0) {
+            return rules.some(r => String(r.productId) === addedId);
+          }
+          if (p.promo_config?.buy_product_id && p.promo_config?.get_product_id) {
+            return String(p.promo_config.buy_product_id) === addedId || String(p.promo_config.get_product_id) === addedId;
+          }
+          return false;
+        });
+
+        for (const promo of bundlingPromos) {
+          let missingProductId = null;
+          const rules = promo.promo_config?.rules || [];
+
+          if (rules.length > 0) {
+            // Cari rule produk pasangan yang belum terpenuhi di keranjang
+            const missingRule = rules.find(r => {
+              const rId = String(r.productId);
+              const targetQty = parseInt(r.minQty, 10) || 1;
+              const inCart = items.find(i => String(i.productId) === rId);
+              const currentQty = inCart ? inCart.quantity : (rId === addedId ? qtyToAdd : 0);
+              return currentQty < targetQty;
+            });
+            if (missingRule) {
+              missingProductId = String(missingRule.productId);
+            }
+          } else if (promo.promo_config?.buy_product_id && promo.promo_config?.get_product_id) {
+            const buyId = String(promo.promo_config.buy_product_id);
+            const getId = String(promo.promo_config.get_product_id);
+            const partnerId = (addedId === buyId) ? getId : buyId;
+            const inCart = items.find(i => String(i.productId) === partnerId);
+            if (!inCart || inCart.quantity < 1) {
+              missingProductId = partnerId;
+            }
+          }
+
+          if (missingProductId && missingProductId !== addedId) {
+            const companionProd = dbProducts.find(p => String(p.id) === missingProductId);
+            if (companionProd) {
+              const bundleDiscount = parseFloat(promo.promo_config?.bundleDiscount || promo.discount_value || 0);
+              const compNormalPrice = parseFloat(companionProd.selling_price || 0);
+
+              setPwpUpsellPrompt({
+                type: 'BUNDLING',
+                promoId: promo.id,
+                promoName: promo.name,
+                triggerName: product.name,
+                rewardProduct: companionProd,
+                rewardNormalPrice: compNormalPrice,
+                rewardFinalPrice: compNormalPrice,
+                bundleDiscount: bundleDiscount,
+                hematText: bundleDiscount > 0 ? `Hemat Rp ${Math.round(bundleDiscount).toLocaleString('id-ID')}` : '',
+                hematAmount: bundleDiscount
+              });
+              promoMatched = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // AI Upsell Recommendation Logic (hanya jika tidak ada promo PWP/Bundling aktif untuk produk ini)
+    if (!promoMatched && aprioriRules && aprioriRules.length > 0) {
       const addedId = String(product.id).toLowerCase();
       // Find a rule involving the added product
       const rule = aprioriRules.find(r => String(r.product_id_1).toLowerCase() === addedId || String(r.product_id_2).toLowerCase() === addedId);
@@ -1716,6 +1869,7 @@ export const POSTransaction = ({
 
       // Clear states BEFORE showing modal to avoid flicker
       setItems([]);
+      setPwpUpsellPrompt(null);
       setPayments([]);
       setManualTotalDiscount(0);
       setReceivedAmount('');
@@ -1797,6 +1951,7 @@ export const POSTransaction = ({
     setHeldTransactions(newHeld);
     safeSetItem('pos_held_transactions', JSON.stringify(newHeld));
     setItems([]);
+    setPwpUpsellPrompt(null);
     setPayments([]);
     setManualTotalDiscount(0);
     setIsReturnMode(false);
@@ -2040,7 +2195,7 @@ export const POSTransaction = ({
           requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0));
           break;
         case 'btn_void_all':
-          requestAuthorization("VOID", () => { setItems([]); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); });
+          requestAuthorization("VOID", () => { setItems([]); setPwpUpsellPrompt(null); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); });
           break;
         case 'handleClearDiscount':
         case 'btn_clear':
@@ -2759,6 +2914,137 @@ export const POSTransaction = ({
           </button>
         </div>
       </header>
+
+      {pwpUpsellPrompt && (
+        <div 
+          className="pwp-upsell-banner fade-in"
+          style={{
+            position: 'fixed',
+            top: '70px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9998,
+            width: '94%',
+            maxWidth: '740px',
+            background: pwpUpsellPrompt.type === 'BUNDLING'
+              ? 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)'
+              : 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+            color: '#ffffff',
+            border: pwpUpsellPrompt.type === 'BUNDLING' ? '2px solid #34d399' : '2px solid #fbbf24',
+            borderRadius: '14px',
+            padding: '12px 18px',
+            boxShadow: '0 14px 40px rgba(0, 0, 0, 0.5), 0 0 20px ' + (pwpUpsellPrompt.type === 'BUNDLING' ? 'rgba(52, 211, 153, 0.35)' : 'rgba(251, 191, 36, 0.35)'),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px',
+            animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ 
+              background: pwpUpsellPrompt.type === 'BUNDLING' ? '#34d399' : '#fbbf24', 
+              color: '#0f172a', 
+              borderRadius: '50%', 
+              width: '44px', 
+              height: '44px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              fontSize: '1.4rem', 
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+            }}>
+              {pwpUpsellPrompt.type === 'BUNDLING' ? '📦' : '🎁'}
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: pwpUpsellPrompt.type === 'BUNDLING' ? '#a7f3d0' : '#fbbf24', fontWeight: '800' }}>
+                {pwpUpsellPrompt.type === 'BUNDLING' ? 'Promo Paket Bundling (Hemat Bersama)' : 'Promo Subsidi Silang (Tebus Murah)'}
+              </div>
+              <div style={{ fontSize: '0.95rem', fontWeight: '600', lineHeight: 1.35 }}>
+                {pwpUpsellPrompt.type === 'BUNDLING' ? (
+                  <>
+                    Tawarkan ke konsumen: Tambah <strong>{pwpUpsellPrompt.rewardProduct.name}</strong> untuk Diskon Paket <span style={{ color: '#4ade80', fontSize: '1.15rem', fontWeight: '800' }}>Rp {Math.round(pwpUpsellPrompt.bundleDiscount).toLocaleString('id-ID')}</span>!
+                  </>
+                ) : (
+                  <>
+                    Tawarkan ke konsumen: Tebus <strong>{pwpUpsellPrompt.rewardProduct.name}</strong> hanya <span style={{ color: '#4ade80', fontSize: '1.15rem', fontWeight: '800' }}>Rp {Math.round(pwpUpsellPrompt.rewardFinalPrice).toLocaleString('id-ID')}</span>
+                    {pwpUpsellPrompt.hematText && (
+                      <span style={{ marginLeft: '6px', background: 'rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700' }}>
+                        {pwpUpsellPrompt.hematText}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '2px' }}>
+                {pwpUpsellPrompt.type === 'BUNDLING' 
+                  ? `(Paket: ${pwpUpsellPrompt.promoName} — Beli ${pwpUpsellPrompt.triggerName} + ${pwpUpsellPrompt.rewardProduct.name})`
+                  : `(Harga Normal: Rp ${Math.round(pwpUpsellPrompt.rewardNormalPrice).toLocaleString('id-ID')} — Syarat: Beli ${pwpUpsellPrompt.triggerName})`
+                }
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => {
+                const prod = pwpUpsellPrompt.rewardProduct;
+                const isBundling = pwpUpsellPrompt.type === 'BUNDLING';
+                setPwpUpsellPrompt(null);
+                addItemToTransaction(prod, 1);
+                setAlertMsg({ 
+                  text: isBundling 
+                    ? `📦 Produk bundling "${prod.name}" ditambahkan! Diskon paket diterapkan.`
+                    : `🎁 Produk tebus murah "${prod.name}" berhasil ditambahkan!`, 
+                  type: 'success' 
+                });
+                barcodeInput.current?.focus();
+              }}
+              style={{
+                background: '#10b981',
+                color: '#ffffff',
+                border: 'none',
+                padding: '9px 16px',
+                borderRadius: '8px',
+                fontWeight: '700',
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Plus size={16} />
+              {pwpUpsellPrompt.type === 'BUNDLING' ? '+ Tambahkan Paket' : '+ Tambahkan (Tebus)'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPwpUpsellPrompt(null);
+                barcodeInput.current?.focus();
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.12)',
+                color: '#cbd5e1',
+                border: 'none',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="Lewati penawaran"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {alertMsg && (
         <div className={`pos-toast slide-down ${alertMsg.type}`}>
@@ -3666,7 +3952,7 @@ export const POSTransaction = ({
             <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0))}><Eraser size={16} />{renderBtnLabel('btn_void_item', 'Void Item', 'Del')}</button>
 
             {/* Row 6: Void All, Clear, Tutup Shift */}
-            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={16} />{renderBtnLabel('btn_void_all', 'Void All', 'Esc')}</button>
+            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setPwpUpsellPrompt(null); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={16} />{renderBtnLabel('btn_void_all', 'Void All', 'Esc')}</button>
             <button className="func-btn danger" onClick={handleClearDiscount}><X size={16} />{renderBtnLabel('btn_clear', 'Clear', 'Ins')}</button>
             <button className="func-btn secondary" onClick={() => {
               if (window.electronAPI && window.electronAPI.openCashDrawer) {

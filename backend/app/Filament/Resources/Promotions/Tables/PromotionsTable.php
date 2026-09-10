@@ -37,6 +37,7 @@ class PromotionsTable
                         'NOMINAL_PER_ITEM' => 'info',
                         'BUNDLING' => 'warning',
                         'TIERED' => 'primary',
+                        'PWP' => 'warning',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
@@ -46,12 +47,20 @@ class PromotionsTable
                         'NOMINAL_PER_ITEM' => 'Nominal Per Item',
                         'BUNDLING' => 'Bundling (Beli X Gratis Y)',
                         'TIERED' => 'Diskon Bertingkat',
+                        'PWP' => 'Subsidi Silang (PWP)',
                         default => $state,
                     })
                     ->searchable(),
                 TextColumn::make('discount_value')
                     ->label('Nilai Diskon')
                     ->formatStateUsing(function ($state, $record) {
+                        if ($record->promo_type === 'PWP') {
+                            $type = $record->promo_config['pwp_discount_type'] ?? 'SPECIAL_PRICE';
+                            $val = (float)($record->promo_config['pwp_discount_value'] ?? 0);
+                            if ($type === 'SPECIAL_PRICE') return 'Tebus Rp ' . number_format($val, 0, ',', '.');
+                            if ($type === 'DISCOUNT_NOMINAL') return 'Hemat Rp ' . number_format($val, 0, ',', '.');
+                            return 'Diskon ' . $val . '%';
+                        }
                         if (in_array($record->promo_type, ['BUNDLING', 'TIERED'])) {
                             return '-';
                         }

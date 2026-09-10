@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Promotions\Schemas;
 
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -36,6 +37,7 @@ class PromotionForm
                                 'NOMINAL_PER_ITEM' => 'Diskon Nominal Per Item',
                                 'BUNDLING' => 'Beli X Gratis Y (Bundling)',
                                 'TIERED' => 'Bertingkat (Min. Belanja)',
+                                'PWP' => 'Subsidi Silang / Tebus Murah (PWP)',
                             ])
                             ->required()
                             ->live()
@@ -59,6 +61,9 @@ class PromotionForm
                                 if ($type === 'TIERED') {
                                     return 'Diskon bertingkat berdasarkan minimum belanja. Contoh: Belanja 100rb diskon 5rb, belanja 200rb diskon 12rb.';
                                 }
+                                if ($type === 'PWP') {
+                                    return 'Subsidi Silang (Purchase With Purchase). Beli produk pendorong margin (Trigger) untuk berhak tebus murah produk sensitif harga (Reward) dengan proteksi kuota tertentu.';
+                                }
                                 return null;
                             }),
                         Toggle::make('is_active')
@@ -66,6 +71,17 @@ class PromotionForm
                             ->default(true),
                     ])
                     ->columns(2),
+
+                Section::make('Cakupan Cabang')
+                    ->schema([
+                        Select::make('branches')
+                            ->relationship('branches', 'name')
+                            ->multiple()
+                            ->preload()
+                            ->label('Berlaku di Cabang')
+                            ->helperText('Pilih cabang mana saja promosi ini berlaku. Jika kosong, promosi berlaku di semua cabang.')
+                            ->columnSpanFull(),
+                    ]),
 
                 Section::make('Parameter Nilai Diskon')
                     ->visible(fn (callable $get) => in_array($get('promo_type'), ['PERCENTAGE', 'FIXED', 'PERCENTAGE_PER_ITEM', 'NOMINAL_PER_ITEM']))
@@ -102,7 +118,7 @@ class PromotionForm
                     ->columns(2),
 
                 Section::make('Target Penerapan Diskon')
-                    ->visible(fn (callable $get) => $get('promo_type') !== 'BUNDLING')
+                    ->visible(fn (callable $get) => !in_array($get('promo_type'), ['BUNDLING', 'PWP']))
                     ->schema([
                         Select::make('applicable_to')
                             ->label('Berlaku Untuk')
@@ -113,12 +129,12 @@ class PromotionForm
                             ])
                             ->required()
                             ->live()
-                            ->dehydrateStateUsing(fn ($state, callable $get) => $get('promo_type') === 'BUNDLING' ? 'ALL' : $state),
+                            ->dehydrateStateUsing(fn ($state, callable $get) => in_array($get('promo_type'), ['BUNDLING', 'PWP']) ? 'ALL' : $state),
                         Select::make('target_ids')
                             ->label('Target (Produk/Kategori)')
                             ->multiple()
                             ->searchable()
-                            ->visible(fn (callable $get) => $get('promo_type') !== 'BUNDLING' && in_array($get('applicable_to'), ['PRODUCT', 'CATEGORY']))
+                            ->visible(fn (callable $get) => !in_array($get('promo_type'), ['BUNDLING', 'PWP']) && in_array($get('applicable_to'), ['PRODUCT', 'CATEGORY']))
                             ->options(function (callable $get) {
                                 $type = $get('applicable_to');
                                 if ($type === 'PRODUCT') {
@@ -129,15 +145,174 @@ class PromotionForm
                                 }
                                 return [];
                             }),
-                        Select::make('branches')
-                            ->relationship('branches', 'name')
-                            ->multiple()
-                            ->preload()
-                            ->label('Berlaku di Cabang')
-                            ->helperText('Pilih cabang mana saja promosi ini berlaku. Jika tidak ada yang dipilih, promosi dianggap tidak berlaku di cabang manapun (atau sesuaikan dengan kebijakan sistem).')
-                            ->columnSpanFull(),
                     ])
                     ->columns(2),
+
+                Section::make('Aturan Khusus Subsidi Silang / Tebus Murah (PWP)')
+                    ->visible(fn (callable $get) => $get('promo_type') === 'PWP')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            Select::make('promo_config.pwp_trigger_product_id')
+                                ->label('1. Produk Pemicu / Margin Generator (Trigger Product)')
+                                ->options(\App\Models\Product::pluck('name', 'id'))
+                                ->searchable()
+                                ->preload()
+                                ->required()
+                                ->live()
+                                ->helperText(function (callable $get) {
+                                    $prodId = $get('promo_config.pwp_trigger_product_id');
+                                    if (!$prodId) return 'Pilih produk yang harus dibeli oleh pelanggan (produk bermargin tinggi).';
+                                    $prod = \App\Models\Product::find($prodId);
+                                    if (!$prod) return null;
+                                    return "Harga Jual: Rp " . number_format((float)$prod->selling_price, 0, ',', '.') . 
+                                           " | HPP/Modal: Rp " . number_format((float)$prod->cost_price, 0, ',', '.');
+                                }),
+                            TextInput::make('promo_config.pwp_trigger_min_qty')
+                                ->label('Min. Qty Pembelian Trigger')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->required()
+                                ->live()
+                                ->helperText('Jumlah pembelian produk pemicu yang dibutuhkan agar hak tebus murah aktif.'),
+                        ]),
+
+                        Grid::make(2)->schema([
+                            Select::make('promo_config.pwp_reward_product_id')
+                                ->label('2. Produk Disubsidi / Tebus Murah (Reward Product)')
+                                ->options(\App\Models\Product::pluck('name', 'id'))
+                                ->searchable()
+                                ->preload()
+                                ->required()
+                                ->live()
+                                ->helperText(function (callable $get) {
+                                    $prodId = $get('promo_config.pwp_reward_product_id');
+                                    if (!$prodId) return 'Pilih produk yang disubsidi harganya (sensitif harga).';
+                                    $prod = \App\Models\Product::find($prodId);
+                                    if (!$prod) return null;
+                                    return "Harga Jual Normal: Rp " . number_format((float)$prod->selling_price, 0, ',', '.') . 
+                                           " | HPP/Modal: Rp " . number_format((float)$prod->cost_price, 0, ',', '.');
+                                }),
+                            Select::make('promo_config.pwp_discount_type')
+                                ->label('Jenis Potongan Reward')
+                                ->options([
+                                    'SPECIAL_PRICE' => 'Harga Tebus Murah (Fixed Price)',
+                                    'DISCOUNT_NOMINAL' => 'Potongan Nominal Rupiah',
+                                    'DISCOUNT_PERCENT' => 'Potongan Persentase (%)',
+                                ])
+                                ->default('SPECIAL_PRICE')
+                                ->required()
+                                ->live(),
+                        ]),
+
+                        Grid::make(3)->schema([
+                            TextInput::make('promo_config.pwp_discount_value')
+                                ->label(fn (callable $get) => match ($get('promo_config.pwp_discount_type')) {
+                                    'SPECIAL_PRICE' => 'Harga Tebus Murah (Rupiah)',
+                                    'DISCOUNT_NOMINAL' => 'Nilai Potongan (Rupiah)',
+                                    'DISCOUNT_PERCENT' => 'Persentase Diskon',
+                                    default => 'Nilai Diskon / Harga Tebus',
+                                })
+                                ->prefix(fn (callable $get) => $get('promo_config.pwp_discount_type') === 'DISCOUNT_PERCENT' ? null : 'Rp')
+                                ->suffix(fn (callable $get) => $get('promo_config.pwp_discount_type') === 'DISCOUNT_PERCENT' ? '%' : null)
+                                ->numeric()
+                                ->required()
+                                ->live()
+                                ->helperText(fn (callable $get) => $get('promo_config.pwp_discount_type') === 'SPECIAL_PRICE' 
+                                    ? 'Contoh: Diisi 10.000 artinya produk tebus dibayar Rp 10.000/pcs.' 
+                                    : 'Besaran diskon yang dipotongkan.'),
+                            TextInput::make('promo_config.pwp_reward_qty_per_trigger')
+                                ->label('Maks. Tebus Per Kelipatan Trigger')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->required()
+                                ->live()
+                                ->helperText('Kuantitas tebus murah per 1 kelipatan syarat trigger.'),
+                            TextInput::make('promo_config.pwp_max_reward_per_transaction')
+                                ->label('Maks. Tebus Per Transaksi (Anti-Hoarding)')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->helperText('Batas tebus murah maksimal per struk (kosongkan jika tanpa batas). Mencegah borongan.'),
+                        ]),
+
+                        Placeholder::make('pwp_margin_simulation')
+                            ->label('📊 Simulasi Profit & Margin Gabungan (Subsidi Silang)')
+                            ->columnSpanFull()
+                            ->content(function (callable $get) {
+                                $triggerId = $get('promo_config.pwp_trigger_product_id');
+                                $rewardId = $get('promo_config.pwp_reward_product_id');
+
+                                if (!$triggerId || !$rewardId) {
+                                    return 'Pilih Produk Trigger (Pemicu) dan Produk Reward (Disubsidi) untuk melihat simulasi margin gabungan.';
+                                }
+
+                                $trigger = \App\Models\Product::find($triggerId);
+                                $reward = \App\Models\Product::find($rewardId);
+
+                                if (!$trigger || !$reward) {
+                                    return 'Data produk tidak ditemukan.';
+                                }
+
+                                $triggerMinQty = max(1, (int) ($get('promo_config.pwp_trigger_min_qty') ?: 1));
+                                $rewardQty = max(1, (int) ($get('promo_config.pwp_reward_qty_per_trigger') ?: 1));
+
+                                $triggerSelling = (float) $trigger->selling_price;
+                                $triggerCost = (float) $trigger->cost_price;
+                                $triggerProfit = ($triggerSelling - $triggerCost) * $triggerMinQty;
+
+                                $rewardSelling = (float) $reward->selling_price;
+                                $rewardCost = (float) $reward->cost_price;
+
+                                $discountType = $get('promo_config.pwp_discount_type') ?: 'SPECIAL_PRICE';
+                                $discountVal = (float) ($get('promo_config.pwp_discount_value') ?: 0);
+
+                                $rewardFinalPrice = $rewardSelling;
+                                if ($discountType === 'SPECIAL_PRICE') {
+                                    $rewardFinalPrice = $discountVal;
+                                } elseif ($discountType === 'DISCOUNT_NOMINAL') {
+                                    $rewardFinalPrice = max(0, $rewardSelling - $discountVal);
+                                } elseif ($discountType === 'DISCOUNT_PERCENT') {
+                                    $rewardFinalPrice = max(0, $rewardSelling * (1 - ($discountVal / 100)));
+                                }
+
+                                $rewardProfit = ($rewardFinalPrice - $rewardCost) * $rewardQty;
+                                $totalRevenue = ($triggerSelling * $triggerMinQty) + ($rewardFinalPrice * $rewardQty);
+                                $totalCost = ($triggerCost * $triggerMinQty) + ($rewardCost * $rewardQty);
+                                $netProfit = $triggerProfit + $rewardProfit;
+                                $netMarginPercent = $totalRevenue > 0 ? ($netProfit / $totalRevenue) * 100 : 0;
+
+                                $statusColor = $netProfit >= 0 ? '#16a34a' : '#dc2626';
+                                $statusBadge = $netProfit >= 0 ? '✅ Margin Sehat (Paket Menguntungkan)' : '⚠️ Margin Negatif (Toko Berpotensi Rugi)';
+
+                                return new \Illuminate\Support\HtmlString("
+                                    <div style='padding: 14px; border-radius: 8px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08);'>
+                                        <div style='font-weight: 600; color: {$statusColor}; margin-bottom: 8px;'>{$statusBadge}</div>
+                                        <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 0.875rem;'>
+                                            <div>
+                                                <strong>Produk Pemicu ({$trigger->name} x {$triggerMinQty}):</strong><br/>
+                                                Harga Jual: Rp " . number_format($triggerSelling * $triggerMinQty, 0, ',', '.') . "<br/>
+                                                HPP/Modal: Rp " . number_format($triggerCost * $triggerMinQty, 0, ',', '.') . "<br/>
+                                                Laba Pemicu: <span style='color: #16a34a; font-weight: 600;'>+Rp " . number_format($triggerProfit, 0, ',', '.') . "</span>
+                                            </div>
+                                            <div>
+                                                <strong>Produk Tebus ({$reward->name} x {$rewardQty}):</strong><br/>
+                                                Harga Tebus: Rp " . number_format($rewardFinalPrice * $rewardQty, 0, ',', '.') . " (Normal: Rp " . number_format($rewardSelling * $rewardQty, 0, ',', '.') . ")<br/>
+                                                HPP/Modal: Rp " . number_format($rewardCost * $rewardQty, 0, ',', '.') . "<br/>
+                                                Laba/Rugi Tebus: <span style='color: " . ($rewardProfit >= 0 ? '#16a34a' : '#dc2626') . "; font-weight: 600;'>" . ($rewardProfit >= 0 ? '+Rp ' : '-Rp ') . number_format(abs($rewardProfit), 0, ',', '.') . "</span>
+                                            </div>
+                                            <div style='border-left: 2px solid rgba(0,0,0,0.08); padding-left: 12px;'>
+                                                <strong>Hasil Gabungan Paket Keranjang:</strong><br/>
+                                                Total Omzet Paket: Rp " . number_format($totalRevenue, 0, ',', '.') . "<br/>
+                                                Total Modal Paket: Rp " . number_format($totalCost, 0, ',', '.') . "<br/>
+                                                <strong>Laba Bersih Paket: <span style='color: {$statusColor}; font-size: 1rem;'>Rp " . number_format($netProfit, 0, ',', '.') . " (" . number_format($netMarginPercent, 1) . "%)</span></strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ");
+                            }),
+                    ]),
 
                 Section::make('Aturan Khusus Bundling (Beli X Gratis Y)')
                     ->visible(fn (callable $get) => $get('promo_type') === 'BUNDLING')

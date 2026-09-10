@@ -59,7 +59,12 @@ export class DiscountEngine {
       const limitType = promo.promo_config?.discount_limit_type || 'PER_TRANSACTION';
       const maxDiscount = parseFloat(promo.max_discount_per_transaction || 0);
 
-      if (limitType === 'PER_ITEM' && maxDiscount > 0 && (promo.promo_type === 'PERCENTAGE' || promo.promo_type === 'FLASH_SALE')) {
+      if (promo.promo_type === 'PWP') {
+        discount = this.applyPwpDiscount(items, promo);
+        if (maxDiscount > 0) {
+          discount = Math.min(discount, maxDiscount);
+        }
+      } else if (limitType === 'PER_ITEM' && maxDiscount > 0 && (promo.promo_type === 'PERCENTAGE' || promo.promo_type === 'FLASH_SALE')) {
         // Calculate discount per item line and cap it
         discount = eligibleItems.reduce((sum, item) => {
            let itemDiscount = Math.floor((item.quantity * parseFloat(item.unitPrice)) * (discountValue / 100));
@@ -97,7 +102,7 @@ export class DiscountEngine {
         }
         
         // Distribute discount to items so backend can record promotion_id
-        if (discount > 0 && eligibleItems.length > 0) {
+        if (discount > 0 && eligibleItems.length > 0 && promo.promo_type !== 'PWP') {
             let remainingDiscount = discount;
             eligibleItems.forEach((item, index) => {
                 const itemBase = item.quantity * parseFloat(item.unitPrice);
@@ -170,6 +175,57 @@ export class DiscountEngine {
     return discount;
   }
 
+  applyPwpDiscount(items, promo) {
+    const config = promo.promo_config;
+    if (!config || !config.pwp_trigger_product_id || !config.pwp_reward_product_id) return 0;
+
+    const triggerId = String(config.pwp_trigger_product_id);
+    const rewardId = String(config.pwp_reward_product_id);
+    const triggerMinQty = Math.max(1, parseInt(config.pwp_trigger_min_qty, 10) || 1);
+    const rewardPerTrigger = Math.max(1, parseInt(config.pwp_reward_qty_per_trigger, 10) || 1);
+    const maxRewardPerTransaction = config.pwp_max_reward_per_transaction 
+      ? parseInt(config.pwp_max_reward_per_transaction, 10) 
+      : Infinity;
+
+    const triggerItem = items.find(i => String(i.productId) === triggerId);
+    const rewardItem = items.find(i => String(i.productId) === rewardId);
+
+    if (!triggerItem || !rewardItem) return 0;
+    if (triggerItem.quantity < triggerMinQty || rewardItem.quantity <= 0) return 0;
+
+    // Hitung berapa kuota reward yang berhak ditebus berdasarkan kuantitas trigger dan batasan transaksi
+    const triggersEarned = Math.floor(triggerItem.quantity / triggerMinQty);
+    const maxRewardAllowed = Math.min(triggersEarned * rewardPerTrigger, maxRewardPerTransaction);
+
+    // Kuantitas reward yang benar-benar ada di keranjang untuk diberikan diskon
+    const eligibleRewardQty = Math.min(rewardItem.quantity, maxRewardAllowed);
+    if (eligibleRewardQty <= 0) return 0;
+
+    const rewardUnitPrice = parseFloat(rewardItem.unitPrice || 0);
+    const discountType = config.pwp_discount_type || 'SPECIAL_PRICE';
+    const discountVal = parseFloat(config.pwp_discount_value || 0);
+
+    let unitDiscount = 0;
+    if (discountType === 'SPECIAL_PRICE') {
+      // Harga tebus murah (contoh: harga normal 18.000, ditebus 10.000 -> diskon 8.000 per unit)
+      unitDiscount = Math.max(0, rewardUnitPrice - discountVal);
+    } else if (discountType === 'DISCOUNT_NOMINAL') {
+      unitDiscount = Math.min(rewardUnitPrice, discountVal);
+    } else if (discountType === 'DISCOUNT_PERCENT') {
+      unitDiscount = Math.floor(rewardUnitPrice * (Math.min(100, Math.max(0, discountVal)) / 100));
+    }
+
+    const totalDiscount = Math.floor(eligibleRewardQty * unitDiscount);
+
+    if (totalDiscount > 0) {
+      // Alokasikan diskon ke rewardItem agar tercatat di struk dan backend
+      rewardItem.discountPerItem = (rewardItem.discountPerItem || 0) + (totalDiscount / rewardItem.quantity);
+      rewardItem.promotionId = promo.id;
+    }
+
+    return totalDiscount;
+  }
+
   isPromoValid(promo, customer) {
     if (!promo || !promo.is_active) return false;
     const now = new Date();
@@ -194,13 +250,11 @@ export class DiscountEngine {
       }
     }
 
-                        
-
     return true;
   }
 
   sortPromosByPriority(promos) {
-    const priority = { 'PERCENTAGE_PER_ITEM': 1, 'NOMINAL_PER_ITEM': 2, 'BUNDLING': 3, 'TIERED': 4, 'PERCENTAGE': 5, 'FIXED': 6 };
+    const priority = { 'PWP': 0, 'PERCENTAGE_PER_ITEM': 1, 'NOMINAL_PER_ITEM': 2, 'BUNDLING': 3, 'TIERED': 4, 'PERCENTAGE': 5, 'FIXED': 6 };
     return [...promos].sort((a, b) =>
       (priority[a.promo_type] || 99) - (priority[b.promo_type] || 99)
     );

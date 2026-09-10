@@ -43,15 +43,19 @@ class Promotion extends Model
 
         static::saved(function ($promotion) {
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+            \Illuminate\Support\Facades\Cache::forget('pos_promos_json_gz_branch_all');
             foreach (\App\Models\Branch::pluck('id') as $branchId) {
                 \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+                \Illuminate\Support\Facades\Cache::forget('pos_promos_json_gz_branch_' . $branchId);
             }
         });
 
         static::deleted(function ($promotion) {
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+            \Illuminate\Support\Facades\Cache::forget('pos_promos_json_gz_branch_all');
             foreach (\App\Models\Branch::pluck('id') as $branchId) {
                 \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+                \Illuminate\Support\Facades\Cache::forget('pos_promos_json_gz_branch_' . $branchId);
             }
         });
     }
