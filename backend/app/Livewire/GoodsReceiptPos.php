@@ -795,6 +795,7 @@ class GoodsReceiptPos extends Component
         $subtotal = $t2 - $d3;
 
         $this->cart[$index]['subtotal'] = round($subtotal, 2);
+        $this->calculateTotals();
     }
 
     public function updatedIncludeTax()
@@ -865,6 +866,8 @@ class GoodsReceiptPos extends Component
 
     public function save()
     {
+        $this->calculateTotals();
+
         $this->validate([
             'supplier_id' => 'required',
             'branch_id' => 'nullable',

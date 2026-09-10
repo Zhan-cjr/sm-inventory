@@ -1929,35 +1929,94 @@ class ReportPrintController extends Controller
         $organizationId = auth()->user()?->organization_id ?? \App\Models\Organization::first()?->id;
         $organization = \App\Models\Organization::find($organizationId);
         
-        $selloutItems = \App\Models\TransactionItem::with('product')
+        $posItems = \App\Models\TransactionItem::with('product')
             ->where('kontrabon_id', $kontrabon->id)
-            ->get()
-            ->groupBy('product_id')
-            ->map(function ($items) {
-                $first = $items->first();
-                $qtyJual = $items->where('quantity', '>', 0)->sum('quantity');
-                $qtyRetur = abs($items->where('quantity', '<', 0)->sum('quantity'));
-                $qtyJualNet = $qtyJual - $qtyRetur;
-                
-                $hargaJual = $first->unit_price ?? ($first->product->price ?? 0);
-                $hpp = $first->product->cost_price ?? 0;
-                
-                return [
-                    'barcode' => $first->product->barcode ?? '-',
-                    'sku' => $first->product->sku ?? '-',
-                    'name' => $first->product->name ?? '-',
-                    'qty_jual' => $qtyJual,
-                    'qty_retur' => $qtyRetur,
-                    'qty_jual_net' => $qtyJualNet,
-                    'cost_price' => $hpp,
-                    'selling_price' => $hargaJual,
-                    'total_jual' => $qtyJual * $hargaJual,
-                    'total_beli_hpp' => $qtyJual * $hpp,
-                    'total_retur_hpp' => $qtyRetur * $hpp,
-                    'total_retur_jual' => $qtyRetur * $hargaJual,
-                    'subtotal' => $qtyJualNet * $hpp,
-                ];
-            })->values();
+            ->get();
+
+        $ecomItems = \App\Models\EcommerceOrderItem::with('product')
+            ->where('kontrabon_id', $kontrabon->id)
+            ->get();
+
+        $allProductIds = $posItems->pluck('product_id')->merge($ecomItems->pluck('product_id'))->unique();
+
+        $selloutItems = $allProductIds->map(function ($productId) use ($posItems, $ecomItems, $kontrabon) {
+            $pItems = $posItems->where('product_id', $productId);
+            $ecItems = $ecomItems->where('product_id', $productId);
+            $firstProduct = $pItems->first()?->product ?? $ecItems->first()?->product;
+
+            $qtyJualPos = (float) $pItems->where('quantity', '>', 0)->sum('quantity');
+            $qtyReturPos = (float) abs($pItems->where('quantity', '<', 0)->sum('quantity'));
+            $totalJualPos = (float) $pItems->where('quantity', '>', 0)->sum(fn($it) => $it->quantity * ($it->unit_price ?? ($it->product->price ?? 0)));
+            $totalReturJualPos = (float) $pItems->where('quantity', '<', 0)->sum(fn($it) => abs($it->quantity) * ($it->unit_price ?? ($it->product->price ?? 0)));
+
+            $qtyJualEcom = (float) $ecItems->where('quantity', '>', 0)->sum('quantity');
+            $qtyReturEcom = 0;
+            $totalJualEcom = (float) $ecItems->where('quantity', '>', 0)->sum(fn($it) => $it->quantity * ($it->unit_price ?? 0));
+            $totalReturJualEcom = 0;
+
+            $qtyJual = $qtyJualPos + $qtyJualEcom;
+            $qtyRetur = $qtyReturPos + $qtyReturEcom;
+            $qtyJualNet = $qtyJual - $qtyRetur;
+            $totalJual = $totalJualPos + $totalJualEcom;
+            $totalReturJual = $totalReturJualPos + $totalReturJualEcom;
+
+            $stock = \App\Models\Stock::where('product_id', $productId)->where('branch_id', $kontrabon->branch_id)->first();
+            $fallbackPrice = $stock && $stock->cost_price_tax > 0 
+                ? (float)$stock->cost_price_tax 
+                : ($stock && $stock->cost_price > 0 
+                    ? (float)$stock->cost_price 
+                    : ($firstProduct && $firstProduct->cost_price_tax > 0 
+                        ? (float)$firstProduct->cost_price_tax 
+                        : (float)($firstProduct->cost_price ?? 0)));
+
+            $amountOwed = 0;
+            foreach ($pItems as $it) {
+                $batchCogs = (float) \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+                    ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+                    ->where('sbd.transaction_item_id', $it->id)
+                    ->sum(\Illuminate\Support\Facades\DB::raw('sbd.quantity * sb.cost_price'));
+
+                if ($it->quantity > 0) {
+                    $amountOwed += $batchCogs > 0 ? $batchCogs : ($it->quantity * $fallbackPrice);
+                } else {
+                    $deduction = $batchCogs > 0 ? $batchCogs : (abs($it->quantity) * $fallbackPrice);
+                    $amountOwed -= $deduction;
+                }
+            }
+
+            foreach ($ecItems as $it) {
+                $batchCogs = (float) \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+                    ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+                    ->where('sbd.ecommerce_order_item_id', $it->id)
+                    ->sum(\Illuminate\Support\Facades\DB::raw('sbd.quantity * sb.cost_price'));
+
+                if ($it->quantity > 0) {
+                    $amountOwed += $batchCogs > 0 ? $batchCogs : ($it->quantity * $fallbackPrice);
+                } else {
+                    $deduction = $batchCogs > 0 ? $batchCogs : (abs($it->quantity) * $fallbackPrice);
+                    $amountOwed -= $deduction;
+                }
+            }
+
+            $averageCostPrice = $qtyJualNet > 0 ? ($amountOwed / $qtyJualNet) : $fallbackPrice;
+            $sellingPrice = $qtyJual > 0 ? ($totalJual / $qtyJual) : (float)($firstProduct->price ?? 0);
+
+            return [
+                'barcode' => $firstProduct->barcode ?? '-',
+                'sku' => $firstProduct->sku ?? '-',
+                'name' => $firstProduct->name ?? '-',
+                'qty_jual' => $qtyJual,
+                'qty_retur' => $qtyRetur,
+                'qty_jual_net' => $qtyJualNet,
+                'cost_price' => $averageCostPrice,
+                'selling_price' => $sellingPrice,
+                'total_jual' => $totalJual,
+                'total_beli_hpp' => $qtyJual * $averageCostPrice,
+                'total_retur_hpp' => $qtyRetur * $averageCostPrice,
+                'total_retur_jual' => $totalReturJual,
+                'subtotal' => $amountOwed,
+            ];
+        })->values();
 
         $dates = \App\Models\Transaction::whereHas('items', function ($q) use ($kontrabon) {
             $q->where('kontrabon_id', $kontrabon->id);
@@ -1968,8 +2027,8 @@ class ReportPrintController extends Controller
             'organization' => $organization,
             'selloutItems' => $selloutItems,
             'title' => 'Nota Kontrabon',
-            'minDate' => $dates->min_date ? \Carbon\Carbon::parse($dates->min_date)->format('d-m-Y') : null,
-            'maxDate' => $dates->max_date ? \Carbon\Carbon::parse($dates->max_date)->format('d-m-Y') : null,
+            'minDate' => $dates?->min_date ? \Carbon\Carbon::parse($dates->min_date)->format('d-m-Y') : null,
+            'maxDate' => $dates?->max_date ? \Carbon\Carbon::parse($dates->max_date)->format('d-m-Y') : null,
         ]);
     }
 
