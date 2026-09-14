@@ -112,12 +112,64 @@ class ProductsTable
                     ->disabled(fn () => auth()->user()->branch_id !== null),
             ])
             ->filters([
-                \Filament\Tables\Filters\SelectFilter::make('supplier_id')
-                    ->label('Pemasok')
-                    ->relationship('supplier', 'name', fn ($query) => $query->where('is_active', true)),
-                \Filament\Tables\Filters\SelectFilter::make('supplier_division_id')
-                    ->label('Sub Divisi Pemasok')
-                    ->relationship('supplierDivision', 'name'),
+                \Filament\Tables\Filters\Filter::make('supplier')
+                    ->form([
+                        \Filament\Forms\Components\Select::make('supplier_id')
+                            ->label('Pemasok')
+                            ->placeholder('Semua Pemasok')
+                            ->options(fn () => \App\Models\Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null)),
+                        \Filament\Forms\Components\Select::make('supplier_division_id')
+                            ->label('Sub Divisi Pemasok')
+                            ->placeholder(fn ($get) => filled($get('supplier_id')) ? 'Semua Sub Divisi' : 'Pilih pemasok terlebih dahulu')
+                            ->options(function ($get) {
+                                $supplierId = $get('supplier_id');
+                                if (!$supplierId) {
+                                    return [];
+                                }
+                                return \App\Models\SupplierDivision::where('supplier_id', $supplierId)
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id');
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->disabled(fn ($get) => blank($get('supplier_id'))),
+                    ])
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                        return $query
+                            ->when(
+                                $data['supplier_id'] ?? null,
+                                function (\Illuminate\Database\Eloquent\Builder $query, $supplierId) use ($data): \Illuminate\Database\Eloquent\Builder {
+                                    $query->where('supplier_id', $supplierId);
+
+                                    return $query->when(
+                                        $data['supplier_division_id'] ?? null,
+                                        fn (\Illuminate\Database\Eloquent\Builder $query, $divisionId): \Illuminate\Database\Eloquent\Builder => $query->where('supplier_division_id', $divisionId)
+                                    );
+                                }
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if (!empty($data['supplier_id'])) {
+                            $supplier = \App\Models\Supplier::find($data['supplier_id']);
+                            if ($supplier) {
+                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Pemasok: ' . $supplier->name);
+                            }
+
+                            if (!empty($data['supplier_division_id'])) {
+                                $division = \App\Models\SupplierDivision::find($data['supplier_division_id']);
+                                if ($division) {
+                                    $indicators[] = \Filament\Tables\Filters\Indicator::make('Sub Divisi: ' . $division->name)
+                                        ->removeField('supplier_division_id');
+                                }
+                            }
+                        }
+                        return $indicators;
+                    }),
                 \Filament\Tables\Filters\SelectFilter::make('branch')
                     ->label('Cabang')
                     ->relationship('stocks.branch', 'name')

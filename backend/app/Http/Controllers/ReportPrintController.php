@@ -1451,6 +1451,17 @@ class ReportPrintController extends Controller
             $query->where('is_active', $filters['is_active']['isActive']);
         }
 
+        // Apply Supplier & Sub Division Filter
+        $supplierId = $filters['supplier']['supplier_id'] ?? $filters['supplier_id']['value'] ?? null;
+        if (!empty($supplierId)) {
+            $query->where('supplier_id', $supplierId);
+
+            $divisionId = $filters['supplier']['supplier_division_id'] ?? $filters['supplier_division_id']['value'] ?? null;
+            if (!empty($divisionId)) {
+                $query->where('supplier_division_id', $divisionId);
+            }
+        }
+
         $user = \Illuminate\Support\Facades\Auth::user();
         $targetBranchId = null;
 
