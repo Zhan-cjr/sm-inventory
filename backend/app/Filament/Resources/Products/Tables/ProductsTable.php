@@ -191,17 +191,54 @@ class ProductsTable
                                 ->required(),
                         ])
                         ->action(function ($records, array $data): void {
-                            $records->each(function ($record) use ($data) {
-                                \App\Models\Stock::updateOrCreate(
-                                    [
-                                        'branch_id' => $data['branch_id'],
-                                        'product_id' => $record->id,
-                                    ],
-                                    [
-                                        'quantity_on_hand' => $data['quantity'],
-                                    ]
+                            @set_time_limit(0);
+                            $productIds = $records->pluck('id')->filter()->unique()->toArray();
+                            if (empty($productIds)) {
+                                return;
+                            }
+
+                            $branchId = $data['branch_id'];
+                            $quantity = $data['quantity'] ?? 0;
+                            $now = now();
+
+                            $payload = [];
+                            foreach ($productIds as $productId) {
+                                $payload[] = [
+                                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                                    'branch_id' => $branchId,
+                                    'product_id' => $productId,
+                                    'quantity_on_hand' => $quantity,
+                                    'quantity_reserved' => 0,
+                                    'min_qty' => 3,
+                                    'max_qty' => 15,
+                                    'is_active' => 1,
+                                    'lead_time' => 3,
+                                    'safety_stock' => 0,
+                                    'desired_inventory_days' => 14,
+                                    'version' => 1,
+                                    'created_at' => $now,
+                                    'updated_at' => $now,
+                                ];
+                            }
+
+                            foreach (array_chunk($payload, 500) as $chunk) {
+                                \App\Models\Stock::upsert(
+                                    $chunk,
+                                    ['branch_id', 'product_id'],
+                                    ['quantity_on_hand', 'updated_at']
                                 );
-                            });
+                            }
+
+                            // Invalidate cache once after mass assignment
+                            \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
+                            \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
+                            \Illuminate\Support\Facades\Cache::forget('pos_products_json_gz_branch_' . $branchId);
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Berhasil Menetapkan ke Cabang')
+                                ->body(count($productIds) . ' produk berhasil ditetapkan ke cabang.')
+                                ->success()
+                                ->send();
                         })
                         ->deselectRecordsAfterCompletion(),
                     BulkAction::make('cetak_label_barcode')
