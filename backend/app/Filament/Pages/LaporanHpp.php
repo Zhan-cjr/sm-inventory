@@ -478,7 +478,7 @@ class LaporanHpp extends Page implements HasForms
                     return response()->stream($callback, 200, $headers);
                 }),
                 \Filament\Actions\Action::make('export_xls')
-                    ->label('Export Xls (Format Cetak)')
+                    ->label('Export Xlsx (Format Cetak)')
                     ->icon('heroicon-o-document-text')
                     ->url(fn () => route('print.report', [
                         'type' => 'laporan-hpp',

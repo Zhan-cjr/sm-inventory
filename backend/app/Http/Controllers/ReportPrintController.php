@@ -47,10 +47,9 @@ class ReportPrintController extends Controller
             default => abort(404, 'Tipe laporan tidak ditemukan'),
         };
 
-        if ($request->has('export') && $request->export === 'xls') {
-            return response($response->render())
-                ->header('Content-Type', 'application/vnd.ms-excel')
-                ->header('Content-Disposition', 'attachment; filename="laporan-' . $type . '.xls"');
+        if ($request->has('export') && in_array($request->export, ['xls', 'xlsx'])) {
+            $filename = 'laporan-' . $type . '-' . date('Ymd_His') . '.xlsx';
+            return app(\App\Services\ReportExportService::class)->export($response, $filename);
         }
 
         return $response;
@@ -1571,18 +1570,14 @@ class ReportPrintController extends Controller
 
     private function exportExcelHtml($title, $period, $columns, $rows)
     {
-        $filename = str_replace(' ', '_', strtolower($title)) . '_' . date('Ymd_His') . '.xls';
-        return response()->streamDownload(function () use ($title, $period, $columns, $rows) {
-            echo view('print.reports.generic', [
-                'title' => $title,
-                'period' => $period,
-                'columns' => $columns,
-                'rows' => $rows
-            ])->render();
-        }, $filename, [
-            'Content-Type' => 'application/vnd.ms-excel',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"'
+        $filename = str_replace(' ', '_', strtolower($title)) . '_' . date('Ymd_His') . '.xlsx';
+        $view = view('print.reports.generic', [
+            'title' => $title,
+            'period' => $period,
+            'columns' => $columns,
+            'rows' => $rows
         ]);
+        return app(\App\Services\ReportExportService::class)->export($view, $filename);
     }
 
     private function exportCsv($title, $columns, $rows)

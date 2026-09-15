@@ -145,7 +145,7 @@ class ArsipLaporanEOD extends Page implements HasTable
                         ->formats([\Filament\Actions\Exports\Enums\ExportFormat::Xlsx])
                         ->icon('heroicon-o-table-cells'),
                     \Filament\Actions\Action::make('export_xls')
-                        ->label('Export Xls (Format Cetak)')
+                        ->label('Export Xlsx (Format Cetak)')
                         ->icon('heroicon-o-document-text')
                         ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                             'type' => 'arsip-transaksi',
