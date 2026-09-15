@@ -76,6 +76,8 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
     lines.push(formatRow('Poin Member', dDetails.point_deduction));
     lines.push(divider);
     
+    const totalSales = (Number(eodData.total_cash_sales) || 0) + nonCashTotal;
+    lines.push(formatRow('TOTAL PENJUALAN', totalSales));
     lines.push(formatRow('EXPECTED CASH', eodData.expected_cash));
     lines.push(formatRow('ACTUAL CASH', eodData.actual_cash));
     lines.push(formatRow('SELISIH', eodData.difference));

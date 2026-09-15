@@ -36,7 +36,7 @@
         </div>
         <div style="display: flex; justify-content: space-between; padding: 2px 0; color: #000000;">
             <span>Penjualan Non-Tunai</span>
-            <span>{{ number_format($shift->total_card_sales, 0, ',', '.') }}</span>
+            <span>{{ number_format(($shift->total_card_sales ?? 0) + ($shift->total_voucher_sales ?? 0), 0, ',', '.') }}</span>
         </div>
 
         @if($shift->card_sales_by_bank && count($shift->card_sales_by_bank) > 0)
@@ -51,6 +51,13 @@
                 <span>- Belum ada rincian bank</span>
                 <span>0</span>
             </div>
+        @endif
+
+        @if(($shift->total_voucher_sales ?? 0) > 0)
+        <div style="display: flex; justify-content: space-between; padding: 1px 0 1px 15px; font-size: 11px; color: #333333;">
+            <span>- Voucher</span>
+            <span>{{ number_format($shift->total_voucher_sales, 0, ',', '.') }}</span>
+        </div>
         @endif
 
         @if($shift->total_cash_returns > 0)
@@ -94,6 +101,10 @@
         <div style="border-bottom: 1px dashed #000000; margin: 8px 0;"></div>
 
         <!-- Expected / Actual / Difference -->
+        <div style="display: flex; justify-content: space-between; padding: 2px 0; font-weight: bold; color: #000000;">
+            <span>TOTAL PENJUALAN</span>
+            <span>{{ number_format(($shift->total_cash_sales ?? 0) + ($shift->total_card_sales ?? 0) + ($shift->total_voucher_sales ?? 0), 0, ',', '.') }}</span>
+        </div>
         <div style="display: flex; justify-content: space-between; padding: 2px 0; font-weight: bold; color: #000000;">
             <span>EXPECTED CASH</span>
             <span>{{ number_format($shift->expected_cash, 0, ',', '.') }}</span>
