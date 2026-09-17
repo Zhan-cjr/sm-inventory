@@ -108,9 +108,11 @@ class OpnamePublicController extends Controller
     public function submitCount1(Request $request, string $rackToken)
     {
         $request->validate([
-            'counter_name' => 'required|string|max:100',
-            'quantities'   => 'required|array',
-            'quantities.*' => 'nullable|numeric|min:0',
+            'counter_name'     => 'required|string|max:100',
+            'quantities'       => 'nullable|array',
+            'quantities.*'     => 'nullable|numeric|min:0',
+            'new_quantities'   => 'nullable|array',
+            'new_quantities.*' => 'nullable|numeric|min:0',
         ]);
 
         $rackSession = StockOpnameRackSession::with('session')
@@ -128,19 +130,22 @@ class OpnamePublicController extends Controller
 
         \DB::transaction(function () use ($request, $rackSession) {
             $submittedIds = [];
-            foreach ($request->quantities as $itemId => $qty) {
-                $item = StockOpnameItem::where('id', $itemId)
-                    ->where('rack_session_id', $rackSession->id)
-                    ->first();
+            $quantities = $request->input('quantities', []);
+            if (is_array($quantities)) {
+                foreach ($quantities as $itemId => $qty) {
+                    $item = StockOpnameItem::where('id', $itemId)
+                        ->where('rack_session_id', $rackSession->id)
+                        ->first();
 
-                if ($item && $item->status === 'PENDING') {
-                    $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
-                    $item->update([
-                        'count1_quantity' => $actualQty,
-                        'count1_at'       => now(),
-                        'status'          => 'COUNT1_DONE',
-                    ]);
-                    $submittedIds[] = $itemId;
+                    if ($item && $item->status === 'PENDING') {
+                        $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
+                        $item->update([
+                            'count1_quantity' => $actualQty,
+                            'count1_at'       => now(),
+                            'status'          => 'COUNT1_DONE',
+                        ]);
+                        $submittedIds[] = $itemId;
+                    }
                 }
             }
 
