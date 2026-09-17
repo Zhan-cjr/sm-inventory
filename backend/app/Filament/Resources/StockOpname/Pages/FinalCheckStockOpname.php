@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\StockOpname\Pages;
 
 use App\Filament\Resources\StockOpname\StockOpnameSessionResource;
+use App\Models\Stock;
 use App\Models\StockOpnameItem;
 use App\Models\StockOpnameSession;
 use Filament\Actions\Action;
@@ -86,6 +87,12 @@ class FinalCheckStockOpname extends Page
             ->with(['product', 'rackSession.rack'])
             ->get();
 
+        $existingProductIds = Stock::where('branch_id', $this->record->branch_id)
+            ->whereIn('product_id', $items->pluck('product_id')->filter())
+            ->pluck('product_id')
+            ->flip()
+            ->all();
+
         $grouped = [];
         foreach ($items as $item) {
             $pid = $item->product_id;
@@ -96,12 +103,13 @@ class FinalCheckStockOpname extends Page
                     ->get();
 
                 $grouped[$pid] = [
-                    'product_name' => $item->product?->name,
-                    'product_sku'  => $item->product?->sku,
-                    'system_qty'   => $item->system_quantity,
-                    'total_count1' => $allItems->sum('count1_quantity'),
-                    'total_count2' => $allItems->sum('count2_quantity'),
-                    'racks'        => [],
+                    'product_name'     => $item->product?->name,
+                    'product_sku'      => $item->product?->sku,
+                    'is_new_to_branch' => !isset($existingProductIds[$pid]),
+                    'system_qty'       => $item->system_quantity,
+                    'total_count1'     => $allItems->sum('count1_quantity'),
+                    'total_count2'     => $allItems->sum('count2_quantity'),
+                    'racks'            => [],
                 ];
             }
 
