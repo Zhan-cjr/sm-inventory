@@ -56,7 +56,7 @@ class Stock extends Model
     public $log_date;
 
     protected $fillable = [
-        'branch_id', 'product_id', 'cost_price', 'cost_price_tax', 'selling_price', 
+        'branch_id', 'product_id', 'supplier_id', 'supplier_division_id', 'cost_price', 'cost_price_tax', 'selling_price', 
         'margin_gol_1', 'harga_jual_1', 'qty_min_gol_1',
         'margin_gol_2', 'harga_jual_2', 'qty_min_gol_2',
         'margin_gol_3', 'harga_jual_3', 'qty_min_gol_3',
@@ -92,6 +92,26 @@ class Stock extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function supplier(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
+    }
+
+    public function supplierDivision(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(SupplierDivision::class, 'supplier_division_id');
+    }
+
+    public function getEffectiveSupplierIdAttribute(): ?string
+    {
+        return $this->supplier_id ?: $this->product?->supplier_id;
+    }
+
+    public function getEffectiveSupplierDivisionIdAttribute(): ?string
+    {
+        return $this->supplier_id ? $this->supplier_division_id : $this->product?->supplier_division_id;
     }
 
     public function racks(): \Illuminate\Database\Eloquent\Relations\BelongsToMany

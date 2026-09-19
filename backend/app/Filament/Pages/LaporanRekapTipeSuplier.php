@@ -34,16 +34,17 @@ class LaporanRekapTipeSuplier extends Page implements HasTable
     protected static ?int $navigationSort = 16;
 
     protected string $view = 'filament.pages.report-page';
-
     public function table(Table $table): Table
     {
         $subquery = DB::table('transaction_items as ti')
             ->join('products as p', 'ti.product_id', '=', 'p.id')
-            ->leftJoin('suppliers as s', 'p.supplier_id', '=', 's.id')
             ->join('transactions as t', 'ti.transaction_id', '=', 't.id')
             ->leftJoin('stocks as st', function($join) {
                 $join->on('st.product_id', '=', 'p.id')
                      ->on('st.branch_id', '=', 't.branch_id');
+            })
+            ->leftJoin('suppliers as s', function($join) {
+                $join->on('s.id', '=', DB::raw('COALESCE(st.supplier_id, p.supplier_id)'));
             })
             ->where('t.is_voided', false)
             ->selectRaw("
@@ -218,11 +219,13 @@ class LaporanRekapTipeSuplier extends Page implements HasTable
 
         $subquery = DB::table('transaction_items as ti')
             ->join('products as p', 'ti.product_id', '=', 'p.id')
-            ->leftJoin('suppliers as s', 'p.supplier_id', '=', 's.id')
             ->join('transactions as t', 'ti.transaction_id', '=', 't.id')
             ->leftJoin('stocks as st', function($join) {
                 $join->on('st.product_id', '=', 'p.id')
                      ->on('st.branch_id', '=', 't.branch_id');
+            })
+            ->leftJoin('suppliers as s', function($join) {
+                $join->on('s.id', '=', DB::raw('COALESCE(st.supplier_id, p.supplier_id)'));
             })
             ->where('t.is_voided', false)
             ->selectRaw("

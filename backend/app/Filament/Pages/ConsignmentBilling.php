@@ -110,7 +110,21 @@ class ConsignmentBilling extends Page implements HasForms
             return;
         }
 
-        $products = Product::where('supplier_id', $this->supplier_id)->get();
+        $branchId = $this->branch_id;
+        $supplierId = $this->supplier_id;
+
+        $products = Product::where(function ($q) use ($branchId, $supplierId) {
+            $q->whereHas('stocks', function ($sq) use ($branchId, $supplierId) {
+                $sq->where('branch_id', $branchId)->where('supplier_id', $supplierId);
+            })->orWhere(function ($sq) use ($branchId, $supplierId) {
+                $sq->where('products.supplier_id', $supplierId)
+                   ->whereDoesntHave('stocks', function ($stq) use ($branchId, $supplierId) {
+                       $stq->where('branch_id', $branchId)
+                           ->whereNotNull('supplier_id')
+                           ->where('supplier_id', '!=', $supplierId);
+                   });
+            });
+        })->get();
 
         $data = [];
         $totalTagihan = 0;
