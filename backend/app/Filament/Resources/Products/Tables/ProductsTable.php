@@ -39,18 +39,28 @@ class ProductsTable
                     $query->withSum('stocks', 'quantity_on_hand');
                 }
                 
-                // Integrate Laravel Scout (Meilisearch) for table search
+                // Integrate Laravel Scout (Meilisearch) with SQL Fallback
                 $search = $livewire->getTableSearch();
                 if (filled($search)) {
-                    $scoutIds = \App\Models\Product::search($search)->take(1000)->keys();
-                    
-                    if ($scoutIds->isEmpty()) {
-                        $query->whereRaw('1 = 0'); // Force empty result if Scout finds nothing
-                    } else {
-                        $query->whereIn('products.id', $scoutIds);
-                        // Preserve Meilisearch relevance ordering
-                        $scoutIdsStr = $scoutIds->implode("','");
-                        $query->orderByRaw("FIELD(products.id, '$scoutIdsStr')");
+                    try {
+                        $scoutIds = \App\Models\Product::search($search)->take(1000)->keys();
+                        
+                        if ($scoutIds->isEmpty()) {
+                            $query->whereRaw('1 = 0'); // Force empty result if Scout finds nothing
+                        } else {
+                            $query->whereIn('products.id', $scoutIds);
+                            // Preserve Meilisearch relevance ordering
+                            $scoutIdsStr = $scoutIds->implode("','");
+                            $query->orderByRaw("FIELD(products.id, '$scoutIdsStr')");
+                        }
+                    } catch (\Throwable $e) {
+                        // Fallback seamlessly to database LIKE search if Meilisearch service is down
+                        $query->where(function ($q) use ($search) {
+                            $q->where('products.name', 'like', "%{$search}%")
+                              ->orWhere('products.sku', 'like', "%{$search}%")
+                              ->orWhere('products.barcode', 'like', "%{$search}%")
+                              ->orWhere('products.metadata', 'like', "%{$search}%");
+                        });
                     }
                 }
 
@@ -124,7 +134,7 @@ class ProductsTable
                             ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null)),
                         \Filament\Forms\Components\Select::make('supplier_division_id')
                             ->label('Sub Divisi Pemasok')
-                            ->placeholder(fn ($get) => filled($get('supplier_id')) ? 'Semua Sub Divisi' : 'Pilih pemasok terlebih dahulu')
+                            ->placeholder('Semua Sub Divisi')
                             ->options(function ($get) {
                                 $supplierId = $get('supplier_id');
                                 if (!$supplierId) {
@@ -136,7 +146,13 @@ class ProductsTable
                             })
                             ->searchable()
                             ->preload()
-                            ->disabled(fn ($get) => blank($get('supplier_id'))),
+                            ->visible(function ($get) {
+                                $supplierId = $get('supplier_id');
+                                if (blank($supplierId)) {
+                                    return false;
+                                }
+                                return \App\Models\SupplierDivision::where('supplier_id', $supplierId)->exists();
+                            }),
                     ])
                     ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
                         return $query
