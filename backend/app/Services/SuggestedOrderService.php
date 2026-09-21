@@ -54,11 +54,21 @@ class SuggestedOrderService
             ->whereHas('product', fn($q) => $q->where('is_active', true));
 
         if (!empty($filters['supplier_id'])) {
-            $query->whereHas('product', function ($q) use ($filters) {
-                $q->where('supplier_id', $filters['supplier_id']);
-                if (!empty($filters['supplier_division_id'])) {
-                    $q->where('supplier_division_id', $filters['supplier_division_id']);
-                }
+            $query->where(function ($q) use ($filters) {
+                $q->where(function ($sq) use ($filters) {
+                    $sq->where('stocks.supplier_id', $filters['supplier_id']);
+                    if (!empty($filters['supplier_division_id'])) {
+                        $sq->where('stocks.supplier_division_id', $filters['supplier_division_id']);
+                    }
+                })->orWhere(function ($sq) use ($filters) {
+                    $sq->whereNull('stocks.supplier_id')
+                       ->whereHas('product', function ($pq) use ($filters) {
+                           $pq->where('supplier_id', $filters['supplier_id']);
+                           if (!empty($filters['supplier_division_id'])) {
+                               $pq->where('supplier_division_id', $filters['supplier_division_id']);
+                           }
+                       });
+                });
             });
         }
 
@@ -86,13 +96,17 @@ class SuggestedOrderService
             return $this->stockCalculationCache[$cacheKey];
         }
 
+        $effectiveSupplierId = $stock->supplier_id ?: ($stock->product->supplier_id ?? null);
+        $effectiveDivisionId = $stock->supplier_id ? $stock->supplier_division_id : ($stock->product->supplier_division_id ?? null);
+
         $aiData = $this->fetchFromAI($stock->branch_id);
         
         if (isset($aiData[$stock->product_id])) {
             $aiItem = $aiData[$stock->product_id];
             $result = [
                 'product_id' => $stock->product_id,
-                'supplier_id' => $stock->product->supplier_id ?? null,
+                'supplier_id' => $effectiveSupplierId,
+                'supplier_division_id' => $effectiveDivisionId,
                 'sku' => $stock->product->sku ?? '-',
                 'name' => $stock->product->name ?? '-',
                 'current_qty' => (float)$aiItem['current_qty'],
@@ -149,7 +163,8 @@ class SuggestedOrderService
 
         $result = [
             'product_id' => $stock->product_id,
-            'supplier_id' => $stock->product->supplier_id ?? null,
+            'supplier_id' => $effectiveSupplierId,
+            'supplier_division_id' => $effectiveDivisionId,
             'sku' => $stock->product->sku ?? '-',
             'name' => $stock->product->name ?? '-',
             'current_qty' => $current_qty,

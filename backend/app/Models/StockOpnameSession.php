@@ -83,43 +83,56 @@ class StockOpnameSession extends Model
      */
     public function getProductSummary()
     {
-        return $this->items()
+        $branchId = $this->branch_id;
+        $itemsGrouped = $this->items()
             ->with(['product'])
             ->get()
-            ->groupBy('product_id')
-            ->map(function ($items) {
-                $product   = $items->first()->product;
-                $totalC1   = $items->whereNotNull('count1_quantity')->sum('count1_quantity');
-                $totalC2   = $items->whereNotNull('count2_quantity')->sum('count2_quantity');
-                $totalFinal = $items->whereNotNull('final_quantity')->sum('final_quantity');
-                $systemQty = $items->first()->system_quantity; // sama untuk semua rak
-                $hasFinal  = $items->where('status', 'FINAL_DONE')->count() > 0;
+            ->groupBy('product_id');
 
-                $effectiveQty = $hasFinal ? $totalFinal : ($totalC2 ?: $totalC1);
-                $finalDisc    = $effectiveQty - $systemQty;
+        $existingProductIds = \App\Models\Stock::where('branch_id', $branchId)
+            ->whereIn('product_id', $itemsGrouped->keys()->filter())
+            ->pluck('product_id')
+            ->flip()
+            ->all();
 
-                // is_discrepancy: cek status DISCREPANCY (final check) ATAU ada selisih hitung vs sistem
-                $hasDiscrepancyStatus = $items->where('status', 'DISCREPANCY')->count() > 0;
-                $hasNumericDisc       = $finalDisc != 0 && $effectiveQty > 0;
+        return $itemsGrouped->map(function ($items) use ($existingProductIds) {
+            $product    = $items->first()->product;
+            $totalC1    = (float) $items->whereNotNull('count1_quantity')->sum('count1_quantity');
+            $totalC2    = (float) $items->whereNotNull('count2_quantity')->sum('count2_quantity');
+            $totalFinal = (float) $items->whereNotNull('final_quantity')->sum('final_quantity');
+            $systemQty  = (float) ($items->first()->system_quantity ?? 0);
+            $hasFinal   = $items->where('status', 'FINAL_DONE')->count() > 0;
 
-                return [
-                    'product_id'     => $product?->id,
-                    'sku'            => $product?->sku,
-                    'name'           => $product?->name,
-                    'system_qty'     => $systemQty,
-                    'total_count1'   => $totalC1,
-                    'total_count2'   => $totalC2,
-                    'total_final'    => $totalFinal,
-                    'final_disc'     => $finalDisc,
-                    'is_discrepancy' => $hasDiscrepancyStatus || $hasNumericDisc,
-                    'racks'          => $items->map(fn ($i) => [
-                        'rack_code'       => $i->rackSession?->rack?->rack_code,
-                        'count1_quantity' => $i->count1_quantity,
-                        'count2_quantity' => $i->count2_quantity,
-                        'final_quantity'  => $i->final_quantity,
-                        'status'          => $i->status,
-                    ]),
-                ];
-            });
+            $effectiveQty = $hasFinal ? $totalFinal : ($totalC2 ?: $totalC1);
+            $finalDisc    = $effectiveQty - $systemQty;
+
+            // is_discrepancy: cek status DISCREPANCY (final check) ATAU ada selisih hitung vs sistem
+            $hasDiscrepancyStatus = $items->where('status', 'DISCREPANCY')->count() > 0;
+            $hasNumericDisc       = $finalDisc != 0;
+
+            $productId     = $product?->id;
+            $isNewToBranch = $productId ? !isset($existingProductIds[$productId]) : false;
+
+            return [
+                'product_id'       => $productId,
+                'sku'              => $product?->sku,
+                'name'             => $product?->name,
+                'is_new_to_branch' => $isNewToBranch,
+                'effective_qty'    => $effectiveQty,
+                'system_qty'       => $systemQty,
+                'total_count1'     => $totalC1,
+                'total_count2'     => $totalC2,
+                'total_final'      => $totalFinal,
+                'final_disc'       => $finalDisc,
+                'is_discrepancy'   => $hasDiscrepancyStatus || $hasNumericDisc || $isNewToBranch,
+                'racks'            => $items->map(fn ($i) => [
+                    'rack_code'       => $i->rackSession?->rack?->rack_code,
+                    'count1_quantity' => $i->count1_quantity,
+                    'count2_quantity' => $i->count2_quantity,
+                    'final_quantity'  => $i->final_quantity,
+                    'status'          => $i->status,
+                ]),
+            ];
+        });
     }
 }

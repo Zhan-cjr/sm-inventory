@@ -174,6 +174,10 @@
         <div class="divider"></div>
 
         <div class="summary-row bold">
+            <span>TOTAL PENJUALAN</span>
+            <span>{{ number_format(($shift->total_cash_sales ?? 0) + ($shift->total_card_sales ?? 0) + ($shift->total_voucher_sales ?? 0), 0, ',', '.') }}</span>
+        </div>
+        <div class="summary-row bold">
             <span>EXPECTED CASH</span>
             <span>{{ number_format($shift->expected_cash, 0, ',', '.') }}</span>
         </div>

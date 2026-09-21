@@ -335,14 +335,24 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 }
             }
         } else {
-            // Min-Max Method: Query ONLY items registered in stocks for THIS branch
+            // Min-Max Method: Query items registered in stocks for THIS branch with effective supplier
             $branchStocks = \App\Models\Stock::where('branch_id', $this->branch_id)
                 ->where('is_active', true)
-                ->whereHas('product', function ($q) {
-                    $q->where('supplier_id', $this->supplier_id)->where('is_active', true);
-                    if ($this->supplier_division_id) {
-                        $q->where('supplier_division_id', $this->supplier_division_id);
-                    }
+                ->where(function ($q) {
+                    $q->where(function ($sq) {
+                        $sq->where('stocks.supplier_id', $this->supplier_id);
+                        if ($this->supplier_division_id) {
+                            $sq->where('stocks.supplier_division_id', $this->supplier_division_id);
+                        }
+                    })->orWhere(function ($sq) {
+                        $sq->whereNull('stocks.supplier_id')
+                           ->whereHas('product', function ($pq) {
+                               $pq->where('supplier_id', $this->supplier_id)->where('is_active', true);
+                               if ($this->supplier_division_id) {
+                                   $pq->where('supplier_division_id', $this->supplier_division_id);
+                               }
+                           });
+                    });
                 })
                 ->with('product')
                 ->get();

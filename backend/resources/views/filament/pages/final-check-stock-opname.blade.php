@@ -364,7 +364,14 @@
             {{-- Product Header --}}
             <div class="fc-product-header">
                 <div>
-                    <div class="fc-product-name">{{ $group['product_name'] }}</div>
+                    <div class="fc-product-name" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span>{{ $group['product_name'] }}</span>
+                        @if(!empty($group['is_new_to_branch']))
+                            <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #059669; border-radius: 9999px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                                ✨ Baru di Cabang (Auto Ditetapkan)
+                            </span>
+                        @endif
+                    </div>
                     <div class="fc-product-sku">SKU: {{ $group['product_sku'] }}</div>
                 </div>
                 <div class="fc-summary-pills">

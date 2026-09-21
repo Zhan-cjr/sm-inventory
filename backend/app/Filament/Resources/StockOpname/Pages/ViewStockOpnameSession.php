@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\StockOpname\Pages;
 
 use App\Filament\Resources\StockOpname\StockOpnameSessionResource;
+use App\Models\Product;
 use App\Models\Stock;
 use App\Models\StockOpnameSession;
 use Filament\Actions\Action;
@@ -141,15 +142,41 @@ class ViewStockOpnameSession extends ViewRecord
                 if (!$productId) continue;
 
                 // Tentukan qty final yang dipakai
-                $totalFinal   = $summary['total_final'];
-                $effectiveQty = ($totalFinal > 0) ? $totalFinal : $summary['total_count2'];
-                if (!$effectiveQty) continue;
+                $effectiveQty = isset($summary['effective_qty'])
+                    ? (float) $summary['effective_qty']
+                    : (($summary['total_final'] > 0) ? (float) $summary['total_final'] : (float) $summary['total_count2']);
 
                 $stock = Stock::where('branch_id', $session->branch_id)
                     ->where('product_id', $productId)
                     ->first();
 
-                if (!$stock) continue;
+                // Jika barang terdaftar di master global tapi belum di stok cabang, otomatis daftarkan ke cabang
+                if (!$stock) {
+                    $product = Product::find($productId);
+                    if (!$product) continue;
+
+                    $stock = Stock::create([
+                        'branch_id'             => $session->branch_id,
+                        'product_id'            => $productId,
+                        'cost_price'            => $product->cost_price ?? 0,
+                        'cost_price_tax'        => $product->cost_price_tax ?? 0,
+                        'selling_price'         => $product->selling_price ?? 0,
+                        'margin_gol_1'          => $product->margin_gol_1,
+                        'harga_jual_1'          => $product->harga_jual_1,
+                        'qty_min_gol_1'         => $product->qty_min_gol_1 ?? 1,
+                        'margin_gol_2'          => $product->margin_gol_2,
+                        'harga_jual_2'          => $product->harga_jual_2,
+                        'qty_min_gol_2'         => $product->qty_min_gol_2,
+                        'margin_gol_3'          => $product->margin_gol_3,
+                        'harga_jual_3'          => $product->harga_jual_3,
+                        'qty_min_gol_3'         => $product->qty_min_gol_3,
+                        'quantity_on_hand'      => 0,
+                        'is_active'             => true,
+                        'min_qty'               => 3,
+                        'max_qty'               => 15,
+                        'version'               => 1,
+                    ]);
+                }
 
                 $before = (float) $stock->quantity_on_hand;
 

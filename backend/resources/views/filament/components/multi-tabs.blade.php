@@ -1,12 +1,13 @@
 <div x-data="filamentMultiTabs()"
      x-init="initTabs()"
      @popstate.window="handleNavigation()"
-     style="display: flex; flex-direction: row; align-items: center; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; position: relative; z-index: 15; margin-top: 0;"
-     class="filament-multi-tabs-wrapper border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md px-3 py-1.5 transition-all">
+     style="display: flex; flex-direction: row; align-items: center; width: 100%; max-width: 100%; box-sizing: border-box; position: -webkit-sticky; position: sticky; top: 4rem; z-index: 25; margin-top: 0;"
+     class="filament-multi-tabs-wrapper border-b border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 transition-all shadow-xs">
     
     <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; max-width: 100%; box-sizing: border-box; gap: 8px; min-width: 0;">
         <!-- Tabs List Container (Horizontal Scrollable Flex Row) -->
         <div id="filament-multi-tabs-scroll-container"
+             @wheel.prevent="$el.scrollLeft += $event.deltaY"
              style="display: flex; flex-direction: row; align-items: center; gap: 6px; overflow-x: auto; overflow-y: hidden; flex: 1 1 0%; min-width: 0; max-width: 100%; padding: 2px 0;" 
              class="scrollbar-none scroll-smooth">
             <template x-for="(tab, index) in tabs" :key="tab.url">
@@ -26,7 +27,7 @@
                     <button type="button"
                             @click.stop.prevent="closeTab(index)"
                             title="Tutup Tab"
-                            style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 4px; border: none; background: transparent; cursor: pointer; margin-left: 2px;"
+                            style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; border: none; background: transparent; cursor: pointer; margin-left: 2px; flex-shrink: 0;"
                             class="tab-close-btn text-slate-400 hover:text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 transition">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 11px; height: 11px; flex-shrink: 0;">
                             <path d="M6 18L18 6M6 6l12 12"></path>
@@ -37,7 +38,7 @@
         </div>
 
         <!-- Scroll Controls & Action Button (Tutup Lainnya) -->
-        <div style="display: flex; flex-direction: row; align-items: center; gap: 4px; flex-shrink: 0; padding-left: 4px; z-index: 5;">
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; padding-left: 4px; z-index: 5;">
             <!-- Scroll Left Button -->
             <button type="button" 
                     @click="scrollTabs(-220)" 
@@ -77,8 +78,9 @@
 function filamentMultiTabs() {
     return {
         tabs: [],
-        pendingClosePath: null,
+        closedPaths: {},
         storageKey: 'sm_filament_admin_tabs',
+        manualTabSwitch: false,
 
         isFormTab(path) {
             if (!path) return false;
@@ -91,6 +93,45 @@ function filamentMultiTabs() {
                    /\/create(\/|$)/.test(clean);
         },
 
+        isPathBlacklisted(path) {
+            if (!path) return false;
+            const clean = path.split('?')[0].replace(/\/$/, '');
+            const expiry = this.closedPaths[clean];
+            return expiry && Date.now() < expiry;
+        },
+
+        blacklistPath(path, duration = 5000) {
+            if (!path) return;
+            const clean = path.split('?')[0].replace(/\/$/, '');
+            this.closedPaths[clean] = Date.now() + duration;
+        },
+
+        getParentUrl(path) {
+            if (!path) return '/admin';
+            const clean = path.split('?')[0].replace(/\/$/, '');
+            
+            // Extract parent list resource:
+            // e.g. /admin/goods-receipts/create -> /admin/goods-receipts
+            // e.g. /admin/goods-receipts/5/edit -> /admin/goods-receipts
+            // e.g. /admin/stock-opnames/create-pos -> /admin/stock-opnames
+            let parent = clean
+                .replace(/\/create(-pos)?$/, '')
+                .replace(/\/[0-9a-zA-Z_-]+\/edit$/, '')
+                .replace(/\/\d+$/, '');
+                
+            if (parent && parent !== clean && parent.startsWith('/admin')) {
+                return parent;
+            }
+            
+            // Fallback: look for an existing tab in this.tabs that is not a form tab
+            const existingListTab = this.tabs.find(t => !this.isFormTab(t.path) && t.path !== '/admin');
+            if (existingListTab) {
+                return existingListTab.url;
+            }
+            
+            return '/admin';
+        },
+
         initTabs() {
             this.loadTabsFromStorage();
             
@@ -99,22 +140,7 @@ function filamentMultiTabs() {
                 this.updateActiveTabUrl();
             }, 400);
 
-            // Listen for notificationSent event (e.g. after Edit form or POS save)
-            window.addEventListener('notificationSent', (e) => {
-                const notif = e.detail?.notification;
-                if (notif && (notif.status === 'success' || notif.color === 'success')) {
-                    const currentPath = window.location.pathname;
-                    if (this.isFormTab(currentPath)) {
-                        this.pendingClosePath = currentPath;
-                        const activeIndex = this.tabs.findIndex(t => t.path === currentPath || (t.active && this.isFormTab(t.path)));
-                        if (activeIndex !== -1) {
-                            this.closeTab(activeIndex);
-                        }
-                    }
-                }
-            });
-
-            // Global click listener for Batal / Cancel / Kembali buttons
+            // Intercept Batal / Cancel clicks on forms to cleanly close the form tab and return to parent tab
             document.addEventListener('click', (e) => {
                 const btn = e.target.closest('a, button');
                 if (!btn) return;
@@ -122,14 +148,32 @@ function filamentMultiTabs() {
                 if (text === 'batal' || text === 'cancel' || text === 'kembali') {
                     const currentPath = window.location.pathname;
                     if (this.isFormTab(currentPath)) {
-                        this.pendingClosePath = currentPath;
-                        const activeIndex = this.tabs.findIndex(t => t.path === currentPath || (t.active && this.isFormTab(t.path)));
-                        if (activeIndex !== -1) {
-                            this.closeTab(activeIndex);
+                        this.blacklistPath(currentPath, 5000);
+                        
+                        const formIdx = this.tabs.findIndex(t => t.path === currentPath || (t.active && this.isFormTab(t.path)));
+                        let parentUrl = null;
+                        if (formIdx !== -1) {
+                            const closingTab = this.tabs[formIdx];
+                            if (closingTab.parentUrl && !this.isFormTab(closingTab.parentUrl)) {
+                                parentUrl = closingTab.parentUrl;
+                            }
+                            this.tabs.splice(formIdx, 1);
                         }
+                        
+                        if (!parentUrl) {
+                            parentUrl = this.getParentUrl(currentPath);
+                        }
+
+                        const parentClean = parentUrl.split('?')[0].replace(/\/$/, '');
+                        const parentTab = this.tabs.find(t => t.path === parentClean || t.url === parentUrl);
+                        if (parentTab) {
+                            this.tabs.forEach(t => t.active = false);
+                            parentTab.active = true;
+                        }
+                        this.saveTabsToStorage();
                     }
                 }
-            });
+            }, true);
 
             // Refresh icons for all existing stored tabs after DOM renders
             setTimeout(() => {
@@ -222,6 +266,73 @@ function filamentMultiTabs() {
                 .trim() || 'Halaman';
         },
 
+        getSidebarTitle(currentPath) {
+            try {
+                const cleanPath = (currentPath || '').split('?')[0].replace(/\/$/, '');
+                if (!cleanPath) return null;
+
+                const sidebarLinks = document.querySelectorAll('.fi-sidebar-item a, .fi-sidebar-item-button, .fi-sidebar a, aside a');
+                for (let link of sidebarLinks) {
+                    const linkPath = (link.pathname || '').replace(/\/$/, '');
+                    if (linkPath && linkPath === cleanPath) {
+                        const labelEl = link.querySelector('.fi-sidebar-item-label') || link.querySelector('span');
+                        const text = (labelEl ? labelEl.innerText : link.innerText) || '';
+                        if (text.trim()) {
+                            return text.trim();
+                        }
+                    }
+                }
+            } catch (e) {}
+            return null;
+        },
+
+        getPageTitle(currentPath) {
+            const cleanPath = (currentPath || '').split('?')[0].replace(/\/$/, '');
+            const isForm = this.isFormTab(currentPath);
+
+            // 1. If it's a non-form list page, exact matching sidebar menu label is the most accurate
+            if (!isForm) {
+                const sidebarTitle = this.getSidebarTitle(cleanPath);
+                if (sidebarTitle) {
+                    return sidebarTitle;
+                }
+            }
+
+            // 2. Check the h1 header on the current page
+            const h1 = document.querySelector('h1.fi-header-heading, header h1, .fi-header-heading, h1');
+            if (h1 && h1.innerText && h1.innerText.trim()) {
+                const h1Text = h1.innerText.trim();
+                // If on a non-form page, reject stale form headings
+                if (!isForm && /^(ubah|edit|tambah|create|buat)\b/i.test(h1Text)) {
+                    // Stale heading from previous form page
+                } else {
+                    return h1Text;
+                }
+            }
+
+            // 3. Check document.title
+            const docTitle = this.cleanTitle(document.title);
+            if (docTitle && docTitle !== 'Halaman' && docTitle !== 'Dashboard') {
+                if (!isForm && /^(ubah|edit|tambah|create|buat)\b/i.test(docTitle)) {
+                    // Stale document.title from previous form page
+                } else {
+                    return docTitle;
+                }
+            }
+
+            // 4. Fallback for form tabs: construct from parent resource title
+            if (isForm) {
+                const parentPath = this.getParentUrl(currentPath);
+                const parentTitle = this.getSidebarTitle(parentPath);
+                if (parentTitle) {
+                    if (cleanPath.includes('/create')) return `Tambah ${parentTitle}`;
+                    if (cleanPath.includes('/edit')) return `Ubah ${parentTitle}`;
+                }
+            }
+
+            return docTitle || 'Halaman';
+        },
+
         extractSidebarIcon(currentPath) {
             try {
                 const cleanPath = currentPath.split('?')[0].replace(/\/$/, '');
@@ -275,40 +386,48 @@ function filamentMultiTabs() {
                 return;
             }
 
-            // Enforce removal of pending closed form tab
-            if (this.pendingClosePath) {
-                const targetToRemove = this.pendingClosePath;
-                this.pendingClosePath = null;
-                const removeIdx = this.tabs.findIndex(t => t.path === targetToRemove);
-                if (removeIdx !== -1) {
-                    this.tabs.splice(removeIdx, 1);
+            // If this path was recently closed, DO NOT capture or re-add it!
+            if (this.isPathBlacklisted(currentPath)) {
+                const idx = this.tabs.findIndex(t => t.path === currentPath);
+                if (idx !== -1) {
+                    this.tabs.splice(idx, 1);
+                    this.saveTabsToStorage();
                 }
-                if (currentPath === targetToRemove) {
-                    return;
-                }
+                return;
             }
 
-            let pageTitle = this.cleanTitle(document.title);
-            if (pageTitle === 'Halaman' || pageTitle === 'Dashboard') {
-                const h1 = document.querySelector('h1.fi-header-heading, header h1, h1');
-                if (h1 && h1.innerText.trim()) {
-                    pageTitle = h1.innerText.trim();
-                }
-            }
-
+            const isCurrentForm = this.isFormTab(currentPath);
+            const pageTitle = this.getPageTitle(currentPath);
             const iconSvg = this.extractSidebarIcon(currentPath);
-            const existingIndex = this.tabs.findIndex(t => t.path === currentPath);
 
             // Save currently active tab as parentUrl for new form tab
             const currentActiveTab = this.tabs.find(t => t.active);
             const parentUrl = (currentActiveTab && currentActiveTab.path !== currentPath) ? currentActiveTab.url : null;
 
+            // If the user was on a form tab (edit/create) and navigated back to its parent list (via Simpan, Batal, or breadcrumb):
+            if (!this.manualTabSwitch && currentActiveTab && this.isFormTab(currentActiveTab.path)) {
+                const parentPath = this.getParentUrl(currentActiveTab.path);
+                const cleanCurrent = currentPath.split('?')[0].replace(/\/$/, '');
+                if (cleanCurrent === parentPath) {
+                    const formTabIdx = this.tabs.findIndex(t => t.path === currentActiveTab.path);
+                    if (formTabIdx !== -1) {
+                        this.tabs.splice(formTabIdx, 1);
+                    }
+                }
+            }
+            this.manualTabSwitch = false;
+
             this.tabs.forEach(t => t.active = false);
+
+            const existingIndex = this.tabs.findIndex(t => t.path === currentPath);
 
             if (existingIndex !== -1) {
                 this.tabs[existingIndex].active = true;
                 this.tabs[existingIndex].url = currentUrl;
-                if (pageTitle && pageTitle !== 'Halaman') {
+                
+                // Never overwrite a list tab's title with a form title (e.g. "Ubah ...")
+                const isFormTitle = /^(ubah|edit|tambah|create|buat)\b/i.test(pageTitle);
+                if (pageTitle && pageTitle !== 'Halaman' && (!isFormTitle || isCurrentForm)) {
                     this.tabs[existingIndex].title = pageTitle;
                 }
                 if (iconSvg) {
@@ -329,9 +448,16 @@ function filamentMultiTabs() {
         },
 
         openTab(url) {
+            this.manualTabSwitch = true;
             this.updateActiveTabUrl();
 
-            if (window.location.pathname + window.location.search === url) return;
+            const cleanPath = url.split('?')[0].replace(/\/$/, '');
+            delete this.closedPaths[cleanPath];
+
+            if (window.location.pathname + window.location.search === url) {
+                this.manualTabSwitch = false;
+                return;
+            }
 
             if (window.Livewire && typeof window.Livewire.navigate === 'function') {
                 window.Livewire.navigate(url);
@@ -345,29 +471,35 @@ function filamentMultiTabs() {
 
             const closingTab = this.tabs[index];
             const isClosingActive = closingTab.active;
-            const parentUrl = closingTab ? closingTab.parentUrl : null;
+            const closingPath = closingTab.path;
+            const parentUrl = closingTab.parentUrl;
 
+            // Immediately blacklist path so captureCurrentPage cannot re-add it
+            this.blacklistPath(closingPath, 5000);
+
+            // Remove from array and storage immediately
             this.tabs.splice(index, 1);
             this.saveTabsToStorage();
 
             if (isClosingActive) {
-                if (parentUrl) {
+                let targetUrl = null;
+                if (parentUrl && !this.isFormTab(parentUrl)) {
                     const parentTab = this.tabs.find(t => t.url === parentUrl || t.path === parentUrl.split('?')[0]);
-                    if (parentTab) {
-                        this.openTab(parentTab.url);
-                        return;
-                    }
+                    targetUrl = parentTab ? parentTab.url : parentUrl;
                 }
 
-                if (this.tabs.length > 0) {
+                if (!targetUrl) {
+                    targetUrl = this.getParentUrl(closingPath);
+                }
+
+                const targetTab = this.tabs.find(t => t.url === targetUrl || t.path === targetUrl.split('?')[0]);
+                if (targetTab) {
+                    this.openTab(targetTab.url);
+                } else if (this.tabs.length > 0) {
                     const fallbackTab = this.tabs.slice(0, index).reverse().find(t => !this.isFormTab(t.path)) || this.tabs[Math.max(0, index - 1)];
-                    if (fallbackTab) {
-                        this.openTab(fallbackTab.url);
-                    } else {
-                        this.openTab('/admin');
-                    }
+                    this.openTab(fallbackTab ? fallbackTab.url : targetUrl);
                 } else {
-                    this.openTab('/admin');
+                    this.openTab(targetUrl || '/admin');
                 }
             }
         },
@@ -378,7 +510,11 @@ function filamentMultiTabs() {
         },
 
         handleNavigation() {
-            this.captureCurrentPage();
+            setTimeout(() => {
+                this.captureCurrentPage();
+                this.refreshAllTabIcons();
+                this.scrollToActiveTab();
+            }, 100);
         }
     };
 }

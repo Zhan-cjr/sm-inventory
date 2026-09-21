@@ -47,7 +47,7 @@ class SuggestedOrders extends Page implements HasTable
                 \App\Models\Stock::query()
                     ->where('is_active', true)
                     ->whereHas('product', fn($q) => $q->where('is_active', true))
-                    ->with(['product', 'product.supplier', 'branch'])
+                    ->with(['product', 'product.supplier', 'supplier', 'branch'])
             )
             ->columns([
                 TextColumn::make('product.sku')
@@ -59,10 +59,26 @@ class SuggestedOrders extends Page implements HasTable
                     ->searchable()
                     ->sortable()
                     ->wrap(),
-                TextColumn::make('product.supplier.name')
+                TextColumn::make('pemasok')
                     ->label('Pemasok')
-                    ->searchable()
-                    ->placeholder('-'),
+                    ->state(function ($record) {
+                        if ($record->supplier) {
+                            return $record->supplier->name;
+                        }
+                        return $record->product?->supplier?->name ?? '-';
+                    })
+                    ->description(fn ($record) => !empty($record->supplier_id) ? 'Pemasok Khusus Cabang' : null)
+                    ->badge(fn ($record) => !empty($record->supplier_id))
+                    ->color(fn ($record) => !empty($record->supplier_id) ? 'info' : null)
+                    ->searchable(query: function (Builder $query, string $search) {
+                        $query->where(function ($q) use ($search) {
+                            $q->whereHas('supplier', fn ($sq) => $sq->where('name', 'like', "%{$search}%"))
+                              ->orWhere(function ($sq) use ($search) {
+                                  $sq->whereNull('stocks.supplier_id')
+                                     ->whereHas('product.supplier', fn ($psq) => $psq->where('name', 'like', "%{$search}%"));
+                              });
+                        });
+                    }),
                 TextColumn::make('branch.name')
                     ->label('Cabang')
                     ->sortable(),
@@ -121,7 +137,18 @@ class SuggestedOrders extends Page implements HasTable
                     ->hidden(fn () => auth()->user()->branch_id !== null),
                 \Filament\Tables\Filters\SelectFilter::make('supplier_id')
                     ->label('Supplier')
-                    ->relationship('product.supplier', 'name'),
+                    ->options(fn () => \App\Models\Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                    ->query(function (Builder $query, array $data) {
+                        $supplierId = $data['value'] ?? null;
+                        if (!$supplierId) return $query;
+                        return $query->where(function ($q) use ($supplierId) {
+                            $q->where('stocks.supplier_id', $supplierId)
+                              ->orWhere(function ($sq) use ($supplierId) {
+                                  $sq->whereNull('stocks.supplier_id')
+                                     ->whereHas('product', fn ($pq) => $pq->where('supplier_id', $supplierId));
+                              });
+                        });
+                    }),
             ])
             ->recordActions([
                 Action::make('create_po')
@@ -133,11 +160,14 @@ class SuggestedOrders extends Page implements HasTable
                         $suggestion = app(SuggestedOrderService::class)->calculateForStock($record);
                         
                         $costPrice = $record->product->cost_price_tax > 0 ? $record->product->cost_price_tax : $record->product->cost_price;
+                        $targetSupplierId = $record->supplier_id ?: $record->product->supplier_id;
+                        $targetDivisionId = $record->supplier_id ? $record->supplier_division_id : $record->product->supplier_division_id;
                         
                         $po = \App\Models\PurchaseOrder::create([
                             'organization_id' => $record->product->organization_id,
                             'branch_id' => $record->branch_id,
-                            'supplier_id' => $record->product->supplier_id,
+                            'supplier_id' => $targetSupplierId,
+                            'supplier_division_id' => $targetDivisionId,
                             'po_number' => 'PO-' . date('YmdHis'),
                             'po_date' => now(),
                             'status' => 'DRAFT',
@@ -170,18 +200,23 @@ class SuggestedOrders extends Page implements HasTable
                     ->action(function (\Illuminate\Support\Collection $records) {
                         if ($records->isEmpty()) return;
 
-                        $recordsBySupplier = $records->groupBy(fn($rec) => $rec->product->supplier_id);
+                        $recordsBySupplier = $records->groupBy(function ($rec) {
+                            return $rec->supplier_id ?: ($rec->product->supplier_id ?? 'unknown');
+                        });
                         $createdPoCount = 0;
                         $lastPo = null;
 
                         foreach ($recordsBySupplier as $supplierId => $supplierRecords) {
-                            if (!$supplierId) continue;
+                            if (!$supplierId || $supplierId === 'unknown') continue;
                             
                             $firstRecord = $supplierRecords->first();
+                            $targetDivisionId = $firstRecord->supplier_id ? $firstRecord->supplier_division_id : $firstRecord->product->supplier_division_id;
+
                             $po = \App\Models\PurchaseOrder::create([
                                 'organization_id' => $firstRecord->product->organization_id,
                                 'branch_id' => $firstRecord->branch_id,
                                 'supplier_id' => $supplierId,
+                                'supplier_division_id' => $targetDivisionId,
                                 'po_number' => 'PO-' . date('YmdHis') . '-' . rand(10,99),
                                 'po_date' => now(),
                                 'status' => 'DRAFT',

@@ -814,7 +814,16 @@
                         @foreach($this->record->getProductSummary() as $summary)
                         <tr class="hover:bg-gray-50/40 dark:hover:bg-gray-950/40 transition-colors {{ $summary['is_discrepancy'] ? 'bg-rose-50/15 dark:bg-rose-950/5' : '' }}">
                             <td class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ $summary['sku'] }}</td>
-                            <td class="font-semibold text-gray-900 dark:text-white">{{ $summary['name'] }}</td>
+                            <td class="font-semibold text-gray-900 dark:text-white">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span>{{ $summary['name'] }}</span>
+                                    @if(!empty($summary['is_new_to_branch']))
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                            Baru di Cabang
+                                        </span>
+                                    @endif
+                                </div>
+                            </td>
                             <td class="text-right font-mono text-gray-600 dark:text-gray-400">{{ number_format($summary['system_qty'], 0) }}</td>
                             <td class="text-right font-mono text-gray-650 dark:text-gray-450">{{ number_format($summary['total_count1'], 0) }}</td>
                             <td class="text-right font-mono text-gray-650 dark:text-gray-450">{{ number_format($summary['total_count2'], 0) }}</td>

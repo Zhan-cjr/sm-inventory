@@ -1,7 +1,7 @@
-desktop-pos/build_dist/
+desktop-pos/
+desktop-admin/
 *.sql
 *.sql.gz
-desktop-pos/node_modules/
 ecommerce-frontend/node_modules/
 frontend/node_modules/
 frontend/dev-dist/

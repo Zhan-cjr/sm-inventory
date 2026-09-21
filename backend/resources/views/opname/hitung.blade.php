@@ -211,6 +211,17 @@
     <div class="alert-error">⚠️ {{ session('error') }}</div>
     @endif
 
+    @if($errors->any())
+    <div class="alert-error">
+        <strong>⚠️ Gagal menyimpan data:</strong>
+        <ul style="margin-left: 20px; margin-top: 6px;">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+    @endif
+
     <form method="POST" action="{{ route('opname.hitung.submit', $rackSession->rack_token) }}" id="count-form">
         @csrf
 

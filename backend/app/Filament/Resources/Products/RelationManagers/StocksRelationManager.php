@@ -45,6 +45,33 @@ class StocksRelationManager extends RelationManager
                     ->multiple()
                     ->searchable()
                     ->preload(),
+                \Filament\Schemas\Components\Section::make('Pemasok Cabang (Opsional)')
+                    ->description('Tentukan pemasok khusus untuk cabang ini jika berbeda dari pemasok utama produk')
+                    ->collapsible()
+                    ->collapsed(fn ($record) => empty($record?->supplier_id))
+                    ->columns(2)
+                    ->columnSpanFull()
+                    ->schema([
+                        \Filament\Forms\Components\Select::make('supplier_id')
+                            ->label('Pemasok Khusus Cabang')
+                            ->relationship('supplier', 'name', fn ($query) => $query->where('is_active', true))
+                            ->placeholder('Ikut Pemasok Utama Produk (Default)')
+                            ->helperText('Kosongkan jika menggunakan pemasok utama produk.')
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null)),
+                        \Filament\Forms\Components\Select::make('supplier_division_id')
+                            ->label('Divisi / Sub-Supplier Cabang')
+                            ->placeholder(fn (callable $get) => filled($get('supplier_id')) ? 'Pilih Divisi (Opsional)' : 'Pilih pemasok cabang dahulu')
+                            ->options(function (callable $get) {
+                                $supplierId = $get('supplier_id');
+                                if (!$supplierId) return [];
+                                return \App\Models\SupplierDivision::where('supplier_id', $supplierId)->pluck('name', 'id');
+                            })
+                            ->searchable()
+                            ->disabled(fn (callable $get) => blank($get('supplier_id'))),
+                    ]),
                 \Filament\Schemas\Components\Section::make('Harga Bertingkat & Margin')
                     ->columns(1)
                     ->columnSpanFull()
@@ -237,6 +264,13 @@ class StocksRelationManager extends RelationManager
                     ->label('No Rak')
                     ->badge()
                     ->separator(','),
+                TextColumn::make('supplier.name')
+                    ->label('Pemasok Cabang')
+                    ->placeholder(fn ($record) => $record && $record->product && $record->product->supplier ? $record->product->supplier->name . ' (Utama)' : '-')
+                    ->badge(fn ($record) => !empty($record?->supplier_id))
+                    ->color(fn ($record) => !empty($record?->supplier_id) ? 'info' : 'gray')
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('cost_price')
                     ->label('Harga Beli (Cabang)')
                     ->money('IDR')

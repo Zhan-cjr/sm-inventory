@@ -9,6 +9,19 @@ class CreateProduct extends CreateRecord
 {
     protected static string $resource = ProductResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
+    protected function getCancelFormAction(): \Filament\Actions\Action
+    {
+        return \Filament\Actions\Action::make('cancel')
+            ->label(__('filament-panels::resources/pages/create-record.form.actions.cancel.label'))
+            ->url($this->getResource()::getUrl('index'))
+            ->color('gray');
+    }
+
     protected function afterCreate(): void
     {
         $user = auth()->user();

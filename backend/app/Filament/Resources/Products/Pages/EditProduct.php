@@ -31,6 +31,19 @@ class EditProduct extends EditRecord
         ];
     }
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
+    protected function getCancelFormAction(): \Filament\Actions\Action
+    {
+        return \Filament\Actions\Action::make('cancel')
+            ->label(__('filament-panels::resources/pages/edit-record.form.actions.cancel.label'))
+            ->url($this->getResource()::getUrl('index'))
+            ->color('gray');
+    }
+
     protected function getFormActions(): array
     {
         if (auth()->user()->branch_id !== null) {

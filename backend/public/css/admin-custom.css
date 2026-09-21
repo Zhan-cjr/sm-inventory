@@ -4,6 +4,93 @@
    Inspired by SAP Fiori, NetSuite, & Odoo 17
    ============================================================ */
 
+/* ============================================================
+   LEGACY CHROMIUM & WINDOWS 7 COLOR FALLBACKS
+   Chromium < 111 (Windows 7 / Electron 22) does not support oklch()
+   Provide standard HEX definitions for all Filament palettes
+   ============================================================ */
+:root {
+    --text-0: #ffffff !important;
+    --dark-text-0: #ffffff !important;
+
+    /* Primary & Success (Emerald) */
+    --primary-50: #ecfdf5 !important;
+    --primary-100: #d1fae5 !important;
+    --primary-200: #a7f3d0 !important;
+    --primary-300: #6ee7b7 !important;
+    --primary-400: #34d399 !important;
+    --primary-500: #10b981 !important;
+    --primary-600: #059669 !important;
+    --primary-700: #047857 !important;
+    --primary-800: #065f46 !important;
+    --primary-900: #064e3b !important;
+    --primary-950: #022c22 !important;
+
+    --success-50: #ecfdf5 !important;
+    --success-100: #d1fae5 !important;
+    --success-200: #a7f3d0 !important;
+    --success-300: #6ee7b7 !important;
+    --success-400: #34d399 !important;
+    --success-500: #10b981 !important;
+    --success-600: #059669 !important;
+    --success-700: #047857 !important;
+    --success-800: #065f46 !important;
+    --success-900: #064e3b !important;
+    --success-950: #022c22 !important;
+
+    /* Info (Sky) */
+    --info-50: #f0f9ff !important;
+    --info-100: #e0f2fe !important;
+    --info-200: #bae6fd !important;
+    --info-300: #7dd3fc !important;
+    --info-400: #38bdf8 !important;
+    --info-500: #0ea5e9 !important;
+    --info-600: #0284c7 !important;
+    --info-700: #0369a1 !important;
+    --info-800: #075985 !important;
+    --info-900: #0c4a6e !important;
+    --info-950: #082f49 !important;
+
+    /* Warning (Amber) */
+    --warning-50: #fffbeb !important;
+    --warning-100: #fef3c7 !important;
+    --warning-200: #fde68a !important;
+    --warning-300: #fcd34d !important;
+    --warning-400: #fbbf24 !important;
+    --warning-500: #f59e0b !important;
+    --warning-600: #d97706 !important;
+    --warning-700: #b45309 !important;
+    --warning-800: #92400e !important;
+    --warning-900: #78350f !important;
+    --warning-950: #451a03 !important;
+
+    /* Danger (Rose) */
+    --danger-50: #fff1f2 !important;
+    --danger-100: #ffe4e6 !important;
+    --danger-200: #fecdd3 !important;
+    --danger-300: #fda4af !important;
+    --danger-400: #fb7185 !important;
+    --danger-500: #f43f5e !important;
+    --danger-600: #e11d48 !important;
+    --danger-700: #be123c !important;
+    --danger-800: #9f1239 !important;
+    --danger-900: #881337 !important;
+    --danger-950: #4c0519 !important;
+
+    /* Gray (Zinc) */
+    --gray-50: #fafafa !important;
+    --gray-100: #f4f4f5 !important;
+    --gray-200: #e4e4e7 !important;
+    --gray-300: #d4d4d8 !important;
+    --gray-400: #a1a1aa !important;
+    --gray-500: #71717a !important;
+    --gray-600: #52525b !important;
+    --gray-700: #3f3f46 !important;
+    --gray-800: #27272a !important;
+    --gray-900: #18181b !important;
+    --gray-950: #09090b !important;
+}
+
 body {
     zoom: 92%;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
@@ -187,51 +274,126 @@ body {
    ============================================================ */
 .fi-badge {
     border-radius: 9999px !important;
-    padding: 0.2rem 0.6rem !important;
-    font-size: 0.7rem !important;
+    padding: 0.25rem 0.75rem !important;
+    font-size: 0.725rem !important;
     font-weight: 700 !important;
     letter-spacing: 0.02em !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
 }
 
 /* Primary / Success Emerald Badge */
-.fi-color-emerald .fi-badge, .fi-badge-color-emerald, .fi-badge-color-success {
-    background-color: rgba(16, 185, 129, 0.12) !important;
-    color: #047857 !important;
-    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+.fi-badge.fi-color-primary,
+.fi-badge.fi-color-success,
+.fi-color-emerald .fi-badge,
+.fi-badge-color-emerald,
+.fi-badge-color-success {
+    background-color: #d1fae5 !important;
+    color: #065f46 !important;
+    border: 1px solid #a7f3d0 !important;
 }
-.dark .fi-color-emerald .fi-badge, .dark .fi-badge-color-emerald, .dark .fi-badge-color-success {
+.fi-badge.fi-color-primary *,
+.fi-badge.fi-color-success * {
+    color: #065f46 !important;
+}
+.dark .fi-badge.fi-color-primary,
+.dark .fi-badge.fi-color-success,
+.dark .fi-color-emerald .fi-badge,
+.dark .fi-badge-color-emerald,
+.dark .fi-badge-color-success {
     background-color: rgba(16, 185, 129, 0.2) !important;
     color: #34d399 !important;
     border-color: rgba(52, 211, 153, 0.3) !important;
 }
+.dark .fi-badge.fi-color-primary *,
+.dark .fi-badge.fi-color-success * {
+    color: #34d399 !important;
+}
 
 /* Warning Amber Badge */
-.fi-badge-color-amber, .fi-badge-color-warning {
-    background-color: rgba(245, 158, 11, 0.12) !important;
-    color: #b45309 !important;
-    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+.fi-badge.fi-color-warning,
+.fi-badge-color-amber,
+.fi-badge-color-warning {
+    background-color: #fef3c7 !important;
+    color: #92400e !important;
+    border: 1px solid #fde68a !important;
 }
-.dark .fi-badge-color-amber, .dark .fi-badge-color-warning {
+.fi-badge.fi-color-warning * {
+    color: #92400e !important;
+}
+.dark .fi-badge.fi-color-warning,
+.dark .fi-badge-color-amber,
+.dark .fi-badge-color-warning {
     background-color: rgba(245, 158, 11, 0.2) !important;
     color: #fbbf24 !important;
     border-color: rgba(251, 191, 36, 0.3) !important;
 }
 
 /* Danger Rose Badge */
-.fi-badge-color-rose, .fi-badge-color-danger {
-    background-color: rgba(244, 63, 94, 0.12) !important;
-    color: #be123c !important;
-    border: 1px solid rgba(244, 63, 94, 0.3) !important;
+.fi-badge.fi-color-danger,
+.fi-badge-color-rose,
+.fi-badge-color-danger {
+    background-color: #ffe4e6 !important;
+    color: #9f1239 !important;
+    border: 1px solid #fecdd3 !important;
 }
-.dark .fi-badge-color-rose, .dark .fi-badge-color-danger {
+.fi-badge.fi-color-danger * {
+    color: #9f1239 !important;
+}
+.dark .fi-badge.fi-color-danger,
+.dark .fi-badge-color-rose,
+.dark .fi-badge-color-danger {
     background-color: rgba(244, 63, 94, 0.2) !important;
     color: #f43f5e !important;
     border-color: rgba(244, 63, 94, 0.3) !important;
 }
 
+/* Info Sky Badge */
+.fi-badge.fi-color-info {
+    background-color: #e0f2fe !important;
+    color: #075985 !important;
+    border: 1px solid #bae6fd !important;
+}
+.fi-badge.fi-color-info * {
+    color: #075985 !important;
+}
+.dark .fi-badge.fi-color-info {
+    background-color: rgba(14, 165, 233, 0.2) !important;
+    color: #38bdf8 !important;
+    border-color: rgba(56, 189, 248, 0.3) !important;
+}
+
+/* Gray Badge */
+.fi-badge.fi-color-gray {
+    background-color: #f4f4f5 !important;
+    color: #3f3f46 !important;
+    border: 1px solid #e4e4e7 !important;
+}
+.dark .fi-badge.fi-color-gray {
+    background-color: #27272a !important;
+    color: #a1a1aa !important;
+    border-color: #3f3f46 !important;
+}
+
 /* ============================================================
    FORM INPUTS & CONTROLS (Precise Field Styling)
    ============================================================ */
+.fi-input-wrp {
+    border: 1px solid #cbd5e1 !important;
+    background-color: #ffffff !important;
+    border-radius: 8px !important;
+    transition: all 0.15s ease !important;
+}
+.dark .fi-input-wrp {
+    border-color: #334155 !important;
+    background-color: #1e293b !important;
+}
+.fi-input-wrp:focus-within {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+}
+
 .fi-fo-text-input input,
 .fi-fo-date-picker input,
 .fi-fo-textarea textarea,
@@ -274,6 +436,7 @@ body {
 
 /* ============================================================
    BUTTONS (Sleek Modern ERP Actions)
+   Full fallback support for Chromium 108 / Windows 7
    ============================================================ */
 .fi-btn {
     border-radius: 8px !important;
@@ -287,16 +450,121 @@ body {
     transform: scale(0.97) !important;
 }
 
+/* Primary Button (Emerald) */
+.fi-btn.fi-color-primary,
 .fi-btn-color-primary {
     background-color: #10b981 !important;
     color: #ffffff !important;
     border: 1px solid #059669 !important;
     box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25) !important;
 }
-
+.fi-btn.fi-color-primary:hover,
 .fi-btn-color-primary:hover {
     background-color: #059669 !important;
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35) !important;
+}
+.fi-btn.fi-color-primary *,
+.fi-btn-color-primary *,
+.fi-btn.fi-color-primary .fi-btn-icon,
+.fi-btn.fi-color-primary svg {
+    color: #ffffff !important;
+}
+
+/* Info Button (Sky / Cyan) */
+.fi-btn.fi-color-info,
+.fi-btn-color-info {
+    background-color: #0284c7 !important;
+    color: #ffffff !important;
+    border: 1px solid #0369a1 !important;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25) !important;
+}
+.fi-btn.fi-color-info:hover,
+.fi-btn-color-info:hover {
+    background-color: #0369a1 !important;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35) !important;
+}
+.fi-btn.fi-color-info *,
+.fi-btn-color-info *,
+.fi-btn.fi-color-info .fi-btn-icon,
+.fi-btn.fi-color-info svg {
+    color: #ffffff !important;
+}
+
+/* Success Button (Emerald) */
+.fi-btn.fi-color-success,
+.fi-btn-color-success {
+    background-color: #10b981 !important;
+    color: #ffffff !important;
+    border: 1px solid #059669 !important;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25) !important;
+}
+.fi-btn.fi-color-success:hover,
+.fi-btn-color-success:hover {
+    background-color: #059669 !important;
+}
+.fi-btn.fi-color-success *,
+.fi-btn-color-success * {
+    color: #ffffff !important;
+}
+
+/* Danger Button (Rose) */
+.fi-btn.fi-color-danger,
+.fi-btn-color-danger {
+    background-color: #e11d48 !important;
+    color: #ffffff !important;
+    border: 1px solid #be123c !important;
+    box-shadow: 0 2px 6px rgba(225, 29, 72, 0.25) !important;
+}
+.fi-btn.fi-color-danger:hover,
+.fi-btn-color-danger:hover {
+    background-color: #be123c !important;
+}
+.fi-btn.fi-color-danger *,
+.fi-btn-color-danger * {
+    color: #ffffff !important;
+}
+
+/* Warning Button (Amber) */
+.fi-btn.fi-color-warning,
+.fi-btn-color-warning {
+    background-color: #f59e0b !important;
+    color: #ffffff !important;
+    border: 1px solid #d97706 !important;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.25) !important;
+}
+.fi-btn.fi-color-warning:hover,
+.fi-btn-color-warning:hover {
+    background-color: #d97706 !important;
+}
+.fi-btn.fi-color-warning *,
+.fi-btn-color-warning * {
+    color: #ffffff !important;
+}
+
+/* Outlined & Gray Secondary Buttons */
+.fi-btn.fi-outlined,
+.fi-btn.fi-color-gray {
+    background-color: #ffffff !important;
+    color: #334155 !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+.fi-btn.fi-outlined:hover,
+.fi-btn.fi-color-gray:hover {
+    background-color: #f8fafc !important;
+    border-color: #94a3b8 !important;
+    color: #0f172a !important;
+}
+.dark .fi-btn.fi-outlined,
+.dark .fi-btn.fi-color-gray {
+    background-color: #1e293b !important;
+    color: #cbd5e1 !important;
+    border-color: #334155 !important;
+}
+.dark .fi-btn.fi-outlined:hover,
+.dark .fi-btn.fi-color-gray:hover {
+    background-color: #334155 !important;
+    color: #ffffff !important;
 }
 
 /* ============================================================
@@ -375,15 +643,41 @@ body {
     display: none !important;
 }
 
+/* ============================================================
+   MULTI-TABS SYSTEM (STICKY / FREEZE & RESPONSIVE CONSTRAINTS)
+   ============================================================ */
+.fi-layout {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: clip !important;
+}
+
+.fi-main-ctn {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 0% !important;
+    overflow: visible !important;
+}
+
 .filament-multi-tabs-wrapper {
-    position: relative !important;
-    top: 0 !important;
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 4rem !important;
     margin-top: 0 !important;
-    z-index: 15 !important;
+    z-index: 25 !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
+    background-color: #f8fafc !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.dark .filament-multi-tabs-wrapper {
+    background-color: #0f172a !important;
+    border-bottom-color: #1e293b !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
 }
 
 .filament-multi-tabs-wrapper svg {
