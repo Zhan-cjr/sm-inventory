@@ -50,83 +50,77 @@ class ProductsTable
                             $query->whereRaw('1 = 0'); // Force empty result if Scout finds nothing
                         } else {
                             $query->whereIn('products.id', $scoutIds);
+                            // Preserve Meilisearch relevance ordering
+                            $scoutIdsStr = $scoutIds->implode("','");
+                            $query->orderByRaw("FIELD(products.id, '$scoutIdsStr')");
                         }
-                    } catch (\Exception $e) {
-                        // Fallback: If Scout/Meilisearch fails or is unreachable, use fast SQL LIKE query
+                    } catch (\Throwable $e) {
+                        // Fallback seamlessly to database LIKE search if Meilisearch service is down
                         $query->where(function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%")
-                              ->orWhere('sku', 'like', "%{$search}%")
-                              ->orWhere('barcode', 'like', "%{$search}%")
-                              ->orWhere('barcode_2', 'like', "%{$search}%")
-                              ->orWhere('barcode_3', 'like', "%{$search}%")
-                              ->orWhere('barcode_4', 'like', "%{$search}%")
-                              ->orWhere('barcode_5', 'like', "%{$search}%")
-                              ->orWhere('barcode_6', 'like', "%{$search}%");
+                            $q->where('products.name', 'like', "%{$search}%")
+                              ->orWhere('products.sku', 'like', "%{$search}%")
+                              ->orWhere('products.barcode', 'like', "%{$search}%")
+                              ->orWhere('products.metadata', 'like', "%{$search}%");
                         });
                     }
                 }
-                
+
                 return $query;
             })
             ->columns([
-                ImageColumn::make('image_url')
+                ImageColumn::make('image_path')
                     ->label('Foto')
-                    ->circular()
-                    ->defaultImageUrl(url('/images/placeholder-product.png')),
+                    ->disk('public')
+                    ->square()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('barcode')
+                    ->label('Barcode')
+                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('sku')
                     ->label('SKU')
-                    ->searchable()
-                    ->sortable()
-                    ->weight('bold')
-                    ->copyable()
-                    ->copyMessage('SKU berhasil disalin')
-                    ->copyMessageDuration(1500),
+                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
+                    ->sortable(),
                 TextColumn::make('name')
                     ->label('Nama Produk')
-                    ->searchable()
-                    ->sortable()
-                    ->wrap(),
-                TextColumn::make('unit_of_measure')
-                    ->label('Satuan')
-                    ->badge()
-                    ->color('gray')
+                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
                     ->sortable(),
-                TextColumn::make('category.name')
-                    ->label('Kategori')
-                    ->sortable()
-                    ->badge()
-                    ->color('primary'),
-                TextColumn::make('supplier.name')
-                    ->label('Suplier')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('cost_price')
-                    ->label('Harga Pokok')
+                TextColumn::make('cost_price_tax')
+                    ->label('Harga Beli (+PPN)')
                     ->money('IDR')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: false),
+                    ->toggleable(),
                 TextColumn::make('selling_price')
-                    ->label('Harga Jual 1')
+                    ->label('Harga Jual')
                     ->money('IDR')
-                    ->sortable()
-                    ->weight('bold'),
+                    ->sortable(),
                 TextColumn::make('stocks_sum_quantity_on_hand')
-                    ->label('Sisa Stok')
-                    ->numeric()
+                    ->label('Stok')
+                    ->formatStateUsing(fn ($state) => (float) $state)
                     ->sortable()
-                    ->alignEnd()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()),
+                TextColumn::make('stocks.racks.rack_code')
+                    ->label('No Rak')
                     ->badge()
-                    ->color(fn ($state) => $state <= 0 ? 'danger' : ($state < 10 ? 'warning' : 'success')),
-                TextColumn::make('stocks.racks.name')
-                    ->label('Rak')
-                    ->badge()
-                    ->color('info')
                     ->separator(',')
-                    ->toggleable(isToggledHiddenByDefault: false),
+                    ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
+                    ->toggleable(),
+                TextColumn::make('supplier.name')
+                    ->label('Pemasok')
+                    ->sortable()
+                    ->toggleable(),
+                TextColumn::make('supplierDivision.name')
+                    ->label('Sub Divisi')
+                    ->placeholder('-')
+                    ->sortable()
+                    ->toggleable(),
                 IconColumn::make('is_active')
                     ->label('Status')
-                    ->boolean()
-                    ->sortable(),
+                    ->boolean(),
+                \Filament\Tables\Columns\ToggleColumn::make('is_ecommerce_active')
+                    ->label('Tampil E-Commerce')
+                    ->disabled(fn () => auth()->user()->branch_id !== null),
             ])
             ->recordUrl(function ($record, \Filament\Tables\Contracts\HasTable $livewire) {
                 $branchId = \Illuminate\Support\Facades\Auth::user()?->branch_id 
@@ -135,58 +129,61 @@ class ProductsTable
                 return $branchId ? "{$url}?branch_id={$branchId}" : $url;
             })
             ->filters([
-                \Filament\Tables\Filters\SelectFilter::make('category')
-                    ->relationship('category', 'name')
-                    ->label('Kategori')
-                    ->searchable()
-                    ->preload(),
-                \Filament\Tables\Filters\SelectFilter::make('supplier')
-                    ->relationship('supplier', 'name')
-                    ->label('Suplier')
-                    ->searchable()
-                    ->preload(),
-                \Filament\Tables\Filters\Filter::make('supplier_division_filter')
+                \Filament\Tables\Filters\Filter::make('supplier')
                     ->form([
                         \Filament\Forms\Components\Select::make('supplier_id')
-                            ->label('Suplier')
-                            ->options(fn () => \App\Models\Supplier::pluck('name', 'id'))
+                            ->label('Pemasok')
+                            ->placeholder('Semua Pemasok')
+                            ->options(fn () => \App\Models\Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
                             ->searchable()
                             ->preload()
                             ->live()
                             ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null)),
                         \Filament\Forms\Components\Select::make('supplier_division_id')
-                            ->label('Sub Divisi')
-                            ->options(function (callable $get) {
+                            ->label('Sub Divisi Pemasok')
+                            ->placeholder('Semua Sub Divisi')
+                            ->options(function ($get) {
                                 $supplierId = $get('supplier_id');
                                 if (!$supplierId) {
                                     return [];
                                 }
-                                return \App\Models\SupplierDivision::where('supplier_id', $supplierId)->pluck('name', 'id');
+                                return \App\Models\SupplierDivision::where('supplier_id', $supplierId)
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id');
                             })
                             ->searchable()
                             ->preload()
-                            ->disabled(fn (callable $get) => !$get('supplier_id')),
+                            ->visible(function ($get) {
+                                $supplierId = $get('supplier_id');
+                                if (blank($supplierId)) {
+                                    return false;
+                                }
+                                return \App\Models\SupplierDivision::where('supplier_id', $supplierId)->exists();
+                            }),
                     ])
                     ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
                         return $query
                             ->when(
-                                $data['supplier_id'],
-                                fn (\Illuminate\Database\Eloquent\Builder $query, $supplierId): \Illuminate\Database\Eloquent\Builder => $query->where('supplier_id', $supplierId),
-                            )
-                            ->when(
-                                $data['supplier_division_id'],
-                                fn (\Illuminate\Database\Eloquent\Builder $query, $divisionId): \Illuminate\Database\Eloquent\Builder => $query->where('supplier_division_id', $divisionId),
+                                $data['supplier_id'] ?? null,
+                                function (\Illuminate\Database\Eloquent\Builder $query, $supplierId) use ($data): \Illuminate\Database\Eloquent\Builder {
+                                    $query->where('supplier_id', $supplierId);
+
+                                    return $query->when(
+                                        $data['supplier_division_id'] ?? null,
+                                        fn (\Illuminate\Database\Eloquent\Builder $query, $divisionId): \Illuminate\Database\Eloquent\Builder => $query->where('supplier_division_id', $divisionId)
+                                    );
+                                }
                             );
                     })
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
-                        if ($data['supplier_id'] ?? null) {
+                        if (!empty($data['supplier_id'])) {
                             $supplier = \App\Models\Supplier::find($data['supplier_id']);
                             if ($supplier) {
-                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Suplier: ' . $supplier->name)
-                                    ->removeField('supplier_id');
+                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Pemasok: ' . $supplier->name);
                             }
-                            if ($data['supplier_division_id'] ?? null) {
+
+                            if (!empty($data['supplier_division_id'])) {
                                 $division = \App\Models\SupplierDivision::find($data['supplier_division_id']);
                                 if ($division) {
                                     $indicators[] = \Filament\Tables\Filters\Indicator::make('Sub Divisi: ' . $division->name)
