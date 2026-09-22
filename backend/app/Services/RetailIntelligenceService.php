@@ -39,6 +39,7 @@ class RetailIntelligenceService
 
     /**
      * Resolusi branch ID & nama branch yang sedang dievaluasi.
+     * User toko fisik SELALU terkunci pada cabangnya sendiri.
      */
     public static function resolveBranchContext(?string $selectedBranchId = null): array
     {
@@ -51,37 +52,42 @@ class RetailIntelligenceService
         $branchLabel = "Semua Cabang";
         $isSpecificBranch = false;
 
-        if ($userBranchId !== null) {
-            // User cabang fisik: selalu terkunci pada cabangnya sendiri
+        // PRIORITAS 1: User cabang fisik (kasir/admin toko) - MUTLAK terkunci ke cabangnya sendiri
+        if (!empty($userBranchId)) {
             $evalBranchId = $userBranchId;
             $b = $allBranches->firstWhere("id", $userBranchId) ?: Branch::find($userBranchId);
             $branchLabel = $b?->name ?? "Cabang";
             $isSpecificBranch = true;
-        } elseif ($selectedBranchId !== null && $selectedBranchId !== "" && $selectedBranchId !== "all") {
-            // Cabang eksplisit terpilih dari filter/parameter
+        }
+        // PRIORITAS 2: Super Admin memilih cabang via filter tabel / URL
+        elseif ($selectedBranchId !== null && $selectedBranchId !== "" && $selectedBranchId !== "all") {
             $evalBranchId = $selectedBranchId;
             $b = $allBranches->firstWhere("id", $selectedBranchId) ?: Branch::find($selectedBranchId);
             $branchLabel = $b?->name ?? "Cabang Terpilih";
             $isSpecificBranch = true;
-        } elseif ($selectedBranchId === "all") {
-            // Pilihan eksplisit Semua Cabang
+        }
+        // PRIORITAS 3: Super Admin eksplisit memilih Semua Cabang ("all")
+        elseif ($selectedBranchId === "all") {
             $evalBranchId = null;
             $branchLabel = "Semua Cabang ({$totalBranchesCount} Cabang)";
             $isSpecificBranch = false;
-        } elseif (session()->has('active_selected_branch_id') && session('active_selected_branch_id') !== 'all' && !empty(session('active_selected_branch_id'))) {
-            // Dari session filter tabel sebelumnya
+        }
+        // PRIORITAS 4: Dari session filter tabel (hanya untuk Super Admin)
+        elseif (session()->has('active_selected_branch_id') && session('active_selected_branch_id') !== 'all' && !empty(session('active_selected_branch_id'))) {
             $evalBranchId = session('active_selected_branch_id');
             $b = $allBranches->firstWhere("id", $evalBranchId) ?: Branch::find($evalBranchId);
             $branchLabel = $b?->name ?? "Cabang Terpilih";
             $isSpecificBranch = true;
-        } elseif ($totalBranchesCount === 1) {
-            // Hanya 1 cabang terdaftar di sistem
+        }
+        // PRIORITAS 5: Jika sistem hanya memiliki 1 cabang aktif
+        elseif ($totalBranchesCount === 1) {
             $firstBranch = $allBranches->first();
-            $evalBranchId = $firstBranch->id;
-            $branchLabel = $firstBranch->name;
+            $evalBranchId = $firstBranch?->id;
+            $branchLabel = $firstBranch?->name ?? "Cabang";
             $isSpecificBranch = true;
-        } else {
-            // Multi cabang - mode konsolidasi nasional
+        }
+        // DEFAULT: Konsolidasi Semua Cabang (Pusat)
+        else {
             $evalBranchId = null;
             $branchLabel = "Semua Cabang ({$totalBranchesCount} Cabang)";
             $isSpecificBranch = false;
@@ -256,7 +262,7 @@ class RetailIntelligenceService
     }
 
     /**
-     * Data Lengkap untuk Hub Retail Intelligence (3 Panel + Komparasi Cabang).
+     * Data Lengkap untuk Hub Retail Intelligence (3 Panel Bersih & Ringkas).
      */
     public static function getIntelligenceData(Product $product, ?string $selectedBranchId = null): array
     {
@@ -267,7 +273,6 @@ class RetailIntelligenceService
         $totalBranchesCount = $context["totalBranchesCount"];
 
         $unit = $product->unit_of_measure ?: "pcs";
-        $minStock = (int) ($product->reorder_point ?: 10);
         $leadTime = (int) ($product->lead_time_days ?: 3);
         $criticalDays = max($leadTime + 4, 7);
         $supplier = $product->supplier;
@@ -423,52 +428,7 @@ class RetailIntelligenceService
             }
         }
 
-        // 6. Matriks Komparasi Stok & Penjualan Seluruh Cabang
-        $branchBreakdown = [];
-        try {
-            $thirtyDaysAgo = Carbon::now()->subDays(30);
-            foreach ($allBranches as $b) {
-                $bQoh = (float) (Stock::where("product_id", $product->id)->where("branch_id", $b->id)->value("quantity_on_hand") ?? 0);
-                $bSales = (float) TransactionItem::where("product_id", $product->id)
-                    ->whereHas("transaction", function ($q) use ($b, $thirtyDaysAgo) {
-                        $q->where("branch_id", $b->id)
-                          ->where("created_at", ">=", $thirtyDaysAgo)
-                          ->where("is_voided", false);
-                    })
-                    ->sum("quantity");
-
-                $bDaily = round($bSales / 30, 2);
-
-                if ($bQoh <= 0 && $bSales == 0) {
-                    $bStatus = "Belum Ada Riwayat Jual (Stok 0)";
-                    $bBadgeColor = "gray";
-                } elseif ($bQoh <= 0 && $bSales > 0) {
-                    $bStatus = "Stok Habis (Laris)";
-                    $bBadgeColor = "danger";
-                } elseif ($bQoh > 0 && $bSales == 0) {
-                    $bStatus = "Barang Macet (Dead Stock)";
-                    $bBadgeColor = "warning";
-                } else {
-                    $bStatus = "Aktif (~{$bDaily}/hari)";
-                    $bBadgeColor = "success";
-                }
-
-                $branchBreakdown[] = [
-                    "id" => $b->id,
-                    "name" => $b->name,
-                    "qoh" => $bQoh,
-                    "sales30Days" => $bSales,
-                    "dailyAvg" => $bDaily,
-                    "status" => $bStatus,
-                    "badgeColor" => $bBadgeColor,
-                    "isSelected" => ($branchId === $b->id),
-                ];
-            }
-        } catch (\Throwable $e) {
-            $branchBreakdown = [];
-        }
-
-        // 7. Saran Tindakan Otomatis (4 Kuadran Cerdas)
+        // 6. Saran Tindakan Otomatis (4 Kuadran Cerdas)
         $prescriptiveActions = [];
 
         if ($transferOpportunity) {
@@ -574,8 +534,6 @@ class RetailIntelligenceService
             "transferOpportunity" => $transferOpportunity,
             "branchLabel" => $branchLabel,
             "branchId" => $branchId,
-            "branchBreakdown" => $branchBreakdown,
-            "totalBranchesCount" => $totalBranchesCount,
         ];
     }
 }
