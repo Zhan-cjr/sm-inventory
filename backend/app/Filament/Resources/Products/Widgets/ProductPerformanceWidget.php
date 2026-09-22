@@ -12,7 +12,23 @@ class ProductPerformanceWidget extends BaseWidget
 {
     public ?Model $record = null;
 
+    public ?string $selectedBranchId = null;
+
     protected ?string $pollingInterval = null;
+
+    protected $listeners = ['branch-context-changed' => 'updateBranchContext'];
+
+    public function mount(): void
+    {
+        $this->selectedBranchId = request()->query('branch_id') 
+            ?: session('active_selected_branch_id') 
+            ?: auth()->user()?->branch_id;
+    }
+
+    public function updateBranchContext(?string $branchId = null): void
+    {
+        $this->selectedBranchId = $branchId;
+    }
 
     protected function getStats(): array
     {
@@ -23,7 +39,12 @@ class ProductPerformanceWidget extends BaseWidget
             return [];
         }
 
-        $stats = RetailIntelligenceService::getPerformanceStats($product);
+        $branchId = $this->selectedBranchId 
+            ?: request()->query('branch_id') 
+            ?: session('active_selected_branch_id') 
+            ?: auth()->user()?->branch_id;
+
+        $stats = RetailIntelligenceService::getPerformanceStats($product, $branchId);
 
         // Stat 1: Sisa Stok Fisik
         $statStock = Stat::make("Sisa Stok Fisik", number_format($stats["qoh"], 0, ",", ".") . " " . $stats["unit"])

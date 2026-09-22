@@ -52,19 +52,30 @@ class RetailIntelligenceService
         $isSpecificBranch = false;
 
         if ($userBranchId !== null) {
-            // User cabang: terkunci pada cabangnya sendiri
+            // User cabang fisik: selalu terkunci pada cabangnya sendiri
             $evalBranchId = $userBranchId;
             $b = $allBranches->firstWhere("id", $userBranchId) ?: Branch::find($userBranchId);
             $branchLabel = $b?->name ?? "Cabang";
             $isSpecificBranch = true;
-        } elseif ($selectedBranchId !== null && $selectedBranchId !== "") {
-            // Super admin memilih cabang tertentu
+        } elseif ($selectedBranchId !== null && $selectedBranchId !== "" && $selectedBranchId !== "all") {
+            // Cabang eksplisit terpilih dari filter/parameter
             $evalBranchId = $selectedBranchId;
             $b = $allBranches->firstWhere("id", $selectedBranchId) ?: Branch::find($selectedBranchId);
             $branchLabel = $b?->name ?? "Cabang Terpilih";
             $isSpecificBranch = true;
+        } elseif ($selectedBranchId === "all") {
+            // Pilihan eksplisit Semua Cabang
+            $evalBranchId = null;
+            $branchLabel = "Semua Cabang ({$totalBranchesCount} Cabang)";
+            $isSpecificBranch = false;
+        } elseif (session()->has('active_selected_branch_id') && session('active_selected_branch_id') !== 'all' && !empty(session('active_selected_branch_id'))) {
+            // Dari session filter tabel sebelumnya
+            $evalBranchId = session('active_selected_branch_id');
+            $b = $allBranches->firstWhere("id", $evalBranchId) ?: Branch::find($evalBranchId);
+            $branchLabel = $b?->name ?? "Cabang Terpilih";
+            $isSpecificBranch = true;
         } elseif ($totalBranchesCount === 1) {
-            // Hanya 1 cabang terdaftar di sistem: otomatis pakai cabang tersebut
+            // Hanya 1 cabang terdaftar di sistem
             $firstBranch = $allBranches->first();
             $evalBranchId = $firstBranch->id;
             $branchLabel = $firstBranch->name;
@@ -200,7 +211,7 @@ class RetailIntelligenceService
             ? "🔴 JUAL RUGI (Harga Jual di Bawah Modal)" 
             : "Modal: Rp " . number_format($cogs, 0, ",", ".") . " ➔ Jual: Rp " . number_format($sellingPrice, 0, ",", ".");
 
-        // 6. Produktivitas Modal Stok (Tanpa Permisalan Rp 1.000 yang Rancu)
+        // 6. Produktivitas Modal Stok
         if ($gmroi >= 2.0) {
             $modalLabel = "Sangat Produktif (" . number_format($gmroi, 1) . "x)";
             $modalDesc = "Modal belanja berputar cepat & menghasilkan laba tinggi setahun";
@@ -223,6 +234,7 @@ class RetailIntelligenceService
             "qoh" => $qoh,
             "unit" => $unit,
             "branchName" => $branchLabel,
+            "branchId" => $branchId,
             "stockDesc" => $stockDesc,
             "stockColor" => $stockColor,
             "stockIcon" => $stockIcon,
@@ -244,7 +256,7 @@ class RetailIntelligenceService
     }
 
     /**
-     * Data Lengkap untuk Hub Retail Intelligence (3 Panel).
+     * Data Lengkap untuk Hub Retail Intelligence (3 Panel + Komparasi Cabang).
      */
     public static function getIntelligenceData(Product $product, ?string $selectedBranchId = null): array
     {
@@ -359,63 +371,33 @@ class RetailIntelligenceService
             $otifScore = 100;
         }
 
-        // 4. Barang yang Sering Dibeli Bersamaan (Market Basket)
+        // 4. Analisis Market Basket (Cross-Selling)
         $topAffinityItems = [];
         try {
-            $rules = MarketBasketRule::with("consequent")
-                ->where("antecedent_id", $product->id)
-                ->orderByDesc("confidence")
+            $rules = MarketBasketRule::where("antecedent_product_id", $product->id)
+                ->with("consequentProduct")
+                ->orderByDesc("lift")
                 ->take(3)
                 ->get();
 
-            if ($rules->isNotEmpty()) {
-                foreach ($rules as $r) {
+            foreach ($rules as $rule) {
+                if ($rule->consequentProduct) {
                     $topAffinityItems[] = [
-                        "name" => $r->consequent_name ?: ($r->consequent?->name ?? "Produk Terkait"),
-                        "sku" => $r->consequent?->sku ?? "-",
-                        "confidence" => round($r->confidence * 100, 0) . "% Pembeli Membeli Bareng",
-                        "lift" => round($r->lift, 1) . "x",
+                        "name" => $rule->consequentProduct->name,
+                        "confidence" => number_format($rule->confidence * 100, 1) . "% Pembeli",
+                        "lift" => number_format($rule->lift, 1) . "x",
                     ];
-                }
-            } else {
-                $txIds = TransactionItem::where("product_id", $product->id)
-                    ->latest()
-                    ->take(50)
-                    ->pluck("transaction_id");
-
-                if ($txIds->isNotEmpty()) {
-                    $coItems = TransactionItem::with("product")
-                        ->whereIn("transaction_id", $txIds)
-                        ->where("product_id", "!=", $product->id)
-                        ->selectRaw("product_id, COUNT(*) as frequency")
-                        ->groupBy("product_id")
-                        ->orderByDesc("frequency")
-                        ->take(3)
-                        ->get();
-
-                    foreach ($coItems as $co) {
-                        if ($co->product) {
-                            $pct = round(($co->frequency / max(1, $txIds->count())) * 100);
-                            $topAffinityItems[] = [
-                                "name" => $co->product->name,
-                                "sku" => $co->product->sku,
-                                "confidence" => "{$pct}% Pembeli Membeli Bareng",
-                                "lift" => $co->frequency . " Transaksi",
-                            ];
-                        }
-                    }
                 }
             }
         } catch (\Throwable $e) {
             $topAffinityItems = [];
         }
 
-        // 5. Cek Peluang Transfer Antar Cabang (Inter-Branch Transfer Opportunity)
+        // 5. Evaluasi Peluang Transfer Antar Cabang
         $transferOpportunity = null;
-        if ($totalBranchesCount > 1 && $branchId) {
+        if ($branchId && $totalBranchesCount > 1) {
             $isDeficit = ($qoh <= 0) || ($dailyAvg > 0 && $doh <= $criticalDays);
             if ($isDeficit) {
-                // Cari cabang lain yang memiliki surplus stok
                 $surplusStock = Stock::with("branch")
                     ->where("product_id", $product->id)
                     ->where("branch_id", "!=", $branchId)
@@ -441,12 +423,54 @@ class RetailIntelligenceService
             }
         }
 
-        // ========================================================
-        // 6. SARAN TINDAKAN OTOMATIS (4 KUADRAN LOGIS & CERDAS)
-        // ========================================================
+        // 6. Matriks Komparasi Stok & Penjualan Seluruh Cabang
+        $branchBreakdown = [];
+        try {
+            $thirtyDaysAgo = Carbon::now()->subDays(30);
+            foreach ($allBranches as $b) {
+                $bQoh = (float) (Stock::where("product_id", $product->id)->where("branch_id", $b->id)->value("quantity_on_hand") ?? 0);
+                $bSales = (float) TransactionItem::where("product_id", $product->id)
+                    ->whereHas("transaction", function ($q) use ($b, $thirtyDaysAgo) {
+                        $q->where("branch_id", $b->id)
+                          ->where("created_at", ">=", $thirtyDaysAgo)
+                          ->where("is_voided", false);
+                    })
+                    ->sum("quantity");
+
+                $bDaily = round($bSales / 30, 2);
+
+                if ($bQoh <= 0 && $bSales == 0) {
+                    $bStatus = "Belum Ada Riwayat Jual (Stok 0)";
+                    $bBadgeColor = "gray";
+                } elseif ($bQoh <= 0 && $bSales > 0) {
+                    $bStatus = "Stok Habis (Laris)";
+                    $bBadgeColor = "danger";
+                } elseif ($bQoh > 0 && $bSales == 0) {
+                    $bStatus = "Barang Macet (Dead Stock)";
+                    $bBadgeColor = "warning";
+                } else {
+                    $bStatus = "Aktif (~{$bDaily}/hari)";
+                    $bBadgeColor = "success";
+                }
+
+                $branchBreakdown[] = [
+                    "id" => $b->id,
+                    "name" => $b->name,
+                    "qoh" => $bQoh,
+                    "sales30Days" => $bSales,
+                    "dailyAvg" => $bDaily,
+                    "status" => $bStatus,
+                    "badgeColor" => $bBadgeColor,
+                    "isSelected" => ($branchId === $b->id),
+                ];
+            }
+        } catch (\Throwable $e) {
+            $branchBreakdown = [];
+        }
+
+        // 7. Saran Tindakan Otomatis (4 Kuadran Cerdas)
         $prescriptiveActions = [];
 
-        // REKOMENDASI TRANSFER ANTAR CABANG (Prioritas Internal Pertama)
         if ($transferOpportunity) {
             $prescriptiveActions[] = [
                 "type" => "transfer",
@@ -457,7 +481,6 @@ class RetailIntelligenceService
             ];
         }
 
-        // EVALUASI KEBUTUHAN PO SUPLIER
         if ($inFlightPOs->isNotEmpty()) {
             $poLatest = $inFlightPOs->first();
             $poNumber = $poLatest->purchaseOrder?->po_number ?? "PO Aktif";
@@ -470,11 +493,11 @@ class RetailIntelligenceService
                 "action_url" => route("filament.admin.resources.purchase-orders.edit", ["record" => $poLatest->purchase_order_id]),
             ];
         } elseif ($qoh <= 0 && $sales30Days == 0) {
-            // KUADRAN A: Stok 0 + Penjualan 0 (Produk Baru / Non-Aktif)
+            // KUADRAN A: Stok 0 + Penjualan 0 (Produk Baru / Non-Aktif di Cabang Ini)
             $prescriptiveActions[] = [
                 "type" => "neutral",
-                "title" => "⚪ Belum Ada Riwayat Penjualan (Stok Kosong)",
-                "message" => "Produk ini belum memiliki riwayat transaksi di sistem dan stok fisik saat ini 0. Jika produk ini aktif ingin dipasarkan, silakan buat Pesanan Pembelian perdana. Jika produk sudah tidak dipasarkan, Anda dapat menonaktifkan status produk.",
+                "title" => "⚪ Belum Ada Riwayat Penjualan ({$branchLabel})",
+                "message" => "Produk ini belum memiliki riwayat transaksi di {$branchLabel} dan stok fisik saat ini 0. Jika produk ini aktif ingin dipasarkan di cabang ini, silakan buat Pesanan Pembelian atau Mutasi dari cabang lain.",
                 "action_label" => $product->supplier_id ? "Buat PO Inisialisasi Perdana" : null,
                 "action_url" => $product->supplier_id ? route("filament.admin.resources.purchase-orders.create") . "?supplier_id={$product->supplier_id}" . ($branchId ? "&branch_id={$branchId}" : "") : null,
             ];
@@ -482,7 +505,7 @@ class RetailIntelligenceService
             // KUADRAN B: Stok 0 + Penjualan > 0 (Barang Laris Habis / Stockout Kritis)
             $prescriptiveActions[] = [
                 "type" => "danger",
-                "title" => "🚨 Stok Habis (Potensi Kehilangan Penjualan)",
+                "title" => "🚨 Stok Habis (Potensi Kehilangan Penjualan di {$branchLabel})",
                 "message" => "Barang ini aktif terjual (~{$dailyAvg} {$unit}/hari) namun stok fisik habis! Segera buat pesanan ke suplier agar toko tidak kehilangan omset.",
                 "action_label" => "Buat Draft Pesanan Pembelian (PO)",
                 "action_url" => route("filament.admin.resources.purchase-orders.create") . "?supplier_id={$product->supplier_id}" . ($branchId ? "&branch_id={$branchId}" : ""),
@@ -491,7 +514,7 @@ class RetailIntelligenceService
             // KUADRAN C: Stok Menipis
             $prescriptiveActions[] = [
                 "type" => "warning",
-                "title" => "⚠️ Stok Menipis (Waktunya Pesan Ulang)",
+                "title" => "⚠️ Stok Menipis di {$branchLabel} (Waktunya Pesan Ulang)",
                 "message" => "Sisa stok ({$qoh} {$unit}) diperkirakan hanya cukup untuk ~{$doh} hari, sedangkan pengiriman suplier butuh waktu {$leadTime} hari. Disarankan segera memesan ulang.",
                 "action_label" => "Buat Draft Pesanan Pembelian (PO)",
                 "action_url" => route("filament.admin.resources.purchase-orders.create") . "?supplier_id={$product->supplier_id}" . ($branchId ? "&branch_id={$branchId}" : ""),
@@ -500,7 +523,7 @@ class RetailIntelligenceService
             // KUADRAN D: Stok Ada + Penjualan 0 (Dead Stock)
             $prescriptiveActions[] = [
                 "type" => "warning",
-                "title" => "⚠️ Barang Macet / Kurang Laku (Modal Mengendap)",
+                "title" => "⚠️ Barang Macet di {$branchLabel} (Modal Mengendap)",
                 "message" => "Ada {$qoh} {$unit} (Nilai modal: Rp " . number_format($invValue, 0, ",", ".") . ") belum terjual dalam 30 hari terakhir. Disarankan retur ke suplier atau buat promo tebus murah.",
                 "action_label" => null,
                 "action_url" => null,
@@ -509,14 +532,13 @@ class RetailIntelligenceService
             // KUADRAN E: Stok Aman
             $prescriptiveActions[] = [
                 "type" => "success",
-                "title" => "🟢 Persediaan Stok Sangat Aman",
+                "title" => "🟢 Persediaan Stok {$branchLabel} Sangat Aman",
                 "message" => "Sisa stok ({$qoh} {$unit}) diperkirakan mencukupi untuk ~{$doh} hari ke depan. Belum diperlukan pemesanan ulang ke suplier.",
                 "action_label" => null,
                 "action_url" => null,
             ];
         }
 
-        // REKOMENDASI PELUANG BUNDLING / RAK
         if (!empty($topAffinityItems)) {
             $firstPair = $topAffinityItems[0]["name"];
             $prescriptiveActions[] = [
@@ -551,6 +573,9 @@ class RetailIntelligenceService
             "prescriptiveActions" => $prescriptiveActions,
             "transferOpportunity" => $transferOpportunity,
             "branchLabel" => $branchLabel,
+            "branchId" => $branchId,
+            "branchBreakdown" => $branchBreakdown,
+            "totalBranchesCount" => $totalBranchesCount,
         ];
     }
 }

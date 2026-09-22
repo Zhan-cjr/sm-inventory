@@ -11,6 +11,16 @@ class EditProduct extends EditRecord
 {
     protected static string $resource = ProductResource::class;
 
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+        
+        $branchId = request()->query('branch_id');
+        if ($branchId) {
+            session(['active_selected_branch_id' => $branchId]);
+        }
+    }
+
     protected function getHeaderWidgets(): array
     {
         return [
