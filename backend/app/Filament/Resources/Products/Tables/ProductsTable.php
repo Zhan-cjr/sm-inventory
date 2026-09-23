@@ -144,35 +144,25 @@ class ProductsTable
                             ->placeholder('Semua Sub Divisi')
                             ->options(function ($get) {
                                 $supplierId = $get('supplier_id');
-                                if (!$supplierId) {
-                                    return [];
+                                if (filled($supplierId)) {
+                                    return \App\Models\SupplierDivision::where('supplier_id', $supplierId)
+                                        ->orderBy('name')
+                                        ->pluck('name', 'id');
                                 }
-                                return \App\Models\SupplierDivision::where('supplier_id', $supplierId)
-                                    ->orderBy('name')
-                                    ->pluck('name', 'id');
+                                return \App\Models\SupplierDivision::orderBy('name')->pluck('name', 'id');
                             })
                             ->searchable()
-                            ->preload()
-                            ->visible(function ($get) {
-                                $supplierId = $get('supplier_id');
-                                if (blank($supplierId)) {
-                                    return false;
-                                }
-                                return \App\Models\SupplierDivision::where('supplier_id', $supplierId)->exists();
-                            }),
+                            ->preload(),
                     ])
                     ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
                         return $query
                             ->when(
                                 $data['supplier_id'] ?? null,
-                                function (\Illuminate\Database\Eloquent\Builder $query, $supplierId) use ($data): \Illuminate\Database\Eloquent\Builder {
-                                    $query->where('supplier_id', $supplierId);
-
-                                    return $query->when(
-                                        $data['supplier_division_id'] ?? null,
-                                        fn (\Illuminate\Database\Eloquent\Builder $query, $divisionId): \Illuminate\Database\Eloquent\Builder => $query->where('supplier_division_id', $divisionId)
-                                    );
-                                }
+                                fn (\Illuminate\Database\Eloquent\Builder $query, $supplierId): \Illuminate\Database\Eloquent\Builder => $query->where('supplier_id', $supplierId)
+                            )
+                            ->when(
+                                $data['supplier_division_id'] ?? null,
+                                fn (\Illuminate\Database\Eloquent\Builder $query, $divisionId): \Illuminate\Database\Eloquent\Builder => $query->where('supplier_division_id', $divisionId)
                             );
                     })
                     ->indicateUsing(function (array $data): array {
@@ -180,15 +170,16 @@ class ProductsTable
                         if (!empty($data['supplier_id'])) {
                             $supplier = \App\Models\Supplier::find($data['supplier_id']);
                             if ($supplier) {
-                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Pemasok: ' . $supplier->name);
+                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Pemasok: ' . $supplier->name)
+                                    ->removeField('supplier_id');
                             }
+                        }
 
-                            if (!empty($data['supplier_division_id'])) {
-                                $division = \App\Models\SupplierDivision::find($data['supplier_division_id']);
-                                if ($division) {
-                                    $indicators[] = \Filament\Tables\Filters\Indicator::make('Sub Divisi: ' . $division->name)
-                                        ->removeField('supplier_division_id');
-                                }
+                        if (!empty($data['supplier_division_id'])) {
+                            $division = \App\Models\SupplierDivision::find($data['supplier_division_id']);
+                            if ($division) {
+                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Sub Divisi: ' . $division->name)
+                                    ->removeField('supplier_division_id');
                             }
                         }
                         return $indicators;
