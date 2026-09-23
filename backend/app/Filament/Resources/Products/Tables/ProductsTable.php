@@ -28,7 +28,6 @@ class ProductsTable
                 }
 
                 if ($branchId) {
-                    session(['active_selected_branch_id' => $branchId]);
                     $query->with(['stocks' => function ($q) use ($branchId) {
                         $q->where('branch_id', $branchId)->with('racks');
                     }]);

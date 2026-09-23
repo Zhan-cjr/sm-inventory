@@ -11,19 +11,6 @@ class EditProduct extends EditRecord
 {
     protected static string $resource = ProductResource::class;
 
-    public function mount(int | string $record): void
-    {
-        parent::mount($record);
-        
-        // Hanya simpan filter URL ke session jika yang login adalah Super Admin (tanpa branch_id)
-        if (auth()->user()?->branch_id === null) {
-            $branchId = request()->query('branch_id');
-            if ($branchId) {
-                session(['active_selected_branch_id' => $branchId]);
-            }
-        }
-    }
-
     protected function getHeaderWidgets(): array
     {
         return [

@@ -23,11 +23,9 @@ class ProductPerformanceWidget extends BaseWidget
             return [];
         }
 
-        // User cabang MUTLAK terkunci ke cabangnya sendiri
+        // User cabang MUTLAK terkunci ke cabangnya; Super admin membaca eksplisit dari URL query
         $userBranchId = auth()->user()?->branch_id;
-        $branchId = !empty($userBranchId) 
-            ? $userBranchId 
-            : (request()->query('branch_id') ?: session('active_selected_branch_id'));
+        $branchId = !empty($userBranchId) ? $userBranchId : request()->query('branch_id');
 
         $stats = RetailIntelligenceService::getPerformanceStats($product, $branchId);
 

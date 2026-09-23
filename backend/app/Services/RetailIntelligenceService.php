@@ -59,34 +59,14 @@ class RetailIntelligenceService
             $branchLabel = $b?->name ?? "Cabang";
             $isSpecificBranch = true;
         }
-        // PRIORITAS 2: Super Admin memilih cabang via filter tabel / URL
+        // PRIORITAS 2: Super Admin secara eksplisit memfilter cabang pada URL (?branch_id=...)
         elseif ($selectedBranchId !== null && $selectedBranchId !== "" && $selectedBranchId !== "all") {
             $evalBranchId = $selectedBranchId;
             $b = $allBranches->firstWhere("id", $selectedBranchId) ?: Branch::find($selectedBranchId);
             $branchLabel = $b?->name ?? "Cabang Terpilih";
             $isSpecificBranch = true;
         }
-        // PRIORITAS 3: Super Admin eksplisit memilih Semua Cabang ("all")
-        elseif ($selectedBranchId === "all") {
-            $evalBranchId = null;
-            $branchLabel = "Semua Cabang ({$totalBranchesCount} Cabang)";
-            $isSpecificBranch = false;
-        }
-        // PRIORITAS 4: Dari session filter tabel (hanya untuk Super Admin)
-        elseif (session()->has('active_selected_branch_id') && session('active_selected_branch_id') !== 'all' && !empty(session('active_selected_branch_id'))) {
-            $evalBranchId = session('active_selected_branch_id');
-            $b = $allBranches->firstWhere("id", $evalBranchId) ?: Branch::find($evalBranchId);
-            $branchLabel = $b?->name ?? "Cabang Terpilih";
-            $isSpecificBranch = true;
-        }
-        // PRIORITAS 5: Jika sistem hanya memiliki 1 cabang aktif
-        elseif ($totalBranchesCount === 1) {
-            $firstBranch = $allBranches->first();
-            $evalBranchId = $firstBranch?->id;
-            $branchLabel = $firstBranch?->name ?? "Cabang";
-            $isSpecificBranch = true;
-        }
-        // DEFAULT: Konsolidasi Semua Cabang (Pusat)
+        // DEFAULT SUPER ADMIN: Selalu "Semua Cabang" (Konsolidasi Nasional tanpa jejak session)
         else {
             $evalBranchId = null;
             $branchLabel = "Semua Cabang ({$totalBranchesCount} Cabang)";
