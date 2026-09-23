@@ -14,18 +14,27 @@ use Filament\Tables\Table;
 
 class ProductsTable
 {
+    public static function resolveActiveBranchId(\Filament\Tables\Contracts\HasTable $livewire): ?string
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user?->branch_id) {
+            return (string) $user->branch_id;
+        }
+
+        $branchId = data_get($livewire->tableFilters, 'branch.value')
+            ?? (method_exists($livewire, 'getTableFilterState') ? data_get($livewire->getTableFilterState('branch'), 'value') : null)
+            ?? data_get($livewire->tableDeferredFilters, 'branch.value')
+            ?? request('tableFilters.branch.value')
+            ?? request('branch_id');
+
+        return (!empty($branchId) && $branchId !== 'all') ? (string) $branchId : null;
+    }
+
     public static function configure(Table $table): Table
     {
         return $table
             ->modifyQueryUsing(function (\Illuminate\Database\Eloquent\Builder $query, \Filament\Tables\Contracts\HasTable $livewire) {
-                $user = \Illuminate\Support\Facades\Auth::user();
-                $branchId = null;
-
-                if ($user && $user->branch_id) {
-                    $branchId = $user->branch_id;
-                } else {
-                    $branchId = $livewire->tableFilters['branch']['value'] ?? null;
-                }
+                $branchId = static::resolveActiveBranchId($livewire);
 
                 if ($branchId) {
                     $query->with(['stocks' => function ($q) use ($branchId) {
@@ -119,13 +128,14 @@ class ProductsTable
                     ->boolean(),
                 \Filament\Tables\Columns\ToggleColumn::make('is_ecommerce_active')
                     ->label('Tampil E-Commerce')
-                    ->disabled(fn () => auth()->user()->branch_id !== null),
+                    ->disabled(fn () => auth()->user()?->branch_id !== null),
             ])
             ->recordUrl(function ($record, \Filament\Tables\Contracts\HasTable $livewire) {
-                $branchId = \Illuminate\Support\Facades\Auth::user()?->branch_id 
-                    ?? ($livewire->tableFilters['branch']['value'] ?? null);
-                $url = route('filament.admin.resources.products.edit', ['record' => $record->id]);
-                return $branchId ? "{$url}?branch_id={$branchId}" : $url;
+                $branchId = static::resolveActiveBranchId($livewire);
+                return \App\Filament\Resources\Products\ProductResource::getUrl('edit', array_filter([
+                    'record' => $record,
+                    'branch_id' => $branchId,
+                ]));
             })
             ->filters([
                 \Filament\Tables\Filters\Filter::make('supplier')
@@ -186,7 +196,7 @@ class ProductsTable
                 \Filament\Tables\Filters\SelectFilter::make('branch')
                     ->label('Cabang')
                     ->relationship('stocks.branch', 'name')
-                    ->hidden(fn () => auth()->user()->branch_id !== null),
+                    ->hidden(fn () => auth()->user()?->branch_id !== null),
                 \Filament\Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Status Produk')
                     ->placeholder('Semua Produk')
@@ -230,15 +240,16 @@ class ProductsTable
                         'filament.components.stock-card-livewire', 
                         [
                             'record' => $record,
-                            'branchId' => $livewire->tableFilters['branch']['value'] ?? null
+                            'branchId' => static::resolveActiveBranchId($livewire)
                         ]
                     )),
                 EditAction::make()
                     ->url(function ($record, \Filament\Tables\Contracts\HasTable $livewire) {
-                        $branchId = \Illuminate\Support\Facades\Auth::user()?->branch_id 
-                            ?? ($livewire->tableFilters['branch']['value'] ?? null);
-                        $url = route('filament.admin.resources.products.edit', ['record' => $record->id]);
-                        return $branchId ? "{$url}?branch_id={$branchId}" : $url;
+                        $branchId = static::resolveActiveBranchId($livewire);
+                        return \App\Filament\Resources\Products\ProductResource::getUrl('edit', array_filter([
+                            'record' => $record,
+                            'branch_id' => $branchId,
+                        ]));
                     }),
             ])
             ->toolbarActions([
@@ -251,8 +262,8 @@ class ProductsTable
                                 ->label('Pilih Cabang')
                                 ->options(fn () => \App\Models\Branch::all()->pluck('name', 'id'))
                                 ->searchable()
-                                ->default(fn() => auth()->user()->branch_id)
-                                ->disabled(fn() => auth()->user()->branch_id !== null)
+                                ->default(fn() => auth()->user()?->branch_id)
+                                ->disabled(fn() => auth()->user()?->branch_id !== null)
                                 ->dehydrated()
                                 ->required(),
                             \Filament\Forms\Components\TextInput::make('quantity')
@@ -353,7 +364,7 @@ class ProductsTable
                         })
                         ->deselectRecordsAfterCompletion(),
                     DeleteBulkAction::make()
-                        ->visible(fn () => auth()->user()->branch_id === null),
+                        ->visible(fn () => auth()->user()?->branch_id === null),
                 ]),
             ]);
     }

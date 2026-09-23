@@ -284,12 +284,14 @@ class ProductForm
                         Placeholder::make('retail_intelligence_hub')
                             ->hiddenLabel()
                             ->columnSpanFull()
-                            ->content(function ($record) {
+                            ->content(function ($record, $livewire = null) {
                                 if (!$record) {
                                     return null;
                                 }
                                 $widget = new \App\Filament\Resources\Products\Widgets\ProductRetailIntelligenceWidget();
                                 $widget->record = $record;
+                                $widget->branchId = auth()->user()?->branch_id 
+                                    ?: ($livewire?->branchId ?? request()->query('branch_id'));
                                 return view('filament.products.widgets.product-retail-intelligence', $widget->getViewData());
                             }),
 

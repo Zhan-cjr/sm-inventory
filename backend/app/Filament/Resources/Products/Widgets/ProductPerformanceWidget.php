@@ -7,10 +7,14 @@ use App\Services\RetailIntelligenceService;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\Url;
 
 class ProductPerformanceWidget extends BaseWidget
 {
     public ?Model $record = null;
+
+    #[Url(as: 'branch_id')]
+    public ?string $branchId = null;
 
     protected ?string $pollingInterval = null;
 
@@ -25,7 +29,7 @@ class ProductPerformanceWidget extends BaseWidget
 
         // User cabang MUTLAK terkunci ke cabangnya; Super admin membaca eksplisit dari URL query
         $userBranchId = auth()->user()?->branch_id;
-        $branchId = !empty($userBranchId) ? $userBranchId : request()->query('branch_id');
+        $branchId = !empty($userBranchId) ? $userBranchId : ($this->branchId ?: request()->query('branch_id'));
 
         $stats = RetailIntelligenceService::getPerformanceStats($product, $branchId);
 

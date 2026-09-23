@@ -6,10 +6,36 @@ use App\Filament\Resources\Products\ProductResource;
 use App\Filament\Resources\Products\Widgets\ProductPerformanceWidget;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
+use Livewire\Attributes\Url;
 
 class EditProduct extends EditRecord
 {
     protected static string $resource = ProductResource::class;
+
+    #[Url(as: 'branch_id')]
+    public ?string $branchId = null;
+
+    public function mount(int | string $record): void
+    {
+        parent::mount($record);
+
+        if (empty($this->branchId)) {
+            $this->branchId = request()->query('branch_id');
+        }
+    }
+
+    public function getWidgetData(): array
+    {
+        $userBranchId = auth()->user()?->branch_id;
+        $evalBranchId = !empty($userBranchId) 
+            ? $userBranchId 
+            : ($this->branchId ?: request()->query('branch_id'));
+
+        return [
+            'record' => $this->getRecord(),
+            'branchId' => $evalBranchId,
+        ];
+    }
 
     protected function getHeaderWidgets(): array
     {
@@ -27,7 +53,7 @@ class EditProduct extends EditRecord
     {
         return [
             DeleteAction::make()
-                ->visible(fn () => auth()->user()->branch_id === null),
+                ->visible(fn () => auth()->user()?->branch_id === null),
         ];
     }
 
@@ -46,7 +72,7 @@ class EditProduct extends EditRecord
 
     protected function getFormActions(): array
     {
-        if (auth()->user()->branch_id !== null) {
+        if (auth()->user()?->branch_id !== null) {
             return [];
         }
 

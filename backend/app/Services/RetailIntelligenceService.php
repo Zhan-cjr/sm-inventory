@@ -61,8 +61,10 @@ class RetailIntelligenceService
         }
         // PRIORITAS 2: Super Admin secara eksplisit memfilter cabang pada URL (?branch_id=...)
         elseif ($selectedBranchId !== null && $selectedBranchId !== "" && $selectedBranchId !== "all") {
-            $evalBranchId = $selectedBranchId;
-            $b = $allBranches->firstWhere("id", $selectedBranchId) ?: Branch::find($selectedBranchId);
+            $evalBranchId = trim($selectedBranchId);
+            $b = $allBranches->firstWhere("id", $evalBranchId) 
+                ?: $allBranches->firstWhere("name", $evalBranchId) 
+                ?: Branch::find($evalBranchId);
             $branchLabel = $b?->name ?? "Cabang Terpilih";
             $isSpecificBranch = true;
         }
