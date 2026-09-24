@@ -196,7 +196,7 @@
                     @if(in_array('name', $visibleColumns)) <th class="pos-grid-th" style="min-width: 20rem; width: 32%;">Nama Produk</th> @endif
                     @if(in_array('stock_available', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Stok Asal</th> @endif
                     @if(in_array('qty_transfer', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;">Qty Kirim</th> @endif
-                    @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Satuan</th> @endif
+                    @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Beli Satuan</th> @endif
                     @if(in_array('subtotal', $visibleColumns)) <th class="pos-grid-th" style="width: 10rem; text-align: right;">Subtotal</th> @endif
                     @if(in_array('notes', $visibleColumns)) <th class="pos-grid-th" style="width: 15rem;">Catatan Item</th> @endif
                     <th class="pos-grid-th" style="width: 3rem; text-align: center;"></th>
@@ -299,6 +299,3 @@
         .dark .pos-dropdown-bg .dark\:text-gray-400 { color: #9ca3af !important; }
     </style>
 </div>
-
-
-

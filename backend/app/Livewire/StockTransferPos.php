@@ -70,9 +70,45 @@ class StockTransferPos extends Component
         } else {
             $this->reference_number = 'TRF-' . strtoupper(uniqid());
             $this->transfer_date = date('Y-m-d');
-            $this->from_branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
-            $this->to_branch_id = null;
+            
+            // Dukungan parameter dari Retail Intelligence & Saran Mutasi Antar Cabang
+            $reqFrom = request()->query('from_branch_id') ?: request()->query('source_branch_id');
+            $reqTo = request()->query('to_branch_id') ?: request()->query('destination_branch_id');
+            $userBranchId = auth()->user()?->branch_id;
+
+            $this->from_branch_id = $reqFrom ?: (!empty($userBranchId) ? $userBranchId : \App\Models\Branch::first()?->id);
+            $this->to_branch_id = $reqTo ?: null;
             $this->status = 'pending';
+
+            $productId = request()->query('product_id');
+            $qty = (int) request()->query('quantity', 1);
+
+            if ($productId && $this->from_branch_id) {
+                $product = Product::find($productId);
+                if ($product) {
+                    $availableStock = (float) (\App\Models\Stock::where('branch_id', $this->from_branch_id)
+                        ->where('product_id', $product->id)
+                        ->value('quantity_on_hand') ?? 0);
+                    $price = (float) ($product->cost_price_tax ?: $product->cost_price ?: $product->selling_price ?: 0);
+                    $qtyToTransfer = $qty > 0 ? $qty : 1;
+
+                    $this->cart[] = [
+                        'product_id' => $product->id,
+                        'sku' => $product->sku,
+                        'barcode' => $product->barcode,
+                        'name' => $product->name,
+                        'stock_available' => $availableStock,
+                        'qty_transfer' => $qtyToTransfer,
+                        'unit_price' => $price,
+                        'subtotal' => $qtyToTransfer * $price,
+                        'notes' => 'Rekomendasi Mutasi Retail Intelligence',
+                    ];
+
+                    if (request()->query('print') == '1') {
+                        $this->cetak_nota = true;
+                    }
+                }
+            }
         }
 
         $this->calculateTotals();

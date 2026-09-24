@@ -32,7 +32,7 @@ class RekapitulasiTransaksi extends Page implements HasTable
         return $table
             ->query(
                 \App\Models\Branch::query()
-                    ->when(Auth::user()?->branch_id, fn ($q, $bId) => $q->where('id', $bId))
+                    ->when(Auth::user()?->branch_id, fn($q, $bId) => $q->where('id', $bId))
             )
             ->columns([
                 TextColumn::make('name')
