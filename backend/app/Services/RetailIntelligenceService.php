@@ -397,14 +397,16 @@ class RetailIntelligenceService
                     $srcQoh = (float) $surplusStock->quantity_on_hand;
                     $suggestedTransferQty = min($srcQoh, max(1, (int) ($product->reorder_qty ?: 10)));
 
+                    $remainingSrcStock = max(0, (int) round($srcQoh - $suggestedTransferQty));
                     $transferOpportunity = [
                         "source_branch_id" => $surplusStock->branch_id,
                         "source_branch_name" => $srcBranchName,
                         "source_qoh" => $srcQoh,
+                        "remaining_source_qoh" => $remainingSrcStock,
                         "destination_branch_id" => $branchId,
                         "destination_branch_name" => $branchLabel,
                         "suggested_qty" => $suggestedTransferQty,
-                        "action_url" => route("filament.admin.resources.stock-transfers.create") . "?product_id={$product->id}&source_branch_id={$surplusStock->branch_id}&destination_branch_id={$branchId}&quantity={$suggestedTransferQty}",
+                        "action_url" => route("filament.admin.resources.stock-transfers.create") . "?product_id={$product->id}&from_branch_id={$surplusStock->branch_id}&to_branch_id={$branchId}&quantity={$suggestedTransferQty}&print=1",
                     ];
                 }
             }
@@ -417,8 +419,8 @@ class RetailIntelligenceService
             $prescriptiveActions[] = [
                 "type" => "transfer",
                 "title" => "📦 Peluang Transfer Stok dari {$transferOpportunity['source_branch_name']}",
-                "message" => "Stok di {$transferOpportunity['destination_branch_name']} menipis ({$qoh} {$unit}), sedangkan di {$transferOpportunity['source_branch_name']} tersedia surplus {$transferOpportunity['source_qoh']} {$unit}. Disarankan melakukan mutasi stok {$transferOpportunity['suggested_qty']} {$unit} untuk menghemat modal PO.",
-                "action_label" => "Buat Surat Transfer Stok",
+                "message" => "Stok di {$transferOpportunity['destination_branch_name']} menipis ({$qoh} {$unit}), sedangkan di {$transferOpportunity['source_branch_name']} surplus {$transferOpportunity['source_qoh']} {$unit}. Disarankan mutasi {$transferOpportunity['suggested_qty']} {$unit} (Cabang asal tetap aman menyisakan {$transferOpportunity['remaining_source_qoh']} {$unit}).",
+                "action_label" => "Kirim Barang Ini & Cetak Nota",
                 "action_url" => $transferOpportunity["action_url"],
             ];
         }
