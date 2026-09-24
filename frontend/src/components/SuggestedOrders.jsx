@@ -343,16 +343,25 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
               <AlertTriangle color="#60a5fa" /> Panduan Membaca Saran Order AI
             </h3>
             <div style={{ color: 'var(--text-muted)', lineHeight: '1.6', fontSize: '0.95rem' }}>
-              <p style={{ marginBottom: '1rem' }}>AI memprediksi kebutuhan restock dengan mempelajari riwayat kecepatan penjualan (velocity) setiap produk. Berikut adalah penjelasan setiap kolom:</p>
-              <ul style={{ paddingLeft: '1.5rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <li><strong>Stok Saat Ini:</strong> Sisa stok aktual di gudang cabang saat ini.</li>
-                <li><strong>ADS (Average Daily Sales):</strong> Rata-rata barang terjual per hari (dihitung dari total penjualan dibagi riwayat hari).</li>
-                <li><strong>Titik Pesan (ROP):</strong> Titik batas aman terendah (ADS × Waktu Kirim). Jika stok turun di bawah angka ini, Anda berisiko kehabisan barang.</li>
-                <li><strong>Target Stok (Hari):</strong> Diambil dari settingan <em>Target Inventori</em> pada menu stok cabang. Ini menentukan seberapa lama Anda ingin stok ini bertahan di gudang sebelum restock berikutnya.</li>
-                <li><strong>Saran Pesan:</strong> Jumlah ideal yang harus dipesan hari ini untuk memenuhi target hari penjualan ke depan. <br/><span style={{fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)'}}>Rumus: ((ADS × Target Stok) + Titik Pesan) - Stok Saat Ini</span></li>
+              <p style={{ marginBottom: '0.75rem' }}>
+                <strong>Saran Order AI (Smart Restock)</strong> memprediksi kebutuhan kulakan secara otomatis berdasarkan perputaran penjualan harian aktual di kasir, waktu pengiriman supplier, dan batas stok aman.
+              </p>
+              <h4 style={{ color: '#60a5fa', fontWeight: 600, margin: '0.75rem 0 0.25rem 0' }}>1. Penjelasan Kolom Data</h4>
+              <ul style={{ paddingLeft: '1.25rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <li><strong>Stok Saat Ini:</strong> Sisa stok fisik yang tercatat aktif di cabang saat ini.</li>
+                <li><strong>ADS (Average Daily Sales):</strong> Kecepatan rata-rata barang terjual per hari (dihitung dari total penjualan 30 hari terakhir, atau 90 hari jika stok sempat kosong).</li>
+                <li><strong>Titik Pesan (ROP):</strong> Batas minimal stok untuk mulai memesan barang kembali agar tidak kehabisan saat menunggu kiriman supplier.</li>
+                <li><strong>Target Stok (Hari):</strong> Target ketahanan persediaan di toko (default 14–30 hari).</li>
+                <li><strong>Saran Pesan:</strong> Estimasi jumlah unit yang direkomendasikan untuk dibeli hari ini.</li>
               </ul>
-              <div style={{ background: 'rgba(59, 130, 246, 0.1)', borderLeft: '4px solid #3b82f6', padding: '1rem', borderRadius: '4px', color: '#93c5fd' }}>
-                <strong>💡 Tips:</strong> Anda dapat mengubah "Target Stok (Hari)" per produk di dashboard admin (Daftar Stok Cabang). AI akan otomatis menyesuaikan hitungannya esok hari!
+              <h4 style={{ color: '#60a5fa', fontWeight: 600, margin: '0.75rem 0 0.25rem 0' }}>2. Arti Status</h4>
+              <ul style={{ paddingLeft: '1.25rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <li><strong style={{ color: '#ef4444' }}>HABIS (CRITICAL):</strong> Stok sudah 0, minus, atau di bawah cadangan aman darurat.</li>
+                <li><strong style={{ color: '#f59e0b' }}>PERLU ORDER:</strong> Stok sudah menyentuh Titik Pesan (ROP). Segera buat PO.</li>
+                <li><strong style={{ color: '#10b981' }}>AMAN:</strong> Stok masih cukup, atau barang tidak bergerak (ADS = 0) sehingga tidak disarankan menambah stok mati.</li>
+              </ul>
+              <div style={{ background: 'rgba(59, 130, 246, 0.1)', borderLeft: '4px solid #3b82f6', padding: '0.75rem', borderRadius: '4px', color: '#93c5fd', fontSize: '0.85rem' }}>
+                <strong>💡 Tips:</strong> Anda dapat mencentang beberapa produk dan klik "Buat PO Terpilih". Sistem akan otomatis memecah draft PO sesuai Pemasok dan Sub Divisi masing-masing.
               </div>
             </div>
             <button onClick={() => setShowFaq(false)} className="btn-secondary" style={{ marginTop: '1.5rem', width: '100%' }}>
