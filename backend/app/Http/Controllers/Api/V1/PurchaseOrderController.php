@@ -61,27 +61,39 @@ class PurchaseOrderController extends Controller
     private function processBulk($user, $items, $branchId)
     {
         return DB::transaction(function () use ($user, $items, $branchId) {
-            // Group items by supplier_id
-            $itemsBySupplier = [];
+            // Group items by supplier_id and supplier_division_id
+            $itemsByGroup = [];
             foreach ($items as $item) {
                 $product = Product::find($item['product_id']);
-                if ($product && $product->supplier_id) {
-                    $itemsBySupplier[$product->supplier_id][] = [
-                        'product' => $product,
-                        'qty' => $item['suggested_qty'],
-                        'original_qty' => $item['original_qty'] ?? $item['suggested_qty']
-                    ];
+                if ($product) {
+                    $stock = Stock::where('branch_id', $branchId)->where('product_id', $product->id)->first();
+                    $targetSupplierId = $stock?->supplier_id ?: $product->supplier_id;
+                    $targetDivisionId = $stock?->supplier_id ? $stock->supplier_division_id : $product->supplier_division_id;
+
+                    if ($targetSupplierId) {
+                        $groupKey = $targetSupplierId . '_' . ($targetDivisionId ?: 'none');
+                        $itemsByGroup[$groupKey][] = [
+                            'product' => $product,
+                            'supplier_id' => $targetSupplierId,
+                            'supplier_division_id' => $targetDivisionId,
+                            'qty' => $item['suggested_qty'],
+                            'original_qty' => $item['original_qty'] ?? $item['suggested_qty']
+                        ];
+                    }
                 }
             }
 
-            if (empty($itemsBySupplier)) {
+            if (empty($itemsByGroup)) {
                 return response()->json(['error' => 'Tidak ada produk valid dengan Supplier yang ditemukan'], 400);
             }
 
             $createdPOs = [];
 
-            foreach ($itemsBySupplier as $supplierId => $supplierItems) {
+            foreach ($itemsByGroup as $groupKey => $supplierItems) {
                 $firstProduct = $supplierItems[0]['product'];
+                $firstItem = $supplierItems[0];
+                $supplierId = $firstItem['supplier_id'];
+                $divisionId = $firstItem['supplier_division_id'];
                 
                 $needsApproval = false;
                 $approvalReasons = [];
@@ -103,6 +115,7 @@ class PurchaseOrderController extends Controller
                     'organization_id' => $firstProduct->organization_id,
                     'branch_id' => $branchId,
                     'supplier_id' => $supplierId,
+                    'supplier_division_id' => $divisionId,
                     'po_number' => 'PO-' . date('YmdHis') . '-' . rand(100, 999),
                     'po_date' => now(),
                     'expired_date' => $expiredDate,
@@ -140,7 +153,7 @@ class PurchaseOrderController extends Controller
 
             return response()->json([
                 'message' => count($createdPOs) > 1 
-                    ? count($createdPOs) . ' Draft PO berhasil dibuat (terpisah berdasarkan Supplier)' 
+                    ? count($createdPOs) . ' Draft PO berhasil dibuat (terpisah berdasarkan Pemasok & Sub Divisi)' 
                     : '1 Draft Pesanan Pembelian berhasil dibuat',
                 'po_numbers' => $createdPOs,
                 'items_count' => count($items)

@@ -29,6 +29,18 @@ class SuggestedOrders extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('refresh_ai')
+                ->label('Segarkan Data AI')
+                ->icon('heroicon-o-arrow-path')
+                ->color('primary')
+                ->action(function () {
+                    $branchId = request('tableFilters.branch_id.value') ?? (auth()->user()->branch_id ?? null);
+                    app(SuggestedOrderService::class)->clearCache($branchId);
+                    \Filament\Notifications\Notification::make()
+                        ->title('Data Saran Order AI berhasil diperbarui')
+                        ->success()
+                        ->send();
+                }),
             Action::make('faq')
                 ->label('Cara Membaca Saran AI')
                 ->icon('heroicon-o-information-circle')
@@ -47,7 +59,7 @@ class SuggestedOrders extends Page implements HasTable
                 \App\Models\Stock::query()
                     ->where('is_active', true)
                     ->whereHas('product', fn($q) => $q->where('is_active', true))
-                    ->with(['product', 'product.supplier', 'supplier', 'branch'])
+                    ->with(['product', 'product.supplier', 'product.supplierDivision', 'supplier', 'supplierDivision', 'branch'])
             )
             ->columns([
                 TextColumn::make('product.sku')
@@ -60,22 +72,36 @@ class SuggestedOrders extends Page implements HasTable
                     ->sortable()
                     ->wrap(),
                 TextColumn::make('pemasok')
-                    ->label('Pemasok')
+                    ->label('Pemasok & Sub Divisi')
                     ->state(function ($record) {
-                        if ($record->supplier) {
-                            return $record->supplier->name;
-                        }
-                        return $record->product?->supplier?->name ?? '-';
+                        return $record->supplier?->name ?? $record->product?->supplier?->name ?? '-';
                     })
-                    ->description(fn ($record) => !empty($record->supplier_id) ? 'Pemasok Khusus Cabang' : null)
+                    ->description(function ($record) {
+                        $division = $record->supplier_id 
+                            ? $record->supplierDivision?->name 
+                            : $record->product?->supplierDivision?->name;
+                        
+                        $parts = [];
+                        if ($division) {
+                            $parts[] = "Divisi: {$division}";
+                        }
+                        if (!empty($record->supplier_id)) {
+                            $parts[] = 'Pemasok Khusus Cabang';
+                        }
+                        return !empty($parts) ? implode(' • ', $parts) : null;
+                    })
                     ->badge(fn ($record) => !empty($record->supplier_id))
                     ->color(fn ($record) => !empty($record->supplier_id) ? 'info' : null)
                     ->searchable(query: function (Builder $query, string $search) {
                         $query->where(function ($q) use ($search) {
                             $q->whereHas('supplier', fn ($sq) => $sq->where('name', 'like', "%{$search}%"))
+                              ->orWhereHas('supplierDivision', fn ($sdq) => $sdq->where('name', 'like', "%{$search}%"))
                               ->orWhere(function ($sq) use ($search) {
                                   $sq->whereNull('stocks.supplier_id')
-                                     ->whereHas('product.supplier', fn ($psq) => $psq->where('name', 'like', "%{$search}%"));
+                                     ->where(function ($pq) use ($search) {
+                                         $pq->whereHas('product.supplier', fn ($psq) => $psq->where('name', 'like', "%{$search}%"))
+                                            ->orWhereHas('product.supplierDivision', fn ($psdq) => $psdq->where('name', 'like', "%{$search}%"));
+                                     });
                               });
                         });
                     }),
@@ -135,19 +161,69 @@ class SuggestedOrders extends Page implements HasTable
                     ->label('Cabang')
                     ->relationship('branch', 'name')
                     ->hidden(fn () => auth()->user()->branch_id !== null),
-                \Filament\Tables\Filters\SelectFilter::make('supplier_id')
-                    ->label('Supplier')
-                    ->options(fn () => \App\Models\Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
-                    ->query(function (Builder $query, array $data) {
-                        $supplierId = $data['value'] ?? null;
-                        if (!$supplierId) return $query;
-                        return $query->where(function ($q) use ($supplierId) {
-                            $q->where('stocks.supplier_id', $supplierId)
-                              ->orWhere(function ($sq) use ($supplierId) {
-                                  $sq->whereNull('stocks.supplier_id')
-                                     ->whereHas('product', fn ($pq) => $pq->where('supplier_id', $supplierId));
-                              });
-                        });
+                \Filament\Tables\Filters\Filter::make('pemasok_filter')
+                    ->form([
+                        \Filament\Forms\Components\Select::make('supplier_id')
+                            ->label('Pemasok')
+                            ->placeholder('Semua Pemasok')
+                            ->options(fn () => \App\Models\Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null)),
+                        \Filament\Forms\Components\Select::make('supplier_division_id')
+                            ->label('Sub Divisi Pemasok')
+                            ->placeholder('Semua Sub Divisi')
+                            ->options(function ($get) {
+                                $supplierId = $get('supplier_id');
+                                if (filled($supplierId)) {
+                                    return \App\Models\SupplierDivision::where('supplier_id', $supplierId)
+                                        ->orderBy('name')
+                                        ->pluck('name', 'id');
+                                }
+                                return \App\Models\SupplierDivision::orderBy('name')->pluck('name', 'id');
+                            })
+                            ->searchable()
+                            ->preload(),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when($data['supplier_id'] ?? null, function ($q, $supplierId) {
+                                $q->where(function ($sq) use ($supplierId) {
+                                    $sq->where('stocks.supplier_id', $supplierId)
+                                       ->orWhere(function ($psq) use ($supplierId) {
+                                           $psq->whereNull('stocks.supplier_id')
+                                              ->whereHas('product', fn ($pq) => $pq->where('supplier_id', $supplierId));
+                                       });
+                                });
+                            })
+                            ->when($data['supplier_division_id'] ?? null, function ($q, $divisionId) {
+                                $q->where(function ($sq) use ($divisionId) {
+                                    $sq->where('stocks.supplier_division_id', $divisionId)
+                                       ->orWhere(function ($psq) use ($divisionId) {
+                                           $psq->whereNull('stocks.supplier_id')
+                                              ->whereHas('product', fn ($pq) => $pq->where('supplier_division_id', $divisionId));
+                                       });
+                                });
+                            });
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if (!empty($data['supplier_id'])) {
+                            $supplier = \App\Models\Supplier::find($data['supplier_id']);
+                            if ($supplier) {
+                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Pemasok: ' . $supplier->name)
+                                    ->removeField('supplier_id');
+                            }
+                        }
+                        if (!empty($data['supplier_division_id'])) {
+                            $division = \App\Models\SupplierDivision::find($data['supplier_division_id']);
+                            if ($division) {
+                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Sub Divisi: ' . $division->name)
+                                    ->removeField('supplier_division_id');
+                            }
+                        }
+                        return $indicators;
                     }),
             ])
             ->recordActions([
@@ -200,24 +276,27 @@ class SuggestedOrders extends Page implements HasTable
                     ->action(function (\Illuminate\Support\Collection $records) {
                         if ($records->isEmpty()) return;
 
-                        $recordsBySupplier = $records->groupBy(function ($rec) {
-                            return $rec->supplier_id ?: ($rec->product->supplier_id ?? 'unknown');
+                        $recordsGrouped = $records->groupBy(function ($rec) {
+                            $supplierId = $rec->supplier_id ?: ($rec->product->supplier_id ?? 'unknown');
+                            $divisionId = $rec->supplier_id ? $rec->supplier_division_id : ($rec->product->supplier_division_id ?? 'none');
+                            return "{$supplierId}_{$divisionId}";
                         });
                         $createdPoCount = 0;
                         $lastPo = null;
 
-                        foreach ($recordsBySupplier as $supplierId => $supplierRecords) {
+                        foreach ($recordsGrouped as $groupKey => $groupRecords) {
+                            $firstRecord = $groupRecords->first();
+                            $supplierId = $firstRecord->supplier_id ?: ($firstRecord->product->supplier_id ?? null);
                             if (!$supplierId || $supplierId === 'unknown') continue;
-                            
-                            $firstRecord = $supplierRecords->first();
-                            $targetDivisionId = $firstRecord->supplier_id ? $firstRecord->supplier_division_id : $firstRecord->product->supplier_division_id;
+
+                            $targetDivisionId = $firstRecord->supplier_id ? $firstRecord->supplier_division_id : ($firstRecord->product->supplier_division_id ?? null);
 
                             $po = \App\Models\PurchaseOrder::create([
                                 'organization_id' => $firstRecord->product->organization_id,
                                 'branch_id' => $firstRecord->branch_id,
                                 'supplier_id' => $supplierId,
                                 'supplier_division_id' => $targetDivisionId,
-                                'po_number' => 'PO-' . date('YmdHis') . '-' . rand(10,99),
+                                'po_number' => 'PO-' . date('YmdHis') . '-' . rand(10, 99),
                                 'po_date' => now(),
                                 'status' => 'DRAFT',
                                 'total_amount' => 0,
@@ -225,7 +304,7 @@ class SuggestedOrders extends Page implements HasTable
                             ]);
 
                             $totalAmount = 0;
-                            foreach ($supplierRecords as $record) {
+                            foreach ($groupRecords as $record) {
                                 $suggestion = app(SuggestedOrderService::class)->calculateForStock($record);
                                 $qty = $suggestion['suggested_qty'] > 0 ? $suggestion['suggested_qty'] : 1;
 
@@ -249,7 +328,7 @@ class SuggestedOrders extends Page implements HasTable
                         }
 
                         \Filament\Notifications\Notification::make()
-                            ->title("{$createdPoCount} Draft Pesanan Pembelian berhasil dibuat berdasarkan Pemasok")
+                            ->title("{$createdPoCount} Draft Pesanan Pembelian berhasil dibuat berdasarkan Pemasok & Sub Divisi")
                             ->success()
                             ->send();
 

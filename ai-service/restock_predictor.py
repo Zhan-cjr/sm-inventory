@@ -31,8 +31,46 @@ def predict_restock_needs(days_history=30, target_days_supply=30, branch_id=None
         # We sum all quantities for successful transactions.
         if branch_id and str(branch_id).strip() and str(branch_id).lower() != 'null':
             branch_filter_sales = f"AND t.branch_id = '{branch_id}'"
+            query_products = f"""
+                SELECT 
+                    p.id as product_id,
+                    p.name as product_name,
+                    p.sku,
+                    p.supplier_id,
+                    s.name as supplier_name,
+                    COALESCE(p.lead_time_days, 7) as lead_time_days,
+                    COALESCE(st_filter.quantity_on_hand, 0) as current_stock,
+                    COALESCE(st_filter.desired_inventory_days, {target_days_supply}) as dynamic_target_days
+                FROM products p
+                JOIN stocks st_filter ON st_filter.product_id = p.id AND st_filter.branch_id = '{branch_id}' AND st_filter.is_active = 1
+                LEFT JOIN suppliers s ON s.id = p.supplier_id
+                WHERE p.is_active = 1
+            """
         else:
             branch_filter_sales = ""
+            query_products = f"""
+                SELECT 
+                    p.id as product_id,
+                    p.name as product_name,
+                    p.sku,
+                    p.supplier_id,
+                    s.name as supplier_name,
+                    COALESCE(p.lead_time_days, 7) as lead_time_days,
+                    COALESCE(st.current_stock, 0) as current_stock,
+                    COALESCE(st.dynamic_target_days, {target_days_supply}) as dynamic_target_days
+                FROM products p
+                LEFT JOIN (
+                    SELECT 
+                        product_id,
+                        SUM(quantity_on_hand) as current_stock,
+                        MAX(desired_inventory_days) as dynamic_target_days
+                    FROM stocks
+                    WHERE is_active = 1
+                    GROUP BY product_id
+                ) st ON st.product_id = p.id
+                LEFT JOIN suppliers s ON s.id = p.supplier_id
+                WHERE p.is_active = 1
+            """
             
         query_sales = f"""
             SELECT 
@@ -47,43 +85,18 @@ def predict_restock_needs(days_history=30, target_days_supply=30, branch_id=None
             GROUP BY ti.product_id
         """
         sales_df = pd.read_sql(query_sales, conn)
-
-        if sales_df.empty:
-            return []
-
-        # Fetch Products data (current stock and lead_time_days)
-        # We need sum of current stock across all branches, or just the product's master stock if it exists.
-        # Often in Laravel, stock is in `stocks` table per branch.
-        if branch_id and str(branch_id).strip() and str(branch_id).lower() != 'null':
-            branch_filter_stocks = f"AND st.branch_id = '{branch_id}'"
-        else:
-            branch_filter_stocks = ""
-            
-        query_products = f"""
-            SELECT 
-                p.id as product_id,
-                p.name as product_name,
-                p.sku,
-                p.supplier_id,
-                s.name as supplier_name,
-                COALESCE(p.lead_time_days, 7) as lead_time_days,
-                (SELECT COALESCE(SUM(st.quantity_on_hand), 0) FROM stocks st WHERE st.product_id = p.id {branch_filter_stocks}) as current_stock,
-                (SELECT COALESCE(MAX(st.desired_inventory_days), {target_days_supply}) FROM stocks st WHERE st.product_id = p.id {branch_filter_stocks}) as dynamic_target_days
-            FROM products p
-            LEFT JOIN suppliers s ON s.id = p.supplier_id
-            WHERE p.is_active = 1
-        """
         products_df = pd.read_sql(query_products, conn)
 
-        # Instead of generic merge, we map directly to ensure zero-sales products are handled
+        # Dictionary lookup for O(1) matching instead of slow O(N*M) iterrows
+        sales_dict = sales_df.set_index('product_id').to_dict('index') if not sales_df.empty else {}
         results = []
-        for _, row in products_df.iterrows():
-            prod_id = row['product_id']
-            # Find sales data
-            sales_row = sales_df[sales_df['product_id'] == prod_id] if not sales_df.empty else pd.DataFrame()
+
+        for p in products_df.to_dict('records'):
+            prod_id = p['product_id']
+            sales_info = sales_dict.get(prod_id)
             
-            sold_30d = float(sales_row['sold_30d'].iloc[0]) if not sales_row.empty else 0.0
-            sold_90d = float(sales_row['sold_90d'].iloc[0]) if not sales_row.empty else 0.0
+            sold_30d = float(sales_info['sold_30d']) if sales_info else 0.0
+            sold_90d = float(sales_info['sold_90d']) if sales_info else 0.0
             
             # Stockout Paradox Logic:
             if sold_30d == 0 and sold_90d > 0:
@@ -91,43 +104,48 @@ def predict_restock_needs(days_history=30, target_days_supply=30, branch_id=None
             else:
                 daily_velocity = sold_30d / days_history
 
-            current_stock = float(row['current_stock'])
-            lead_time_days = int(row['lead_time_days'])
-            
-            # Use provided min_qty as absolute fallback if velocity is 0
-            min_qty = 10 # Default fallback
-            # (Assuming we selected min_qty in query, but if not we hardcode default 10 for phase 1 fallback)
-            
-            # Safety stock is estimated as lead_time * velocity
-            safety_stock = lead_time_days * daily_velocity
-            
-            # Fallback for new products (0 velocity)
-            if safety_stock == 0:
-                safety_stock = min_qty
-            
-            # Target stock is how much we want to have on hand to cover target_days_supply
-            product_target_days = int(row['dynamic_target_days'])
-            target_stock = (product_target_days * daily_velocity) + safety_stock
-            if target_stock == safety_stock: # If velocity is 0
-                target_stock = safety_stock * 2 # Just arbitrary target if 0 velocity
-            
-            suggested_order = 0
-            if current_stock <= safety_stock:
-                suggested_order = max(0, target_stock - current_stock)
+            current_stock = float(p['current_stock'])
+            lead_time_days = int(p['lead_time_days'])
+            product_target_days = int(p['dynamic_target_days'])
+
+            if daily_velocity > 0:
+                safety_stock = round(daily_velocity * 3, 2)
+                reorder_point = round((lead_time_days * daily_velocity) + safety_stock, 2)
+                target_stock = round((product_target_days * daily_velocity) + safety_stock, 2)
                 
+                if current_stock < 0:
+                    suggested_order = int(abs(current_stock) + target_stock)
+                    status = "CRITICAL"
+                elif current_stock == 0:
+                    suggested_order = int(max(1, target_stock))
+                    status = "CRITICAL"
+                elif current_stock <= reorder_point:
+                    suggested_order = int(max(0, target_stock - current_stock))
+                    status = "CRITICAL" if current_stock <= safety_stock else ("REORDER" if suggested_order > 0 else "OK")
+                else:
+                    suggested_order = 0
+                    status = "OK"
+            else:
+                # ADS == 0: Tidak ada penjualan (Dead stock / slow moving), tidak perlu order
+                safety_stock = 0.0
+                reorder_point = 0.0
+                target_stock = 0.0
+                suggested_order = 0
+                status = "OK"
+
             results.append({
-                "product_id": row['product_id'],
-                "sku": row['sku'],
-                "name": row['product_name'],
-                "supplier_name": row['supplier_name'] if pd.notna(row['supplier_name']) else "Umum",
+                "product_id": prod_id,
+                "sku": p['sku'],
+                "name": p['product_name'],
+                "supplier_name": p['supplier_name'] if pd.notna(p['supplier_name']) and p['supplier_name'] else "Umum",
                 "current_qty": current_stock,
                 "total_sold_30d": sold_30d,
                 "ads": round(daily_velocity, 2),
                 "lead_time": lead_time_days,
                 "target_days": product_target_days,
-                "reorder_point": round(safety_stock, 2),
+                "reorder_point": round(reorder_point, 2),
                 "suggested_qty": int(suggested_order),
-                "status": "CRITICAL" if current_stock < safety_stock else ("REORDER" if current_stock <= target_stock and target_stock > 0 else "OK")
+                "status": status
             })
 
         return results

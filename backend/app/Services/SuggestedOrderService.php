@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\Stock;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -15,35 +16,94 @@ class SuggestedOrderService
 
     protected array $aiCache = [];
     protected array $stockCalculationCache = [];
+    protected array $branchSales30DaysCache = [];
 
-    protected function fetchFromAI(string $branchId): array
+    public function clearCache(?string $branchId = null): void
     {
-        if (isset($this->aiCache[$branchId])) {
-            return $this->aiCache[$branchId];
-        }
+        $this->aiCache = [];
+        $this->stockCalculationCache = [];
+        $this->branchSales30DaysCache = [];
 
-        $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
-
-        try {
-            $response = Http::timeout(2)->get($aiUrl . '/api/v1/ai/restock-suggestions', [
-                'branch_id' => $branchId
-            ]);
-
-            if ($response->successful()) {
-                $data = $response->json()['data'] ?? [];
-                $indexed = [];
-                foreach ($data as $item) {
-                    $indexed[$item['product_id']] = $item;
+        if ($branchId) {
+            Cache::forget("suggested_orders_ai_{$branchId}");
+            Cache::forget("restock_needed_stock_ids_{$branchId}");
+        } else {
+            Cache::forget("suggested_orders_ai_all");
+            Cache::forget("restock_needed_stock_ids_all");
+            try {
+                $branchIds = \App\Models\Branch::pluck('id');
+                foreach ($branchIds as $bId) {
+                    Cache::forget("suggested_orders_ai_{$bId}");
+                    Cache::forget("restock_needed_stock_ids_{$bId}");
                 }
-                $this->aiCache[$branchId] = $indexed;
-                return $indexed;
+            } catch (\Exception $e) {
+                // Ignore if database connection is not ready
             }
-        } catch (\Exception $e) {
-            Log::warning('AI Restock Service unavailable (' . $aiUrl . '): ' . $e->getMessage() . '. Falling back to database ADS calculation.');
+        }
+    }
+
+    protected function getBranchSales30Days(?string $branchId = null): array
+    {
+        $cacheKey = $branchId ?: 'all';
+        if (isset($this->branchSales30DaysCache[$cacheKey])) {
+            return $this->branchSales30DaysCache[$cacheKey];
         }
 
-        $this->aiCache[$branchId] = [];
-        return [];
+        $thirtyDaysAgo = Carbon::now()->subDays(30);
+        $query = DB::table('transaction_items')
+            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            ->where('transactions.created_at', '>=', $thirtyDaysAgo)
+            ->where(function ($q) {
+                $q->where('transactions.is_voided', 0)->orWhereNull('transactions.is_voided');
+            });
+
+        if ($branchId) {
+            $query->where('transactions.branch_id', $branchId);
+        }
+
+        $sales = $query->groupBy('transaction_items.product_id')
+            ->select('transaction_items.product_id', DB::raw('SUM(transaction_items.quantity) as total_qty'))
+            ->pluck('total_qty', 'product_id')
+            ->toArray();
+
+        $this->branchSales30DaysCache[$cacheKey] = $sales;
+        return $sales;
+    }
+
+    protected function fetchFromAI(?string $branchId = null): array
+    {
+        $cacheBranchKey = $branchId ?: 'all';
+        if (isset($this->aiCache[$cacheBranchKey])) {
+            return $this->aiCache[$cacheBranchKey];
+        }
+
+        $cachedData = Cache::remember("suggested_orders_ai_{$cacheBranchKey}", now()->addMinutes(30), function () use ($branchId) {
+            $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
+
+            try {
+                $params = [];
+                if ($branchId) {
+                    $params['branch_id'] = $branchId;
+                }
+                $response = Http::timeout(10)->get($aiUrl . '/api/v1/ai/restock-suggestions', $params);
+
+                if ($response->successful()) {
+                    $data = $response->json()['data'] ?? [];
+                    $indexed = [];
+                    foreach ($data as $item) {
+                        $indexed[$item['product_id']] = $item;
+                    }
+                    return $indexed;
+                }
+            } catch (\Exception $e) {
+                Log::warning('AI Restock Service unavailable (' . $aiUrl . '): ' . $e->getMessage() . '. Falling back to database ADS calculation.');
+            }
+
+            return [];
+        });
+
+        $this->aiCache[$cacheBranchKey] = $cachedData;
+        return $cachedData;
     }
 
     public function calculateForBranch(string $branchId, array $filters = []): array
@@ -121,16 +181,10 @@ class SuggestedOrderService
             return $result;
         }
 
-        // Fallback: Smart Database Calculation for ADS & Reorder Point
+        // Fallback: Smart Database Calculation for ADS & Reorder Point (Bulk Optimized)
         $current_qty = (float)$stock->quantity_on_hand;
-        $thirtyDaysAgo = Carbon::now()->subDays(30);
-        
-        $sales30Days = (float)DB::table('transaction_items')
-            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-            ->where('transactions.branch_id', $stock->branch_id)
-            ->where('transaction_items.product_id', $stock->product_id)
-            ->where('transactions.created_at', '>=', $thirtyDaysAgo)
-            ->sum('transaction_items.quantity');
+        $branchSales = $this->getBranchSales30Days($stock->branch_id);
+        $sales30Days = (float)($branchSales[$stock->product_id] ?? 0);
 
         $ads = round($sales30Days / 30, 2);
         $leadTime = (int)($stock->product->lead_time_days ?? 7);
@@ -182,24 +236,27 @@ class SuggestedOrderService
 
     public function getRestockNeededStockIds(?string $branchId = null): array
     {
-        $query = Stock::query()
-            ->where('is_active', true)
-            ->whereHas('product', fn($q) => $q->where('is_active', true));
+        $cacheKey = "restock_needed_stock_ids_" . ($branchId ?: 'all');
+        return Cache::remember($cacheKey, now()->addMinutes(15), function () use ($branchId) {
+            $query = Stock::query()
+                ->where('is_active', true)
+                ->whereHas('product', fn($q) => $q->where('is_active', true));
 
-        if ($branchId) {
-            $query->where('branch_id', $branchId);
-        }
-
-        $stocks = $query->get();
-        $neededStockIds = [];
-
-        foreach ($stocks as $stock) {
-            $result = $this->calculateForStock($stock);
-            if ($result['suggested_qty'] > 0 || $result['status'] !== 'OK') {
-                $neededStockIds[] = $stock->id;
+            if ($branchId) {
+                $query->where('branch_id', $branchId);
             }
-        }
 
-        return $neededStockIds;
+            $stocks = $query->with(['product'])->get();
+            $neededStockIds = [];
+
+            foreach ($stocks as $stock) {
+                $result = $this->calculateForStock($stock);
+                if ($result['suggested_qty'] > 0 || $result['status'] !== 'OK') {
+                    $neededStockIds[] = $stock->id;
+                }
+            }
+
+            return $neededStockIds;
+        });
     }
 }
