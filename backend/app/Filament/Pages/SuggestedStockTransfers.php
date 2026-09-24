@@ -16,6 +16,7 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -80,6 +81,12 @@ class SuggestedStockTransfers extends Page implements HasTable
                     ->whereHas('product', fn($q) => $q->where('is_active', true))
                     ->with(['product', 'branch'])
             )
+            ->groups([
+                Group::make('branch.name')
+                    ->label('Cabang Tujuan (Membutuhkan)')
+                    ->collapsible(),
+            ])
+            ->defaultGroup('branch.name')
             ->columns([
                 ImageColumn::make('product.image_path')
                     ->label('Foto')
