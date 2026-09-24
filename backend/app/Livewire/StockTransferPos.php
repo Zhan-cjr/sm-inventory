@@ -76,7 +76,7 @@ class StockTransferPos extends Component
             $reqTo = request()->query('to_branch_id') ?: request()->query('destination_branch_id');
             $userBranchId = auth()->user()?->branch_id;
 
-            $this->from_branch_id = !empty($userBranchId) ? $userBranchId : ($reqFrom ?: \App\Models\Branch::first()?->id);
+            $this->from_branch_id = $reqFrom ?: (!empty($userBranchId) ? $userBranchId : \App\Models\Branch::first()?->id);
             $this->to_branch_id = $reqTo ?: null;
             $this->status = 'pending';
 

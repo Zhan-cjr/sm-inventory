@@ -53,9 +53,21 @@ class SuggestedStockTransfers extends Page implements HasTable
 
     public function getFleetSummaryData(): array
     {
-        $records = $this->getFilteredTableQuery()->get();
         $fromBranchId = data_get($this->tableFilters, 'from_branch_id.value');
+        $toBranchId = data_get($this->tableFilters, 'to_branch_id.value') ?? (auth()->user()?->branch_id ?? null);
 
+        $candidateStockIds = app(SuggestedStockTransferService::class)->getTransferCandidateStockIds($fromBranchId, $toBranchId);
+        if (empty($candidateStockIds)) {
+            return [
+                'total_items' => 0,
+                'total_units' => 0,
+                'total_capital_freed' => 0,
+                'total_routes' => 0,
+                'routes' => [],
+            ];
+        }
+
+        $records = Stock::whereIn('id', $candidateStockIds)->with(['product', 'branch'])->get();
         return app(SuggestedStockTransferService::class)->getFleetSummary($records, $fromBranchId);
     }
 

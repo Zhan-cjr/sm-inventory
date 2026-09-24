@@ -174,19 +174,32 @@ class SuggestedStockTransferService
             return [];
         }
 
-        $query = Stock::query()
-            ->where('is_active', true)
-            ->whereHas('product', fn($q) => $q->where('is_active', true))
-            ->where(function ($q) {
-                $q->where('quantity_on_hand', '<=', 10)
-                  ->orWhere('quantity_on_hand', '<=', 0);
-            });
+        $query = DB::table('stocks as dest')
+            ->join('stocks as donor', function ($join) {
+                $join->on('dest.product_id', '=', 'donor.product_id')
+                     ->whereColumn('dest.branch_id', '!=', 'donor.branch_id');
+            })
+            ->join('products', 'dest.product_id', '=', 'products.id')
+            ->where('dest.is_active', true)
+            ->where('donor.is_active', true)
+            ->where('products.is_active', true)
+            ->where('dest.quantity_on_hand', '<=', 10)
+            ->where('donor.quantity_on_hand', '>', 2);
 
         if (!empty($toBranchId) && $toBranchId !== 'all') {
-            $query->where('branch_id', $toBranchId);
+            $query->where('dest.branch_id', $toBranchId);
         }
 
-        $candidateStocks = $query->with(['product', 'branch'])->get();
+        if (!empty($fromBranchId) && $fromBranchId !== 'all') {
+            $query->where('donor.branch_id', $fromBranchId);
+        }
+
+        $destStockIds = $query->distinct()->pluck('dest.id')->all();
+        if (empty($destStockIds)) {
+            return [];
+        }
+
+        $candidateStocks = Stock::whereIn('id', $destStockIds)->with(['product', 'branch'])->get();
         $matchedStockIds = [];
 
         foreach ($candidateStocks as $stock) {

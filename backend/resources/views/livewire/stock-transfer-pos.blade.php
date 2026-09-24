@@ -299,7 +299,3 @@
     .dark .pos-dropdown-bg .dark\:text-gray-200 { color: #e5e7eb !important; }
     .dark .pos-dropdown-bg .dark\:text-gray-400 { color: #9ca3af !important; }
 </style>
-</div>
-
-
-
