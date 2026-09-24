@@ -291,14 +291,13 @@
             </div>
         </div>
     </div>
-</div>
 
-<style>
-    .pos-dropdown-bg { background-color: #ffffff !important; }
-    .dark .pos-dropdown-bg { background-color: #1f2937 !important; border-color: #374151 !important; }
-    .dark .pos-dropdown-bg .dark\:text-gray-200 { color: #e5e7eb !important; }
-    .dark .pos-dropdown-bg .dark\:text-gray-400 { color: #9ca3af !important; }
-</style>
+    <style>
+        .pos-dropdown-bg { background-color: #ffffff !important; }
+        .dark .pos-dropdown-bg { background-color: #1f2937 !important; border-color: #374151 !important; }
+        .dark .pos-dropdown-bg .dark\:text-gray-200 { color: #e5e7eb !important; }
+        .dark .pos-dropdown-bg .dark\:text-gray-400 { color: #9ca3af !important; }
+    </style>
 </div>
 
 

@@ -121,20 +121,50 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
     public function updatedSearchQuery($value)
     {
-        if (empty($this->branch_id)) {
+        $value = trim((string) $value);
+        if (empty($this->branch_id) || strlen($value) < 2) {
             $this->searchResults = [];
             return;
         }
 
-        if (strlen($value) >= 2) {
-            $this->searchResults = Product::search($value)
-                ->whereIn('available_branch_ids', [$this->branch_id])
-                ->where('is_active', true)
-                ->take(20)
-                ->get();
-        } else {
-            $this->searchResults = [];
+        // 1. Prioritaskan exact match barcode/SKU di database yang terdaftar di cabang ini
+        $exactMatches = Product::query()
+            ->where('is_active', true)
+            ->whereHas('stocks', fn($sq) => $sq->where('branch_id', $this->branch_id))
+            ->where(function ($q) use ($value) {
+                $q->where('barcode', $value)
+                  ->orWhere('sku', $value)
+                  ->orWhereJsonContains('metadata->additional_barcodes', $value);
+            })
+            ->take(10)
+            ->get();
+
+        if ($exactMatches->isNotEmpty()) {
+            $this->searchResults = $exactMatches;
+            return;
         }
+
+        // 2. Jika bukan exact match, cari berdasarkan potongan barcode (awal/tengah/akhir), SKU, nama, atau metadata
+        $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $value);
+        $this->searchResults = Product::query()
+            ->where('is_active', true)
+            ->whereHas('stocks', fn($sq) => $sq->where('branch_id', $this->branch_id))
+            ->where(function ($q) use ($escaped) {
+                $q->where('barcode', 'like', "%{$escaped}%")
+                  ->orWhere('sku', 'like', "%{$escaped}%")
+                  ->orWhere('name', 'like', "%{$escaped}%")
+                  ->orWhere('metadata', 'like', "%{$escaped}%");
+            })
+            ->orderByRaw("
+                CASE 
+                    WHEN barcode LIKE ? OR sku LIKE ? THEN 1
+                    WHEN barcode LIKE ? OR sku LIKE ? THEN 2
+                    WHEN name LIKE ? THEN 3
+                    ELSE 4
+                END
+            ", ["{$escaped}%", "{$escaped}%", "%{$escaped}%", "%{$escaped}%", "{$escaped}%"])
+            ->take(20)
+            ->get();
     }
 
     public function updatedSupplierId($value)
@@ -169,11 +199,9 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         $product = Product::query()
-            ->select('products.*')
-            ->join('stocks', 'stocks.product_id', '=', 'products.id')
-            ->where('stocks.branch_id', $this->branch_id)
-            ->where('products.is_active', true)
-            ->where('products.id', $productId)
+            ->where('is_active', true)
+            ->where('id', $productId)
+            ->whereHas('stocks', fn($sq) => $sq->where('branch_id', $this->branch_id))
             ->first();
 
         if ($product) {
@@ -191,12 +219,41 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             return;
         }
 
-        if (strlen($this->searchQuery) > 0) {
-            $queryStr = $this->searchQuery;
-            $product = Product::search($queryStr)
-                ->whereIn('available_branch_ids', [$this->branch_id])
+        $queryStr = trim((string) $this->searchQuery);
+        if (strlen($queryStr) > 0) {
+            // 1. Prioritaskan Exact Match langsung dari database yang terdaftar di cabang ini
+            $product = Product::query()
                 ->where('is_active', true)
+                ->whereHas('stocks', fn($sq) => $sq->where('branch_id', $this->branch_id))
+                ->where(function ($q) use ($queryStr) {
+                    $q->where('barcode', $queryStr)
+                      ->orWhere('sku', $queryStr)
+                      ->orWhereJsonContains('metadata->additional_barcodes', $queryStr);
+                })
                 ->first();
+
+            // 2. Jika bukan exact match, gunakan pencarian parsial (awalan / potongan barcode, SKU, nama)
+            if (!$product) {
+                $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $queryStr);
+                $product = Product::query()
+                    ->where('is_active', true)
+                    ->whereHas('stocks', fn($sq) => $sq->where('branch_id', $this->branch_id))
+                    ->where(function ($q) use ($escaped) {
+                        $q->where('barcode', 'like', "%{$escaped}%")
+                          ->orWhere('sku', 'like', "%{$escaped}%")
+                          ->orWhere('name', 'like', "%{$escaped}%")
+                          ->orWhere('metadata', 'like', "%{$escaped}%");
+                    })
+                    ->orderByRaw("
+                        CASE 
+                            WHEN barcode LIKE ? OR sku LIKE ? THEN 1
+                            WHEN barcode LIKE ? OR sku LIKE ? THEN 2
+                            WHEN name LIKE ? THEN 3
+                            ELSE 4
+                        END
+                    ", ["{$escaped}%", "{$escaped}%", "%{$escaped}%", "%{$escaped}%", "{$escaped}%"])
+                    ->first();
+            }
 
             if ($product) {
                 $this->addItemToCart($product);

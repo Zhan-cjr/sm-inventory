@@ -143,14 +143,31 @@ Route::prefix('v1')->group(function () {
         // Get Active Promotions
         Route::get('/promotions', [\App\Http\Controllers\Api\V1\PosCatalogController::class, 'getPromotions']);
 
-        // Backoffice Meilisearch Product Search
+        // Backoffice Product Search (Exact match priority & Substring search)
         Route::get('/backoffice/products/search', function (Request $request) {
-            $query = $request->query('q', '');
+            $query = trim((string) $request->query('q', ''));
             if (empty($query)) {
                 return response()->json([]);
             }
-            // Execute search using Laravel Scout (Meilisearch)
-            $results = \App\Models\Product::search($query)->take(100)->get();
+            $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $query);
+            $results = \App\Models\Product::query()
+                ->where('is_active', true)
+                ->where(function ($q) use ($escaped) {
+                    $q->where('barcode', 'like', "%{$escaped}%")
+                      ->orWhere('sku', 'like', "%{$escaped}%")
+                      ->orWhere('name', 'like', "%{$escaped}%")
+                      ->orWhere('metadata', 'like', "%{$escaped}%");
+                })
+                ->orderByRaw("
+                    CASE 
+                        WHEN barcode LIKE ? OR sku LIKE ? THEN 1
+                        WHEN barcode LIKE ? OR sku LIKE ? THEN 2
+                        WHEN name LIKE ? THEN 3
+                        ELSE 4
+                    END
+                ", ["{$escaped}%", "{$escaped}%", "%{$escaped}%", "%{$escaped}%", "{$escaped}%"])
+                ->take(50)
+                ->get();
             return response()->json($results);
         });
 

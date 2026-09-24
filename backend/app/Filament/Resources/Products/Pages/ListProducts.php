@@ -37,25 +37,7 @@ class ListProducts extends ListRecords
 
     protected function applySearchToTableQuery(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
-        if (filled($search = $this->getTableSearch())) {
-            try {
-                $keys = \App\Models\Product::search($search)->take(1000)->keys();
-                if ($keys->isNotEmpty()) {
-                    $query->whereIn('id', $keys);
-                } else {
-                    $query->whereRaw('1 = 0');
-                }
-            } catch (\Throwable $e) {
-                // Fallback to database SQL LIKE query if Meilisearch index is missing or unreachable
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('sku', 'like', "%{$search}%")
-                      ->orWhere('barcode', 'like', "%{$search}%")
-                      ->orWhere('metadata', 'like', "%{$search}%");
-                });
-            }
-        }
-
-        return $query;
+        // Global search filtering is centrally handled in ProductsTable::configure() via modifyQueryUsing()
+        return $this->applyColumnSearchesToTableQuery($query);
     }
 }

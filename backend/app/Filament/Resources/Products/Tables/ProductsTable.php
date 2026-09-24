@@ -62,38 +62,23 @@ class ProductsTable
                         // Jika barcode/SKU cocok 100%, hanya tampilkan produk yang cocok eksak
                         $query->whereIn('products.id', $exactMatches);
                     } else {
-                        // 2. Jika bukan exact match, gunakan Scout/Meilisearch atau Prefix Search
-                        try {
-                            $isNumericCode = preg_match('/^[0-9]{6,}$/', $search);
-
-                            if ($isNumericCode) {
-                                // Untuk kode barcode parsial, gunakan prefix search database agar tidak melompat ke produk lain akibat fuzzy typo
-                                $query->where(function ($q) use ($search) {
-                                    $q->where('products.barcode', 'like', "{$search}%")
-                                      ->orWhere('products.sku', 'like', "{$search}%")
-                                      ->orWhere('products.name', 'like', "%{$search}%")
-                                      ->orWhere('products.metadata', 'like', "%{$search}%");
-                                });
-                            } else {
-                                $scoutIds = \App\Models\Product::search($search)->take(100)->keys();
-                                
-                                if ($scoutIds->isEmpty()) {
-                                    $query->whereRaw('1 = 0');
-                                } else {
-                                    $query->whereIn('products.id', $scoutIds);
-                                    $scoutIdsStr = $scoutIds->implode("','");
-                                    $query->orderByRaw("FIELD(products.id, '$scoutIdsStr')");
-                                }
-                            }
-                        } catch (\Throwable $e) {
-                            // Fallback SQL LIKE search jika Meilisearch tidak tersedia
-                            $query->where(function ($q) use ($search) {
-                                $q->where('products.name', 'like', "%{$search}%")
-                                  ->orWhere('products.sku', 'like', "%{$search}%")
-                                  ->orWhere('products.barcode', 'like', "%{$search}%")
-                                  ->orWhere('products.metadata', 'like', "%{$search}%");
-                            });
-                        }
+                        // 2. Jika bukan exact match, lakukan pencarian substring (LIKE %...%)
+                        // Mendukung pencarian digit awal, tengah, maupun digit akhir barcode/SKU persis seperti di kasir
+                        $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+                        $query->where(function ($q) use ($escapedSearch) {
+                            $q->where('products.barcode', 'like', "%{$escapedSearch}%")
+                              ->orWhere('products.sku', 'like', "%{$escapedSearch}%")
+                              ->orWhere('products.name', 'like', "%{$escapedSearch}%")
+                              ->orWhere('products.metadata', 'like', "%{$escapedSearch}%");
+                        })
+                        ->orderByRaw("
+                            CASE 
+                                WHEN products.barcode LIKE ? OR products.sku LIKE ? THEN 1
+                                WHEN products.barcode LIKE ? OR products.sku LIKE ? THEN 2
+                                WHEN products.name LIKE ? THEN 3
+                                ELSE 4
+                            END
+                        ", ["{$escapedSearch}%", "{$escapedSearch}%", "%{$escapedSearch}%", "%{$escapedSearch}%", "{$escapedSearch}%"]);
                     }
                 }
 

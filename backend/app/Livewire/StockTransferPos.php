@@ -92,15 +92,48 @@ class StockTransferPos extends Component
         }
 
         if (strlen($value) >= 2) {
-            $this->searchResults = Product::search($value)
-                ->whereIn('available_branch_ids', [$this->from_branch_id])
-                ->where('is_active', true)
-                ->query(function ($q) {
-                    $q->select('products.*', 'stocks.quantity_on_hand as branch_stock')
-                      ->join('stocks', 'stocks.product_id', '=', 'products.id')
-                      ->where('stocks.branch_id', $this->from_branch_id)
-                      ->where('stocks.quantity_on_hand', '>', 0);
+            // 1. Prioritaskan exact match barcode/SKU
+            $exactMatches = Product::query()
+                ->select('products.*', 'stocks.quantity_on_hand as branch_stock')
+                ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                ->where('stocks.branch_id', $this->from_branch_id)
+                ->where('stocks.quantity_on_hand', '>', 0)
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($value) {
+                    $q->where('products.barcode', $value)
+                      ->orWhere('products.sku', $value)
+                      ->orWhereJsonContains('products.metadata->additional_barcodes', $value);
                 })
+                ->take(10)
+                ->get();
+
+            if ($exactMatches->isNotEmpty()) {
+                $this->searchResults = $exactMatches;
+                return;
+            }
+
+            // 2. Jika bukan exact match, cari berdasarkan potongan barcode, SKU, nama, metadata
+            $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $value);
+            $this->searchResults = Product::query()
+                ->select('products.*', 'stocks.quantity_on_hand as branch_stock')
+                ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                ->where('stocks.branch_id', $this->from_branch_id)
+                ->where('stocks.quantity_on_hand', '>', 0)
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($escaped) {
+                    $q->where('products.barcode', 'like', "%{$escaped}%")
+                      ->orWhere('products.sku', 'like', "%{$escaped}%")
+                      ->orWhere('products.name', 'like', "%{$escaped}%")
+                      ->orWhere('products.metadata', 'like', "%{$escaped}%");
+                })
+                ->orderByRaw("
+                    CASE 
+                        WHEN products.barcode LIKE ? OR products.sku LIKE ? THEN 1
+                        WHEN products.barcode LIKE ? OR products.sku LIKE ? THEN 2
+                        WHEN products.name LIKE ? THEN 3
+                        ELSE 4
+                    END
+                ", ["{$escaped}%", "{$escaped}%", "%{$escaped}%", "%{$escaped}%", "{$escaped}%"])
                 ->take(20)
                 ->get();
         } else {
@@ -139,17 +172,44 @@ class StockTransferPos extends Component
         }
 
         if (strlen($this->searchQuery) > 0) {
-            $queryStr = $this->searchQuery;
-            $product = Product::search($queryStr)
-                ->whereIn('available_branch_ids', [$this->from_branch_id])
-                ->where('is_active', true)
-                ->query(function ($q) {
-                    $q->select('products.*')
-                      ->join('stocks', 'stocks.product_id', '=', 'products.id')
-                      ->where('stocks.branch_id', $this->from_branch_id)
-                      ->where('stocks.quantity_on_hand', '>', 0);
+            $queryStr = trim((string) $this->searchQuery);
+            $product = Product::query()
+                ->select('products.*')
+                ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                ->where('stocks.branch_id', $this->from_branch_id)
+                ->where('stocks.quantity_on_hand', '>', 0)
+                ->where('products.is_active', true)
+                ->where(function ($q) use ($queryStr) {
+                    $q->where('products.barcode', $queryStr)
+                      ->orWhere('products.sku', $queryStr)
+                      ->orWhereJsonContains('products.metadata->additional_barcodes', $queryStr);
                 })
                 ->first();
+
+            if (!$product) {
+                $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $queryStr);
+                $product = Product::query()
+                    ->select('products.*')
+                    ->join('stocks', 'stocks.product_id', '=', 'products.id')
+                    ->where('stocks.branch_id', $this->from_branch_id)
+                    ->where('stocks.quantity_on_hand', '>', 0)
+                    ->where('products.is_active', true)
+                    ->where(function ($q) use ($escaped) {
+                        $q->where('products.barcode', 'like', "%{$escaped}%")
+                          ->orWhere('products.sku', 'like', "%{$escaped}%")
+                          ->orWhere('products.name', 'like', "%{$escaped}%")
+                          ->orWhere('products.metadata', 'like', "%{$escaped}%");
+                    })
+                    ->orderByRaw("
+                        CASE 
+                            WHEN products.barcode LIKE ? OR products.sku LIKE ? THEN 1
+                            WHEN products.barcode LIKE ? OR products.sku LIKE ? THEN 2
+                            WHEN products.name LIKE ? THEN 3
+                            ELSE 4
+                        END
+                    ", ["{$escaped}%", "{$escaped}%", "%{$escaped}%", "%{$escaped}%", "{$escaped}%"])
+                    ->first();
+            }
 
             if ($product) {
                 $this->addItemToCart($product);

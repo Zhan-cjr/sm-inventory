@@ -1480,7 +1480,12 @@ class ReportPrintController extends Controller
         // Apply global search if present
         $search = request()->query('tableSearchQuery') ?? request()->query('search');
         if (!empty($search)) {
-            $query->whereIn('id', \App\Models\Product::search($search)->take(1000)->keys());
+            $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+            $query->where(function ($q) use ($escaped) {
+                $q->where('products.barcode', 'like', "%{$escaped}%")
+                  ->orWhere('products.sku', 'like', "%{$escaped}%")
+                  ->orWhere('products.name', 'like', "%{$escaped}%");
+            });
         }
 
         $products = $query->get();

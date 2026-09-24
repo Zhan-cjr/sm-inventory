@@ -29,9 +29,24 @@ class ItemsRelationManager extends RelationManager
                     ->label('Produk')
                     ->relationship('product', 'name')
                     ->searchable()
-                    ->getSearchResultsUsing(fn (string $search): \Illuminate\Database\Eloquent\Builder => 
-                        \App\Models\Product::whereIn('id', \App\Models\Product::search($search)->take(50)->keys())
-                    )
+                    ->getSearchResultsUsing(function (string $search): \Illuminate\Database\Eloquent\Builder {
+                        $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+                        return \App\Models\Product::query()
+                            ->where('barcode', 'like', "%{$escaped}%")
+                            ->orWhere('sku', 'like', "%{$escaped}%")
+                            ->orWhere('name', 'like', "%{$escaped}%")
+                            ->orWhere('metadata', 'like', "%{$escaped}%")
+                            ->orderByRaw("
+                                CASE 
+                                    WHEN barcode = ? OR sku = ? THEN 1
+                                    WHEN barcode LIKE ? OR sku LIKE ? THEN 2
+                                    WHEN barcode LIKE ? OR sku LIKE ? THEN 3
+                                    WHEN name LIKE ? THEN 4
+                                    ELSE 5
+                                END
+                            ", [$escaped, $escaped, "{$escaped}%", "{$escaped}%", "%{$escaped}%", "%{$escaped}%", "{$escaped}%"])
+                            ->limit(50);
+                    })
                     ->required(),
                 TextInput::make('quantity_ordered')
                     ->required()
