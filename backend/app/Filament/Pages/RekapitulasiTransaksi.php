@@ -32,6 +32,7 @@ class RekapitulasiTransaksi extends Page implements HasTable
         return $table
             ->query(
                 \App\Models\Branch::query()
+                    ->when(Auth::user()?->branch_id, fn($q, $bId) => $q->where('id', $bId))
             )
             ->columns([
                 TextColumn::make('name')
@@ -123,6 +124,7 @@ class RekapitulasiTransaksi extends Page implements HasTable
                     }),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
+                    ->attribute('id')
                     ->options(\App\Models\Branch::pluck('name', 'id'))
                     ->hidden(fn () => Auth::user()->branch_id !== null),
             ])
