@@ -47,7 +47,7 @@ class SuggestedStockTransferService
         $destAds = round($destSales30Days / 30, 2);
         $leadTime = (int) ($stock->product->lead_time_days ?? 3);
         $criticalDays = max($leadTime + 4, 7);
-        $destDoh = $destAds > 0 ? (int) round($destQoh / $destAds) : ($destQoh > 0 ? 999 : 0);
+        $destDoh = ($destQoh > 0 && $destAds > 0) ? (int) round($destQoh / $destAds) : ($destQoh > 0 ? 999 : 0);
 
         // Kriteria Cabang Tujuan: Butuh Stok (Defisit atau Kritis)
         $isDestDeficit = ($destQoh <= 0 && $destSales30Days > 0) || ($destAds > 0 && $destDoh <= $criticalDays) || ($destQoh < 0);
