@@ -38,6 +38,11 @@ class SuggestedStockTransfers extends Page implements HasTable
         return auth()->check();
     }
 
+    public function getSubheading(): ?string
+    {
+        return 'Analisa cerdas disparitas laju penjualan (ADS) & sisa hari stok (DOH) untuk meredistribusi stok mati antar-cabang secara aman (P2P Store-to-Store).';
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -49,6 +54,13 @@ class SuggestedStockTransfers extends Page implements HasTable
                 ->modalContent(view('filament.components.saran-mutasi-faq'))
                 ->modalSubmitAction(false)
                 ->modalCancelActionLabel('Tutup'),
+        ];
+    }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            \App\Filament\Widgets\SuggestedStockTransferStats::class,
         ];
     }
 
