@@ -35,4 +35,9 @@ class SupplierDeduction extends Model
     {
         return $this->hasMany(KontrabonDeduction::class);
     }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'reference_id');
+    }
 }

@@ -55,6 +55,14 @@ class Product extends Model
             $sku = trim($product->sku ?? '');
             $primaryBarcode = trim($product->barcode ?? '');
 
+            // Pastikan jika barcode kosong selalu disimpan sebagai NULL (bukan string kosong '')
+            // agar indeks UNIQUE di MySQL mengizinkan banyak produk tanpa barcode tanpa pernah bentrok.
+            if (empty($primaryBarcode)) {
+                $product->barcode = null;
+            } else {
+                $product->barcode = $primaryBarcode;
+            }
+
             // 1. Validasi Barcode Utama
             if (!empty($primaryBarcode)) {
                 if (!empty($sku) && strtolower($primaryBarcode) === strtolower($sku)) {
@@ -149,7 +157,9 @@ class Product extends Model
         'unit_of_measure', 'reorder_point', 
         'reorder_qty', 'lead_time_days', 'is_active', 'is_taxable', 'metadata', 
         'is_ecommerce_active', 'ecommerce_category', 'image_path',
-        'product_type', 'ppob_sku'
+        'product_type', 'ppob_sku',
+        'listing_status', 'listing_fee', 'trial_start_date', 'trial_end_date', 'allowed_branch_ids', 'listing_notes',
+        'product_listing_id'
     ];
 
     protected $casts = [
@@ -169,6 +179,10 @@ class Product extends Model
         'is_active' => 'boolean',
         'is_ecommerce_active' => 'boolean',
         'is_taxable' => 'boolean',
+        'listing_fee' => 'decimal:2',
+        'trial_start_date' => 'date',
+        'trial_end_date' => 'date',
+        'allowed_branch_ids' => 'array',
     ];
 
     public function organization(): \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -195,6 +209,11 @@ class Product extends Model
     public function supplierDivision(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(SupplierDivision::class, 'supplier_division_id');
+    }
+
+    public function productListing(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ProductListing::class, 'product_listing_id');
     }
 
     public function assemblies()
@@ -270,5 +289,57 @@ class Product extends Model
     public function setMarginGol3Attribute($value)
     {
         $this->attributes['margin_gol_3'] = static::parseIndonesianNumber($value);
+    }
+
+    public function listingDeduction(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(SupplierDeduction::class, 'reference_id')
+            ->where('deduction_type', 'LISTING_FEE');
+    }
+
+    public function getDaysRemainingAttribute(): ?int
+    {
+        if (!$this->trial_end_date) {
+            return null;
+        }
+        return (int) now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($this->trial_end_date)->startOfDay(), false);
+    }
+
+    public function isTrialActive(): bool
+    {
+        return $this->listing_status === 'TRIAL' && ($this->trial_end_date === null || \Carbon\Carbon::parse($this->trial_end_date)->endOfDay()->isFuture());
+    }
+
+    public function isTrialExpired(): bool
+    {
+        return $this->listing_status === 'TRIAL' && $this->trial_end_date !== null && \Carbon\Carbon::parse($this->trial_end_date)->endOfDay()->isPast();
+    }
+
+    public function isBranchAllowed(string $branchId): bool
+    {
+        if ($this->listing_status === 'REGULAR' || empty($this->allowed_branch_ids)) {
+            return true;
+        }
+        return in_array($branchId, (array) $this->allowed_branch_ids);
+    }
+
+    public function scopeListingProducts($query)
+    {
+        return $query->where('listing_status', '!=', 'REGULAR');
+    }
+
+    public function scopeInTrial($query)
+    {
+        return $query->where('listing_status', 'TRIAL');
+    }
+
+    public function scopePassed($query)
+    {
+        return $query->where('listing_status', 'PASSED');
+    }
+
+    public function scopeDelisted($query)
+    {
+        return $query->where('listing_status', 'DELISTED');
     }
 }

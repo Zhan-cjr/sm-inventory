@@ -20,7 +20,7 @@ class ProductAssemblyResource extends Resource
 
     protected static \UnitEnum|string|null $navigationGroup = 'PERSEDIAAN';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 6;
 
     protected static ?string $navigationLabel = 'Paket & Bundling';
 
