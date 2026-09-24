@@ -172,6 +172,11 @@ class SuggestedStockTransfers extends Page implements HasTable
                     })
                     ->weight('bold')
                     ->color('primary'),
+                TextColumn::make('cost_price')
+                    ->label('Harga Beli Satuan')
+                    ->state(fn($record) => 'Rp ' . number_format($record->product->cost_price_tax ?: $record->product->cost_price ?: 0, 0, ',', '.'))
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('remaining_safe')
                     ->label('Sisa Pengirim (Aman)')
                     ->state(function ($record) {

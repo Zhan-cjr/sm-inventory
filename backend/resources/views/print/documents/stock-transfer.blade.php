@@ -45,22 +45,27 @@
                 <tr>
                     <th style="width: 25px;" class="text-center">No</th>
                     <th>Produk / Barang</th>
-                    <th class="text-center" style="width: 60px;">Qty Kirim</th>
-                    <th class="text-center" style="width: 60px;">Qty Terima</th>
-                    <th class="text-right" style="width: 100px;">Total Nilai</th>
+                    <th class="text-center" style="width: 55px;">Qty Kirim</th>
+                    <th class="text-right" style="width: 85px;">Harga Beli</th>
+                    <th class="text-center" style="width: 55px;">Qty Terima</th>
+                    <th class="text-right" style="width: 95px;">Total Nilai</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($doc->items as $index => $item)
+                @php
+                    $unitCost = (float) ($item->unit_price ?: ($item->product?->cost_price_tax ?: $item->product?->cost_price ?: 0));
+                @endphp
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>
                         {{ $item->product ? $item->product->name : '-' }}
                         <span style="color: #666; font-size: 0.85em;"> | Barcode: {{ $item->product ? $item->product->barcode : '-' }}</span>
                     </td>
-                    <td class="text-center">{{ $item->quantity }}</td>
+                    <td class="text-center" style="font-weight: 600;">{{ $item->quantity }}</td>
+                    <td class="text-right">Rp {{ number_format($unitCost, 0, ',', '.') }}</td>
                     <td class="text-center">{{ $item->quantity_received ?: '-' }}</td>
-                    <td class="text-right">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                    <td class="text-right" style="font-weight: 600;">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
                 </tr>
                 @endforeach
             </tbody>
