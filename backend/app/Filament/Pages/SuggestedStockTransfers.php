@@ -60,7 +60,7 @@ class SuggestedStockTransfers extends Page implements HasTable
     protected function getHeaderWidgets(): array
     {
         return [
-            \App\Filament\Widgets\SuggestedStockTransferStats::class,
+            \App\Filament\Pages\Widgets\SuggestedStockTransferStats::class,
         ];
     }
 

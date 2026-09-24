@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Widgets;
+namespace App\Filament\Pages\Widgets;
 
 use App\Models\Stock;
 use App\Services\SuggestedStockTransferService;
@@ -15,6 +15,8 @@ class SuggestedStockTransferStats extends BaseWidget
     {
         return 4;
     }
+
+
 
     protected function getStats(): array
     {
