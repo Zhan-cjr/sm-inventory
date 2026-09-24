@@ -26,6 +26,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(\App\Services\SuggestedOrderService::class, function ($app) {
             return new \App\Services\SuggestedOrderService();
         });
+        $this->app->singleton(\App\Services\SuggestedStockTransferService::class, function ($app) {
+            return new \App\Services\SuggestedStockTransferService();
+        });
     }
 
     /**

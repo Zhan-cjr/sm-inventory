@@ -9,12 +9,113 @@ use App\Models\StockTransfer;
 use App\Models\StockTransferItem;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SuggestedStockTransferService
 {
     protected array $calculationCache = [];
+    protected ?array $sales30DaysMap = null;
+    protected ?int $allBranchesCount = null;
+    protected ?Collection $donorsByProduct = null;
+
+    /**
+     * Cache jumlah cabang aktif
+     */
+    public function getAllBranchesCount(): int
+    {
+        if ($this->allBranchesCount === null) {
+            $this->allBranchesCount = Branch::where('is_active', true)->count();
+        }
+        return $this->allBranchesCount;
+    }
+
+    /**
+     * Agregasi seluruh penjualan 30 hari dalam 1 query ringkas (high-performance in-memory map)
+     */
+    public function getSales30DaysMap(): array
+    {
+        if ($this->sales30DaysMap !== null) {
+            return $this->sales30DaysMap;
+        }
+
+        $this->sales30DaysMap = Cache::remember('transfer_service_sales_30d_map', 300, function () {
+            $thirtyDaysAgo = Carbon::now()->subDays(30);
+
+            $sales = DB::table('transaction_items')
+                ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+                ->where('transactions.created_at', '>=', $thirtyDaysAgo)
+                ->where('transactions.is_voided', false)
+                ->groupBy('transactions.branch_id', 'transaction_items.product_id')
+                ->selectRaw('transactions.branch_id, transaction_items.product_id, SUM(transaction_items.quantity) as total_qty')
+                ->get();
+
+            $map = [];
+            foreach ($sales as $row) {
+                $map[$row->branch_id][$row->product_id] = (float) $row->total_qty;
+            }
+            return $map;
+        });
+
+        return $this->sales30DaysMap;
+    }
+
+    /**
+     * Preload stok donor untuk sekumpulan produk sekaligus (mencegah N+1 query)
+     */
+    public function preloadDonorsForProducts(array $productIds, ?string $forceFromBranchId = null): void
+    {
+        if (empty($productIds)) {
+            $this->donorsByProduct = collect();
+            return;
+        }
+
+        $query = Stock::with('branch')
+            ->whereIn('product_id', $productIds)
+            ->where('is_active', true)
+            ->where('quantity_on_hand', '>', 0);
+
+        if (!empty($forceFromBranchId) && $forceFromBranchId !== 'all') {
+            $query->where('branch_id', $forceFromBranchId);
+        }
+
+        $donors = $query->get();
+
+        if ($this->donorsByProduct === null) {
+            $this->donorsByProduct = $donors->groupBy('product_id');
+        } else {
+            foreach ($donors->groupBy('product_id') as $pid => $items) {
+                $this->donorsByProduct[$pid] = $items;
+            }
+        }
+    }
+
+    /**
+     * Ambil stok donor untuk produk tertentu dari memory / fallback query
+     */
+    public function getDonorStocksForProduct($productId, $destBranchId, ?string $forceFromBranchId = null): Collection
+    {
+        if ($this->donorsByProduct !== null && isset($this->donorsByProduct[$productId])) {
+            return $this->donorsByProduct[$productId]->filter(function ($ds) use ($destBranchId, $forceFromBranchId) {
+                if ($ds->branch_id == $destBranchId) return false;
+                if (!empty($forceFromBranchId) && $forceFromBranchId !== 'all' && $ds->branch_id != $forceFromBranchId) return false;
+                return $ds->quantity_on_hand > 0;
+            });
+        }
+
+        $donorQuery = Stock::with('branch')
+            ->where('product_id', $productId)
+            ->where('branch_id', '!=', $destBranchId)
+            ->where('is_active', true)
+            ->where('quantity_on_hand', '>', 0);
+
+        if (!empty($forceFromBranchId) && $forceFromBranchId !== 'all') {
+            $donorQuery->where('branch_id', $forceFromBranchId);
+        }
+
+        return $donorQuery->get();
+    }
 
     /**
      * Hitung peluang transfer/mutasi untuk sebuah record Stock di cabang tujuan (destinasi).
@@ -26,23 +127,16 @@ class SuggestedStockTransferService
             return $this->calculationCache[$cacheKey];
         }
 
-        $allBranchesCount = Branch::where('is_active', true)->count();
-        if ($allBranchesCount <= 1) {
+        if ($this->getAllBranchesCount() <= 1) {
             return null;
         }
 
         $destBranchId = $stock->branch_id;
         $destQoh = (float) $stock->quantity_on_hand;
-        $thirtyDaysAgo = Carbon::now()->subDays(30);
 
-        // 1. Kecepatan jual di cabang tujuan (Destinasi)
-        $destSales30Days = (float) DB::table('transaction_items')
-            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-            ->where('transactions.branch_id', $destBranchId)
-            ->where('transaction_items.product_id', $stock->product_id)
-            ->where('transactions.created_at', '>=', $thirtyDaysAgo)
-            ->where('transactions.is_voided', false)
-            ->sum('transaction_items.quantity');
+        // 1. Kecepatan jual di cabang tujuan (Destinasi) via Pre-aggregated Map
+        $salesMap = $this->getSales30DaysMap();
+        $destSales30Days = (float) ($salesMap[$destBranchId][$stock->product_id] ?? 0);
 
         $destAds = round($destSales30Days / 30, 2);
         $leadTime = (int) ($stock->product->lead_time_days ?? 3);
@@ -57,17 +151,7 @@ class SuggestedStockTransferService
         }
 
         // 2. Cari Cabang Asal (Donor) yang memiliki surplus stok
-        $donorQuery = Stock::with('branch')
-            ->where('product_id', $stock->product_id)
-            ->where('branch_id', '!=', $destBranchId)
-            ->where('is_active', true)
-            ->where('quantity_on_hand', '>', 0);
-
-        if (!empty($forceFromBranchId)) {
-            $donorQuery->where('branch_id', $forceFromBranchId);
-        }
-
-        $donorStocks = $donorQuery->get();
+        $donorStocks = $this->getDonorStocksForProduct($stock->product_id, $destBranchId, $forceFromBranchId);
         if ($donorStocks->isEmpty()) {
             $this->calculationCache[$cacheKey] = null;
             return null;
@@ -83,15 +167,8 @@ class SuggestedStockTransferService
         foreach ($donorStocks as $donorStock) {
             $donorQoh = (float) $donorStock->quantity_on_hand;
 
-            // Kecepatan jual di cabang donor
-            $donorSales30Days = (float) DB::table('transaction_items')
-                ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-                ->where('transactions.branch_id', $donorStock->branch_id)
-                ->where('transaction_items.product_id', $stock->product_id)
-                ->where('transactions.created_at', '>=', $thirtyDaysAgo)
-                ->where('transactions.is_voided', false)
-                ->sum('transaction_items.quantity');
-
+            // Kecepatan jual di cabang donor via Pre-aggregated Map
+            $donorSales30Days = (float) ($salesMap[$donorStock->branch_id][$stock->product_id] ?? 0);
             $donorAds = round($donorSales30Days / 30, 2);
             $donorDoh = $donorAds > 0 ? (int) round($donorQoh / $donorAds) : 999;
 
@@ -169,8 +246,7 @@ class SuggestedStockTransferService
      */
     public function getTransferCandidateStockIds(?string $fromBranchId = null, ?string $toBranchId = null): array
     {
-        $allBranchesCount = Branch::where('is_active', true)->count();
-        if ($allBranchesCount <= 1) {
+        if ($this->getAllBranchesCount() <= 1) {
             return [];
         }
 
@@ -200,6 +276,12 @@ class SuggestedStockTransferService
         }
 
         $candidateStocks = Stock::whereIn('id', $destStockIds)->with(['product', 'branch'])->get();
+        
+        // Preload donor stocks dan sales map sekaligus sebelum evaluasi
+        $productIds = $candidateStocks->pluck('product_id')->unique()->all();
+        $this->preloadDonorsForProducts($productIds, $fromBranchId);
+        $this->getSales30DaysMap();
+
         $matchedStockIds = [];
 
         foreach ($candidateStocks as $stock) {
@@ -223,6 +305,11 @@ class SuggestedStockTransferService
         $totalUnits = 0;
         $totalCapitalFreed = 0;
         $routes = [];
+
+        // Preload jika belum terisi
+        $productIds = $records->pluck('product_id')->unique()->all();
+        $this->preloadDonorsForProducts($productIds, $fromBranchId);
+        $this->getSales30DaysMap();
 
         foreach ($records as $record) {
             $calc = $this->calculateForStock($record, $fromBranchId);
