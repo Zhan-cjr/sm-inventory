@@ -48,28 +48,52 @@ class ProductsTable
                     $query->withSum('stocks', 'quantity_on_hand');
                 }
                 
-                // Integrate Laravel Scout (Meilisearch) with SQL Fallback
-                $search = $livewire->getTableSearch();
+                // Smart Search: Prioritize Exact Match for Barcode / SKU, Fallback to Meilisearch & SQL
+                $search = trim((string) $livewire->getTableSearch());
                 if (filled($search)) {
-                    try {
-                        $scoutIds = \App\Models\Product::search($search)->take(1000)->keys();
-                        
-                        if ($scoutIds->isEmpty()) {
-                            $query->whereRaw('1 = 0'); // Force empty result if Scout finds nothing
-                        } else {
-                            $query->whereIn('products.id', $scoutIds);
-                            // Preserve Meilisearch relevance ordering
-                            $scoutIdsStr = $scoutIds->implode("','");
-                            $query->orderByRaw("FIELD(products.id, '$scoutIdsStr')");
+                    // 1. Cek Exact Match terlebih dahulu (Barcode, SKU, atau Additional Barcodes)
+                    $exactMatches = \App\Models\Product::query()
+                        ->where('barcode', $search)
+                        ->orWhere('sku', $search)
+                        ->orWhereJsonContains('metadata->additional_barcodes', $search)
+                        ->pluck('id');
+
+                    if ($exactMatches->isNotEmpty()) {
+                        // Jika barcode/SKU cocok 100%, hanya tampilkan produk yang cocok eksak
+                        $query->whereIn('products.id', $exactMatches);
+                    } else {
+                        // 2. Jika bukan exact match, gunakan Scout/Meilisearch atau Prefix Search
+                        try {
+                            $isNumericCode = preg_match('/^[0-9]{6,}$/', $search);
+
+                            if ($isNumericCode) {
+                                // Untuk kode barcode parsial, gunakan prefix search database agar tidak melompat ke produk lain akibat fuzzy typo
+                                $query->where(function ($q) use ($search) {
+                                    $q->where('products.barcode', 'like', "{$search}%")
+                                      ->orWhere('products.sku', 'like', "{$search}%")
+                                      ->orWhere('products.name', 'like', "%{$search}%")
+                                      ->orWhere('products.metadata', 'like', "%{$search}%");
+                                });
+                            } else {
+                                $scoutIds = \App\Models\Product::search($search)->take(100)->keys();
+                                
+                                if ($scoutIds->isEmpty()) {
+                                    $query->whereRaw('1 = 0');
+                                } else {
+                                    $query->whereIn('products.id', $scoutIds);
+                                    $scoutIdsStr = $scoutIds->implode("','");
+                                    $query->orderByRaw("FIELD(products.id, '$scoutIdsStr')");
+                                }
+                            }
+                        } catch (\Throwable $e) {
+                            // Fallback SQL LIKE search jika Meilisearch tidak tersedia
+                            $query->where(function ($q) use ($search) {
+                                $q->where('products.name', 'like', "%{$search}%")
+                                  ->orWhere('products.sku', 'like', "%{$search}%")
+                                  ->orWhere('products.barcode', 'like', "%{$search}%")
+                                  ->orWhere('products.metadata', 'like', "%{$search}%");
+                            });
                         }
-                    } catch (\Throwable $e) {
-                        // Fallback seamlessly to database LIKE search if Meilisearch service is down
-                        $query->where(function ($q) use ($search) {
-                            $q->where('products.name', 'like', "%{$search}%")
-                              ->orWhere('products.sku', 'like', "%{$search}%")
-                              ->orWhere('products.barcode', 'like', "%{$search}%")
-                              ->orWhere('products.metadata', 'like', "%{$search}%");
-                        });
                     }
                 }
 

@@ -141,7 +141,21 @@ return [
         'key' => env('MEILISEARCH_KEY'),
         'index-settings' => [
             \App\Models\Product::class => [
-                'filterableAttributes'=> ['available_branch_ids', 'is_active', 'product_type'],
+                'filterableAttributes' => ['available_branch_ids', 'is_active', 'product_type'],
+                'searchableAttributes' => [
+                    'barcode',
+                    'sku',
+                    'additional_barcodes',
+                    'name',
+                    'category',
+                ],
+                'typoTolerance' => [
+                    'disableOnAttributes' => [
+                        'barcode',
+                        'sku',
+                        'additional_barcodes',
+                    ],
+                ],
             ],
         ],
     ],
