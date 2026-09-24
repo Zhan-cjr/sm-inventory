@@ -16,6 +16,8 @@ use Illuminate\Support\Str;
 class SuggestedStockTransferService
 {
     protected array $calculationCache = [];
+    protected array $candidateResultsCache = [];
+    protected array $fleetSummaryCache = [];
     protected ?array $sales30DaysMap = null;
     protected ?int $allBranchesCount = null;
     protected ?Collection $donorsByProduct = null;
@@ -32,7 +34,7 @@ class SuggestedStockTransferService
     }
 
     /**
-     * Agregasi seluruh penjualan 30 hari dalam 1 query ringkas (high-performance in-memory map)
+     * Agregasi seluruh penjualan 30 hari dalam 1 query terindeks (transaksi_date) berkecepatan tinggi
      */
     public function getSales30DaysMap(): array
     {
@@ -40,15 +42,15 @@ class SuggestedStockTransferService
             return $this->sales30DaysMap;
         }
 
-        $this->sales30DaysMap = Cache::remember('transfer_service_sales_30d_map', 300, function () {
-            $thirtyDaysAgo = Carbon::now()->subDays(30);
+        $this->sales30DaysMap = Cache::remember('transfer_service_sales_30d_map_v2', 600, function () {
+            $thirtyDaysAgo = Carbon::now()->subDays(30)->toDateString();
 
-            $sales = DB::table('transaction_items')
-                ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-                ->where('transactions.created_at', '>=', $thirtyDaysAgo)
-                ->where('transactions.is_voided', false)
-                ->groupBy('transactions.branch_id', 'transaction_items.product_id')
-                ->selectRaw('transactions.branch_id, transaction_items.product_id, SUM(transaction_items.quantity) as total_qty')
+            $sales = DB::table('transactions as t')
+                ->join('transaction_items as ti', 'ti.transaction_id', '=', 't.id')
+                ->where('t.transaction_date', '>=', $thirtyDaysAgo)
+                ->where('t.is_voided', false)
+                ->groupBy('t.branch_id', 'ti.product_id')
+                ->selectRaw('t.branch_id, ti.product_id, SUM(ti.quantity) as total_qty')
                 ->get();
 
             $map = [];
@@ -122,7 +124,8 @@ class SuggestedStockTransferService
      */
     public function calculateForStock(Stock $stock, ?string $forceFromBranchId = null): ?array
     {
-        $cacheKey = "stock_transfer_{$stock->id}_" . ($forceFromBranchId ?: 'auto');
+        $fromKey = (!empty($forceFromBranchId) && $forceFromBranchId !== 'all') ? $forceFromBranchId : 'auto';
+        $cacheKey = "stock_transfer_{$stock->id}_{$fromKey}";
         if (isset($this->calculationCache[$cacheKey])) {
             return $this->calculationCache[$cacheKey];
         }
@@ -246,10 +249,29 @@ class SuggestedStockTransferService
      */
     public function getTransferCandidateStockIds(?string $fromBranchId = null, ?string $toBranchId = null): array
     {
-        if ($this->getAllBranchesCount() <= 1) {
-            return [];
+        $memoKey = ($fromBranchId ?: 'all') . '_' . ($toBranchId ?: 'all');
+        if (isset($this->candidateResultsCache[$memoKey])) {
+            return $this->candidateResultsCache[$memoKey];
         }
 
+        if ($this->getAllBranchesCount() <= 1) {
+            return $this->candidateResultsCache[$memoKey] = [];
+        }
+
+        // 1. Dapatkan sales map dan kumpulkan produk yang aktif terjual dalam 30 hari
+        $salesMap = $this->getSales30DaysMap();
+        $activeProductIds = [];
+        foreach ($salesMap as $bId => $pMap) {
+            if (!empty($toBranchId) && $toBranchId !== 'all' && $bId != $toBranchId) continue;
+            foreach ($pMap as $pId => $qty) {
+                if ($qty > 0) {
+                    $activeProductIds[$pId] = true;
+                }
+            }
+        }
+        $validProductIds = array_keys($activeProductIds);
+
+        // 2. Query kandidat yang hanya relevan (menghindari load ribuan dead non-selling products)
         $query = DB::table('stocks as dest')
             ->join('stocks as donor', function ($join) {
                 $join->on('dest.product_id', '=', 'donor.product_id')
@@ -259,6 +281,14 @@ class SuggestedStockTransferService
             ->where('dest.is_active', true)
             ->where('donor.is_active', true)
             ->where('products.is_active', true)
+            ->where(function ($q) use ($validProductIds) {
+                if (!empty($validProductIds)) {
+                    $q->whereIn('dest.product_id', $validProductIds)
+                      ->orWhere('dest.quantity_on_hand', '<', 0);
+                } else {
+                    $q->where('dest.quantity_on_hand', '<', 0);
+                }
+            })
             ->where('dest.quantity_on_hand', '<=', 10)
             ->where('donor.quantity_on_hand', '>', 2);
 
@@ -272,15 +302,14 @@ class SuggestedStockTransferService
 
         $destStockIds = $query->distinct()->pluck('dest.id')->all();
         if (empty($destStockIds)) {
-            return [];
+            return $this->candidateResultsCache[$memoKey] = [];
         }
 
         $candidateStocks = Stock::whereIn('id', $destStockIds)->with(['product', 'branch'])->get();
         
-        // Preload donor stocks dan sales map sekaligus sebelum evaluasi
+        // Preload donor stocks sekaligus sebelum evaluasi
         $productIds = $candidateStocks->pluck('product_id')->unique()->all();
         $this->preloadDonorsForProducts($productIds, $fromBranchId);
-        $this->getSales30DaysMap();
 
         $matchedStockIds = [];
 
@@ -293,7 +322,7 @@ class SuggestedStockTransferService
             }
         }
 
-        return $matchedStockIds;
+        return $this->candidateResultsCache[$memoKey] = $matchedStockIds;
     }
 
     /**
@@ -301,6 +330,11 @@ class SuggestedStockTransferService
      */
     public function getFleetSummary(Collection $records, ?string $fromBranchId = null): array
     {
+        $memoKey = ($fromBranchId ?: 'all') . '_' . md5($records->pluck('id')->implode(','));
+        if (isset($this->fleetSummaryCache[$memoKey])) {
+            return $this->fleetSummaryCache[$memoKey];
+        }
+
         $totalItems = 0;
         $totalUnits = 0;
         $totalCapitalFreed = 0;
@@ -333,7 +367,7 @@ class SuggestedStockTransferService
             }
         }
 
-        return [
+        return $this->fleetSummaryCache[$memoKey] = [
             'total_items' => $totalItems,
             'total_units' => $totalUnits,
             'total_capital_freed' => $totalCapitalFreed,
