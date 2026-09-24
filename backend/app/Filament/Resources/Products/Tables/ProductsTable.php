@@ -126,6 +126,22 @@ class ProductsTable
                 IconColumn::make('is_active')
                     ->label('Status')
                     ->boolean(),
+                TextColumn::make('listing_status')
+                    ->label('Listing')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'TRIAL' => 'Uji Coba',
+                        'PASSED' => 'Lolos Listing',
+                        'DELISTED' => 'Delisted',
+                        default => 'Reguler',
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        'TRIAL' => 'warning',
+                        'PASSED' => 'success',
+                        'DELISTED' => 'danger',
+                        default => 'gray',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
                 \Filament\Tables\Columns\ToggleColumn::make('is_ecommerce_active')
                     ->label('Tampil E-Commerce')
                     ->disabled(fn () => auth()->user()?->branch_id !== null),
@@ -203,6 +219,14 @@ class ProductsTable
                     ->trueLabel('Produk Aktif')
                     ->falseLabel('Produk Non Aktif')
                     ->default(true),
+                \Filament\Tables\Filters\SelectFilter::make('listing_status')
+                    ->label('Status Listing')
+                    ->options([
+                        'REGULAR' => 'Reguler',
+                        'TRIAL' => 'Masa Uji Coba (Trial)',
+                        'PASSED' => 'Lolos Listing',
+                        'DELISTED' => 'Dihentikan (Delisted)',
+                    ]),
             ])
             ->headerActions([
                 \Filament\Actions\ActionGroup::make([
