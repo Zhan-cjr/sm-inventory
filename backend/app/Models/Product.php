@@ -157,7 +157,7 @@ class Product extends Model
         'unit_of_measure', 'reorder_point', 
         'reorder_qty', 'lead_time_days', 'is_active', 'is_taxable', 'metadata', 
         'is_ecommerce_active', 'ecommerce_category', 'image_path',
-        'product_type', 'ppob_sku',
+        'product_type', 'ppob_sku', 'ppob_provider',
         'listing_status', 'listing_fee', 'trial_start_date', 'trial_end_date', 'allowed_branch_ids', 'listing_notes',
         'product_listing_id'
     ];
