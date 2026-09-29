@@ -11,14 +11,14 @@ class AmaWebhookController extends Controller
 {
     public function handle(Request $request)
     {
-        // Based on PDF: HTTP GET
+        // Based on PDF: HTTP GET (or POST fallback)
         // http://<ip client>?trxid=<trxid>&userid=<userid>&sn=<serialnumber>&status=<status transaksi>&msg=<pesan>
         
-        $trxid = $request->query('trxid');
-        $userid = $request->query('userid');
-        $sn = $request->query('sn');
-        $status = $request->query('status');
-        $msg = $request->query('msg');
+        $trxid = $request->input('trxid');
+        $userid = $request->input('userid');
+        $sn = $request->input('sn') ?? $request->input('serialnumber');
+        $status = (string) $request->input('status');
+        $msg = $request->input('msg') ?? $request->input('message');
 
         if (!$trxid) {
             return response()->json(['error' => 'Missing trxid'], 400);
@@ -28,22 +28,16 @@ class AmaWebhookController extends Controller
             $transaction = PpobTransaction::where('ref_id', $trxid)->first();
             
             if ($transaction) {
-                // Map AMA status to our standard status if needed
-                // E.g., '00' = Success, '04' = Failed, '68' = Pending
+                // Map AMA status to our standard status
+                // '00' = Success, '04' = Failed, '68' = Pending
                 $mappedStatus = 'Pending';
-                if ($status === '00' || $status === 'Success') {
-                    $mappedStatus = 'Gagal'; // Default mapping just in case
-                }
-                
-                // Better mapping based on PDF Response Code table
-                if ($status === '00') {
+                if ($status === '00' || strtolower($status) === 'success') {
                     $mappedStatus = 'Sukses';
-                } elseif (in_array($status, ['03', '04', '05', '06', '63', '65', '67', '99'])) {
+                } elseif (in_array($status, ['03', '04', '05', '06', '63', '65', '67', '99']) || strtolower($status) === 'failed') {
                     $mappedStatus = 'Gagal';
-                } elseif ($status === '68') {
+                } elseif ($status === '68' || strtolower($status) === 'pending') {
                     $mappedStatus = 'Pending';
                 } else {
-                    // Fallback to literal status if unknown
                     $mappedStatus = $status;
                 }
 

@@ -14,9 +14,29 @@ class AmaService implements PpobProviderInterface
 
     public function __construct()
     {
-        $this->userId = env('AMA_USER_ID');
-        $this->apiKey = env('AMA_PIN');
-        $this->baseUrl = rtrim(env('AMA_API_URL', 'https://api.ama.com/v1'), '/'); // fallback url if not set
+        $this->userId = env('AMA_USER_ID', '262711139');
+        $this->apiKey = env('AMA_PIN', '352ee5');
+        $this->baseUrl = rtrim(env('AMA_API_URL', 'https://202.43.189.122:13008/clientapi/v2/json'), '/');
+    }
+
+    private function getHttpClient()
+    {
+        return Http::withoutVerifying()
+            ->withOptions([
+                'curl' => [
+                    CURLOPT_SSL_CIPHER_LIST => 'DEFAULT@SECLEVEL=0',
+                    CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_0,
+                ],
+                'timeout' => 60,
+            ]);
+    }
+
+    private function getTransactionUrl(): string
+    {
+        if (str_ends_with($this->baseUrl, '.json') || str_contains($this->baseUrl, '/clientapi/')) {
+            return $this->baseUrl;
+        }
+        return $this->baseUrl . '/transaction';
     }
 
     private function generateSign($payloadJson)
@@ -49,7 +69,6 @@ class AmaService implements PpobProviderInterface
     public function checkBalance()
     {
         // Note: The provided API doc does not specify a check balance endpoint for AMA.
-        // Assuming it will be documented later, returning a dummy success for now.
         return ['data' => ['status' => 'success', 'balance' => 0]];
     }
 
@@ -57,16 +76,18 @@ class AmaService implements PpobProviderInterface
     {
         // Based on PDF: <url_endpoint_product>?userid=<userid>
         // with X-API-KEY header: HMAC256(userid, eKEY)
-        
         $sign = hash_hmac('sha256', $this->userId, $this->apiKey);
-        
+        $productUrl = str_ends_with($this->baseUrl, '.json')
+            ? str_replace('/json', '/product', $this->baseUrl)
+            : $this->baseUrl . '/product';
+
         try {
-            $response = Http::withHeaders([
+            $response = $this->getHttpClient()->withHeaders([
                 'X-API-KEY' => $sign
-            ])->get($this->baseUrl . '/product', [
+            ])->get($productUrl, [
                 'userid' => $this->userId
             ]);
-            
+
             return $response->json();
         } catch (\Exception $e) {
             Log::error('AMA Price List Error: ' . $e->getMessage());
@@ -77,17 +98,16 @@ class AmaService implements PpobProviderInterface
     public function topup(string $skuCode, string $customerNo, string $refId, array $additionalInfo = [])
     {
         // method depends on product. For standard topup: 'topUpRequest', 'INQ', or 'PAY'
-        // Assuming 'topUpRequest' for regular transactions for now.
         $payload = $this->buildRequestPayload('topUpRequest', $skuCode, $customerNo, $refId, $additionalInfo);
         
         $payloadJson = json_encode($payload);
         $sign = $this->generateSign($payloadJson);
 
         try {
-            $response = Http::withHeaders([
+            $response = $this->getHttpClient()->withHeaders([
                 'Content-Type' => 'application/json',
                 'X-API-KEY' => $sign
-            ])->withBody($payloadJson, 'application/json')->post($this->baseUrl . '/transaction');
+            ])->withBody($payloadJson, 'application/json')->post($this->getTransactionUrl());
             
             $res = $response->json();
             return $this->mapResponseToStandard($res);
@@ -99,16 +119,16 @@ class AmaService implements PpobProviderInterface
 
     public function checkStatus(string $skuCode, string $customerNo, string $refId)
     {
-        // For AMA, assuming 'INQ' method for status inquiry based on standard H2H (or we can use topUpRequest again)
+        // For AMA, using 'INQ' method or status inquiry
         $payload = $this->buildRequestPayload('INQ', $skuCode, $customerNo, $refId, []);
         $payloadJson = json_encode($payload);
         $sign = $this->generateSign($payloadJson);
 
         try {
-            $response = Http::withHeaders([
+            $response = $this->getHttpClient()->withHeaders([
                 'Content-Type' => 'application/json',
                 'X-API-KEY' => $sign
-            ])->withBody($payloadJson, 'application/json')->post($this->baseUrl . '/transaction');
+            ])->withBody($payloadJson, 'application/json')->post($this->getTransactionUrl());
             
             $res = $response->json();
             return $this->mapResponseToStandard($res);
@@ -125,7 +145,7 @@ class AmaService implements PpobProviderInterface
         }
 
         $gwRs = $res['gwRs'];
-        $status = $gwRs['status'] ?? '';
+        $status = (string) ($gwRs['status'] ?? '');
         
         $mappedStatus = 'Pending';
         if ($status === '00') {
@@ -140,7 +160,7 @@ class AmaService implements PpobProviderInterface
             'data' => [
                 'status' => $mappedStatus,
                 'rc' => $status,
-                'sn' => $gwRs['sn'] ?? '',
+                'sn' => $gwRs['serialnumber'] ?? $gwRs['sn'] ?? '',
                 'message' => $gwRs['message'] ?? '',
                 'price' => $gwRs['price'] ?? 0,
             ]
