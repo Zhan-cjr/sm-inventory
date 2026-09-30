@@ -311,8 +311,19 @@
             <span class="modal-title">⚠️ Barang Belum Di-scan</span>
             <button class="modal-close" onclick="closeReviewModal()" type="button">✕</button>
         </div>
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5;">
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.5;">
             Terdapat produk yang belum di-scan pada rak ini. Tentukan status barang tersebut:
+        </div>
+        <!-- Quick Action Buttons -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
+            <button type="button" onclick="markAllReview('zero')"
+                    style="flex: 1; min-width: 130px; background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.3); color: #93c5fd; border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer;">
+                🔵 Tandai Semua Stok 0
+            </button>
+            <button type="button" onclick="markAllReview('remove')"
+                    style="flex: 1; min-width: 130px; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); color: #fca5a5; border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer;">
+                ⚪ Tandai Semua Pindah Rak
+            </button>
         </div>
         <div id="review-list" style="overflow-y: auto; flex: 1; padding-right: 5px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
             <!-- Injected via JS -->
@@ -532,14 +543,12 @@
         }
 
         unscannedDomItems.forEach(itemDiv => {
-            if (itemDiv.style.display !== 'none') {
-                const inp = itemDiv.querySelector('.qty-input');
-                unscannedItems.push({
-                    id: itemDiv.dataset.itemId || inp.name.match(/\[(.*?)\]/)[1],
-                    name: itemDiv.querySelector('.product-name').textContent,
-                    input: inp
-                });
-            }
+            const inp = itemDiv.querySelector('.qty-input');
+            unscannedItems.push({
+                id: itemDiv.dataset.itemId || (inp && inp.name.match(/\[(.*?)\]/) ? inp.name.match(/\[(.*?)\]/)[1] : null),
+                name: itemDiv.querySelector('.product-name').textContent,
+                input: inp
+            });
         });
 
         if (unscannedItems.length > 0) {
@@ -565,15 +574,10 @@
         
         unscannedItems.forEach((item, index) => {
             const isNewQty = item.input && item.input.name.includes('new_quantities');
-            const hiddenInputs = isNewQty 
-                ? '' 
-                : `<input type="radio" name="review_action_${item.id}" value="remove" id="ra_rem_${item.id}" style="accent-color: #ef4444;">
-                   <label for="ra_rem_${item.id}" style="font-size: 13px; cursor: pointer; color: #fca5a5;">Keluarkan dari Rak</label>`;
-                   
             listEl.innerHTML += `
                 <div style="background: var(--surface); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
                     <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">${item.name}</div>
-                    <div style="display: flex; gap: 16px; align-items: center;">
+                    <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
                         <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                             <input type="radio" name="review_action_${item.id}" value="zero" checked style="accent-color: var(--blue);">
                             <span style="font-size: 13px;">Stok 0 (Habis)</span>
@@ -581,7 +585,7 @@
                         ${isNewQty ? '' : `
                         <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                             <input type="radio" name="review_action_${item.id}" value="remove" style="accent-color: #ef4444;">
-                            <span style="font-size: 13px; color: #fca5a5;">Bukan di Rak Ini (Hapus)</span>
+                            <span style="font-size: 13px; color: #fca5a5;">Bukan di Rak Ini (Keluarkan)</span>
                         </label>`}
                     </div>
                 </div>
@@ -589,11 +593,19 @@
         });
         
         document.getElementById('review-modal').classList.add('open');
-    }
+    };
     
     window.closeReviewModal = function() {
         document.getElementById('review-modal').classList.remove('open');
-    }
+    };
+
+    window.markAllReview = function(action) {
+        document.querySelectorAll('#review-list input[type="radio"]').forEach(r => {
+            if (r.value === action) {
+                r.checked = true;
+            }
+        });
+    };
     
     window.confirmReviewAndSubmit = function() {
         const form = document.getElementById('check-form');
@@ -602,9 +614,10 @@
         document.querySelectorAll('.remove-rack-input').forEach(el => el.remove());
         
         unscannedItems.forEach(item => {
-            const action = document.querySelector(`input[name="review_action_${item.id}"]:checked`).value;
+            const checkedRadio = document.querySelector(`input[name="review_action_${item.id}"]:checked`);
+            const action = checkedRadio ? checkedRadio.value : 'zero';
             if (action === 'zero') {
-                if(item.input) item.input.value = '0';
+                if (item.input) item.input.value = '0';
             } else if (action === 'remove') {
                 // We add a hidden input array remove_from_rack[]
                 const hidden = document.createElement('input');
@@ -615,13 +628,13 @@
                 form.appendChild(hidden);
                 
                 // Set qty to 0 just in case to pass validation
-                if(item.input) item.input.value = '0';
+                if (item.input) item.input.value = '0';
             }
         });
         
         closeReviewModal();
         proceedSubmit();
-    }
+    };
 
     // ─── Barcode match & focus ───
     let isProcessingScan = false;
@@ -649,18 +662,20 @@
             status.className = 'scan-status';
             status.textContent = 'Mencari produk di server...';
             
-            fetch(`{{ route('opname.search-product') }}?code=${encodeURIComponent(code)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
+            fetch(`{{ route('opname.search-product') }}?code=${encodeURIComponent(code)}&session_token={{ $sessionToken }}`)
+                .then(async res => {
+                    const data = await res.json();
+                    if (!res.ok || data.error) {
                         status.className = 'scan-status notfound';
-                        status.textContent = `❌ Produk "${code}" tidak ditemukan di server.`;
+                        const errMsg = data.message || `Produk "${code}" tidak ditemukan di server.`;
+                        status.textContent = `❌ ${errMsg}`;
                         if (!document.getElementById('scan-modal').classList.contains('open')) {
-                            alert(`❌ Produk "${code}" tidak ditemukan di server.`);
+                            alert(`❌ ${errMsg}`);
                             searchInput.select();
                         }
                         isProcessingScan = false;
-                    } else {
+                        return;
+                    }
                         // Create new product item in DOM
                         const list = document.getElementById('product-list');
                         const div = document.createElement('div');

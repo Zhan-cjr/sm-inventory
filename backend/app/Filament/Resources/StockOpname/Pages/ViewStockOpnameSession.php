@@ -38,42 +38,21 @@ class ViewStockOpnameSession extends ViewRecord
                     $this->refreshFormData(['status']);
                 }),
 
-            // Mulai Pengecekan: COUNTING → CHECKING (setelah semua rak count1 selesai)
-            Action::make('mulai_pengecekan')
-                ->label('Mulai Pengecekan ke-2')
-                ->icon('heroicon-o-magnifying-glass')
-                ->color('warning')
-                ->visible(fn () => $record->status === 'COUNTING')
-                ->requiresConfirmation()
-                ->modalHeading('Mulai Pengecekan ke-2?')
-                ->modalDescription('Pengecek ke-2 dapat mengakses rak yang sudah dihitung. Pastikan semua rak sudah dihitung oleh penghitung 1.')
-                ->action(function () use ($record) {
-                    $pendingRacks = $record->rackSessions()->where('count1_status', 'PENDING')->count();
-                    if ($pendingRacks > 0) {
-                        Notification::make()
-                            ->title("Masih ada {$pendingRacks} rak yang belum dihitung penghitung 1!")
-                            ->warning()->send();
-                        return;
-                    }
-                    $record->update(['status' => 'CHECKING']);
-                    Notification::make()->title('Sesi masuk tahap Pengecekan ke-2.')->success()->send();
-                    $this->refreshFormData(['status']);
-                }),
-
-            // Final Check: CHECKING → FINAL_CHECK (jika ada item DISCREPANCY)
+            // Final Check: COUNTING/CHECKING → FINAL_CHECK (jika ada item DISCREPANCY)
             Action::make('final_check')
-                ->label('Final Check (SPV)')
+                ->label('Final Check / Verifikasi Selisih')
                 ->icon('heroicon-o-shield-check')
                 ->color('danger')
-                ->visible(fn () => $record->status === 'CHECKING')
+                ->visible(fn () => in_array($record->status, ['COUNTING', 'CHECKING']))
                 ->requiresConfirmation()
                 ->modalHeading('Masuk ke tahap Final Check?')
-                ->modalDescription('Item yang selisih antara penghitung 1 dan 2 akan ditampilkan untuk dicek SPV.')
+                ->modalDescription('Item yang selisih antara penghitung 1 dan 2 akan diverifikasi pada tahap ini.')
                 ->action(function () use ($record) {
-                    $pendingRacks = $record->rackSessions()->where('count2_status', 'PENDING')->count();
-                    if ($pendingRacks > 0) {
+                    $pendingCount1 = $record->rackSessions()->where('count1_status', 'PENDING')->count();
+                    $pendingCount2 = $record->rackSessions()->where('count2_status', 'PENDING')->count();
+                    if ($pendingCount1 > 0 || $pendingCount2 > 0) {
                         Notification::make()
-                            ->title("Masih ada {$pendingRacks} rak yang belum dicek pengecek ke-2!")
+                            ->title("Masih ada {$pendingCount1} rak belum dihitung (P1) atau {$pendingCount2} rak belum dicek (P2)!")
                             ->warning()->send();
                         return;
                     }
@@ -92,20 +71,29 @@ class ViewStockOpnameSession extends ViewRecord
                     $this->refreshFormData(['status']);
                 }),
 
-            // Simpan & Selesaikan (dari FINAL_CHECK setelah SPV selesai)
+            // Simpan & Selesaikan
             Action::make('selesaikan')
                 ->label('Simpan & Selesaikan')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
-                ->visible(fn () => $record->status === 'FINAL_CHECK')
+                ->visible(fn () => in_array($record->status, ['COUNTING', 'CHECKING', 'FINAL_CHECK']))
                 ->requiresConfirmation()
                 ->modalHeading('Selesaikan Stok Opname?')
                 ->modalDescription('Stok akan diupdate sesuai hasil opname final. Aksi ini tidak dapat dibatalkan!')
                 ->action(function () use ($record) {
+                    $pendingCount1 = $record->rackSessions()->where('count1_status', 'PENDING')->count();
+                    $pendingCount2 = $record->rackSessions()->where('count2_status', 'PENDING')->count();
+                    if ($pendingCount1 > 0 || $pendingCount2 > 0) {
+                        Notification::make()
+                            ->title("Masih ada rak yang belum selesai dihitung!")
+                            ->danger()->send();
+                        return;
+                    }
+
                     $pendingFinal = $record->items()->where('status', 'DISCREPANCY')->count();
                     if ($pendingFinal > 0) {
                         Notification::make()
-                            ->title("Masih ada {$pendingFinal} item selisih yang belum di-final-check!")
+                            ->title("Masih ada {$pendingFinal} item selisih yang belum diverifikasi final!")
                             ->danger()->send();
                         return;
                     }
@@ -114,9 +102,20 @@ class ViewStockOpnameSession extends ViewRecord
                     $this->refreshFormData(['status']);
                 }),
 
-            // Tombol ke halaman final check
+            // Tombol modal scan QR Final Check
+            Action::make('qr_final_check')
+                ->label('Scan QR Final Check')
+                ->icon('heroicon-o-qr-code')
+                ->color('warning')
+                ->visible(fn () => $record->status === 'FINAL_CHECK')
+                ->modalHeading('QR Code Portal Pengecek Final')
+                ->modalContent(fn () => view('filament.modals.qr-final-check', ['record' => $record]))
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('Tutup'),
+
+            // Tombol ke halaman monitoring & QR final check
             Action::make('buka_final_check')
-                ->label('Buka Final Check')
+                ->label('Buka Final Check & Monitoring')
                 ->icon('heroicon-o-arrow-right-circle')
                 ->color('danger')
                 ->visible(fn () => $record->status === 'FINAL_CHECK')

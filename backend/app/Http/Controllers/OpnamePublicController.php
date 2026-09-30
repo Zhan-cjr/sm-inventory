@@ -438,11 +438,96 @@ class OpnamePublicController extends Controller
         ]);
     }
 
+    public function showFinalCheck(string $sessionToken)
+    {
+        $session = StockOpnameSession::with(['branch', 'rackSessions.rack'])
+            ->where('session_token', $sessionToken)
+            ->firstOrFail();
+
+        if (!in_array($session->status, ['COUNTING', 'CHECKING', 'FINAL_CHECK'])) {
+            return view('opname.error', [
+                'message' => 'Sesi opname ini sudah selesai atau tidak menerima final check.',
+                'session' => $session,
+            ]);
+        }
+
+        // Ambil semua item yang berstatus DISCREPANCY atau FINAL_DONE (jika sudah sebagian)
+        $discrepancyItems = $session->items()
+            ->with(['product.category', 'rackSession.rack'])
+            ->whereIn('status', ['DISCREPANCY', 'FINAL_DONE'])
+            ->get();
+
+        // Kelompokkan per rak
+        $groupedByRack = $discrepancyItems->groupBy(function ($item) {
+            return $item->rackSession?->rack?->rack_code ?? 'TANPA-RAK';
+        });
+
+        return view('opname.final', [
+            'session'          => $session,
+            'sessionToken'     => $sessionToken,
+            'discrepancyItems' => $discrepancyItems,
+            'groupedByRack'    => $groupedByRack,
+            'totalDiscrepancy' => $discrepancyItems->where('status', 'DISCREPANCY')->count(),
+            'totalDone'        => $discrepancyItems->where('status', 'FINAL_DONE')->count(),
+        ]);
+    }
+
+    public function submitFinalCheck(Request $request, string $sessionToken)
+    {
+        $request->validate([
+            'checker_name'       => 'required|string|max:100',
+            'final_quantities'   => 'required|array',
+            'final_quantities.*' => 'nullable|numeric|min:0',
+            'final_notes'        => 'nullable|array',
+            'final_notes.*'      => 'nullable|string|max:255',
+        ]);
+
+        $session = StockOpnameSession::where('session_token', $sessionToken)->firstOrFail();
+
+        \DB::transaction(function () use ($request, $session) {
+            foreach ($request->final_quantities as $itemId => $qty) {
+                if ($qty === null || $qty === '') continue;
+
+                $item = StockOpnameItem::where('id', $itemId)
+                    ->where('session_id', $session->id)
+                    ->first();
+
+                if ($item) {
+                    $item->update([
+                        'final_quantity' => (float) $qty,
+                        'final_by_name'  => $request->checker_name,
+                        'final_at'       => now(),
+                        'final_notes'    => $request->input("final_notes.{$itemId}"),
+                        'status'         => 'FINAL_DONE',
+                    ]);
+                }
+            }
+        });
+
+        return redirect()->route('opname.done', [
+            'role'      => 'final',
+            'rack_code' => 'Pengecekan Final',
+            'next_url'  => route('opname.final', $sessionToken),
+        ]);
+    }
+
     public function searchProduct(Request $request)
     {
-        $code = trim($request->query('code'));
+        $code = trim((string) $request->query('code', ''));
         if (!$code) {
-            return response()->json(['error' => 'Code required'], 400);
+            return response()->json([
+                'error'   => 'CODE_REQUIRED',
+                'message' => 'Kode barcode / SKU diperlukan.'
+            ], 400);
+        }
+
+        $branchId = $request->query('branch_id');
+        if (!$branchId && $request->has('rack_token')) {
+            $rackSession = StockOpnameRackSession::with('session')->where('rack_token', $request->query('rack_token'))->first();
+            $branchId = $rackSession?->session?->branch_id;
+        } elseif (!$branchId && $request->has('session_token')) {
+            $session = StockOpnameSession::where('session_token', $request->query('session_token'))->first();
+            $branchId = $session?->branch_id;
         }
 
         $product = \App\Models\Product::where(function ($q) use ($code) {
@@ -453,7 +538,25 @@ class OpnamePublicController extends Controller
         })->first();
 
         if (!$product) {
-            return response()->json(['error' => 'Product not found'], 404);
+            return response()->json([
+                'error'   => 'NOT_FOUND',
+                'message' => "Produk \"{$code}\" tidak ditemukan di sistem master.",
+            ], 404);
+        }
+
+        // Validasi apakah produk terdaftar dan aktif di cabang ini
+        if ($branchId) {
+            $stock = \App\Models\Stock::where('branch_id', $branchId)
+                ->where('product_id', $product->id)
+                ->where('is_active', true)
+                ->first();
+
+            if (!$stock) {
+                return response()->json([
+                    'error'   => 'NOT_IN_BRANCH',
+                    'message' => 'Barang tidak ditemukan di cabang ini, silahkan hubungi administrator.',
+                ], 422);
+            }
         }
 
         return response()->json([

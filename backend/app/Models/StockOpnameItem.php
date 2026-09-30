@@ -15,7 +15,7 @@ class StockOpnameItem extends Model
         'count1_quantity', 'count1_at',
         'count2_quantity', 'count2_at',
         'discrepancy_1_2',
-        'final_quantity', 'final_by', 'final_at', 'final_notes',
+        'final_quantity', 'final_by', 'final_by_name', 'final_at', 'final_notes',
         'status',
     ];
 

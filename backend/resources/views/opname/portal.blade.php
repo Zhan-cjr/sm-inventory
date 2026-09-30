@@ -171,7 +171,7 @@
         @endif
     </div>
 
-    @if(in_array($session->status, ['COUNTING', 'CHECKING']))
+    @if(in_array($session->status, ['COUNTING', 'CHECKING', 'FINAL_CHECK']))
         <div class="divider">Saya adalah</div>
 
         {{-- Penghitung 1: instruksi scan rak --}}
@@ -196,13 +196,30 @@
             </div>
             <span class="role-arrow">›</span>
         </a>
+
+        {{-- Pengecek Final (jika ada selisih) --}}
+        @if($discrepancy > 0 || $session->status === 'FINAL_CHECK')
+        <a href="{{ route('opname.final', $sessionToken) }}" class="role-card final-check" style="border-color: rgba(239,68,68,.3); background: rgba(239,68,68,.04);">
+            <div class="role-header">
+                <div class="role-icon" style="background: rgba(239,68,68,.15); color: #f87171; font-size: 24px;">⚖️</div>
+                <div>
+                    <div class="role-title" style="color: #fca5a5;">Pengecek Final</div>
+                    <div class="role-subtitle">Verifikasi fisik barang yang berselisih (P1 ≠ P2)</div>
+                </div>
+            </div>
+            <div class="role-desc">
+                Terdapat <strong style="color:#f87171">{{ $discrepancy }} item</strong> berselisih.
+                Scan barcode barang di rak untuk membuka kolom input dan masukkan jumlah fisik aktual.
+            </div>
+            <span class="role-arrow" style="color:#f87171;">›</span>
+        </a>
+        @endif
     @endif
 
-    @if(!in_array($session->status, ['COUNTING', 'CHECKING', 'DRAFT']))
+    @if(!in_array($session->status, ['COUNTING', 'CHECKING', 'FINAL_CHECK', 'DRAFT']))
     <div class="info-box">
         ℹ️ Sesi opname ini sudah dalam status
         <strong>{{ match($session->status) {
-            'FINAL_CHECK' => 'Final Check SPV',
             'COMPLETED'   => 'Selesai',
             'CANCELLED'   => 'Dibatalkan',
             default       => $session->status,

@@ -1,482 +1,700 @@
 <x-filament-panels::page>
-<style>
-    /* ===== Final Check Page Styles ===== */
-    .fc-page-wrapper {
-        font-family: 'Inter', sans-serif;
-        max-width: 1100px;
-        margin: 0 auto;
-        padding-bottom: 2rem;
-    }
+<div wire:poll.5s>
+    <style>
+        .fc-container {
+            font-family: inherit;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
 
-    /* Header Banner */
-    .fc-header {
-        background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #2563eb 100%);
-        border-radius: 1.25rem;
-        padding: 1.75rem 2rem;
-        color: white;
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 8px 24px rgba(79, 70, 229, 0.3);
-        position: relative;
-        overflow: hidden;
-    }
-    .fc-header::before {
-        content: '';
-        position: absolute;
-        top: -40px; right: -40px;
-        width: 160px; height: 160px;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.07);
-    }
-    .fc-header::after {
-        content: '';
-        position: absolute;
-        bottom: -60px; right: 100px;
-        width: 120px; height: 120px;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.05);
-    }
-    .fc-header-meta { font-size: 0.85rem; opacity: 0.85; margin-top: 0.35rem; }
-    .fc-header-badge {
-        background: rgba(255,255,255,0.2);
-        border: 1px solid rgba(255,255,255,0.3);
-        border-radius: 9999px;
-        padding: 0.35rem 1rem;
-        font-size: 0.8rem;
-        font-weight: 700;
-        white-space: nowrap;
-        backdrop-filter: blur(4px);
-    }
-    .fc-header-stats {
-        display: flex;
-        gap: 1.5rem;
-        margin-top: 1rem;
-    }
-    .fc-stat {
-        text-align: center;
-    }
-    .fc-stat-val { font-size: 1.75rem; font-weight: 800; line-height: 1; }
-    .fc-stat-label { font-size: 0.7rem; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem; }
+        /* Hero Banner */
+        .fc-banner {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #2563eb 100%);
+            border-radius: 1.25rem;
+            padding: 1.75rem 2rem;
+            color: #ffffff;
+            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .fc-banner::after {
+            content: '';
+            position: absolute;
+            right: -20px;
+            bottom: -30px;
+            width: 180px;
+            height: 180px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .fc-banner-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .fc-banner-meta {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            margin-top: 0.4rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .fc-banner-stats {
+            display: flex;
+            gap: 1rem;
+        }
+        .fc-stat-box {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(8px);
+            border-radius: 0.875rem;
+            padding: 0.6rem 1.2rem;
+            text-align: center;
+            min-width: 90px;
+        }
+        .fc-stat-val {
+            font-size: 1.4rem;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+        .fc-stat-lbl {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            opacity: 0.85;
+            margin-top: 0.2rem;
+        }
 
-    /* Instruction Box */
-    .fc-instruction {
-        background: linear-gradient(135deg, #fef3c7, #fde68a);
-        border: 1px solid #f59e0b;
-        border-radius: 1rem;
-        padding: 1rem 1.5rem;
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: flex-start;
-        gap: 0.75rem;
-    }
-    .dark .fc-instruction {
-        background: linear-gradient(135deg, rgba(120,53,15,0.25), rgba(120,53,15,0.15));
-        border-color: rgba(245,158,11,0.4);
-    }
-    .fc-instruction-icon { font-size: 1.25rem; flex-shrink: 0; margin-top: 0.1rem; }
-    .fc-instruction-text { font-size: 0.875rem; color: #78350f; line-height: 1.6; }
-    .dark .fc-instruction-text { color: #fcd34d; }
+        /* QR Portal Card */
+        .fc-qr-card {
+            background: #ffffff;
+            border: 2px solid #e0e7ff;
+            border-radius: 1.25rem;
+            padding: 1.75rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 2rem;
+            align-items: center;
+        }
+        .dark .fc-qr-card {
+            background: #111827;
+            border-color: #312e81;
+        }
+        @media (max-width: 768px) {
+            .fc-qr-card {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+        .fc-qr-frame {
+            background: #ffffff;
+            padding: 1rem;
+            border-radius: 1rem;
+            border: 2px dashed #6366f1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+            width: fit-content;
+            margin: 0 auto;
+        }
+        .fc-qr-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #eef2ff;
+            color: #4338ca;
+            border: 1px solid #c7d2fe;
+            border-radius: 9999px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+        }
+        .dark .fc-qr-badge {
+            background: #312e81;
+            color: #e0e7ff;
+            border-color: #4338ca;
+        }
+        .fc-qr-info h3 {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .dark .fc-qr-info h3 { color: #f8fafc; }
+        .fc-qr-info p {
+            font-size: 0.875rem;
+            color: #64748b;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+        .dark .fc-qr-info p { color: #94a3b8; }
+        
+        .fc-alert-locked {
+            background: #fffbeb;
+            border: 1px solid #fef3c7;
+            border-left: 4px solid #f59e0b;
+            border-radius: 0.75rem;
+            padding: 0.85rem 1rem;
+            font-size: 0.825rem;
+            color: #92400e;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            line-height: 1.5;
+        }
+        .dark .fc-alert-locked {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: rgba(245, 158, 11, 0.2);
+            color: #fcd34d;
+        }
 
-    /* Product Card */
-    .fc-product-card {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 1.25rem;
-        margin-bottom: 1.5rem;
-        overflow: hidden;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-    }
-    .dark .fc-product-card {
-        background: #0f172a;
-        border-color: #1e293b;
-    }
+        .fc-url-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 1.25rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #334155;
+            word-break: break-all;
+        }
+        .dark .fc-url-box {
+            background: #1e293b;
+            border-color: #334155;
+            color: #cbd5e1;
+        }
 
-    /* Product Card Header */
-    .fc-product-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1.25rem 1.5rem;
-        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-        border-bottom: 1px solid #e2e8f0;
-        gap: 1rem;
-    }
-    .dark .fc-product-header {
-        background: linear-gradient(135deg, #1e293b, #0f172a);
-        border-color: #334155;
-    }
-    .fc-product-name { font-size: 1.0625rem; font-weight: 800; color: #0f172a; }
-    .dark .fc-product-name { color: #f8fafc; }
-    .fc-product-sku { font-size: 0.75rem; color: #64748b; font-family: monospace; margin-top: 0.2rem; }
+        .fc-btn-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .fc-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.75rem;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+            border: none;
+        }
+        .fc-btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+        }
+        .fc-btn-primary:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+        }
+        .fc-btn-secondary {
+            background: #f1f5f9;
+            color: #334155 !important;
+            border: 1px solid #cbd5e1;
+        }
+        .dark .fc-btn-secondary {
+            background: #1e293b;
+            color: #cbd5e1 !important;
+            border-color: #475569;
+        }
+        .fc-btn-secondary:hover {
+            background: #e2e8f0;
+        }
 
-    /* Summary Pills */
-    .fc-summary-pills {
-        display: flex;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-    .fc-pill {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 0.5rem 0.875rem;
-        border-radius: 0.75rem;
-        font-size: 0.7rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        min-width: 68px;
-    }
-    .fc-pill-val { font-size: 1.25rem; font-weight: 800; line-height: 1.1; }
-    .fc-pill-sistem   { background: #eff6ff; color: #1d4ed8; }
-    .fc-pill-p1       { background: #f0fdf4; color: #16a34a; }
-    .fc-pill-p2       { background: #fef3c7; color: #d97706; }
-    .fc-pill-selisih  { background: #fff1f2; color: #be123c; }
-    .dark .fc-pill-sistem  { background: rgba(37,99,235,0.15); color: #93c5fd; }
-    .dark .fc-pill-p1      { background: rgba(22,163,74,0.15); color: #86efac; }
-    .dark .fc-pill-p2      { background: rgba(217,119,6,0.15); color: #fcd34d; }
-    .dark .fc-pill-selisih { background: rgba(190,18,60,0.15); color: #fda4af; }
+        /* Progress Card */
+        .fc-progress-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 1.25rem;
+            padding: 1.25rem 1.75rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        }
+        .dark .fc-progress-card {
+            background: #111827;
+            border-color: #1f2937;
+        }
+        .fc-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .fc-progress-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .dark .fc-progress-title { color: #f8fafc; }
+        .fc-live-pulse {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+            animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .fc-progress-bar-bg {
+            height: 10px;
+            background: #f1f5f9;
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        .dark .fc-progress-bar-bg { background: #1e293b; }
+        .fc-progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            border-radius: 9999px;
+            transition: width 0.4s ease;
+        }
 
-    /* Items Table */
-    .fc-table-wrap { overflow-x: auto; }
-    .fc-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.875rem;
-    }
-    .fc-table thead tr {
-        background: #f8fafc;
-        border-bottom: 2px solid #cbd5e1;
-    }
-    .dark .fc-table thead tr {
-        background: #1e293b;
-        border-color: #334155;
-    }
-    .fc-table th {
-        padding: 0.75rem 1rem;
-        font-size: 0.7rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #64748b;
-        white-space: nowrap;
-    }
-    .fc-table td {
-        padding: 0.875rem 1rem;
-        border-bottom: 1px solid #f1f5f9;
-        vertical-align: middle;
-    }
-    .dark .fc-table td {
-        border-color: #1e293b;
-    }
-    .fc-table tbody tr:last-child td { border-bottom: none; }
-    .fc-table tbody tr:hover { background: rgba(79,70,229,0.025); }
-    .dark .fc-table tbody tr:hover { background: rgba(79,70,229,0.06); }
+        /* Items Monitoring */
+        .fc-product-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 1.25rem;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+            margin-bottom: 1.25rem;
+        }
+        .dark .fc-product-card {
+            background: #111827;
+            border-color: #1f2937;
+        }
+        .fc-product-header {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .dark .fc-product-header {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        .fc-product-name {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .dark .fc-product-name { color: #f8fafc; }
+        .fc-product-meta {
+            font-size: 0.775rem;
+            color: #64748b;
+            margin-top: 0.2rem;
+            display: flex;
+            gap: 0.75rem;
+        }
+        .dark .fc-product-meta { color: #94a3b8; }
+        
+        .fc-pill-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .fc-pill {
+            padding: 0.3rem 0.65rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 60px;
+        }
+        .fc-pill-label { font-size: 0.65rem; opacity: 0.8; text-transform: uppercase; }
+        .fc-pill-system { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+        .fc-pill-p1 { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+        .fc-pill-p2 { background: #fefce8; color: #854d0e; border: 1px solid #fef08a; }
+        .fc-pill-diff { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .dark .fc-pill-system { background: #1e3a8a; color: #bfdbfe; border-color: #1e40af; }
+        .dark .fc-pill-p1 { background: #14532d; color: #bbf7d0; border-color: #166534; }
+        .dark .fc-pill-p2 { background: #713f12; color: #fef08a; border-color: #854d0e; }
+        .dark .fc-pill-diff { background: #7f1d1d; color: #fecaca; border-color: #991b1b; }
 
-    /* Input Final Qty */
-    .fc-input-qty {
-        width: 120px;
-        padding: 0.5rem 0.75rem;
-        border: 2px solid #e2e8f0;
-        border-radius: 0.625rem;
-        font-size: 0.9rem;
-        font-weight: 700;
-        text-align: right;
-        color: #0f172a;
-        background: white;
-        transition: border-color 0.15s, box-shadow 0.15s;
-        -moz-appearance: textfield;
-    }
-    .fc-input-qty:focus {
-        outline: none;
-        border-color: #6366f1;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-    }
-    .dark .fc-input-qty {
-        background: #1e293b;
-        border-color: #334155;
-        color: #f8fafc;
-    }
-    .fc-input-note {
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        border: 1.5px solid #e2e8f0;
-        border-radius: 0.625rem;
-        font-size: 0.8rem;
-        color: #475569;
-        background: white;
-        transition: border-color 0.15s;
-    }
-    .fc-input-note:focus {
-        outline: none;
-        border-color: #6366f1;
-    }
-    .dark .fc-input-note {
-        background: #1e293b;
-        border-color: #334155;
-        color: #e2e8f0;
-    }
+        /* Table inside Product Card */
+        .fc-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .fc-table th {
+            text-align: left;
+            padding: 0.75rem 1.5rem;
+            background: #fafafa;
+            font-size: 0.725rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .dark .fc-table th {
+            background: #182234;
+            border-color: #334155;
+            color: #94a3b8;
+        }
+        .fc-table td {
+            padding: 0.85rem 1.5rem;
+            border-bottom: 1px solid #f1f5f9;
+            color: #334155;
+        }
+        .dark .fc-table td {
+            border-color: #1e293b;
+            color: #cbd5e1;
+        }
+        .fc-table tr:last-child td {
+            border-bottom: none;
+        }
 
-    /* Action Bar */
-    .fc-action-bar {
-        position: sticky;
-        bottom: 1rem;
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 1rem;
-        padding: 1rem 1.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.1);
-        z-index: 20;
-        flex-wrap: wrap;
-    }
-    .dark .fc-action-bar {
-        background: #0f172a;
-        border-color: #1e293b;
-    }
+        .fc-badge-status-pending {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            background: #fffbeb;
+            color: #b45309;
+            border: 1px solid #fde68a;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .dark .fc-badge-status-pending {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+        .fc-badge-status-done {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .dark .fc-badge-status-done {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
 
-    .fc-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.625rem 1.5rem;
-        font-size: 0.875rem;
-        font-weight: 700;
-        border-radius: 0.75rem;
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s;
-        text-decoration: none;
-    }
-    .fc-btn-primary {
-        background: linear-gradient(135deg, #059669, #10b981);
-        color: white;
-        box-shadow: 0 4px 12px rgba(5,150,105,0.3);
-    }
-    .fc-btn-primary:hover { background: linear-gradient(135deg, #047857, #059669); transform: translateY(-1px); }
-    .fc-btn-secondary {
-        background: #f1f5f9;
-        color: #334155;
-        border: 1.5px solid #e2e8f0;
-    }
-    .dark .fc-btn-secondary {
-        background: #1e293b;
-        color: #e2e8f0;
-        border-color: #334155;
-    }
-    .fc-btn-secondary:hover { background: #e2e8f0; }
-    .dark .fc-btn-secondary:hover { background: #334155; }
-    .fc-btn-print {
-        background: linear-gradient(135deg, #0ea5e9, #2563eb);
-        color: white;
-        box-shadow: 0 4px 12px rgba(14,165,233,0.3);
-    }
-    .fc-btn-print:hover { background: linear-gradient(135deg, #0284c7, #1d4ed8); transform: translateY(-1px); }
-
-    /* Empty State */
-    .fc-empty {
-        text-align: center;
-        padding: 4rem 2rem;
-        background: white;
-        border-radius: 1.25rem;
-        border: 1px dashed #cbd5e1;
-    }
-    .dark .fc-empty {
-        background: #0f172a;
-        border-color: #334155;
-    }
-
-    /* Print Styles */
-    @media print {
-        .fc-action-bar, .fc-no-print { display: none !important; }
-        .fc-page-wrapper { max-width: 100%; }
-        .fc-product-card { page-break-inside: avoid; }
-        .fc-header { background: #4f46e5 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        .fc-input-qty, .fc-input-note { border: 1px solid #ccc !important; }
-    }
-</style>
-
-<div class="fc-page-wrapper">
+        /* Bottom Sticky Action Bar */
+        .fc-bottom-bar {
+            position: sticky;
+            bottom: 1rem;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid #cbd5e1;
+            border-radius: 1rem;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            z-index: 30;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .dark .fc-bottom-bar {
+            background: rgba(17, 24, 39, 0.95);
+            border-color: #374151;
+        }
+        .fc-btn-complete {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #ffffff !important;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+        }
+        .fc-btn-complete:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+        }
+    </style>
 
     @php
-        $groups      = $this->getDiscrepancyGrouped();
-        $totalItems  = collect($groups)->sum(fn($g) => count($g['racks']));
-        $totalProds  = count($groups);
-        $session     = $this->record;
+        $session = $this->record;
+        $summary = $this->summary;
+        $grouped = $this->getDiscrepancyGrouped();
+        $finalPortalUrl = $this->finalPortalUrl;
     @endphp
 
-    {{-- ===== Header Banner ===== --}}
-    <div class="fc-header">
+    <div class="fc-container">
+        <!-- 1. HEADER BANNER -->
+        <div class="fc-banner">
+            <div>
+                <h1 class="fc-banner-title">
+                    <span>⚖️</span> Portal & Monitoring Final Check
+                </h1>
+                <div class="fc-banner-meta">
+                    <span><strong>Sesi:</strong> {{ $session->session_number }}</span>
+                    <span><strong>Cabang:</strong> {{ $session->branch?->name }}</span>
+                    <span><strong>Tanggal:</strong> {{ $session->opname_date?->format('d M Y') }}</span>
+                </div>
+            </div>
+            <div class="fc-banner-stats">
+                <div class="fc-stat-box">
+                    <div class="fc-stat-val">{{ $summary['total'] }}</div>
+                    <div class="fc-stat-lbl">Item Selisih</div>
+                </div>
+                <div class="fc-stat-box">
+                    <div class="fc-stat-val" style="color: #6ee7b7;">{{ $summary['verified'] }}</div>
+                    <div class="fc-stat-lbl">Terverifikasi</div>
+                </div>
+                <div class="fc-stat-box">
+                    <div class="fc-stat-val" style="color: #fde68a;">{{ $summary['pending'] }}</div>
+                    <div class="fc-stat-lbl">Menunggu Scan</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. QR PORTAL HERO CARD -->
+        <div class="fc-qr-card">
+            <div class="fc-qr-frame">
+                <span class="fc-qr-badge">📱 SCAN QR DENGAN HP</span>
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ urlencode($finalPortalUrl) }}"
+                     alt="QR Portal Pengecek Final"
+                     width="200"
+                     height="200"
+                     style="display: block; border-radius: 8px;" />
+                <span style="font-size: 0.7rem; color: #64748b; font-weight: 600;">PORTAL PENGECEK FINAL</span>
+            </div>
+
+            <div class="fc-qr-info">
+                <h3><span>📷</span> Portal Mobile Pengecek Final (Wajib Scan Fisik)</h3>
+                <p>
+                    Silakan scan QR code di samping menggunakan smartphone atau perangkat scanner mobile untuk membuka portal Pengecek Final.
+                </p>
+
+                <div class="fc-alert-locked">
+                    <span style="font-size: 1.1rem; flex-shrink: 0;">🔒</span>
+                    <div>
+                        <strong>Pengamanan Validasi Fisik Aktif:</strong>
+                        Input kuantitas final <em>tidak dapat diketik manual di layar admin ini</em> untuk mencegah manipulasi data tanpa melihat barang. 
+                        Pengecek Final <strong>wajib men-scan fisik barcode barang</strong> di lokasi rak melalui portal mobile untuk membuka form input kuantitas.
+                    </div>
+                </div>
+
+                <div class="fc-url-box">
+                    <span style="color: #6366f1;">🔗</span>
+                    <span style="flex: 1;" id="portalUrlText">{{ $finalPortalUrl }}</span>
+                    <button type="button" 
+                            onclick="navigator.clipboard.writeText('{{ $finalPortalUrl }}'); alert('Link portal berhasil disalin!');"
+                            style="background: #e2e8f0; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: 700; color: #334155;">
+                        Salin
+                    </button>
+                </div>
+
+                <div class="fc-btn-group">
+                    <a href="{{ $finalPortalUrl }}" target="_blank" class="fc-btn fc-btn-primary">
+                        <span>📱 Buka Portal di Browser Ini (Tab Baru)</span>
+                    </a>
+                    <a href="{{ route('opname.print-final-check', ['sessionId' => $session->id]) }}" target="_blank" class="fc-btn fc-btn-secondary">
+                        <span>🖨 Cetak Lembar Final Check</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. PROGRESS REAL-TIME CARD -->
+        <div class="fc-progress-card">
+            <div class="fc-progress-header">
+                <div class="fc-progress-title">
+                    <span class="fc-live-pulse"></span>
+                    <span>Monitoring Verifikasi Fisik Lapangan</span>
+                    <span style="font-size: 0.75rem; color: #64748b; font-weight: normal;">(Auto-update setiap 5 detik)</span>
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 800; color: {{ $summary['is_complete'] ? '#059669' : '#4f46e5' }};">
+                    {{ $summary['verified'] }} / {{ $summary['total'] }} Item Selesai ({{ $summary['percent'] }}%)
+                </div>
+            </div>
+            <div class="fc-progress-bar-bg">
+                <div class="fc-progress-bar-fill" style="width: {{ $summary['percent'] }}%;"></div>
+            </div>
+        </div>
+
+        <!-- 4. DAFTAR PRODUK SELISIH & HASIL VERIFIKASI -->
         <div>
-            <div style="font-size:0.75rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem;">Final Check SPV — Stock Opname</div>
-            <h1 style="font-size:1.5rem;font-weight:900;margin:0;line-height:1.2;">{{ $session->session_number }}</h1>
-            <p class="fc-header-meta">
-                🏢 {{ $session->branch?->name }} &nbsp;|&nbsp; 📅 {{ $session->opname_date?->format('d M Y') }}
-            </p>
-            <div class="fc-header-stats">
-                <div class="fc-stat">
-                    <div class="fc-stat-val">{{ $totalProds }}</div>
-                    <div class="fc-stat-label">Produk Selisih</div>
+            <h2 style="font-size: 1.1rem; font-weight: 800; color: #1e293b; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>📋</span> Status Item Selisih Per Rak
+            </h2>
+
+            @forelse($grouped as $product)
+                <div class="fc-product-card">
+                    <div class="fc-product-header">
+                        <div>
+                            <div class="fc-product-name">{{ $product['product_name'] }}</div>
+                            <div class="fc-product-meta">
+                                <span>SKU: <strong>{{ $product['product_sku'] }}</strong></span>
+                                <span>Barcode: <strong>{{ $product['product_barcode'] }}</strong></span>
+                            </div>
+                        </div>
+                        <div class="fc-pill-group">
+                            <div class="fc-pill fc-pill-system">
+                                <span class="fc-pill-label">Sistem</span>
+                                <span>{{ $product['system_qty'] }}</span>
+                            </div>
+                            <div class="fc-pill fc-pill-p1">
+                                <span class="fc-pill-label">Total P1</span>
+                                <span>{{ $product['total_count1'] }}</span>
+                            </div>
+                            <div class="fc-pill fc-pill-p2">
+                                <span class="fc-pill-label">Total P2</span>
+                                <span>{{ $product['total_count2'] }}</span>
+                            </div>
+                            <div class="fc-pill fc-pill-diff">
+                                <span class="fc-pill-label">Selisih</span>
+                                <span>{{ $product['total_count2'] - $product['total_count1'] }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table class="fc-table">
+                        <thead>
+                            <tr>
+                                <th>Rak</th>
+                                <th style="text-align: center;">Hitung P1</th>
+                                <th style="text-align: center;">Cek P2</th>
+                                <th style="text-align: center;">Selisih</th>
+                                <th>Status Verifikasi Fisik (Portal)</th>
+                                <th>Kuantitas Final</th>
+                                <th>Pemeriksa & Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($product['racks'] as $rack)
+                                <tr>
+                                    <td>
+                                        <div style="font-weight: 700; color: #4338ca;">{{ $rack['rack_code'] }}</div>
+                                        <div style="font-size: 0.75rem; color: #64748b;">{{ $rack['rack_name'] }}</div>
+                                    </td>
+                                    <td style="text-align: center; font-weight: 700; color: #166534;">
+                                        {{ $rack['count1_quantity'] }}
+                                    </td>
+                                    <td style="text-align: center; font-weight: 700; color: #854d0e;">
+                                        {{ $rack['count2_quantity'] }}
+                                    </td>
+                                    <td style="text-align: center; font-weight: 700; color: {{ $rack['discrepancy'] != 0 ? '#dc2626' : '#64748b' }};">
+                                        {{ $rack['discrepancy'] > 0 ? '+' : '' }}{{ $rack['discrepancy'] }}
+                                    </td>
+                                    <td>
+                                        @if($rack['status'] === 'FINAL_DONE')
+                                            <span class="fc-badge-status-done">
+                                                <span>✔</span> Terverifikasi Fisik
+                                            </span>
+                                        @else
+                                            <span class="fc-badge-status-pending">
+                                                <span>⏳</span> Menunggu Scan Fisik
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($rack['status'] === 'FINAL_DONE')
+                                            <span style="font-size: 1.1rem; font-weight: 800; color: #059669;">
+                                                {{ $rack['final_quantity'] }}
+                                            </span>
+                                        @else
+                                            <span style="color: #94a3b8; font-style: italic;">(Belum di-scan)</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($rack['status'] === 'FINAL_DONE')
+                                            <div style="font-weight: 600; font-size: 0.8rem; color: #1e293b;">
+                                                {{ $rack['final_by_name'] ?? 'Pemeriksa' }}
+                                                @if($rack['final_at'])
+                                                    <span style="font-size: 0.7rem; color: #64748b; font-weight: normal;">
+                                                        • {{ \Carbon\Carbon::parse($rack['final_at'])->format('H:i') }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            @if($rack['final_notes'])
+                                                <div style="font-size: 0.75rem; color: #475569; margin-top: 2px;">
+                                                    "{{ $rack['final_notes'] }}"
+                                                </div>
+                                            @endif
+                                        @else
+                                            <span style="color: #94a3b8;">-</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-                <div class="fc-stat">
-                    <div class="fc-stat-val">{{ $totalItems }}</div>
-                    <div class="fc-stat-label">Item di Rak</div>
+            @empty
+                <div style="text-align: center; padding: 3rem; background: white; border-radius: 1rem; border: 1px dashed #cbd5e1; color: #64748b;">
+                    <p style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Tidak ada item selisih!</p>
+                    <p style="font-size: 0.85rem;">Hasil hitung pertama dan kedua cocok untuk semua item.</p>
                 </div>
-            </div>
+            @endforelse
         </div>
-        <div>
-            <span class="fc-header-badge">⚠️ Menunggu Verifikasi SPV</span>
-        </div>
-    </div>
 
-    {{-- ===== Instruction Box ===== --}}
-    <div class="fc-instruction">
-        <span class="fc-instruction-icon">📋</span>
-        <div class="fc-instruction-text">
-            <strong>Instruksi SPV:</strong> Di bawah ini adalah produk yang ditemukan <strong>selisih</strong> antara Penghitung 1 dan Pengecek 2.
-            Masukkan <strong>Final Qty (SPV)</strong> — jumlah fisik aktual hasil pengecekan ulang Anda per rak.
-            Setelah semua diisi, klik <strong>"Simpan Final Check"</strong>.
-        </div>
-    </div>
-
-    {{-- ===== Discrepancy Groups ===== --}}
-    @if(count($groups) === 0)
-        <div class="fc-empty">
-            <div style="font-size:2.5rem;margin-bottom:0.75rem;">✅</div>
-            <h3 style="font-size:1.125rem;font-weight:700;color:#0f172a;margin:0 0 0.5rem;">Tidak Ada Selisih</h3>
-            <p style="color:#64748b;font-size:0.875rem;">Semua item antara Penghitung 1 dan Pengecek 2 sudah sesuai.</p>
-            <a href="{{ \App\Filament\Resources\StockOpname\StockOpnameSessionResource::getUrl('view', ['record' => $session]) }}"
-               class="fc-btn fc-btn-secondary" style="margin-top:1.25rem;display:inline-flex;">← Kembali ke Sesi</a>
-        </div>
-    @else
-        @foreach($groups as $group)
-        @php $selisihP1P2 = $group['total_count2'] - $group['total_count1']; @endphp
-        <div class="fc-product-card">
-
-            {{-- Product Header --}}
-            <div class="fc-product-header">
-                <div>
-                    <div class="fc-product-name" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <span>{{ $group['product_name'] }}</span>
-                        @if(!empty($group['is_new_to_branch']))
-                            <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #059669; border-radius: 9999px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
-                                ✨ Baru di Cabang (Auto Ditetapkan)
-                            </span>
-                        @endif
-                    </div>
-                    <div class="fc-product-sku">SKU: {{ $group['product_sku'] }}</div>
-                </div>
-                <div class="fc-summary-pills">
-                    <div class="fc-pill fc-pill-sistem">
-                        <span class="fc-pill-val">{{ number_format($group['system_qty'], 0) }}</span>
-                        <span>Sistem</span>
-                    </div>
-                    <div class="fc-pill fc-pill-p1">
-                        <span class="fc-pill-val">{{ number_format($group['total_count1'], 0) }}</span>
-                        <span>Total P1</span>
-                    </div>
-                    <div class="fc-pill fc-pill-p2">
-                        <span class="fc-pill-val">{{ number_format($group['total_count2'], 0) }}</span>
-                        <span>Total P2</span>
-                    </div>
-                    <div class="fc-pill fc-pill-selisih">
-                        <span class="fc-pill-val">{{ $selisihP1P2 > 0 ? '+' : '' }}{{ number_format($selisihP1P2, 0) }}</span>
-                        <span>Selisih P1↔P2</span>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Items Table --}}
-            <div class="fc-table-wrap">
-                <table class="fc-table">
-                    <thead>
-                        <tr>
-                            <th style="text-align:left;">Rak</th>
-                            <th style="text-align:right;">Hitung P1</th>
-                            <th style="text-align:right;">Cek P2</th>
-                            <th style="text-align:right;">Selisih P1↔P2</th>
-                            <th style="text-align:right;">Final Qty (SPV) *</th>
-                            <th style="text-align:left;min-width:180px;">Catatan (Opsional)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($group['racks'] as $rack)
-                        @php $disc = $rack['discrepancy'] ?? ($rack['count2_quantity'] - $rack['count1_quantity']); @endphp
-                        <tr>
-                            <td>
-                                <span style="font-weight:800;font-size:0.8rem;color:#4f46e5;font-family:monospace;">{{ $rack['rack_code'] }}</span>
-                                @if(!empty($rack['rack_name']))
-                                <br><span style="font-size:0.75rem;color:#94a3b8;">{{ $rack['rack_name'] }}</span>
-                                @endif
-                            </td>
-                            <td style="text-align:right;font-weight:700;color:#16a34a;">{{ number_format($rack['count1_quantity'], 0) }}</td>
-                            <td style="text-align:right;font-weight:700;color:#d97706;">{{ number_format($rack['count2_quantity'], 0) }}</td>
-                            <td style="text-align:right;font-weight:800;{{ $disc != 0 ? 'color:#be123c;' : 'color:#94a3b8;' }}">
-                                {{ $disc > 0 ? '+' : '' }}{{ number_format($disc, 0) }}
-                            </td>
-                            <td style="text-align:right;">
-                                <input
-                                    type="number"
-                                    class="fc-input-qty"
-                                    wire:model.defer="finalQuantities.{{ $rack['item_id'] }}"
-                                    placeholder="{{ number_format($rack['count2_quantity'], 0) }}"
-                                    min="0"
-                                    step="1"
-                                />
-                            </td>
-                            <td>
-                                <input
-                                    type="text"
-                                    class="fc-input-note"
-                                    wire:model.defer="finalNotes.{{ $rack['item_id'] }}"
-                                    placeholder="Opsional..."
-                                />
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-        </div>
-        @endforeach
-
-        {{-- ===== Sticky Action Bar ===== --}}
-        <div class="fc-action-bar fc-no-print">
-            <div style="font-size:0.8rem;color:#64748b;">
-                <strong style="color:#0f172a;" class="dark:text-white">{{ $totalProds }} produk</strong> dengan selisih perlu diverifikasi
-            </div>
-            <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
-                <a href="{{ route('opname.print-final-check', ['sessionId' => $session->id]) }}"
-                   target="_blank"
-                   class="fc-btn fc-btn-print">
-                    🖨️ Cetak Laporan
-                </a>
-                <a href="{{ \App\Filament\Resources\StockOpname\StockOpnameSessionResource::getUrl('view', ['record' => $session]) }}"
+        <!-- 5. BOTTOM ACTION BAR -->
+        <div class="fc-bottom-bar">
+            <div>
+                <a href="{{ \App\Filament\Resources\StockOpname\StockOpnameSessionResource::getUrl('view', ['record' => $session]) }}" 
                    class="fc-btn fc-btn-secondary">
-                    ← Kembali
+                    <span>⬅ Kembali ke Sesi Opname</span>
                 </a>
-                <button type="button" wire:click="saveFinalCheck" class="fc-btn fc-btn-primary">
-                    ✅ Simpan Final Check
-                </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                @if($summary['is_complete'])
+                    <button type="button" 
+                            wire:click="finalizeSession" 
+                            wire:confirm="Semua item telah terverifikasi via scan fisik. Simpan dan selesaikan sesi stok opname sekarang?"
+                            class="fc-btn fc-btn-complete">
+                        <span>✅ Selesaikan Stok Opname Sekarang</span>
+                    </button>
+                @else
+                    <div style="font-size: 0.825rem; color: #b45309; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
+                        <span>⚠️</span>
+                        <span>Masih ada {{ $summary['pending'] }} item yang menunggu scan fisik di portal mobile.</span>
+                    </div>
+                @endif
             </div>
         </div>
-
-        {{-- Print Header (only visible when printing) --}}
-        <div style="display:none;" id="print-footer">
-            <p style="font-size:0.75rem;color:#64748b;text-align:center;margin-top:2rem;">
-                Dicetak dari SM Inventory — {{ $session->session_number }} — {{ now()->format('d M Y H:i') }}
-            </p>
-        </div>
-
-    @endif
+    </div>
 </div>
 </x-filament-panels::page>

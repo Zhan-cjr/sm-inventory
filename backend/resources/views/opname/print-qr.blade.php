@@ -156,6 +156,40 @@
     </div>
 
     <div class="qr-grid">
+        <!-- QR Portal Utama / Pengecek 2 -->
+        <div class="qr-card" style="border: 2px solid #6366f1; background: #faf5ff;">
+            <div class="rack-code" style="color: #6366f1; font-size: 18px;">PORTAL OPNAME</div>
+            <div class="rack-name">Portal Sesi & Pengecek ke-2</div>
+            <div class="scan-label" style="background:#f3e8ff;color:#7e22ce;border-color:#d8b4fe;">📱 SCAN PORTAL</div>
+            <div class="qr-wrap">
+                <div class="qr-inner" style="display: flex; align-items: center; justify-content: center; width: 186px; height: 186px; margin: 0 auto; border-color: #d8b4fe;">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data={{ urlencode(url('/opname/' . $session->session_token)) }}"
+                         alt="QR Portal Sesi"
+                         width="170"
+                         height="170" />
+                </div>
+            </div>
+            <div class="url-text">{{ url('/opname/' . $session->session_token) }}</div>
+            <div class="branch-info">🏪 {{ $session->branch?->name }}</div>
+        </div>
+
+        <!-- QR Pengecek Final -->
+        <div class="qr-card" style="border: 2px solid #ef4444; background: #fff5f5;">
+            <div class="rack-code" style="color: #dc2626; font-size: 18px;">PENGECEK FINAL</div>
+            <div class="rack-name">Verifikasi Item Selisih (Count 3)</div>
+            <div class="scan-label" style="background:#fee2e2;color:#dc2626;border-color:#fca5a5;">⚖️ SCAN FINAL CHECK</div>
+            <div class="qr-wrap">
+                <div class="qr-inner" style="display: flex; align-items: center; justify-content: center; width: 186px; height: 186px; margin: 0 auto; border-color: #fca5a5;">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data={{ urlencode(url('/opname/final/' . $session->session_token)) }}"
+                         alt="QR Pengecek Final"
+                         width="170"
+                         height="170" />
+                </div>
+            </div>
+            <div class="url-text">{{ url('/opname/final/' . $session->session_token) }}</div>
+            <div class="branch-info">🏪 {{ $session->branch?->name }}</div>
+        </div>
+
         @foreach($rackSessions as $rs)
         <div class="qr-card">
             <div class="rack-code">{{ $rs->rack?->rack_code }}</div>

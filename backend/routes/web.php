@@ -102,6 +102,12 @@ Route::prefix('opname')->name('opname.')->middleware('web')->group(function () {
     Route::post('/cek/{sessionToken}/rak/{rackId}', [\App\Http\Controllers\OpnamePublicController::class, 'submitCount2'])
         ->name('cek.submit');
 
+    // Pengecek Final: verifikasi selisih
+    Route::get('/final/{sessionToken}',  [\App\Http\Controllers\OpnamePublicController::class, 'showFinalCheck'])
+        ->name('final');
+    Route::post('/final/{sessionToken}', [\App\Http\Controllers\OpnamePublicController::class, 'submitFinalCheck'])
+        ->name('final.submit');
+
     // Halaman selesai
     Route::get('/selesai', [\App\Http\Controllers\OpnamePublicController::class, 'done'])
         ->name('done');

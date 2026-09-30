@@ -57,10 +57,12 @@
     <p class="subtitle">Hasil hitungan untuk rak <strong style="color:#f1f5f9">{{ $rack_code }}</strong> telah berhasil disimpan dan rak telah dikunci.</p>
     @elseif($role === 'pengecek')
     <p class="subtitle">Hasil pengecekan untuk rak <strong style="color:#f1f5f9">{{ $rack_code }}</strong> telah berhasil disimpan.</p>
+    @elseif($role === 'final')
+    <p class="subtitle">Hasil verifikasi <strong style="color:#f1f5f9">{{ $rack_code }}</strong> telah berhasil disimpan sebagai hasil akhir.</p>
     @endif
 
     <div class="info-box">
-        <div class="lbl">Rak yang diproses</div>
+        <div class="lbl">Aktivitas yang diproses</div>
         <div class="val">{{ $rack_code }}</div>
     </div>
 
@@ -68,6 +70,8 @@
     <p class="note">🎉 Terima kasih! Lanjutkan ke rak berikutnya dengan scan QR rak selanjutnya.</p>
     @elseif($role === 'pengecek' && $next_url)
     <a href="{{ $next_url }}" class="btn btn-purple">🔍 Cek Rak Lainnya</a>
+    @elseif($role === 'final' && $next_url)
+    <a href="{{ $next_url }}" class="btn btn-purple">📋 Kembali ke Daftar Selisih</a>
     @endif
 
     <a href="javascript:window.close()" class="btn btn-gray">Tutup Halaman</a>

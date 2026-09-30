@@ -3,16 +3,15 @@
 namespace App\Filament\Resources\StockOpname\Pages;
 
 use App\Filament\Resources\StockOpname\StockOpnameSessionResource;
+use App\Models\Product;
 use App\Models\Stock;
 use App\Models\StockOpnameItem;
 use App\Models\StockOpnameSession;
-use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class FinalCheckStockOpname extends Page
 {
@@ -20,9 +19,6 @@ class FinalCheckStockOpname extends Page
 
     protected static string $resource = StockOpnameSessionResource::class;
     protected string $view            = 'filament.pages.final-check-stock-opname';
-
-    public array $finalQuantities = [];
-    public array $finalNotes      = [];
 
     public function mount(string|int $record): void
     {
@@ -33,48 +29,38 @@ class FinalCheckStockOpname extends Page
             'items.rackSession.rack',
         ]);
 
-        if ($this->record->status !== 'FINAL_CHECK') {
+        if (!in_array($this->record->status, ['FINAL_CHECK', 'COMPLETED'])) {
             $this->redirect(StockOpnameSessionResource::getUrl('view', ['record' => $this->record]));
             return;
         }
-
-        // Pre-load discrepancy items
-        $discrepancyItems = $this->record->items()->where('status', 'DISCREPANCY')->get();
-        foreach ($discrepancyItems as $item) {
-            $this->finalQuantities[$item->id] = $item->count2_quantity;
-            $this->finalNotes[$item->id]      = '';
-        }
     }
 
-    public function saveFinalCheck(): void
+    public function getFinalPortalUrlProperty(): string
     {
-        $session         = $this->record;
-        $discrepancyItems = $session->items()->where('status', 'DISCREPANCY')->get();
-        $allFilled       = true;
+        return route('opname.final', $this->record->session_token);
+    }
 
-        foreach ($discrepancyItems as $item) {
-            $qty = $this->finalQuantities[$item->id] ?? null;
-            if ($qty === null || $qty === '') {
-                $allFilled = false;
-                break;
-            }
+    /**
+     * Ringkasan status verifikasi final check
+     */
+    public function getSummaryProperty(): array
+    {
+        $items = $this->record->items()
+            ->whereIn('status', ['DISCREPANCY', 'FINAL_DONE'])
+            ->get();
 
-            $item->update([
-                'final_quantity' => (float) $qty,
-                'final_by'       => Auth::id(),
-                'final_at'       => now(),
-                'final_notes'    => $this->finalNotes[$item->id] ?? null,
-                'status'         => 'FINAL_DONE',
-            ]);
-        }
+        $total    = $items->count();
+        $verified = $items->where('status', 'FINAL_DONE')->count();
+        $pending  = $items->where('status', 'DISCREPANCY')->count();
+        $percent  = $total > 0 ? round(($verified / $total) * 100) : 100;
 
-        if (!$allFilled) {
-            Notification::make()->title('Harap isi semua final quantity!')->danger()->send();
-            return;
-        }
-
-        Notification::make()->title('Final check tersimpan. Silakan kembali dan klik "Simpan & Selesaikan".')->success()->send();
-        $this->redirect(StockOpnameSessionResource::getUrl('view', ['record' => $session]));
+        return [
+            'total'       => $total,
+            'verified'    => $verified,
+            'pending'     => $pending,
+            'percent'     => $percent,
+            'is_complete' => $pending === 0 && $total > 0,
+        ];
     }
 
     /**
@@ -83,46 +69,154 @@ class FinalCheckStockOpname extends Page
     public function getDiscrepancyGrouped(): array
     {
         $items = $this->record->items()
-            ->where('status', 'DISCREPANCY')
+            ->whereIn('status', ['DISCREPANCY', 'FINAL_DONE'])
             ->with(['product', 'rackSession.rack'])
             ->get();
-
-        $existingProductIds = Stock::where('branch_id', $this->record->branch_id)
-            ->whereIn('product_id', $items->pluck('product_id')->filter())
-            ->pluck('product_id')
-            ->flip()
-            ->all();
 
         $grouped = [];
         foreach ($items as $item) {
             $pid = $item->product_id;
             if (!isset($grouped[$pid])) {
-                // Hitung total lintas rak untuk produk ini
                 $allItems = $this->record->items()
                     ->where('product_id', $pid)
                     ->get();
 
                 $grouped[$pid] = [
-                    'product_name'     => $item->product?->name,
-                    'product_sku'      => $item->product?->sku,
-                    'is_new_to_branch' => !isset($existingProductIds[$pid]),
-                    'system_qty'       => $item->system_quantity,
-                    'total_count1'     => $allItems->sum('count1_quantity'),
-                    'total_count2'     => $allItems->sum('count2_quantity'),
+                    'product_id'       => $pid,
+                    'product_name'     => $item->product?->name ?? 'Produk #' . $pid,
+                    'product_sku'      => $item->product?->sku ?? '-',
+                    'product_barcode'  => $item->product?->barcode ?? '-',
+                    'system_qty'       => (float) $item->system_quantity,
+                    'total_count1'     => (float) $allItems->sum('count1_quantity'),
+                    'total_count2'     => (float) $allItems->sum('count2_quantity'),
                     'racks'            => [],
                 ];
             }
 
             $grouped[$pid]['racks'][] = [
                 'item_id'         => $item->id,
-                'rack_code'       => $item->rackSession?->rack?->rack_code,
-                'rack_name'       => $item->rackSession?->rack?->rack_name,
-                'count1_quantity' => $item->count1_quantity,
-                'count2_quantity' => $item->count2_quantity,
-                'discrepancy'     => $item->discrepancy_1_2,
+                'rack_code'       => $item->rackSession?->rack?->rack_code ?? '-',
+                'rack_name'       => $item->rackSession?->rack?->rack_name ?? '-',
+                'count1_quantity' => (float) $item->count1_quantity,
+                'count2_quantity' => (float) $item->count2_quantity,
+                'discrepancy'     => (float) $item->discrepancy_1_2,
+                'status'          => $item->status,
+                'final_quantity'  => $item->final_quantity !== null ? (float) $item->final_quantity : null,
+                'final_by_name'   => $item->final_by_name,
+                'final_at'        => $item->final_at,
+                'final_notes'     => $item->final_notes,
             ];
         }
 
         return array_values($grouped);
+    }
+
+    /**
+     * Selesaikan sesi stok opname setelah semua item selisih diverifikasi di portal fisik
+     */
+    public function finalizeSession(): void
+    {
+        $session = $this->record;
+
+        $pending = $session->items()->where('status', 'DISCREPANCY')->count();
+        if ($pending > 0) {
+            Notification::make()
+                ->title("Masih ada {$pending} item selisih yang belum diverifikasi di portal fisik!")
+                ->danger()
+                ->send();
+            return;
+        }
+
+        DB::transaction(function () use ($session) {
+            $productSummary = $session->getProductSummary();
+
+            foreach ($productSummary as $summary) {
+                $productId = $summary['product_id'];
+                if (!$productId) continue;
+
+                $effectiveQty = isset($summary['effective_qty'])
+                    ? (float) $summary['effective_qty']
+                    : (($summary['total_final'] > 0) ? (float) $summary['total_final'] : (float) $summary['total_count2']);
+
+                $stock = Stock::where('branch_id', $session->branch_id)
+                    ->where('product_id', $productId)
+                    ->first();
+
+                if (!$stock) {
+                    $product = Product::find($productId);
+                    if (!$product) continue;
+
+                    $stock = Stock::create([
+                        'branch_id'             => $session->branch_id,
+                        'product_id'            => $productId,
+                        'cost_price'            => $product->cost_price ?? 0,
+                        'cost_price_tax'        => $product->cost_price_tax ?? 0,
+                        'selling_price'         => $product->selling_price ?? 0,
+                        'margin_gol_1'          => $product->margin_gol_1,
+                        'harga_jual_1'          => $product->harga_jual_1,
+                        'qty_min_gol_1'         => $product->qty_min_gol_1 ?? 1,
+                        'margin_gol_2'          => $product->margin_gol_2,
+                        'harga_jual_2'          => $product->harga_jual_2,
+                        'qty_min_gol_2'         => $product->qty_min_gol_2,
+                        'margin_gol_3'          => $product->margin_gol_3,
+                        'harga_jual_3'          => $product->harga_jual_3,
+                        'qty_min_gol_3'         => $product->qty_min_gol_3,
+                        'quantity_on_hand'      => 0,
+                        'is_active'             => true,
+                        'min_qty'               => 3,
+                        'max_qty'               => 15,
+                        'version'               => 1,
+                    ]);
+                }
+
+                $before = (float) $stock->quantity_on_hand;
+
+                $stock->log_type           = $effectiveQty >= $before ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
+                $stock->reason_code        = 'STOCK_OPNAME';
+                $stock->reference_doc_type = 'STOCK_OPNAME';
+                $stock->reference_doc_id   = $session->id;
+                $stock->notes              = "Hasil Stok Opname {$session->session_number}";
+                $stock->recorded_by        = Auth::id();
+
+                $stock->update([
+                    'quantity_on_hand' => $effectiveQty,
+                    'last_count_date'  => $session->opname_date,
+                ]);
+            }
+
+            $session->update([
+                'status'       => 'COMPLETED',
+                'approved_by'  => Auth::id(),
+                'completed_at' => now(),
+            ]);
+
+            // Assign products to their scanned racks
+            $scannedItems = $session->items()->with('rackSession.rack')->get();
+            foreach ($scannedItems as $item) {
+                if ($item->rackSession && $item->rackSession->rack) {
+                    $rack = $item->rackSession->rack;
+                    if ($rack->rack_code === 'ALL-RACK') continue;
+
+                    $stock = Stock::where('branch_id', $session->branch_id)
+                        ->where('product_id', $item->product_id)
+                        ->first();
+                        
+                    if ($stock) {
+                        $stock->racks()->syncWithoutDetaching([$rack->id]);
+                    }
+                }
+            }
+            
+            // Catat jurnal akuntansi Stok Opname
+            $accountingService = new \App\Services\AccountingService();
+            $accountingService->recordStockOpnameJournal($session);
+        });
+
+        Notification::make()
+            ->title('Stok opname berhasil diselesaikan! Stok fisik telah diperbarui.')
+            ->success()
+            ->send();
+
+        $this->redirect(StockOpnameSessionResource::getUrl('view', ['record' => $session]));
     }
 }

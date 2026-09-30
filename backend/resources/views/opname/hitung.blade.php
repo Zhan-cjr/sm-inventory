@@ -241,18 +241,27 @@
 
         <!-- Daftar Produk -->
         <div class="card">
-            <div class="card-title">Daftar Produk — {{ $items->count() }} item</div>
+            <div class="card-title">Daftar Scan Hasil Hitung</div>
 
             <div class="search-row">
                 <input type="text" class="search-input" id="search-product"
-                       placeholder="🔍 Cari nama / SKU / barcode..." autocomplete="off">
+                       placeholder="🔍 Cari nama / SKU / barcode untuk tambah..." autocomplete="off">
                 <button type="button" class="scan-btn" onclick="openScanModal()">📷 Scan</button>
             </div>
-            <div class="item-count" id="item-count">Menampilkan {{ $items->count() }} produk</div>
+            <div class="item-count" id="item-count">0 produk di-scan</div>
+
+            <!-- Empty State Placeholder -->
+            <div id="empty-cart-state" class="empty-state" style="padding: 30px 20px; text-align: center; color: var(--muted); border: 2px dashed rgba(255,255,255,.07); border-radius: 14px; margin-bottom: 10px;">
+                <div style="font-size: 32px; margin-bottom: 10px;">📦</div>
+                <h4 style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px;">Belum Ada Produk Yang Di-scan</h4>
+                <p style="font-size: 12px; line-height: 1.5; color: var(--muted);">Gunakan tombol <strong>📷 Scan Barcode</strong> atau ketik pencarian di atas untuk memasukkan produk ke daftar hitung.</p>
+            </div>
 
             <div class="product-list" id="product-list">
                 @foreach($items as $item)
                 <div class="product-item"
+                     style="display: none;"
+                     data-scanned="false"
                      data-name="{{ strtolower($item->product?->name) }}"
                      data-sku="{{ strtolower($item->product?->sku) }}"
                      data-barcode="{{ strtolower($item->product?->barcode ?? '') }}"
@@ -317,8 +326,19 @@
             <span class="modal-title">⚠️ Barang Belum Di-scan</span>
             <button class="modal-close" onclick="closeReviewModal()" type="button">✕</button>
         </div>
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5;">
-            Terdapat produk yang dibiarkan kosong (tidak di-scan). Tentukan status barang tersebut di rak ini:
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.5;">
+            Terdapat produk bawaan rak yang belum di-scan. Tentukan status barang tersebut di rak ini:
+        </div>
+        <!-- Quick Action Buttons -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
+            <button type="button" onclick="markAllReview('zero')"
+                    style="flex: 1; min-width: 130px; background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.3); color: #93c5fd; border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer;">
+                🔵 Tandai Semua Stok 0
+            </button>
+            <button type="button" onclick="markAllReview('remove')"
+                    style="flex: 1; min-width: 130px; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); color: #fca5a5; border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer;">
+                ⚪ Tandai Semua Pindah Rak
+            </button>
         </div>
         <div id="review-list" style="overflow-y: auto; flex: 1; padding-right: 5px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
             <!-- Injected via JS -->
@@ -344,7 +364,7 @@
         };
         
         document.querySelectorAll('.product-item').forEach(el => {
-            if (el.style.display !== 'none') {
+            if (el.dataset.scanned === "true" || el.style.display !== 'none') {
                 const qtyInput = el.querySelector('.qty-input');
                 if (qtyInput && qtyInput.value !== '') {
                     state.items.push({
@@ -383,6 +403,7 @@
                         div.dataset.name = item.name;
                         div.dataset.sku = item.sku;
                         div.dataset.barcode = item.barcode;
+                        div.dataset.scanned = "true";
                         div.innerHTML = `
                             <div>
                                 <div class="product-name">${item.rawName}</div>
@@ -405,17 +426,19 @@
                         newInput.addEventListener('input', saveDraft);
                     } else {
                         existing.value = item.qty;
+                        markAsScanned(existing.closest('.product-item'));
                     }
                 } else {
                     const inp = document.querySelector(`input[name="quantities[${item.id}]"]`);
-                    if (inp) inp.value = item.qty;
+                    if (inp) {
+                        inp.value = item.qty;
+                        markAsScanned(inp.closest('.product-item'));
+                    }
                 }
             });
             
             productList = document.querySelectorAll('#product-list .product-item');
-            const countEl = document.getElementById('item-count');
-            let visibleCount = Array.from(productList).filter(e => e.style.display !== 'none').length;
-            if (countEl) countEl.textContent = `Menampilkan ${visibleCount} produk`;
+            filterProducts('');
         } catch(e) {
             console.error("Gagal meload draft", e);
         }
@@ -424,20 +447,50 @@
     // ─── Search filter ───
     const searchInput = document.getElementById('search-product');
     let productList = document.querySelectorAll('#product-list .product-item');
-    const countEl     = document.getElementById('item-count');
+    const countEl = document.getElementById('item-count');
+    const emptyStateEl = document.getElementById('empty-cart-state');
+
+    function markAsScanned(el) {
+        if (!el) return;
+        el.dataset.scanned = "true";
+        if (emptyStateEl) emptyStateEl.style.display = 'none';
+    }
 
     function filterProducts(q) {
         q = q.toLowerCase().trim();
         let visible = 0;
+        let scannedCount = 0;
+        productList = document.querySelectorAll('#product-list .product-item');
+
         productList.forEach(el => {
-            const match = !q
-                || el.dataset.name.includes(q)
-                || el.dataset.sku.includes(q)
-                || el.dataset.barcode.includes(q);
-            el.style.display = match ? '' : 'none';
-            if (match) visible++;
+            const isScanned = el.dataset.scanned === "true";
+            if (isScanned) scannedCount++;
+
+            if (!q) {
+                // If search is empty, show ONLY already scanned items
+                const show = isScanned;
+                el.style.display = show ? 'grid' : 'none';
+                if (show) visible++;
+            } else {
+                // If search has query, show items matching query
+                const match = el.dataset.name.includes(q)
+                    || el.dataset.sku.includes(q)
+                    || (el.dataset.barcode && el.dataset.barcode.includes(q))
+                    || (el.dataset.additionalBarcodes && el.dataset.additionalBarcodes.includes(q));
+                
+                el.style.display = match ? 'grid' : 'none';
+                if (match) visible++;
+            }
         });
-        countEl.textContent = `Menampilkan ${visible} produk`;
+
+        // Update counts
+        if (!q) {
+            countEl.textContent = `${scannedCount} produk di-scan`;
+            if (emptyStateEl) emptyStateEl.style.display = (scannedCount === 0) ? 'block' : 'none';
+        } else {
+            countEl.textContent = `Menampilkan ${visible} hasil pencarian`;
+            if (emptyStateEl) emptyStateEl.style.display = 'none';
+        }
     }
     searchInput.addEventListener('input', () => filterProducts(searchInput.value));
 
@@ -472,18 +525,31 @@
     let unscannedItems = [];
     
     document.getElementById('count-form').addEventListener('submit', function(e) {
-        const allInputs = document.querySelectorAll('.qty-input');
+        let hasEmptyScanned = false;
+        let scannedItems = document.querySelectorAll('.product-item[data-scanned="true"]');
+        let unscannedDomItems = document.querySelectorAll('.product-item[data-scanned="false"]');
         unscannedItems = [];
         
-        allInputs.forEach(inp => {
-            const itemDiv = inp.closest('.product-item');
-            if (itemDiv.style.display !== 'none' && inp.value === '') {
-                unscannedItems.push({
-                    id: itemDiv.dataset.itemId || inp.name.match(/\[(.*?)\]/)[1],
-                    name: itemDiv.querySelector('.product-name').textContent,
-                    input: inp
-                });
+        scannedItems.forEach(item => {
+            const inp = item.querySelector('.qty-input');
+            if (inp && (inp.value === '' || inp.value === null)) {
+                hasEmptyScanned = true;
             }
+        });
+
+        if (hasEmptyScanned) {
+            alert('Harap isi kuantitas untuk semua produk yang telah di-scan!');
+            e.preventDefault();
+            return;
+        }
+
+        unscannedDomItems.forEach(itemDiv => {
+            const inp = itemDiv.querySelector('.qty-input');
+            unscannedItems.push({
+                id: itemDiv.dataset.itemId || (inp && inp.name.match(/\[(.*?)\]/) ? inp.name.match(/\[(.*?)\]/)[1] : null),
+                name: itemDiv.querySelector('.product-name').textContent,
+                input: inp
+            });
         });
         
         if (unscannedItems.length > 0) {
@@ -508,16 +574,11 @@
         listEl.innerHTML = '';
         
         unscannedItems.forEach((item, index) => {
-            const isNewQty = item.input.name.includes('new_quantities');
-            const hiddenInputs = isNewQty 
-                ? '' 
-                : `<input type="radio" name="review_action_${item.id}" value="remove" id="ra_rem_${item.id}" style="accent-color: #ef4444;">
-                   <label for="ra_rem_${item.id}" style="font-size: 13px; cursor: pointer; color: #fca5a5;">Keluarkan dari Rak</label>`;
-                   
+            const isNewQty = item.input && item.input.name.includes('new_quantities');
             listEl.innerHTML += `
                 <div style="background: var(--surface); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
                     <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">${item.name}</div>
-                    <div style="display: flex; gap: 16px; align-items: center;">
+                    <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
                         <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                             <input type="radio" name="review_action_${item.id}" value="zero" checked style="accent-color: var(--blue);">
                             <span style="font-size: 13px;">Stok 0 (Habis)</span>
@@ -525,7 +586,7 @@
                         ${isNewQty ? '' : `
                         <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
                             <input type="radio" name="review_action_${item.id}" value="remove" style="accent-color: #ef4444;">
-                            <span style="font-size: 13px; color: #fca5a5;">Bukan di Rak Ini (Hapus)</span>
+                            <span style="font-size: 13px; color: #fca5a5;">Bukan di Rak Ini (Keluarkan)</span>
                         </label>`}
                     </div>
                 </div>
@@ -533,11 +594,19 @@
         });
         
         document.getElementById('review-modal').classList.add('open');
-    }
+    };
     
     window.closeReviewModal = function() {
         document.getElementById('review-modal').classList.remove('open');
-    }
+    };
+
+    window.markAllReview = function(action) {
+        document.querySelectorAll('#review-list input[type="radio"]').forEach(r => {
+            if (r.value === action) {
+                r.checked = true;
+            }
+        });
+    };
     
     window.confirmReviewAndSubmit = function() {
         const form = document.getElementById('count-form');
@@ -546,11 +615,11 @@
         document.querySelectorAll('.remove-rack-input').forEach(el => el.remove());
         
         unscannedItems.forEach(item => {
-            const action = document.querySelector(`input[name="review_action_${item.id}"]:checked`).value;
+            const checkedRadio = document.querySelector(`input[name="review_action_${item.id}"]:checked`);
+            const action = checkedRadio ? checkedRadio.value : 'zero';
             if (action === 'zero') {
-                item.input.value = '0';
+                if (item.input) item.input.value = '0';
             } else if (action === 'remove') {
-                // We add a hidden input array remove_from_rack[]
                 const hidden = document.createElement('input');
                 hidden.type = 'hidden';
                 hidden.name = 'remove_from_rack[]';
@@ -558,14 +627,13 @@
                 hidden.className = 'remove-rack-input';
                 form.appendChild(hidden);
                 
-                // Set qty to 0 just in case to pass validation
-                item.input.value = '0';
+                if (item.input) item.input.value = '0';
             }
         });
         
         closeReviewModal();
         proceedSubmit();
-    }
+    };
 
     // ─── Barcode scan & highlight logic ───
     let isProcessingScan = false;
@@ -578,8 +646,8 @@
         const status = document.getElementById('scan-status');
         let found = null;
 
+        productList = document.querySelectorAll('#product-list .product-item');
         found = [...productList].find(el => {
-            if (el.style.display === 'none') return false;
             const bc = (el.dataset.barcode || '').toLowerCase();
             const sku = (el.dataset.sku || '').toLowerCase();
             const addBc = (el.dataset.additionalBarcodes || '').toLowerCase().split(',').map(s => s.trim());
@@ -595,62 +663,64 @@
             status.className = 'scan-status';
             status.textContent = 'Mencari produk di server...';
             
-            fetch(`{{ route('opname.search-product') }}?code=${encodeURIComponent(code)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
+            fetch(`{{ route('opname.search-product') }}?code=${encodeURIComponent(code)}&rack_token={{ $rackSession->rack_token }}`)
+                .then(async res => {
+                    const data = await res.json();
+                    if (!res.ok || data.error) {
                         status.className = 'scan-status notfound';
-                        status.textContent = `❌ Produk "${code}" tidak ditemukan di server.`;
+                        const errMsg = data.message || `Produk "${code}" tidak ditemukan di server.`;
+                        status.textContent = `❌ ${errMsg}`;
                         if (!document.getElementById('scan-modal').classList.contains('open')) {
-                            alert(`❌ Produk "${code}" tidak ditemukan di server.`);
+                            alert(`❌ ${errMsg}`);
                             searchInput.select();
                         }
                         isProcessingScan = false;
-                    } else {
-                        // Create new product item in DOM
-                        const list = document.getElementById('product-list');
-                        const div = document.createElement('div');
-                        div.className = 'product-item';
-                        div.dataset.name = data.name.toLowerCase();
-                        div.dataset.sku = data.sku.toLowerCase();
-                        div.dataset.barcode = data.barcode ? data.barcode.toLowerCase() : '';
-                        
-                        const meta = `SKU: ${data.sku}` + 
-                                     (data.barcode ? ` &nbsp;&middot;&nbsp; Barcode: ${data.barcode}` : '') +
-                                     (data.category_name ? ` &nbsp;&middot;&nbsp; ${data.category_name}` : '');
-                                     
-                        div.innerHTML = `
-                            <div>
-                                <div class="product-name">${data.name} <span style="color:#10b981;font-size:10px;">(BARU)</span></div>
-                                <div class="product-meta">${meta}</div>
-                            </div>
-                            <input type="number" name="new_quantities[${data.id}]"
-                                   class="qty-input" placeholder="0" min="0" step="1" inputmode="numeric">
-                        `;
-                        
-                        list.insertBefore(div, list.firstChild); // prepend to top
-                        
-                        // Update lists
-                        productList = document.querySelectorAll('#product-list .product-item');
-                        const countEl = document.getElementById('item-count');
-                        let visibleCount = Array.from(productList).filter(e => e.style.display !== 'none').length;
-                        countEl.textContent = `Menampilkan ${visibleCount} produk`;
-                        
-                        // Handle enter key for new input
-                        const newInput = div.querySelector('.qty-input');
-                        newInput.addEventListener('input', saveDraft); // Auto-save new input
-                        newInput.addEventListener('keydown', e => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const searchInp = document.getElementById('search-product');
-                                searchInp.value = '';
-                                filterProducts('');
-                                searchInp.focus();
-                            }
-                        });
-                        
-                        highlightAndFocus(div, status, code);
+                        return;
                     }
+
+                    // Create new product item in DOM
+                    const list = document.getElementById('product-list');
+                    const div = document.createElement('div');
+                    div.className = 'product-item';
+                    div.dataset.name = data.name.toLowerCase();
+                    div.dataset.sku = data.sku.toLowerCase();
+                    div.dataset.barcode = data.barcode ? data.barcode.toLowerCase() : '';
+                    div.dataset.scanned = "false";
+                    
+                    const meta = `SKU: ${data.sku}` + 
+                                 (data.barcode ? ` &nbsp;&middot;&nbsp; Barcode: ${data.barcode}` : '') +
+                                 (data.category_name ? ` &nbsp;&middot;&nbsp; ${data.category_name}` : '');
+                                 
+                    div.innerHTML = `
+                        <div>
+                            <div class="product-name">${data.name} <span style="color:#10b981;font-size:10px;">(BARU)</span></div>
+                            <div class="product-meta">${meta}</div>
+                        </div>
+                        <input type="number" name="new_quantities[${data.id}]"
+                               class="qty-input" placeholder="0" min="0" step="1" inputmode="numeric">
+                    `;
+                    
+                    list.insertBefore(div, list.firstChild); // prepend to top
+                    
+                    // Update lists
+                    productList = document.querySelectorAll('#product-list .product-item');
+                    
+                    // Bind events for new input
+                    const newInput = div.querySelector('.qty-input');
+                    newInput.addEventListener('input', () => { markAsScanned(div); saveDraft(); });
+                    newInput.addEventListener('focus', () => markAsScanned(div));
+                    newInput.addEventListener('keydown', e => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const searchInp = document.getElementById('search-product');
+                            searchInp.value = '';
+                            filterProducts('');
+                            searchInp.focus();
+                        }
+                    });
+                    
+                    markAsScanned(div);
+                    highlightAndFocus(div, status, code);
                 })
                 .catch(err => {
                     status.className = 'scan-status notfound';
@@ -665,11 +735,12 @@
     }
 
     function highlightAndFocus(found, status, code) {
-        // Reset all highlight classes
-        productList = document.querySelectorAll('#product-list .product-item');
-        productList.forEach(el => el.classList.remove('scan-match', 'highlighted'));
+        markAsScanned(found);
 
-        // Scroll into view & highlight
+        // Reset search view to only show scanned items including the new one
+        searchInput.value = '';
+        filterProducts('');
+
         found.classList.add('scan-match');
         found.scrollIntoView({ behavior: 'smooth', block: 'center' });
         
