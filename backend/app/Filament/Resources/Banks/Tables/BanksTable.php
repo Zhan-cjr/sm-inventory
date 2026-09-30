@@ -19,10 +19,27 @@ class BanksTable
                     ->label('ID')
                     ->searchable(),
                 TextColumn::make('name')
+                    ->label('Nama Bank / Metode')
                     ->searchable(),
                 TextColumn::make('code')
+                    ->label('Kode')
                     ->searchable(),
+                TextColumn::make('type')
+                    ->label('Tipe')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'QRIS'     => 'success',
+                        'EDC'      => 'info',
+                        'TRANSFER' => 'warning',
+                        default    => 'gray',
+                    })
+                    ->sortable(),
+                TextColumn::make('min_transaction_amount')
+                    ->label('Min. Transaksi')
+                    ->money('IDR', locale: 'id')
+                    ->sortable(),
                 IconColumn::make('is_active')
+                    ->label('Aktif')
                     ->boolean(),
                 TextColumn::make('created_at')
                     ->dateTime()

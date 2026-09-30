@@ -9,6 +9,7 @@ use App\Models\Stock;
 use App\Models\InventoryLog;
 use App\Models\StockBatch;
 use App\Models\StockBatchDeduction;
+use App\Models\Bank;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
@@ -75,6 +76,29 @@ class TransactionController extends Controller
                 } else if (is_array($requestPayments) && count($requestPayments) === 1) {
                     $paymentMethod = $requestPayments[0]['method'];
                     $paymentDetails = $requestPayments;
+                }
+
+                // Validasi minimal transaksi bank / QRIS
+                $bankId = $request->input('bankId') ?? $request->input('bank_id');
+                if ($bankId) {
+                    $bank = Bank::find($bankId);
+                    if ($bank && $bank->min_transaction_amount > 0) {
+                        $paidForBank = (float) ($request->input('receivedAmount') ?? $request->input('received_amount') ?? $validated['final_amount']);
+                        if ($paidForBank < (float) $bank->min_transaction_amount) {
+                            throw new \Exception("Nominal pembayaran via {$bank->name} minimal Rp " . number_format($bank->min_transaction_amount, 0, ',', '.') . "!");
+                        }
+                    }
+                }
+                if (is_array($requestPayments)) {
+                    foreach ($requestPayments as $p) {
+                        $pBankId = $p['bankId'] ?? $p['bank_id'] ?? null;
+                        if (!empty($pBankId)) {
+                            $bank = Bank::find($pBankId);
+                            if ($bank && $bank->min_transaction_amount > 0 && ((float) ($p['amount'] ?? 0)) < (float) $bank->min_transaction_amount) {
+                                throw new \Exception("Nominal porsi pembayaran via {$bank->name} minimal Rp " . number_format($bank->min_transaction_amount, 0, ',', '.') . "!");
+                            }
+                        }
+                    }
                 }
 
                 $transaction = Transaction::create([

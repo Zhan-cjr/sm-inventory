@@ -2797,24 +2797,35 @@ export const POSTransaction = ({
       )}
 
       {/* Bank Selection Modal */}
+      {/* Bank Selection Modal */}
       {isBankSelectOpen && (
         <div className="change-modal-overlay">
           <div className="change-modal-content bank-select-card fade-in">
             <CreditCard size={48} className="text-primary" />
-            <h2>Pilih Bank / Mesin EDC</h2>
+            <h2>Pilih Bank / Mesin EDC / QRIS</h2>
             <div className="bank-grid-large">
-              {banks.map(bank => (
-                <button key={bank.id} className="bank-item-btn" onClick={() => {
-                  setSelectedBank(bank);
-                  const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-                  setDirectCardInput(sisa !== 0 ? formatThousandSeparator(sisa) : '');
-                  setIsBankSelectOpen(false);
-                  setIsDirectCardAmountModalOpen(true);
-                }}>
-                  <span className="bank-name">{bank.name}</span>
-                  <span className="bank-code">{bank.code || 'EDC'}</span>
-                </button>
-              ))}
+              {banks.map(bank => {
+                const minReq = parseFloat(bank.min_transaction_amount) || (bank.type === 'QRIS' ? 20000 : 50000);
+                return (
+                  <button key={bank.id} className="bank-item-btn" onClick={() => {
+                    setSelectedBank(bank);
+                    const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
+                    setDirectCardInput(sisa !== 0 ? formatThousandSeparator(sisa) : '');
+                    setIsBankSelectOpen(false);
+                    setIsDirectCardAmountModalOpen(true);
+                  }}>
+                    <span className="bank-name">{bank.name}</span>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <span className={`bank-type-badge ${bank.type === 'QRIS' ? 'qris' : (bank.type === 'TRANSFER' ? 'transfer' : 'edc')}`}>
+                        {bank.type || 'EDC'}
+                      </span>
+                      <span className="bank-min-badge">
+                        Min. {formatCurrency(minReq)}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
             <button className="btn-secondary" onClick={() => setIsBankSelectOpen(false)}>BATAL (ESC)</button>
           </div>
@@ -2826,18 +2837,48 @@ export const POSTransaction = ({
         <div className="change-modal-overlay">
           <div className="change-modal-content bank-select-card fade-in">
             <CreditCard size={48} className="text-primary" />
-            <h2>Pilih Bank / Mesin EDC (Multi Payment)</h2>
+            <h2>Pilih Bank / Mesin EDC / QRIS (Multi Payment)</h2>
+            <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem', textAlign: 'center' }}>
+              Porsi Nominal yang Digesek: <strong style={{ color: '#2563eb' }}>{formatCurrency(pendingCardAmount)}</strong>
+            </p>
             <div className="bank-grid-large">
-              {banks.map(bank => (
-                <button key={bank.id} className="bank-item-btn" onClick={() => {
-                  setPayments([...payments, { method: 'CARD', amount: pendingCardAmount, bankId: bank.id, label: `Card: ${bank.name}` }]);
-                  setIsMultiBankSelectOpen(false);
-                  setIsMultiPaymentModalOpen(true);
-                }}>
-                  <span className="bank-name">{bank.name}</span>
-                  <span className="bank-code">{bank.code || 'EDC'}</span>
-                </button>
-              ))}
+              {banks.map(bank => {
+                const minReq = parseFloat(bank.min_transaction_amount) || (bank.type === 'QRIS' ? 20000 : 50000);
+                const isBelowMin = pendingCardAmount < minReq;
+                return (
+                  <button key={bank.id} 
+                          className="bank-item-btn" 
+                          style={isBelowMin ? { opacity: 0.7, borderColor: 'rgba(239, 68, 68, 0.4)' } : {}}
+                          onClick={() => {
+                            if (isBelowMin) {
+                              setAlertMsg({
+                                text: `Nominal porsi pembayaran ${bank.name} minimal ${formatCurrency(minReq)}! (Diinput: ${formatCurrency(pendingCardAmount)})`,
+                                type: 'error'
+                              });
+                              setTimeout(() => setAlertMsg(null), 4000);
+                              return;
+                            }
+                            setPayments([...payments, { 
+                              method: 'CARD', 
+                              amount: pendingCardAmount, 
+                              bankId: bank.id, 
+                              label: `${bank.type === 'QRIS' ? 'QRIS' : 'Card'}: ${bank.name}` 
+                            }]);
+                            setIsMultiBankSelectOpen(false);
+                            setIsMultiPaymentModalOpen(true);
+                          }}>
+                    <span className="bank-name">{bank.name}</span>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <span className={`bank-type-badge ${bank.type === 'QRIS' ? 'qris' : (bank.type === 'TRANSFER' ? 'transfer' : 'edc')}`}>
+                        {bank.type || 'EDC'}
+                      </span>
+                      <span className="bank-min-badge" style={isBelowMin ? { color: '#ef4444', borderColor: 'rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.1)' } : {}}>
+                        Min. {formatCurrency(minReq)}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
             <button className="btn-secondary" onClick={() => { setIsMultiBankSelectOpen(false); setIsMultiPaymentModalOpen(true); }}>BATAL (ESC)</button>
           </div>
@@ -3352,7 +3393,20 @@ export const POSTransaction = ({
       {isDirectCardAmountModalOpen && (
         <div className="change-modal-overlay">
           <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Nominal Pembayaran {selectedBank?.name}</h3>
+            <h3 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>Nominal Pembayaran {selectedBank?.name}</h3>
+            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+              <span style={{ 
+                fontSize: '0.75rem', 
+                fontWeight: '700', 
+                color: '#f59e0b', 
+                background: 'rgba(245,158,11,0.12)', 
+                border: '1px solid rgba(245,158,11,0.3)',
+                padding: '3px 10px', 
+                borderRadius: '6px' 
+              }}>
+                Minimal Transaksi: {formatCurrency(parseFloat(selectedBank?.min_transaction_amount) || (selectedBank?.type === 'QRIS' ? 20000 : 50000))}
+              </span>
+            </div>
             <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
               Sisa Tagihan: {formatCurrency(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0))}
             </p>
@@ -3368,6 +3422,15 @@ export const POSTransaction = ({
                 if (e.key === 'Enter') {
                   const val = parseFloat(directCardInput.replace(/\./g, ''));
                   if (!isNaN(val) && val !== 0) {
+                    const minRequired = parseFloat(selectedBank?.min_transaction_amount) || (selectedBank?.type === 'QRIS' ? 20000 : 50000);
+                    if (val < minRequired) {
+                      setAlertMsg({
+                        text: `Nominal pembayaran via ${selectedBank?.name || 'Bank'} minimal ${formatCurrency(minRequired)}! (Diinput: ${formatCurrency(val)})`,
+                        type: 'error'
+                      });
+                      setTimeout(() => setAlertMsg(null), 4000);
+                      return;
+                    }
                     setIsDirectCardAmountModalOpen(false);
                     processTransaction('CARD', selectedBank?.id, val);
                   }
@@ -3384,6 +3447,15 @@ export const POSTransaction = ({
               <button className="btn-success" style={{ flex: 1 }} onClick={() => {
                 const val = parseFloat(directCardInput.replace(/\./g, ''));
                 if (!isNaN(val) && val !== 0) {
+                  const minRequired = parseFloat(selectedBank?.min_transaction_amount) || (selectedBank?.type === 'QRIS' ? 20000 : 50000);
+                  if (val < minRequired) {
+                    setAlertMsg({
+                      text: `Nominal pembayaran via ${selectedBank?.name || 'Bank'} minimal ${formatCurrency(minRequired)}! (Diinput: ${formatCurrency(val)})`,
+                      type: 'error'
+                    });
+                    setTimeout(() => setAlertMsg(null), 4000);
+                    return;
+                  }
                   setIsDirectCardAmountModalOpen(false);
                   processTransaction('CARD', selectedBank?.id, val);
                 }
