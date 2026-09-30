@@ -46,7 +46,18 @@ class ProductExporter extends Exporter
             ExportColumn::make('is_active'),
             ExportColumn::make('is_ecommerce_active'),
             ExportColumn::make('ecommerce_category'),
-            ExportColumn::make('metadata'),
+            ExportColumn::make('metadata')
+                ->formatStateUsing(function ($state) {
+                    if (blank($state)) {
+                        return '';
+                    }
+
+                    if (is_array($state) || is_object($state)) {
+                        return json_encode($state, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    }
+
+                    return (string) $state;
+                }),
             ExportColumn::make('product_type'),
             ExportColumn::make('ppob_sku'),
             ExportColumn::make('created_at'),
