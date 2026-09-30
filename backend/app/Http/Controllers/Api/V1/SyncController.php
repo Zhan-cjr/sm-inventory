@@ -190,7 +190,11 @@ class SyncController extends Controller
                             if ($product && !empty($product->ppob_sku)) {
                                 $customerNo = $item['customerNo'] ?? null;
                                 if ($customerNo) {
-                                    $refId = $tx->receipt_number . '-' . strtoupper(substr(uniqid(), -4));
+                                    $refId = $tx->receipt_number;
+                                    $existingPpobCount = \App\Models\PpobTransaction::where('transaction_id', $tx->id)->count();
+                                    if ($existingPpobCount > 0) {
+                                        $refId .= '-' . ($existingPpobCount + 1);
+                                    }
                                     
                                     $user = auth()->user();
                                     $additionalInfo = $user ? [$user->organization_id ?? 'Toko', $user->name] : [];

@@ -223,7 +223,11 @@ class TransactionController extends Controller
                     if ($product && $product->product_type === 'digital' && !empty($product->ppob_sku)) {
                         $customerNo = $item['customer_no'] ?? null;
                         if ($customerNo) {
-                            $refId = $transaction->receipt_number . '-' . strtoupper(substr(uniqid(), -4));
+                            $refId = $transaction->receipt_number;
+                            $existingPpobCount = \App\Models\PpobTransaction::where('transaction_id', $transaction->id)->count();
+                            if ($existingPpobCount > 0) {
+                                $refId .= '-' . ($existingPpobCount + 1);
+                            }
                             
                             $user = auth()->user();
                             $additionalInfo = $user ? [$user->organization_id ?? 'Toko', $user->name] : [];
