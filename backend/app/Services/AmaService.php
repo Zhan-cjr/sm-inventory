@@ -113,6 +113,17 @@ class AmaService implements PpobProviderInterface
             return $this->mapResponseToStandard($res);
         } catch (\Exception $e) {
             Log::error('AMA Topup Error: ' . $e->getMessage());
+            if (str_contains($e->getMessage(), 'timed out') || str_contains($e->getMessage(), 'timeout')) {
+                return [
+                    'data' => [
+                        'status' => 'Pending',
+                        'rc' => '68',
+                        'sn' => '',
+                        'message' => 'Transaksi pending (timeout > 60s), menunggu callback',
+                        'price' => 0,
+                    ]
+                ];
+            }
             return ['data' => ['status' => 'Gagal', 'message' => 'Exception: ' . $e->getMessage()]];
         }
     }
