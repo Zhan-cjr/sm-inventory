@@ -203,7 +203,8 @@ class ProductImporter extends Importer
             ImportColumn::make('unit_of_measure')
                 ->label('Satuan')
                 ->example('pcs')
-                ->rules(['nullable', 'string', 'max:50']),
+                ->rules(['nullable', 'string', 'max:50'])
+                ->fillRecordUsing(fn ($record, $state) => $record->unit_of_measure = !empty(trim((string) $state)) ? trim($state) : 'PCS'),
 
             ImportColumn::make('reorder_point')
                 ->label('Titik Pesan Ulang')
