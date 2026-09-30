@@ -43,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
             request()->secure()
         ) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
+            request()->server->set('HTTPS', 'on');
         }
 
         \Illuminate\Support\Facades\Gate::before(function ($user, $ability) {

@@ -17,6 +17,14 @@ if [ $# -gt 0 ]; then
     exec "$@"
 fi
 
+# Ensure PHP upload settings are sufficient for CSV imports
+mkdir -p /usr/local/etc/php/conf.d
+cat <<EOF > /usr/local/etc/php/conf.d/uploads.ini
+upload_max_filesize = 50M
+post_max_size = 50M
+memory_limit = 512M
+EOF
+
 echo "Starting PHP-FPM and Nginx..."
 php-fpm -D
 exec nginx -g "daemon off;"
