@@ -34,6 +34,7 @@ class LaporanPersediaan extends Page implements HasTable
         return $table
             ->query(
                 Stock::query()
+                    ->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id))
                     ->with(['branch', 'product', 'product.category'])
                     ->addSelect([
                         'batch_valuation' => \App\Models\StockBatch::select(\Illuminate\Support\Facades\DB::raw('COALESCE(SUM(remaining_quantity * cost_price), 0)'))

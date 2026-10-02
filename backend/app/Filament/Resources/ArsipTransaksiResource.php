@@ -628,7 +628,12 @@ class ArsipTransaksiResource extends Resource
 
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
-        return parent::getEloquentQuery()->with('items');
+        $query = parent::getEloquentQuery()->with('items');
+        $user = Auth::user();
+        if ($user && $user->branch_id) {
+            $query->where('branch_id', $user->branch_id);
+        }
+        return $query;
     }
 }
 

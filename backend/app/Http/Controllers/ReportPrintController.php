@@ -941,7 +941,9 @@ class ReportPrintController extends Controller
             if (isset($filters['supplier_id']['value']) && !empty($filters['supplier_id']['value'])) {
                 $q->where('supplier_id', $filters['supplier_id']['value']);
             }
-            if (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            if (auth()->user()->branch_id !== null) {
+                $q->where('branch_id', auth()->user()->branch_id);
+            } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
                 $q->where('branch_id', $filters['branch_id']['value']);
             }
         })->with(['product', 'goodsReceipt', 'goodsReceipt.supplier']);

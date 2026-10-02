@@ -40,6 +40,7 @@ class LaporanPenjualanKasir extends Page implements HasTable
             ->query(
                 Transaction::query()
                     ->where('is_voided', false)
+                    ->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id))
                     ->with(['branch', 'cashier', 'terminal', 'shift'])
             )
             ->defaultGroup('cashier.name')
@@ -126,10 +127,10 @@ class LaporanPenjualanKasir extends Page implements HasTable
                     ->hidden(fn () => Auth::user()->branch_id !== null),
                 SelectFilter::make('terminal_id')
                     ->label('Terminal/Kassa')
-                    ->relationship('terminal', 'name'),
+                    ->relationship('terminal', 'name', fn ($query) => $query->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id))),
                 SelectFilter::make('cashier_id')
                     ->label('Kasir')
-                    ->relationship('cashier', 'name')
+                    ->relationship('cashier', 'name', fn ($query) => $query->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id)))
             ])
             ->headerActions([
                 \Filament\Actions\Action::make('cetak')

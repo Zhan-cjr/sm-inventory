@@ -32,6 +32,7 @@ class LaporanStokOpnameRingkas extends Page implements HasTable
         return $table
             ->query(
                 StockOpnameSession::query()
+                    ->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id))
                     ->with(['branch', 'creator', 'approver'])
             )
             ->columns([

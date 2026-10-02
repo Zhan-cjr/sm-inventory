@@ -36,6 +36,7 @@ class LaporanBarangDibeli extends Page implements HasTable
         return $table
             ->query(
                 GoodsReceiptItem::query()
+                    ->when(Auth::user()->branch_id !== null, fn ($q) => $q->whereHas('goodsReceipt', fn ($gr) => $gr->where('branch_id', Auth::user()->branch_id)))
                     ->with(['goodsReceipt', 'goodsReceipt.branch', 'goodsReceipt.supplier', 'product'])
             )
             ->columns([

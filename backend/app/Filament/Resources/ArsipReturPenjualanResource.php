@@ -352,7 +352,12 @@ class ArsipReturPenjualanResource extends Resource
     
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->where('transaction_type', 'RETURN');
+        $query = parent::getEloquentQuery()->where('transaction_type', 'RETURN');
+        $user = Auth::user();
+        if ($user && $user->branch_id) {
+            $query->where('branch_id', $user->branch_id);
+        }
+        return $query;
     }
     
     public static function canCreate(): bool

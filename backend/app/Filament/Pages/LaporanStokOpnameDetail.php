@@ -33,6 +33,7 @@ class LaporanStokOpnameDetail extends Page implements HasTable
         return $table
             ->query(
                 StockOpnameItem::query()
+                    ->when(Auth::user()->branch_id !== null, fn ($q) => $q->whereHas('session', fn ($sq) => $sq->where('branch_id', Auth::user()->branch_id)))
                     ->with(['session.branch', 'product', 'rackSession.rack'])
             )
             ->columns([

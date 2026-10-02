@@ -101,6 +101,7 @@ class LaporanLabaRugi extends Page implements HasTable
             ->query(
                 Transaction::query()
                     ->fromSub($subquery, 'transactions')
+                    ->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('transactions.branch_id', Auth::user()->branch_id))
                     ->with(['branch']) // Items are no longer eager-loaded because it'll fail for ecommerce IDs
             )
             ->columns([

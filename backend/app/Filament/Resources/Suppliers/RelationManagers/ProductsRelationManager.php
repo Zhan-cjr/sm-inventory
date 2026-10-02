@@ -28,17 +28,21 @@ class ProductsRelationManager extends RelationManager
         return $table
             ->modifyQueryUsing(function (Builder $query) use ($currentSupplierId, $userBranchId) {
                 if ($userBranchId) {
-                    // User Cabang: Hanya tampilkan barang yang aktif dipasok oleh supplier ini ke cabangnya
-                    $query->where(function ($q) use ($userBranchId, $currentSupplierId) {
+                    // User Cabang: Hanya tampilkan barang yang ada di cabangnya dan aktif dipasok oleh supplier ini
+                    $query->whereHas('stocks', function ($sq) use ($userBranchId) {
+                        $sq->where('branch_id', $userBranchId);
+                    })->where(function ($q) use ($userBranchId, $currentSupplierId) {
                         $q->whereHas('stocks', function ($sq) use ($userBranchId, $currentSupplierId) {
                             $sq->where('branch_id', $userBranchId)->where('supplier_id', $currentSupplierId);
                         })
                         ->orWhere(function ($sq) use ($userBranchId, $currentSupplierId) {
                             $sq->where('products.supplier_id', $currentSupplierId)
-                               ->whereDoesntHave('stocks', function ($stq) use ($userBranchId, $currentSupplierId) {
+                               ->whereHas('stocks', function ($stq) use ($userBranchId, $currentSupplierId) {
                                    $stq->where('branch_id', $userBranchId)
-                                       ->whereNotNull('supplier_id')
-                                       ->where('supplier_id', '!=', $currentSupplierId);
+                                       ->where(function ($sub) use ($currentSupplierId) {
+                                           $sub->whereNull('supplier_id')
+                                               ->orWhere('supplier_id', $currentSupplierId);
+                                       });
                                });
                         });
                     });
@@ -57,6 +61,13 @@ class ProductsRelationManager extends RelationManager
                     ->label('SKU')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('barcode')
+                    ->label('Barcode')
+                    ->placeholder('-')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable()
+                    ->copyMessage('Barcode disalin!'),
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nama Barang')
                     ->searchable()
@@ -116,16 +127,20 @@ class ProductsRelationManager extends RelationManager
                         $branchId = $data['value'] ?? null;
                         if (!$branchId) return $query;
                         
-                        return $query->where(function ($q) use ($branchId, $currentSupplierId) {
+                        return $query->whereHas('stocks', function ($sq) use ($branchId) {
+                            $sq->where('branch_id', $branchId);
+                        })->where(function ($q) use ($branchId, $currentSupplierId) {
                             $q->whereHas('stocks', function ($sq) use ($branchId, $currentSupplierId) {
                                 $sq->where('branch_id', $branchId)->where('supplier_id', $currentSupplierId);
                             })
                             ->orWhere(function ($sq) use ($branchId, $currentSupplierId) {
                                 $sq->where('products.supplier_id', $currentSupplierId)
-                                   ->whereDoesntHave('stocks', function ($stq) use ($branchId, $currentSupplierId) {
+                                   ->whereHas('stocks', function ($stq) use ($branchId, $currentSupplierId) {
                                        $stq->where('branch_id', $branchId)
-                                           ->whereNotNull('supplier_id')
-                                           ->where('supplier_id', '!=', $currentSupplierId);
+                                           ->where(function ($sub) use ($currentSupplierId) {
+                                               $sub->whereNull('supplier_id')
+                                                   ->orWhere('supplier_id', $currentSupplierId);
+                                           });
                                    });
                             });
                         });
@@ -182,8 +197,12 @@ class ProductsRelationManager extends RelationManager
                             ->label('Pilih Barang')
                             ->multiple()
                             ->searchable()
-                            ->options(function () {
-                                return \App\Models\Product::orderBy('name')->pluck('name', 'id');
+                            ->options(function () use ($isBranchUser, $user) {
+                                $q = \App\Models\Product::orderBy('name');
+                                if ($isBranchUser && $user->branch_id) {
+                                    $q->whereHas('stocks', fn ($sq) => $sq->where('branch_id', $user->branch_id));
+                                }
+                                return $q->pluck('name', 'id');
                             })
                             ->required();
 

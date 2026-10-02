@@ -36,7 +36,10 @@ class LaporanJasaTerjual extends Page implements HasTable
         return $table
             ->query(
                 TransactionItem::query()
-                    ->whereHas('transaction', fn (Builder $query) => $query->where('is_voided', false))
+                    ->whereHas('transaction', fn (Builder $query) => 
+                        $query->where('is_voided', false)
+                            ->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id))
+                    )
                     ->whereNotNull('service_id')
                     ->with(['transaction', 'transaction.branch', 'service'])
             )
