@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, RefreshCw, Wifi, WifiOff, Settings, Sun, Moon, User, LogOut } from 'lucide-react';
+import { Clock, RefreshCw, Wifi, WifiOff, Settings, Sun, Moon, User, LogOut, AlertTriangle } from 'lucide-react';
 import LiveClock from './LiveClock';
 
 const PosHeader = ({
@@ -8,6 +8,8 @@ const PosHeader = ({
   terminalInfo,
   activeShift,
   pendingCount,
+  unrefundedFailedPpobCount = 0,
+  onOpenPpobMenu,
   isOnline,
   syncStatus,
   syncTransactions,
@@ -52,6 +54,31 @@ const PosHeader = ({
       <LiveClock />
 
       <div className="pos-user-status">
+        {unrefundedFailedPpobCount > 0 && (
+          <button
+            type="button"
+            className="ppob-failed-badge mr-4"
+            onClick={onOpenPpobMenu}
+            title="Ada transaksi PPOB yang gagal dan perlu direfund ke konsumen! Klik untuk buka."
+            style={{
+              background: 'rgba(230, 0, 18, 0.15)',
+              border: '1px solid var(--danger)',
+              padding: '4px 12px',
+              borderRadius: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--danger)',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: '0.8rem'
+            }}
+          >
+            <AlertTriangle size={16} />
+            <span>⚠️ {unrefundedFailedPpobCount} PPOB Gagal (Refund)</span>
+          </button>
+        )}
+
         {pendingCount > 0 && (
           <div
             className={`sync-status mr-4 ${!isOnline ? 'warning-pulse' : ''}`}

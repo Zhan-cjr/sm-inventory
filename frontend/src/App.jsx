@@ -341,6 +341,7 @@ function App() {
                   branchName={deviceInfo?.branchName || user.branch_name}
                   branchCode={deviceInfo?.branchCode || user.branch_code}
                   branchAddress={deviceInfo?.branchAddress || user.branch_address}
+                  branchPhone={deviceInfo?.branchPhone || user.branch_phone}
                   orgName={user.organization_name}
                   authToken={token}
                   userName={user.name}

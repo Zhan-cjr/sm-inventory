@@ -101,6 +101,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/transactions/receipt/{receipt}', [\App\Http\Controllers\Api\V1\TransactionController::class, 'getTransactionByReceipt']);
         Route::get('/transactions/ppob/today', [\App\Http\Controllers\Api\V1\TransactionController::class, 'getTodayPpobTransactions']);
         Route::post('/transactions/ppob/{ppobTransactionId}/check-status', [\App\Http\Controllers\Api\V1\TransactionController::class, 'checkPpobStatus']);
+        Route::post('/transactions/ppob/{ppobTransactionId}/refund', [\App\Http\Controllers\Api\V1\TransactionController::class, 'refundPpobTransaction']);
 
         Route::get('/user', function (Request $request) {
             $user = $request->user();
@@ -114,6 +115,7 @@ Route::prefix('v1')->group(function () {
                     'branch_name' => $user->branch?->name,
                     'branch_code' => $user->branch?->code,
                     'branch_address' => $user->branch?->address,
+                    'branch_phone' => $user->branch?->phone,
                     'organization_id' => $user->organization_id,
                     'organization_name' => $user->organization?->name,
                     'point_conversion_rate' => $user->organization?->point_conversion_rate ?? 1000,

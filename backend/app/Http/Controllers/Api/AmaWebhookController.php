@@ -48,6 +48,11 @@ class AmaWebhookController extends Controller
                     'raw_response' => json_encode($request->all())
                 ]);
 
+                $branchId = $transaction->transaction?->branch_id;
+                if ($branchId) {
+                    event(new \App\Events\PpobStatusUpdated($branchId, $transaction->fresh()->load('transaction.items.product')));
+                }
+
                 Log::info("AMA Webhook Received for trxid: {$trxid}, Status: {$status} ({$mappedStatus})");
                 
                 // Return Ack OK to partner

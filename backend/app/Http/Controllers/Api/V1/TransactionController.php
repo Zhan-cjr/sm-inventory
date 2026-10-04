@@ -276,12 +276,30 @@ class TransactionController extends Controller
                             
                             $customerName = isset($res['data']) ? $this->extractCustomerName($res['data']) : null;
                             
+                            // Pre-Flight Check: Jika provider langsung merespon Gagal (Nomor Salah / Gangguan / Saldo Kurang),
+                            // batalkan seluruh transaksi agar kasir tidak perlu mem-void dan laci kasir tidak selisih!
+                            if (strtolower($status) === 'gagal') {
+                                $providerMsg = $res['data']['message'] ?? 'Pengisian ditolak oleh operator/provider.';
+                                throw new \App\Exceptions\PpobFailedException(
+                                    "Pengisian {$product->name} Gagal: {$providerMsg}",
+                                    [
+                                        'product_id' => $product->id,
+                                        'product_name' => $product->name,
+                                        'customer_no' => $customerNo,
+                                        'provider_message' => $providerMsg,
+                                    ]
+                                );
+                            }
+
+                            $customerWaPhone = $item['customer_wa_phone'] ?? null;
+
                             \App\Models\PpobTransaction::create([
                                 'transaction_id' => $transaction->id,
                                 'provider' => $product->ppob_provider ?? 'digiflazz',
                                 'ref_id' => $refId,
                                 'customer_no' => $customerNo,
                                 'customer_name' => $customerName,
+                                'customer_wa_phone' => $customerWaPhone,
                                 'buyer_sku_code' => $product->ppob_sku,
                                 'price' => $res['data']['price'] ?? 0,
                                 'status' => $status,
@@ -322,6 +340,14 @@ class TransactionController extends Controller
                 ]
             ], 201);
 
+        } catch (\App\Exceptions\PpobFailedException $e) {
+            Log::warning('PPOB Pre-flight Rejected: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'PPOB_FAILED',
+                'message' => $e->getMessage(),
+                'failed_item' => $e->getFailedItem(),
+            ], 422);
         } catch (\Exception $e) {
             Log::error('Transaction creation failed: ' . $e->getMessage());
             return response()->json([
@@ -451,10 +477,15 @@ class TransactionController extends Controller
 
     public function checkPpobStatus(Request $request, $ppobTransactionId)
     {
+        $user = $request->user();
         $ppob = \App\Models\PpobTransaction::with('transaction.items.product')->find($ppobTransactionId);
 
         if (!$ppob) {
             return response()->json(['message' => 'PPOB Transaction not found'], 404);
+        }
+
+        if ($user && $ppob->transaction && $ppob->transaction->branch_id !== $user->branch_id && !in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN'])) {
+            return response()->json(['message' => 'Unauthorized: Transaksi ini milik cabang lain'], 403);
         }
 
         if ($ppob->status !== 'Pending') {
@@ -484,6 +515,11 @@ class TransactionController extends Controller
                 }
                 
                 $ppob->update($updateData);
+
+                $branchId = $ppob->transaction?->branch_id ?? $user?->branch_id;
+                if ($branchId) {
+                    event(new \App\Events\PpobStatusUpdated($branchId, $ppob->fresh()->load('transaction.items.product')));
+                }
             }
         }
 
@@ -491,5 +527,117 @@ class TransactionController extends Controller
             'message' => 'Status checked successfully',
             'data' => $ppob->fresh()
         ]);
+    }
+
+    /**
+     * Refund dana PPOB yang gagal ke konsumen (Tunai Laci atau Non-Tunai Transfer).
+     * Jika Tunai: mencatat CashMovement CASH_OUT pada shift aktif kasir yang bertugas,
+     * sehingga target cash laci saat close shift otomatis berkurang dan tidak selisih!
+     */
+    public function refundPpobTransaction(Request $request, $ppobTransactionId)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $validated = $request->validate([
+            'refund_method' => 'required|in:CASH,TRANSFER,EWALLET',
+            'notes' => 'nullable|string|max:255',
+            'terminal_id' => 'nullable|string',
+        ]);
+
+        $ppob = \App\Models\PpobTransaction::with(['transaction.items.product'])->find($ppobTransactionId);
+        if (!$ppob) {
+            return response()->json(['message' => 'Transaksi PPOB tidak ditemukan'], 404);
+        }
+
+        // Validasi kepemilikan cabang ketat
+        $branchId = $ppob->transaction?->branch_id ?? $user->branch_id;
+        if ($branchId !== $user->branch_id && !in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN'])) {
+            return response()->json(['message' => 'Unauthorized: Transaksi ini milik cabang lain'], 403);
+        }
+
+        // Hanya transaksi berstatus Gagal yang bisa direfund
+        if (strtolower($ppob->status) !== 'gagal') {
+            return response()->json(['message' => 'Hanya transaksi berstatus Gagal yang dapat direfund'], 422);
+        }
+
+        if ($ppob->refund_status === 'REFUNDED') {
+            return response()->json(['message' => 'Transaksi PPOB ini sudah pernah direfund sebelumnya'], 422);
+        }
+
+        // Tentukan nominal refund: ambil dari harga jual item transaksi, atau fallback ke price
+        $refundAmount = 0;
+        if ($ppob->transaction && $ppob->transaction->items) {
+            $matchedItem = $ppob->transaction->items->first(function ($item) use ($ppob) {
+                return $item->product && $item->product->ppob_sku === $ppob->buyer_sku_code;
+            });
+            if ($matchedItem) {
+                $refundAmount = (float) $matchedItem->unit_price;
+            }
+        }
+        if ($refundAmount <= 0) {
+            $refundAmount = (float) $ppob->price;
+        }
+
+        return DB::transaction(function () use ($ppob, $validated, $user, $refundAmount, $branchId, $request) {
+            $shift = null;
+            if ($validated['refund_method'] === 'CASH') {
+                $terminalId = $validated['terminal_id'] ?? $request->header('X-Terminal-Id');
+                
+                // Cari shift OPEN milik kasir saat ini di cabang ini
+                $shiftQuery = \App\Models\Shift::where('branch_id', $user->branch_id)
+                    ->where('user_id', $user->id)
+                    ->where('status', 'OPEN');
+                if ($terminalId) {
+                    $shiftQuery->where('terminal_id', $terminalId);
+                }
+                $shift = $shiftQuery->latest()->first();
+
+                // Fallback: jika kasir berganti tapi terminal sama
+                if (!$shift && $terminalId) {
+                    $shift = \App\Models\Shift::where('branch_id', $user->branch_id)
+                        ->where('terminal_id', $terminalId)
+                        ->where('status', 'OPEN')
+                        ->latest()
+                        ->first();
+                }
+
+                // Catat CashMovement (CASH_OUT) pada shift aktif agar uang laci seimbang
+                if ($shift) {
+                    \App\Models\CashMovement::create([
+                        'shift_id' => $shift->id,
+                        'user_id' => $user->id,
+                        'terminal_id' => $shift->terminal_id,
+                        'type' => 'CASH_OUT',
+                        'amount' => $refundAmount,
+                        'description' => "Refund PPOB Gagal: Struk #{$ppob->transaction?->receipt_number} ({$ppob->customer_no})" . ($validated['notes'] ? " - " . $validated['notes'] : ''),
+                    ]);
+
+                    $shift->total_cash_out += $refundAmount;
+                    $shift->save();
+                }
+            }
+
+            $ppob->update([
+                'refund_status' => 'REFUNDED',
+                'refund_method' => $validated['refund_method'],
+                'refund_amount' => $refundAmount,
+                'refunded_by' => $user->id,
+                'refunded_at' => now(),
+                'refund_notes' => $validated['notes'] ?? null,
+            ]);
+
+            // Broadcast status terupdate ke WebSocket cabang ini
+            event(new \App\Events\PpobStatusUpdated($branchId, $ppob->fresh()->load('transaction.items.product')));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengembalian dana PPOB berhasil diproses.',
+                'data' => $ppob->fresh(),
+                'cash_movement_recorded' => $shift !== null,
+            ]);
+        });
     }
 }

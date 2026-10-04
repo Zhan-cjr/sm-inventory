@@ -63,6 +63,11 @@ class DigiflazzWebhookController extends Controller
                     }
                     $transaction->update($updateData);
 
+                    $branchId = $transaction->transaction?->branch_id;
+                    if ($branchId) {
+                        event(new \App\Events\PpobStatusUpdated($branchId, $transaction->fresh()->load('transaction.items.product')));
+                    }
+
                     Log::info("Digiflazz Webhook Received for ref_id: {$refId}, Status: {$status}");
                 } else {
                     Log::warning("Digiflazz Webhook: Transaction with ref_id {$refId} not found.");

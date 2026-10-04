@@ -46,6 +46,7 @@ const PosActionSidebar = ({
   setIsReprintOldModalOpen,
   setIsPpobMenuOpen,
   fetchPpobTransactions,
+  unrefundedFailedPpobCount = 0,
   updateQuantity,
   setItems,
   setPwpUpsellPrompt,
@@ -246,7 +247,32 @@ const PosActionSidebar = ({
             setIsPpobMenuOpen(true);
             fetchPpobTransactions();
           }}
+          style={unrefundedFailedPpobCount > 0 ? { position: 'relative', border: '2px solid var(--danger)' } : {}}
+          title={unrefundedFailedPpobCount > 0 ? `${unrefundedFailedPpobCount} PPOB gagal butuh refund` : ''}
         >
+          {unrefundedFailedPpobCount > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '-6px',
+                right: '-6px',
+                background: 'var(--danger)',
+                color: '#fff',
+                borderRadius: '50%',
+                width: '18px',
+                height: '18px',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 6px rgba(230,0,18,0.7)',
+                zIndex: 10
+              }}
+            >
+              {unrefundedFailedPpobCount}
+            </span>
+          )}
           <Package size={16} />
           {renderLabel('btn_ppob_menu', 'Menu PPOB', 'F10')}
         </button>

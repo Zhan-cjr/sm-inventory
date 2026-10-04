@@ -19,3 +19,5 @@ export { MultiCardModal } from './MultiCardModal';
 export { QtyModal } from './QtyModal';
 export { ReprintOldModal } from './ReprintOldModal';
 export { DigitalProductModal } from './DigitalProductModal';
+export { PpobRefundModal } from './PpobRefundModal';
+export { PpobFailedCorrectionModal } from './PpobFailedCorrectionModal';

@@ -21,7 +21,8 @@ export const PpobMenuModal = ({
   isFetchingPpobTransactions,
   ppobTransactions = [],
   handleCheckPpobStatus,
-  handleReprintPpob
+  handleReprintPpob,
+  openRefundModal
 }) => {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [copiedSnId, setCopiedSnId] = useState(null);
@@ -54,14 +55,17 @@ export const PpobMenuModal = ({
     const sukses = allPpobList.filter(p => p.status === 'Sukses').length;
     const pending = allPpobList.filter(p => p.status === 'Pending').length;
     const gagal = allPpobList.filter(p => p.status === 'Gagal').length;
-    return { total, sukses, pending, gagal };
+    const butuhRefund = allPpobList.filter(p => p.status === 'Gagal' && p.refund_status !== 'REFUNDED').length;
+    return { total, sukses, pending, gagal, butuhRefund };
   }, [allPpobList]);
 
   // Filtered List
   const filteredList = useMemo(() => {
     return allPpobList.filter(item => {
       // 1. Status Filter
-      if (statusFilter !== 'ALL' && item.status !== statusFilter) {
+      if (statusFilter === 'BUTUH_REFUND') {
+        if (item.status !== 'Gagal' || item.refund_status === 'REFUNDED') return false;
+      } else if (statusFilter !== 'ALL' && item.status !== statusFilter) {
         return false;
       }
       // 2. Search Query Filter
@@ -280,6 +284,22 @@ export const PpobMenuModal = ({
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
               <span>Gagal</span>
               <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({stats.gagal})</span>
+            </button>
+
+            <button
+              type="button"
+              className={`ppob-filter-tab ${statusFilter === 'BUTUH_REFUND' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('BUTUH_REFUND')}
+              style={{
+                color: statusFilter === 'BUTUH_REFUND' ? '#dc2626' : undefined,
+                fontWeight: stats.butuhRefund > 0 ? 800 : undefined,
+                backgroundColor: stats.butuhRefund > 0 && statusFilter !== 'BUTUH_REFUND' ? '#fef2f2' : undefined,
+                border: stats.butuhRefund > 0 ? '1px solid #f87171' : undefined
+              }}
+            >
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626' }} />
+              <span>Perlu Refund</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dc2626' }}>({stats.butuhRefund})</span>
             </button>
           </div>
 
@@ -510,7 +530,47 @@ export const PpobMenuModal = ({
 
                       {/* Aksi */}
                       <td style={{ padding: '0.9rem 1.25rem', verticalAlign: 'middle', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                          {isGagal && (
+                            ppob.refund_status === 'REFUNDED' ? (
+                              <span style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '3px',
+                                padding: '4px 8px', 
+                                borderRadius: '6px', 
+                                fontSize: '0.75rem', 
+                                fontWeight: 700, 
+                                background: '#ecfdf5', 
+                                color: '#059669', 
+                                border: '1px solid #a7f3d0' 
+                              }}>
+                                ✓ Direfund ({ppob.refund_method || 'CASH'})
+                              </span>
+                            ) : (
+                              <button 
+                                type="button"
+                                style={{ 
+                                  padding: '0.45rem 0.8rem', 
+                                  fontSize: '0.8rem', 
+                                  borderRadius: '8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  backgroundColor: '#ef4444',
+                                  color: 'white',
+                                  border: 'none',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.25)'
+                                }} 
+                                onClick={() => openRefundModal && openRefundModal(ppob)}
+                                title="Klik untuk memproses pengembalian dana ke konsumen"
+                              >
+                                💵 Refund Konsumen
+                              </button>
+                            )
+                          )}
                           {isPending && (
                             <button 
                               type="button"

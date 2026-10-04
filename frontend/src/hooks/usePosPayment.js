@@ -32,6 +32,7 @@ export const usePosPayment = ({
   branchCode,
   branchName,
   branchAddress,
+  branchPhone,
   orgName,
   userName,
   allTerminals,
@@ -86,6 +87,10 @@ export const usePosPayment = ({
   // Reprint Old
   const [isReprintOldModalOpen, setIsReprintOldModalOpen] = useState(false);
   const [oldReceiptInput, setOldReceiptInput] = useState('');
+
+  // PPOB Pre-flight Failure Correction
+  const [isPpobFailedModalOpen, setIsPpobFailedModalOpen] = useState(false);
+  const [ppobFailedModalData, setPpobFailedModalData] = useState(null);
 
   const totalPaid = payments.length > 0
     ? payments.reduce((sum, p) => sum + p.amount, 0)
@@ -156,8 +161,9 @@ export const usePosPayment = ({
     }
   };
 
-  const processTransaction = async (method = paymentMethod, bankId = selectedBank?.id, overrideReceived = null) => {
-    if (items.length === 0) return;
+  const processTransaction = async (method = paymentMethod, bankId = selectedBank?.id, overrideReceived = null, explicitItems = null) => {
+    const currentItems = explicitItems || items;
+    if (currentItems.length === 0) return;
     setIsProcessing(true);
     try {
       const nowCorrected = new Date(Date.now() + serverOffset);
@@ -181,12 +187,17 @@ export const usePosPayment = ({
         }
       }
 
-      const currentFinalAmount = finalAmount;
+      const grossTotal = currentItems.reduce((sum, item) => sum + (item.quantity * parseFloat(item.unitPrice)), 0);
+      const totalItemManualDiscount = currentItems.reduce((sum, item) => sum + (item.quantity * (item.manualDiscount || 0)), 0);
+      const currentFinalAmount = explicitItems 
+        ? Math.max(0, grossTotal - (totalItemManualDiscount + totalDiscount + manualTotalDiscount))
+        : finalAmount;
+
       let finalPayments = [...payments];
       if (overrideReceived !== null) {
         finalPayments.push({ method, amount: parseFloat(overrideReceived), bankId, label: method === 'CASH' ? 'Tunai' : (method === 'CARD' ? 'Card' : method) });
       } else if (payments.length === 0) {
-        finalPayments = [{ method, amount: parseFloat(receivedAmount) || finalAmount, bankId }];
+        finalPayments = [{ method, amount: parseFloat(receivedAmount) || currentFinalAmount, bankId }];
       }
 
       const currentReceived = finalPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -199,12 +210,10 @@ export const usePosPayment = ({
       }
 
       const currentChange = currentReceived - currentFinalAmount;
-      const grossTotal = items.reduce((sum, item) => sum + (item.quantity * parseFloat(item.unitPrice)), 0);
-      const totalItemManualDiscount = items.reduce((sum, item) => sum + (item.quantity * (item.manualDiscount || 0)), 0);
       const actualPaymentMethod = finalPayments.length > 1 ? 'MULTI' : finalPayments[0].method;
 
       const transaction = {
-        items,
+        items: currentItems,
         totalAmount: grossTotal,
         discountAmount: totalItemManualDiscount + totalDiscount + manualTotalDiscount,
         manualDiscount: totalItemManualDiscount + manualTotalDiscount,
@@ -224,6 +233,156 @@ export const usePosPayment = ({
         transaction_type: isReturnMode ? 'RETURN' : 'SALES',
       };
 
+      // --- KHUSUS PPOB (PRODUK DIGITAL): PRE-FLIGHT CHECK LANGSUNG KE BACKEND ---
+      const hasDigitalProducts = currentItems.some(i => i.productType === 'digital');
+      if (hasDigitalProducts && !isOnline) {
+        setAlertMsg({ text: 'Produk digital (PPOB) membutuhkan koneksi internet aktif.', type: 'error' });
+        setIsProcessing(false);
+        return;
+      }
+
+      if (hasDigitalProducts && isOnline) {
+        const directRes = await fetch('/api/v1/transactions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'X-Terminal-Id': terminalInfo?.id || '',
+          },
+          body: JSON.stringify({
+            items: currentItems.map(item => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              manualDiscount: item.manualDiscount || 0,
+              discountPerItem: item.discountPerItem || 0,
+              promotionId: item.promotionId || null,
+              originalTransactionId: item.originalTransactionId || null,
+              customer_no: item.customerNo || null,
+              customer_wa_phone: item.customerWaPhone || null,
+            })),
+            payment_method: actualPaymentMethod,
+            received_amount: currentReceived,
+            change_amount: currentChange,
+            total_amount: grossTotal,
+            discount_amount: totalItemManualDiscount + totalDiscount + manualTotalDiscount,
+            manual_discount: totalItemManualDiscount + manualTotalDiscount,
+            promo_discount: totalDiscount,
+            final_amount: currentFinalAmount,
+            customer_id: selectedCustomer?.id || null,
+            shift_id: activeShift?.id || null,
+            payments: finalPayments,
+            bank_id: bankId,
+            terminal_id: terminalInfo?.id || null,
+            receipt_number: transaction.receipt_number,
+            transaction_type: transaction.transaction_type,
+          })
+        });
+
+        const directJson = await directRes.json();
+        if (!directRes.ok) {
+          if (directJson.error === 'PPOB_FAILED') {
+            // PROVIDER GAGAL LANGSUNG (Nomor Salah / Gangguan).
+            // Transaksi TIDAK DIBUAT di database, laci kasir TIDAK selisih, kasir TIDAK PERLU VOID!
+            setIsProcessing(false);
+            setPpobFailedModalData(directJson.failed_item || {
+              product_name: 'Produk Digital',
+              customer_no: currentItems.find(i => i.productType === 'digital')?.customerNo,
+              provider_message: directJson.message
+            });
+            setIsPpobFailedModalOpen(true);
+            return;
+          }
+          throw new Error(directJson.error || directJson.message || 'Transaksi gagal diproses');
+        }
+
+        // Ambil transaksi segar dengan status & SN PPOB
+        let finalItemsForReceipt = [...currentItems];
+        try {
+          const freshRes = await fetch(`/api/v1/transactions/receipt/${encodeURIComponent(transaction.receipt_number)}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+          });
+          if (freshRes.ok) {
+            const freshData = await freshRes.json();
+            if (freshData.ppob_transactions) {
+              finalItemsForReceipt = finalItemsForReceipt.map(item => {
+                if (item.productType === 'digital') {
+                  const ppob = freshData.ppob_transactions.find(p => p.customer_no === item.customerNo);
+                  if (ppob) {
+                    return {
+                      ...item,
+                      sn: ppob.sn,
+                      ppobStatus: ppob.status,
+                      ppobMessage: ppob.message
+                    };
+                  }
+                }
+                return item;
+              });
+            }
+          }
+        } catch (e) {}
+
+        const currentCustomer = selectedCustomer;
+
+        // Reset state transaksi
+        setItems([]);
+        setPwpUpsellPrompt(null);
+        setPayments([]);
+        setManualTotalDiscount(0);
+        setReceivedAmount('');
+        if (typeof setInputValue === 'function') setInputValue('');
+        if (typeof setIsSubtotalMode === 'function') setIsSubtotalMode(false);
+        setSelectedBank(null);
+
+        // Update poin member
+        if (currentCustomer) {
+          const earnedPoints = Math.floor(currentFinalAmount / pointConversionRate);
+          const updatedPoints = (currentCustomer.points || 0) + earnedPoints;
+          let updatedTier = 'BRONZE';
+          if (updatedPoints >= 10000) updatedTier = 'PLATINUM';
+          else if (updatedPoints >= 5000) updatedTier = 'GOLD';
+          else if (updatedPoints >= 1000) updatedTier = 'SILVER';
+
+          const updatedCustomer = {
+            ...currentCustomer,
+            points: updatedPoints,
+            member_tier: updatedTier
+          };
+          const updatedCustomersList = customers.map(c =>
+            c.id === currentCustomer.id ? updatedCustomer : c
+          );
+          setCustomers(updatedCustomersList);
+          safeSetItem('pos_cached_customers', JSON.stringify(updatedCustomersList));
+        }
+        setSelectedCustomer(null);
+
+        const fullTransactionData = {
+          ...transaction,
+          items: finalItemsForReceipt,
+          timestamp: new Date().toISOString(),
+          branchName,
+          branchAddress,
+          branchPhone,
+          orgName,
+          userName,
+          terminal_code: terminalInfo?.code || 'KASSA-1',
+          customerName: currentCustomer ? currentCustomer.name : null,
+          memberCardNumber: currentCustomer ? (currentCustomer.member_card_number || currentCustomer.card_number || currentCustomer.phone) : null,
+          earnedPoints: currentCustomer ? Math.floor(currentFinalAmount / pointConversionRate) : 0,
+          totalPoints: currentCustomer ? ((currentCustomer.points || 0) + Math.floor(currentFinalAmount / pointConversionRate)) : 0,
+        };
+
+        setLastTransaction(fullTransactionData);
+        setShowReceiptPreview(true);
+        setAlertMsg({ text: 'Transaksi berhasil disimpan!', type: 'success' });
+        setTimeout(() => setAlertMsg(null), 3000);
+        setIsProcessing(false);
+        setIsMultiPaymentModalOpen(false);
+        return;
+      }
+
+      // --- ALUR TRANSAKSI NON-PPOB (OFFLINE-FIRST DENGAN SYNC) ---
       let localTx = null;
       try {
         localTx = await storeLocalTransaction(transaction);
@@ -417,6 +576,25 @@ export const usePosPayment = ({
     setShowReceiptPreview(true);
   };
 
+  const handleRetryPpobWithNewNumber = async (newNumber) => {
+    const updatedItems = items.map(item => {
+      if (item.productType === 'digital') {
+        return { ...item, customerNo: newNumber };
+      }
+      return item;
+    });
+    setItems(updatedItems);
+    setIsPpobFailedModalOpen(false);
+    return processTransaction(paymentMethod, selectedBank?.id, null, updatedItems);
+  };
+
+  const handleRemovePpobAndContinue = () => {
+    const remainingItems = items.filter(item => item.productType !== 'digital');
+    setItems(remainingItems);
+    setIsPpobFailedModalOpen(false);
+    setAlertMsg({ text: 'Item PPOB dihapus. Silakan selesaikan pembayaran barang fisik.', type: 'info' });
+  };
+
   return {
     paymentMethod,
     setPaymentMethod,
@@ -480,6 +658,13 @@ export const usePosPayment = ({
     mapApiTransactionToLocal,
     handleReprintLast,
     handleReprintOld,
-    handleReprintPpob
+    handleReprintPpob,
+    // PPOB Pre-flight failure correction
+    isPpobFailedModalOpen,
+    setIsPpobFailedModalOpen,
+    ppobFailedModalData,
+    setPpobFailedModalData,
+    handleRetryPpobWithNewNumber,
+    handleRemovePpobAndContinue
   };
 };

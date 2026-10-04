@@ -61,6 +61,22 @@ export const generateRawTextReceipt = (transaction, branchSettings, isHeaderBott
     return linesToPrint;
   };
 
+  const wrapText = (str, len) => {
+    const linesToPrint = [];
+    let remaining = String(str).trim();
+    while (remaining.length > 0) {
+      if (remaining.length <= len) {
+        linesToPrint.push(pad(remaining, len));
+        break;
+      }
+      let breakPoint = remaining.lastIndexOf(' ', len);
+      if (breakPoint === -1 || breakPoint === 0) breakPoint = len;
+      linesToPrint.push(pad(remaining.substring(0, breakPoint).trim(), len));
+      remaining = remaining.substring(breakPoint).trim();
+    }
+    return linesToPrint;
+  };
+
   const formatPlaceholder = (lineText) => {
     if (!lineText) return '';
     let result = lineText
@@ -140,6 +156,11 @@ export const generateRawTextReceipt = (transaction, branchSettings, isHeaderBott
     if (item.sn) lines.push(pad(`  SN: ${item.sn}`, columns));
     if (item.ppobStatus) lines.push(pad(`  Status: ${item.ppobStatus}`, columns));
     if (item.ppobMessage) lines.push(pad(`  Ket: ${item.ppobMessage}`, columns));
+    if (item.ppobStatus === 'Pending') {
+      const phone = transaction.branchPhone || branchSettings?.phone || '';
+      const pendingMsg = `* PPOB Sedang Diproses. Jika belum masuk dlm 1x24 jam, hubungi toko di Telp: ${phone || '-'} dgn struk ini.`;
+      lines.push(...wrapText(pendingMsg, columns));
+    }
 
     const unitPriceNum = Number(item.unitPrice);
     const qtyNum = Number(item.quantity);

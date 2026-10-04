@@ -61,6 +61,7 @@ export const POSTransaction = ({
   branchName,
   branchCode,
   branchAddress,
+  branchPhone,
   orgName,
   authToken,
   userName,
@@ -322,8 +323,15 @@ export const POSTransaction = ({
     ppobSearchQuery,
     setPpobSearchQuery,
     fetchPpobTransactions,
-    handleCheckPpobStatus
-  } = usePosPpob({ authToken, setAlertMsg });
+    handleCheckPpobStatus,
+    selectedPpobForRefund,
+    isRefundModalOpen,
+    isRefunding,
+    openRefundModal,
+    closeRefundModal,
+    handleRefundPpob,
+    unrefundedFailedPpobCount
+  } = usePosPpob({ authToken, setAlertMsg, branchId, terminalInfo });
 
   const {
     inputValue,
@@ -407,7 +415,12 @@ export const POSTransaction = ({
     mapApiTransactionToLocal,
     handleReprintLast,
     handleReprintOld,
-    handleReprintPpob
+    handleReprintPpob,
+    isPpobFailedModalOpen,
+    setIsPpobFailedModalOpen,
+    ppobFailedModalData,
+    handleRetryPpobWithNewNumber,
+    handleRemovePpobAndContinue
   } = usePosPayment({
     items,
     setItems,
@@ -432,6 +445,7 @@ export const POSTransaction = ({
     branchCode,
     branchName,
     branchAddress,
+    branchPhone,
     orgName,
     userName,
     allTerminals,
@@ -875,6 +889,17 @@ export const POSTransaction = ({
         ppobTransactions={ppobTransactions}
         handleCheckPpobStatus={handleCheckPpobStatus}
         handleReprintPpob={handleReprintPpob}
+        openRefundModal={openRefundModal}
+        isRefundModalOpen={isRefundModalOpen}
+        closeRefundModal={closeRefundModal}
+        selectedPpobForRefund={selectedPpobForRefund}
+        handleRefundPpob={handleRefundPpob}
+        isRefunding={isRefunding}
+        isPpobFailedModalOpen={isPpobFailedModalOpen}
+        setIsPpobFailedModalOpen={setIsPpobFailedModalOpen}
+        ppobFailedModalData={ppobFailedModalData}
+        handleRetryPpobWithNewNumber={handleRetryPpobWithNewNumber}
+        handleRemovePpobAndContinue={handleRemovePpobAndContinue}
         isDigitalInputModalOpen={isDigitalInputModalOpen}
         setIsDigitalInputModalOpen={setIsDigitalInputModalOpen}
         pendingDigitalProduct={pendingDigitalProduct}
@@ -895,6 +920,11 @@ export const POSTransaction = ({
         terminalInfo={terminalInfo}
         activeShift={activeShift}
         pendingCount={pendingCount}
+        unrefundedFailedPpobCount={unrefundedFailedPpobCount}
+        onOpenPpobMenu={() => {
+          setIsPpobMenuOpen(true);
+          fetchPpobTransactions();
+        }}
         isOnline={isOnline}
         syncStatus={syncStatus}
         syncTransactions={syncTransactions}
@@ -996,6 +1026,7 @@ export const POSTransaction = ({
           setIsReprintOldModalOpen={setIsReprintOldModalOpen}
           setIsPpobMenuOpen={setIsPpobMenuOpen}
           fetchPpobTransactions={fetchPpobTransactions}
+          unrefundedFailedPpobCount={unrefundedFailedPpobCount}
           updateQuantity={updateQuantity}
           setItems={setItems}
           setPwpUpsellPrompt={setPwpUpsellPrompt}

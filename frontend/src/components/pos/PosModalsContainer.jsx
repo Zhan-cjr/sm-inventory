@@ -21,7 +21,9 @@ import {
   MultiCardModal,
   QtyModal,
   ReprintOldModal,
-  DigitalProductModal
+  DigitalProductModal,
+  PpobRefundModal,
+  PpobFailedCorrectionModal
 } from './modals';
 import { AuthorizationModal } from '../AuthorizationModal';
 import { ReturnItemModal } from '../ReturnItemModal';
@@ -199,6 +201,19 @@ export const PosModalsContainer = ({
   ppobTransactions,
   handleCheckPpobStatus,
   handleReprintPpob,
+  openRefundModal,
+  isRefundModalOpen,
+  closeRefundModal,
+  selectedPpobForRefund,
+  handleRefundPpob,
+  isRefunding,
+
+  // PPOB Failed Correction Modal
+  isPpobFailedModalOpen,
+  setIsPpobFailedModalOpen,
+  ppobFailedModalData,
+  handleRetryPpobWithNewNumber,
+  handleRemovePpobAndContinue,
 
   // Digital Product
   isDigitalInputModalOpen,
@@ -727,8 +742,31 @@ export const PosModalsContainer = ({
             ppobTransactions={ppobTransactions}
             handleCheckPpobStatus={handleCheckPpobStatus}
             handleReprintPpob={handleReprintPpob}
+            openRefundModal={openRefundModal}
           />
         </Suspense>
+      )}
+
+      {/* PPOB Refund Modal */}
+      {isRefundModalOpen && (
+        <PpobRefundModal
+          isOpen={isRefundModalOpen}
+          onClose={closeRefundModal}
+          ppobItem={selectedPpobForRefund}
+          onConfirmRefund={handleRefundPpob}
+          isRefunding={isRefunding}
+        />
+      )}
+
+      {/* PPOB Instant Pre-flight Failed Correction Modal */}
+      {isPpobFailedModalOpen && (
+        <PpobFailedCorrectionModal
+          isOpen={isPpobFailedModalOpen}
+          onClose={() => setIsPpobFailedModalOpen(false)}
+          failedItem={ppobFailedModalData}
+          onRetryWithNewNumber={handleRetryPpobWithNewNumber}
+          onRemovePpobAndContinue={handleRemovePpobAndContinue}
+        />
       )}
 
       {/* Digital Product Modal */}
