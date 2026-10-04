@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import {
   TerminalSelectModal,
   OpenShiftModal,
@@ -21,13 +21,15 @@ import {
   MultiCardModal,
   QtyModal,
   ReprintOldModal,
-  PpobMenuModal,
   DigitalProductModal
 } from './modals';
 import { AuthorizationModal } from '../AuthorizationModal';
 import { ReturnItemModal } from '../ReturnItemModal';
 import { ReceiptPreview } from '../ReceiptPreview';
 import { EODReportPreview } from '../EODReportPreview';
+
+// Lazy load large PPOB dashboard modal (592 lines)
+const PpobMenuModal = lazy(() => import('./modals/PpobMenuModal').then(m => ({ default: m.PpobMenuModal })));
 
 export const PosModalsContainer = ({
   // Terminal Select
@@ -216,57 +218,67 @@ export const PosModalsContainer = ({
   return (
     <>
       {/* Terminal Selection Modal */}
-      <TerminalSelectModal
-        isOpen={isTerminalModalOpen}
-        allTerminals={allTerminals}
-        onSelectTerminal={handleSelectTerminal}
-      />
+      {isTerminalModalOpen && (
+        <TerminalSelectModal
+          isOpen={isTerminalModalOpen}
+          allTerminals={allTerminals}
+          onSelectTerminal={handleSelectTerminal}
+        />
+      )}
 
       {/* Buka Shift Modal */}
-      <OpenShiftModal
-        isOpen={isOpenShiftModalOpen}
-        selectedShiftName={selectedShiftName}
-        setSelectedShiftName={setSelectedShiftName}
-        startingCash={startingCash}
-        setStartingCash={setStartingCash}
-        formatThousandSeparator={formatThousandSeparator}
-        onOpenShift={handleOpenShift}
-      />
+      {isOpenShiftModalOpen && (
+        <OpenShiftModal
+          isOpen={isOpenShiftModalOpen}
+          selectedShiftName={selectedShiftName}
+          setSelectedShiftName={setSelectedShiftName}
+          startingCash={startingCash}
+          setStartingCash={setStartingCash}
+          formatThousandSeparator={formatThousandSeparator}
+          onOpenShift={handleOpenShift}
+        />
+      )}
 
       {/* Tutup Shift Modal */}
-      <CloseShiftModal
-        isOpen={isCloseShiftModalOpen}
-        onClose={() => setIsCloseShiftModalOpen(false)}
-        activeShift={activeShift}
-        actualCash={actualCash}
-        setActualCash={setActualCash}
-        formatThousandSeparator={formatThousandSeparator}
-        formatCurrency={formatCurrency}
-        onCloseShift={handleCloseShift}
-        isProcessing={isProcessing}
-      />
+      {isCloseShiftModalOpen && (
+        <CloseShiftModal
+          isOpen={isCloseShiftModalOpen}
+          onClose={() => setIsCloseShiftModalOpen(false)}
+          activeShift={activeShift}
+          actualCash={actualCash}
+          setActualCash={setActualCash}
+          formatThousandSeparator={formatThousandSeparator}
+          formatCurrency={formatCurrency}
+          onCloseShift={handleCloseShift}
+          isProcessing={isProcessing}
+        />
+      )}
 
       {/* Cash Movement (Kas Masuk/Keluar) Modal */}
-      <CashMovementModal
-        isOpen={isCashMovementModalOpen}
-        onClose={() => setIsCashMovementModalOpen(false)}
-        cashMovementType={cashMovementType}
-        setCashMovementType={setCashMovementType}
-        cashMovementAmount={cashMovementAmount}
-        setCashMovementAmount={setCashMovementAmount}
-        cashMovementDesc={cashMovementDesc}
-        setCashMovementDesc={setCashMovementDesc}
-        onSave={handleCashMovement}
-        isProcessing={isProcessing}
-      />
+      {isCashMovementModalOpen && (
+        <CashMovementModal
+          isOpen={isCashMovementModalOpen}
+          onClose={() => setIsCashMovementModalOpen(false)}
+          cashMovementType={cashMovementType}
+          setCashMovementType={setCashMovementType}
+          cashMovementAmount={cashMovementAmount}
+          setCashMovementAmount={setCashMovementAmount}
+          cashMovementDesc={cashMovementDesc}
+          setCashMovementDesc={setCashMovementDesc}
+          onSave={handleCashMovement}
+          isProcessing={isProcessing}
+        />
+      )}
 
       {/* Printer Settings Modal */}
-      <PrinterSettingsModal
-        isOpen={isPrinterSettingsOpen}
-        onClose={() => setIsPrinterSettingsOpen(false)}
-        localPrinterSettings={localPrinterSettings}
-        setLocalPrinterSettings={setLocalPrinterSettings}
-      />
+      {isPrinterSettingsOpen && (
+        <PrinterSettingsModal
+          isOpen={isPrinterSettingsOpen}
+          onClose={() => setIsPrinterSettingsOpen(false)}
+          localPrinterSettings={localPrinterSettings}
+          setLocalPrinterSettings={setLocalPrinterSettings}
+        />
+      )}
 
       {/* EOD Report Preview */}
       {eodReportData && (
@@ -282,53 +294,61 @@ export const PosModalsContainer = ({
       )}
 
       {/* Recall (HOLD) Modal */}
-      <RecallModal
-        isOpen={isRecallModalOpen}
-        onClose={() => setIsRecallModalOpen(false)}
-        heldTransactions={heldTransactions}
-        setHeldTransactions={setHeldTransactions}
-        onRecallTransaction={handleRecallTransaction}
-        formatCurrency={formatCurrency}
-        safeSetItem={safeSetItem}
-      />
+      {isRecallModalOpen && (
+        <RecallModal
+          isOpen={isRecallModalOpen}
+          onClose={() => setIsRecallModalOpen(false)}
+          heldTransactions={heldTransactions}
+          setHeldTransactions={setHeldTransactions}
+          onRecallTransaction={handleRecallTransaction}
+          formatCurrency={formatCurrency}
+          safeSetItem={safeSetItem}
+        />
+      )}
 
       {/* Member Selection Modal */}
-      <MemberSelectModal
-        isOpen={isMemberModalOpen}
-        onClose={() => setIsMemberModalOpen(false)}
-        customers={customers}
-        setSelectedCustomer={setSelectedCustomer}
-        memberSearchQuery={memberSearchQuery}
-        setMemberSearchQuery={setMemberSearchQuery}
-      />
+      {isMemberModalOpen && (
+        <MemberSelectModal
+          isOpen={isMemberModalOpen}
+          onClose={() => setIsMemberModalOpen(false)}
+          customers={customers}
+          setSelectedCustomer={setSelectedCustomer}
+          memberSearchQuery={memberSearchQuery}
+          setMemberSearchQuery={setMemberSearchQuery}
+        />
+      )}
 
       {/* Point Redemption Modal */}
-      <RedeemPointModal
-        isOpen={isRedeemPointModalOpen}
-        onClose={() => setIsRedeemPointModalOpen(false)}
-        pointRedemptionEnabled={pointRedemptionEnabled}
-        formatCurrency={formatCurrency}
-        pointRedemptionValue={pointRedemptionValue}
-        minimumPointsToRedeem={minimumPointsToRedeem}
-        selectedCustomer={selectedCustomer}
-        finalAmount={finalAmount}
-        payments={payments}
-        pointsToRedeemInput={pointsToRedeemInput}
-        setPointsToRedeemInput={setPointsToRedeemInput}
-        handleApplyPoints={handleApplyPoints}
-      />
+      {isRedeemPointModalOpen && (
+        <RedeemPointModal
+          isOpen={isRedeemPointModalOpen}
+          onClose={() => setIsRedeemPointModalOpen(false)}
+          pointRedemptionEnabled={pointRedemptionEnabled}
+          formatCurrency={formatCurrency}
+          pointRedemptionValue={pointRedemptionValue}
+          minimumPointsToRedeem={minimumPointsToRedeem}
+          selectedCustomer={selectedCustomer}
+          finalAmount={finalAmount}
+          payments={payments}
+          pointsToRedeemInput={pointsToRedeemInput}
+          setPointsToRedeemInput={setPointsToRedeemInput}
+          handleApplyPoints={handleApplyPoints}
+        />
+      )}
 
       {/* Change Modal Overlay */}
-      <ChangeModal
-        changeModalInfo={changeModalInfo}
-        onClose={() => setChangeModalInfo(null)}
-        onPrintReceipt={() => {
-          setChangeModalInfo(null);
-          setShowReceiptPreview(true);
-        }}
-        formatCurrency={formatCurrency}
-        autoPrint={localPrinterSettings.autoPrint}
-      />
+      {changeModalInfo && (
+        <ChangeModal
+          changeModalInfo={changeModalInfo}
+          onClose={() => setChangeModalInfo(null)}
+          onPrintReceipt={() => {
+            setChangeModalInfo(null);
+            setShowReceiptPreview(true);
+          }}
+          formatCurrency={formatCurrency}
+          autoPrint={localPrinterSettings.autoPrint}
+        />
+      )}
 
       {/* Receipt Preview */}
       {showReceiptPreview && lastTransaction && (
@@ -345,52 +365,56 @@ export const PosModalsContainer = ({
       )}
 
       {/* Bank Selection Modal */}
-      <BankSelectModal
-        isOpen={isBankSelectOpen}
-        onClose={() => setIsBankSelectOpen(false)}
-        banks={banks}
-        formatCurrency={formatCurrency}
-        onSelectBank={(bank) => {
-          setSelectedBank(bank);
-          const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-          setDirectCardInput(sisa !== 0 ? formatThousandSeparator(sisa) : '');
-          setIsBankSelectOpen(false);
-          setIsDirectCardAmountModalOpen(true);
-        }}
-      />
+      {isBankSelectOpen && (
+        <BankSelectModal
+          isOpen={isBankSelectOpen}
+          onClose={() => setIsBankSelectOpen(false)}
+          banks={banks}
+          formatCurrency={formatCurrency}
+          onSelectBank={(bank) => {
+            setSelectedBank(bank);
+            const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
+            setDirectCardInput(sisa !== 0 ? formatThousandSeparator(sisa) : '');
+            setIsBankSelectOpen(false);
+            setIsDirectCardAmountModalOpen(true);
+          }}
+        />
+      )}
 
       {/* Multi Payment Bank Selection Modal */}
-      <MultiBankSelectModal
-        isOpen={isMultiBankSelectOpen}
-        onClose={() => {
-          setIsMultiBankSelectOpen(false);
-          setIsMultiPaymentModalOpen(true);
-        }}
-        banks={banks}
-        pendingCardAmount={pendingCardAmount}
-        formatCurrency={formatCurrency}
-        onSelectBank={(bank, minReq, isBelowMin) => {
-          if (isBelowMin) {
-            setAlertMsg({
-              text: `Nominal porsi pembayaran ${bank.name} minimal ${formatCurrency(minReq)}! (Diinput: ${formatCurrency(pendingCardAmount)})`,
-              type: 'error'
-            });
-            setTimeout(() => setAlertMsg(null), 4000);
-            return;
-          }
-          setPayments([
-            ...payments,
-            {
-              method: 'CARD',
-              amount: pendingCardAmount,
-              bankId: bank.id,
-              label: `${bank.type === 'QRIS' ? 'QRIS' : 'Card'}: ${bank.name}`
+      {isMultiBankSelectOpen && (
+        <MultiBankSelectModal
+          isOpen={isMultiBankSelectOpen}
+          onClose={() => {
+            setIsMultiBankSelectOpen(false);
+            setIsMultiPaymentModalOpen(true);
+          }}
+          banks={banks}
+          pendingCardAmount={pendingCardAmount}
+          formatCurrency={formatCurrency}
+          onSelectBank={(bank, minReq, isBelowMin) => {
+            if (isBelowMin) {
+              setAlertMsg({
+                text: `Nominal porsi pembayaran ${bank.name} minimal ${formatCurrency(minReq)}! (Diinput: ${formatCurrency(pendingCardAmount)})`,
+                type: 'error'
+              });
+              setTimeout(() => setAlertMsg(null), 4000);
+              return;
             }
-          ]);
-          setIsMultiBankSelectOpen(false);
-          setIsMultiPaymentModalOpen(true);
-        }}
-      />
+            setPayments([
+              ...payments,
+              {
+                method: 'CARD',
+                amount: pendingCardAmount,
+                bankId: bank.id,
+                label: `${bank.type === 'QRIS' ? 'QRIS' : 'Card'}: ${bank.name}`
+              }
+            ]);
+            setIsMultiBankSelectOpen(false);
+            setIsMultiPaymentModalOpen(true);
+          }}
+        />
+      )}
 
       {/* Authorization Modal */}
       {pendingAuthAction && (
@@ -416,285 +440,311 @@ export const PosModalsContainer = ({
       )}
 
       {/* Discount Modal */}
-      <DiscountModal
-        discountModal={discountModal}
-        discountInputVal={discountInputVal}
-        setDiscountInputVal={setDiscountInputVal}
-        formatThousandSeparator={formatThousandSeparator}
-        onApply={applyEnteredDiscount}
-        onCancel={() => {
-          setDiscountModal(null);
-          setDiscountInputVal('');
-          barcodeInput.current?.focus();
-        }}
-      />
+      {discountModal && (
+        <DiscountModal
+          discountModal={discountModal}
+          discountInputVal={discountInputVal}
+          setDiscountInputVal={setDiscountInputVal}
+          formatThousandSeparator={formatThousandSeparator}
+          onApply={applyEnteredDiscount}
+          onCancel={() => {
+            setDiscountModal(null);
+            setDiscountInputVal('');
+            barcodeInput.current?.focus();
+          }}
+        />
+      )}
 
       {/* Voucher Modal */}
-      <VoucherModal
-        isOpen={isVoucherModalOpen}
-        voucherInput={voucherInput}
-        setVoucherInput={setVoucherInput}
-        onProcessVoucher={async () => {
-          try {
-            const res = await fetch(`/api/v1/vouchers/validate?code=${voucherInput}`, {
-              headers: { Authorization: `Bearer ${authToken}` }
-            });
-            const data = await res.json();
-            if (!res.ok || !data.valid) {
-              setAlertMsg({ text: data.message || 'Voucher tidak valid', type: 'error' });
-              return;
-            }
-
-            setPayments((prev) => [
-              ...prev,
-              {
-                method: 'VOUCHER',
-                amount: parseFloat(data.voucher.nominal_value),
-                voucherId: data.voucher.id,
-                label: `Voucher: ${data.voucher.code}`
+      {isVoucherModalOpen && (
+        <VoucherModal
+          isOpen={isVoucherModalOpen}
+          voucherInput={voucherInput}
+          setVoucherInput={setVoucherInput}
+          onProcessVoucher={async () => {
+            try {
+              const res = await fetch(`/api/v1/vouchers/validate?code=${voucherInput}`, {
+                headers: { Authorization: `Bearer ${authToken}` }
+              });
+              const data = await res.json();
+              if (!res.ok || !data.valid) {
+                setAlertMsg({ text: data.message || 'Voucher tidak valid', type: 'error' });
+                return;
               }
-            ]);
-            setAlertMsg({
-              text: `Voucher Rp ${formatCurrency(data.voucher.nominal_value)} ditambahkan!`,
-              type: 'success'
-            });
+
+              setPayments((prev) => [
+                ...prev,
+                {
+                  method: 'VOUCHER',
+                  amount: parseFloat(data.voucher.nominal_value),
+                  voucherId: data.voucher.id,
+                  label: `Voucher: ${data.voucher.code}`
+                }
+              ]);
+              setAlertMsg({
+                text: `Voucher Rp ${formatCurrency(data.voucher.nominal_value)} ditambahkan!`,
+                type: 'success'
+              });
+              setIsVoucherModalOpen(false);
+              setVoucherInput('');
+              if (voucherSource === 'MULTI') {
+                setIsMultiPaymentModalOpen(true);
+                setVoucherSource(null);
+              } else {
+                setTimeout(() => barcodeInput.current?.focus(), 100);
+              }
+            } catch (err) {
+              setAlertMsg({ text: 'Gagal memvalidasi voucher (offline/error)', type: 'error' });
+            }
+          }}
+          onCancel={() => {
             setIsVoucherModalOpen(false);
             setVoucherInput('');
             if (voucherSource === 'MULTI') {
               setIsMultiPaymentModalOpen(true);
               setVoucherSource(null);
             } else {
-              setTimeout(() => barcodeInput.current?.focus(), 100);
+              barcodeInput.current?.focus();
             }
-          } catch (err) {
-            setAlertMsg({ text: 'Gagal memvalidasi voucher (offline/error)', type: 'error' });
-          }
-        }}
-        onCancel={() => {
-          setIsVoucherModalOpen(false);
-          setVoucherInput('');
-          if (voucherSource === 'MULTI') {
-            setIsMultiPaymentModalOpen(true);
-            setVoucherSource(null);
-          } else {
-            barcodeInput.current?.focus();
-          }
-        }}
-      />
+          }}
+        />
+      )}
 
       {/* Open Price Modal */}
-      <OpenPriceModal
-        isOpen={isOpenPriceModalOpen}
-        openPriceTargetItem={openPriceTargetItem}
-        newOpenPrice={newOpenPrice}
-        setNewOpenPrice={setNewOpenPrice}
-        formatCurrency={formatCurrency}
-        onSubmit={() => {
-          const val = parseFloat(newOpenPrice);
-          if (!isNaN(val) && val >= 0) {
-            setItems(
-              items.map((i) =>
-                i.productId === openPriceTargetItem.productId
-                  ? { ...i, unitPrice: val, originalUnitPrice: i.originalUnitPrice || i.unitPrice }
-                  : i
-              )
-            );
-            setAlertMsg({ text: 'Harga berhasil diubah', type: 'success' });
+      {isOpenPriceModalOpen && (
+        <OpenPriceModal
+          isOpen={isOpenPriceModalOpen}
+          openPriceTargetItem={openPriceTargetItem}
+          newOpenPrice={newOpenPrice}
+          setNewOpenPrice={setNewOpenPrice}
+          formatCurrency={formatCurrency}
+          onSubmit={() => {
+            const val = parseFloat(newOpenPrice);
+            if (!isNaN(val) && val >= 0) {
+              setItems(
+                items.map((i) =>
+                  i.productId === openPriceTargetItem.productId
+                    ? { ...i, unitPrice: val, originalUnitPrice: i.originalUnitPrice || i.unitPrice }
+                    : i
+                )
+              );
+              setAlertMsg({ text: 'Harga berhasil diubah', type: 'success' });
+              setIsOpenPriceModalOpen(false);
+              setNewOpenPrice('');
+              setOpenPriceTargetItem(null);
+              setTimeout(() => barcodeInput.current?.focus(), 100);
+            }
+          }}
+          onCancel={() => {
             setIsOpenPriceModalOpen(false);
             setNewOpenPrice('');
             setOpenPriceTargetItem(null);
             setTimeout(() => barcodeInput.current?.focus(), 100);
-          }
-        }}
-        onCancel={() => {
-          setIsOpenPriceModalOpen(false);
-          setNewOpenPrice('');
-          setOpenPriceTargetItem(null);
-          setTimeout(() => barcodeInput.current?.focus(), 100);
-        }}
-      />
+          }}
+        />
+      )}
 
       {/* Multi Payment Modal */}
-      <MultiPaymentModal
-        isOpen={isMultiPaymentModalOpen}
-        onClose={() => {
-          setIsMultiPaymentModalOpen(false);
-          barcodeInput.current?.focus();
-        }}
-        finalAmount={finalAmount}
-        payments={payments}
-        setPayments={setPayments}
-        formatCurrency={formatCurrency}
-        onAddVoucher={() => {
-          setVoucherSource('MULTI');
-          setIsVoucherModalOpen(true);
-          setIsMultiPaymentModalOpen(false);
-        }}
-        onAddCash={() => {
-          const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-          setMultiCashInput(sisa > 0 ? formatThousandSeparator(sisa) : '');
-          setIsMultiCashModalOpen(true);
-          setIsMultiPaymentModalOpen(false);
-        }}
-        onAddCard={() => {
-          const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-          if (sisa > 0) {
-            setMultiCardInput(formatThousandSeparator(sisa));
-            setIsMultiCardAmountModalOpen(true);
+      {isMultiPaymentModalOpen && (
+        <MultiPaymentModal
+          isOpen={isMultiPaymentModalOpen}
+          onClose={() => {
             setIsMultiPaymentModalOpen(false);
-          }
-        }}
-        onProcessPay={() => {
-          setIsMultiPaymentModalOpen(false);
-          processTransaction('MULTI');
-        }}
-      />
+            barcodeInput.current?.focus();
+          }}
+          finalAmount={finalAmount}
+          payments={payments}
+          setPayments={setPayments}
+          formatCurrency={formatCurrency}
+          onAddVoucher={() => {
+            setVoucherSource('MULTI');
+            setIsVoucherModalOpen(true);
+            setIsMultiPaymentModalOpen(false);
+          }}
+          onAddCash={() => {
+            const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
+            setMultiCashInput(sisa > 0 ? formatThousandSeparator(sisa) : '');
+            setIsMultiCashModalOpen(true);
+            setIsMultiPaymentModalOpen(false);
+          }}
+          onAddCard={() => {
+            const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
+            if (sisa > 0) {
+              setMultiCardInput(formatThousandSeparator(sisa));
+              setIsMultiCardAmountModalOpen(true);
+              setIsMultiPaymentModalOpen(false);
+            }
+          }}
+          onProcessPay={() => {
+            setIsMultiPaymentModalOpen(false);
+            processTransaction('MULTI');
+          }}
+        />
+      )}
 
       {/* Direct Cash Modal */}
-      <DirectCashModal
-        isOpen={isDirectCashModalOpen}
-        onClose={() => {
-          setIsDirectCashModalOpen(false);
-          setDirectCashInput('');
-        }}
-        finalAmount={finalAmount}
-        payments={payments}
-        directCashInput={directCashInput}
-        setDirectCashInput={setDirectCashInput}
-        formatCurrency={formatCurrency}
-        formatThousandSeparator={formatThousandSeparator}
-        onPay={(val) => {
-          setIsDirectCashModalOpen(false);
-          processTransaction('CASH', null, val);
-        }}
-      />
+      {isDirectCashModalOpen && (
+        <DirectCashModal
+          isOpen={isDirectCashModalOpen}
+          onClose={() => {
+            setIsDirectCashModalOpen(false);
+            setDirectCashInput('');
+          }}
+          finalAmount={finalAmount}
+          payments={payments}
+          directCashInput={directCashInput}
+          setDirectCashInput={setDirectCashInput}
+          formatCurrency={formatCurrency}
+          formatThousandSeparator={formatThousandSeparator}
+          onPay={(val) => {
+            setIsDirectCashModalOpen(false);
+            processTransaction('CASH', null, val);
+          }}
+        />
+      )}
 
       {/* Direct Card Amount Modal */}
-      <DirectCardModal
-        isOpen={isDirectCardAmountModalOpen}
-        onClose={() => {
-          setIsDirectCardAmountModalOpen(false);
-          setDirectCardInput('');
-        }}
-        selectedBank={selectedBank}
-        finalAmount={finalAmount}
-        payments={payments}
-        directCardInput={directCardInput}
-        setDirectCardInput={setDirectCardInput}
-        formatCurrency={formatCurrency}
-        formatThousandSeparator={formatThousandSeparator}
-        onPay={(val, minReq, inputVal) => {
-          if (val === null) {
-            setAlertMsg({
-              text: `Nominal pembayaran via ${selectedBank?.name || 'Bank'} minimal ${formatCurrency(minReq)}! (Diinput: ${formatCurrency(inputVal)})`,
-              type: 'error'
-            });
-            setTimeout(() => setAlertMsg(null), 4000);
-            return;
-          }
-          setIsDirectCardAmountModalOpen(false);
-          processTransaction('CARD', selectedBank?.id, val);
-        }}
-      />
+      {isDirectCardAmountModalOpen && (
+        <DirectCardModal
+          isOpen={isDirectCardAmountModalOpen}
+          onClose={() => {
+            setIsDirectCardAmountModalOpen(false);
+            setDirectCardInput('');
+          }}
+          selectedBank={selectedBank}
+          finalAmount={finalAmount}
+          payments={payments}
+          directCardInput={directCardInput}
+          setDirectCardInput={setDirectCardInput}
+          formatCurrency={formatCurrency}
+          formatThousandSeparator={formatThousandSeparator}
+          onPay={(val, minReq, inputVal) => {
+            if (val === null) {
+              setAlertMsg({
+                text: `Nominal pembayaran via ${selectedBank?.name || 'Bank'} minimal ${formatCurrency(minReq)}! (Diinput: ${formatCurrency(inputVal)})`,
+                type: 'error'
+              });
+              setTimeout(() => setAlertMsg(null), 4000);
+              return;
+            }
+            setIsDirectCardAmountModalOpen(false);
+            processTransaction('CARD', selectedBank?.id, val);
+          }}
+        />
+      )}
 
       {/* Multi Cash Modal */}
-      <MultiCashModal
-        isOpen={isMultiCashModalOpen}
-        onClose={() => {
-          setIsMultiCashModalOpen(false);
-          setMultiCashInput('');
-          setIsMultiPaymentModalOpen(true);
-        }}
-        finalAmount={finalAmount}
-        payments={payments}
-        multiCashInput={multiCashInput}
-        setMultiCashInput={setMultiCashInput}
-        formatCurrency={formatCurrency}
-        formatThousandSeparator={formatThousandSeparator}
-        onAddCash={(val) => {
-          setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
-          setIsMultiCashModalOpen(false);
-          setMultiCashInput('');
-          setIsMultiPaymentModalOpen(true);
-        }}
-      />
+      {isMultiCashModalOpen && (
+        <MultiCashModal
+          isOpen={isMultiCashModalOpen}
+          onClose={() => {
+            setIsMultiCashModalOpen(false);
+            setMultiCashInput('');
+            setIsMultiPaymentModalOpen(true);
+          }}
+          finalAmount={finalAmount}
+          payments={payments}
+          multiCashInput={multiCashInput}
+          setMultiCashInput={setMultiCashInput}
+          formatCurrency={formatCurrency}
+          formatThousandSeparator={formatThousandSeparator}
+          onAddCash={(val) => {
+            setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
+            setIsMultiCashModalOpen(false);
+            setMultiCashInput('');
+            setIsMultiPaymentModalOpen(true);
+          }}
+        />
+      )}
 
       {/* Multi Card Amount Modal */}
-      <MultiCardModal
-        isOpen={isMultiCardAmountModalOpen}
-        onClose={() => {
-          setIsMultiCardAmountModalOpen(false);
-          setMultiCardInput('');
-          setIsMultiPaymentModalOpen(true);
-        }}
-        finalAmount={finalAmount}
-        payments={payments}
-        multiCardInput={multiCardInput}
-        setMultiCardInput={setMultiCardInput}
-        formatCurrency={formatCurrency}
-        formatThousandSeparator={formatThousandSeparator}
-        onNext={(val) => {
-          setPendingCardAmount(val);
-          setIsMultiCardAmountModalOpen(false);
-          setMultiCardInput('');
-          setIsMultiBankSelectOpen(true);
-        }}
-      />
+      {isMultiCardAmountModalOpen && (
+        <MultiCardModal
+          isOpen={isMultiCardAmountModalOpen}
+          onClose={() => {
+            setIsMultiCardAmountModalOpen(false);
+            setMultiCardInput('');
+            setIsMultiPaymentModalOpen(true);
+          }}
+          finalAmount={finalAmount}
+          payments={payments}
+          multiCardInput={multiCardInput}
+          setMultiCardInput={setMultiCardInput}
+          formatCurrency={formatCurrency}
+          formatThousandSeparator={formatThousandSeparator}
+          onNext={(val) => {
+            setPendingCardAmount(val);
+            setIsMultiCardAmountModalOpen(false);
+            setMultiCardInput('');
+            setIsMultiBankSelectOpen(true);
+          }}
+        />
+      )}
 
       {/* Qty Modal */}
-      <QtyModal
-        isOpen={isQtyModalOpen}
-        nextItemQty={nextItemQty}
-        setNextItemQty={setNextItemQty}
-        onConfirm={() => {
-          setIsQtyModalOpen(false);
-          setTimeout(() => barcodeInput.current?.focus(), 100);
-        }}
-        onCancel={() => {
-          setNextItemQty('');
-          setIsQtyModalOpen(false);
-          barcodeInput.current?.focus();
-        }}
-      />
+      {isQtyModalOpen && (
+        <QtyModal
+          isOpen={isQtyModalOpen}
+          nextItemQty={nextItemQty}
+          setNextItemQty={setNextItemQty}
+          onConfirm={() => {
+            setIsQtyModalOpen(false);
+            setTimeout(() => barcodeInput.current?.focus(), 100);
+          }}
+          onCancel={() => {
+            setNextItemQty('');
+            setIsQtyModalOpen(false);
+            barcodeInput.current?.focus();
+          }}
+        />
+      )}
 
       {/* Reprint Old Receipt Modal */}
-      <ReprintOldModal
-        isOpen={isReprintOldModalOpen}
-        oldReceiptInput={oldReceiptInput}
-        setOldReceiptInput={setOldReceiptInput}
-        onSubmit={handleReprintOld}
-        onCancel={() => {
-          setIsReprintOldModalOpen(false);
-          setOldReceiptInput('');
-          setTimeout(() => barcodeInput.current?.focus(), 100);
-        }}
-      />
+      {isReprintOldModalOpen && (
+        <ReprintOldModal
+          isOpen={isReprintOldModalOpen}
+          oldReceiptInput={oldReceiptInput}
+          setOldReceiptInput={setOldReceiptInput}
+          onSubmit={handleReprintOld}
+          onCancel={() => {
+            setIsReprintOldModalOpen(false);
+            setOldReceiptInput('');
+            setTimeout(() => barcodeInput.current?.focus(), 100);
+          }}
+        />
+      )}
 
-      {/* PPOB Menu Modal */}
-      <PpobMenuModal
-        isOpen={isPpobMenuOpen}
-        onClose={() => setIsPpobMenuOpen(false)}
-        ppobSearchQuery={ppobSearchQuery}
-        setPpobSearchQuery={setPpobSearchQuery}
-        fetchPpobTransactions={fetchPpobTransactions}
-        isFetchingPpobTransactions={isFetchingPpobTransactions}
-        ppobTransactions={ppobTransactions}
-        handleCheckPpobStatus={handleCheckPpobStatus}
-        handleReprintPpob={handleReprintPpob}
-      />
+      {/* PPOB Menu Modal (Lazy Loaded) */}
+      {isPpobMenuOpen && (
+        <Suspense fallback={null}>
+          <PpobMenuModal
+            isOpen={isPpobMenuOpen}
+            onClose={() => setIsPpobMenuOpen(false)}
+            ppobSearchQuery={ppobSearchQuery}
+            setPpobSearchQuery={setPpobSearchQuery}
+            fetchPpobTransactions={fetchPpobTransactions}
+            isFetchingPpobTransactions={isFetchingPpobTransactions}
+            ppobTransactions={ppobTransactions}
+            handleCheckPpobStatus={handleCheckPpobStatus}
+            handleReprintPpob={handleReprintPpob}
+          />
+        </Suspense>
+      )}
 
       {/* Digital Product Modal */}
-      <DigitalProductModal
-        isOpen={isDigitalInputModalOpen}
-        onClose={() => {
-          setIsDigitalInputModalOpen(false);
-          setPendingDigitalProduct(null);
-        }}
-        pendingDigitalProduct={pendingDigitalProduct}
-        customerNoInput={customerNoInput}
-        setCustomerNoInput={setCustomerNoInput}
-        onSubmit={handleDigitalProductSubmit}
-      />
+      {isDigitalInputModalOpen && (
+        <DigitalProductModal
+          isOpen={isDigitalInputModalOpen}
+          onClose={() => {
+            setIsDigitalInputModalOpen(false);
+            setPendingDigitalProduct(null);
+          }}
+          pendingDigitalProduct={pendingDigitalProduct}
+          customerNoInput={customerNoInput}
+          setCustomerNoInput={setCustomerNoInput}
+          onSubmit={handleDigitalProductSubmit}
+        />
+      )}
     </>
   );
 };

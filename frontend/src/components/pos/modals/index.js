@@ -18,5 +18,4 @@ export { MultiCashModal } from './MultiCashModal';
 export { MultiCardModal } from './MultiCardModal';
 export { QtyModal } from './QtyModal';
 export { ReprintOldModal } from './ReprintOldModal';
-export { PpobMenuModal } from './PpobMenuModal';
 export { DigitalProductModal } from './DigitalProductModal';
