@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { POSTransaction } from './components/POSTransaction';
-import { BIDashboard } from './components/BIDashboard';
 import { Login } from './components/Login';
-import { MobileLayout } from './components/Mobile/MobileLayout';
-import { MobileAuthQueue } from './components/Mobile/MobileAuthQueue';
-import { MobileEcommerceQueue } from './components/Mobile/MobileEcommerceQueue';
-import { MobileDashboard } from './components/Mobile/MobileDashboard';
-import { MobileProductScanner } from './components/Mobile/MobileProductScanner';
-import { MobileSuggestedOrders } from './components/Mobile/MobileSuggestedOrders';
 import './index.css';
+
+// Code splitting (Lazy loading) for non-critical initial chunks
+const BIDashboard = lazy(() => import('./components/BIDashboard').then(m => ({ default: m.BIDashboard })));
+const MobileLayout = lazy(() => import('./components/Mobile/MobileLayout').then(m => ({ default: m.MobileLayout })));
+const MobileAuthQueue = lazy(() => import('./components/Mobile/MobileAuthQueue').then(m => ({ default: m.MobileAuthQueue })));
+const MobileEcommerceQueue = lazy(() => import('./components/Mobile/MobileEcommerceQueue').then(m => ({ default: m.MobileEcommerceQueue })));
+const MobileDashboard = lazy(() => import('./components/Mobile/MobileDashboard').then(m => ({ default: m.MobileDashboard })));
+const MobileProductScanner = lazy(() => import('./components/Mobile/MobileProductScanner').then(m => ({ default: m.MobileProductScanner })));
+const MobileSuggestedOrders = lazy(() => import('./components/Mobile/MobileSuggestedOrders').then(m => ({ default: m.MobileSuggestedOrders })));
+
+const PageLoader = () => (
+  <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-dark, #0f172a)', color: 'var(--text-main, #fff)' }}>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ width: 36, height: 36, border: '3px solid rgba(59, 130, 246, 0.2)', borderTopColor: '#3b82f6', borderRadius: '50%', margin: '0 auto 0.75rem', animation: 'spin 0.8s linear infinite' }} />
+      <p style={{ fontSize: '0.9rem', color: 'var(--text-muted, #94a3b8)' }}>Memuat Halaman...</p>
+    </div>
+  </div>
+);
 
 // Interceptor global fetch untuk otomatis menyertakan header X-Device-UUID di semua request API v1
 const originalFetch = window.fetch;
@@ -316,49 +327,51 @@ function App() {
 
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={
-          isMobileDevice ? <Navigate to="/mobile" replace /> : (canAccessDashboard ? <Navigate to="/dashboard" replace /> : (user.can_access_pos ? <Navigate to="/pos" replace /> : <div style={{ padding: '2rem', textAlign: 'center', marginTop: '10vh' }}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px' }}>Logout</button></div>))
-        } />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={
+            isMobileDevice ? <Navigate to="/mobile" replace /> : (canAccessDashboard ? <Navigate to="/dashboard" replace /> : (user.can_access_pos ? <Navigate to="/pos" replace /> : <div style={{ padding: '2rem', textAlign: 'center', marginTop: '10vh' }}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px' }}>Logout</button></div>))
+          } />
 
-        <Route path="/pos" element={
-          isMobileDevice ? <Navigate to="/mobile" replace /> : (user.can_access_pos ? (
-            <div className="app-container">
-              <POSTransaction
-                branchId={deviceInfo?.branchId || user.branch_id}
-                branchName={deviceInfo?.branchName || user.branch_name}
-                branchCode={deviceInfo?.branchCode || user.branch_code}
-                branchAddress={deviceInfo?.branchAddress || user.branch_address}
-                orgName={user.organization_name}
-                authToken={token}
-                userName={user.name}
-                userRole={user.role}
-                onLogout={handleLogout}
-                // Locked Device Terminal Info (Props)
-                lockedTerminalId={deviceInfo?.terminalId}
-                lockedTerminalName={deviceInfo?.terminalName}
-              />
-            </div>
-          ) : <div style={{ padding: '2rem', textAlign: 'center', marginTop: '10vh' }}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px' }}>Logout</button></div>)
-        } />
+          <Route path="/pos" element={
+            isMobileDevice ? <Navigate to="/mobile" replace /> : (user.can_access_pos ? (
+              <div className="app-container">
+                <POSTransaction
+                  branchId={deviceInfo?.branchId || user.branch_id}
+                  branchName={deviceInfo?.branchName || user.branch_name}
+                  branchCode={deviceInfo?.branchCode || user.branch_code}
+                  branchAddress={deviceInfo?.branchAddress || user.branch_address}
+                  orgName={user.organization_name}
+                  authToken={token}
+                  userName={user.name}
+                  userRole={user.role}
+                  onLogout={handleLogout}
+                  // Locked Device Terminal Info (Props)
+                  lockedTerminalId={deviceInfo?.terminalId}
+                  lockedTerminalName={deviceInfo?.terminalName}
+                />
+              </div>
+            ) : <div style={{ padding: '2rem', textAlign: 'center', marginTop: '10vh' }}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px' }}>Logout</button></div>)
+          } />
 
-        <Route path="/dashboard" element={
-          canAccessDashboard ? (
-            <BIDashboard user={user} authToken={token} onBack={() => window.location.href = '/mobile'} />
-          ) : <Navigate to="/pos" replace />
-        } />
+          <Route path="/dashboard" element={
+            canAccessDashboard ? (
+              <BIDashboard user={user} authToken={token} onBack={() => window.location.href = '/mobile'} />
+            ) : <Navigate to="/pos" replace />
+          } />
 
-        <Route path="/mobile" element={
-          user ? <MobileLayout user={user} onLogout={handleLogout} /> : <Navigate to="/" replace />
-        }>
-          <Route index element={<Navigate to={(!canAccessDashboard) ? "scanner" : "dashboard"} replace />} />
-          <Route path="dashboard" element={(!canAccessDashboard) ? <Navigate to="/mobile/scanner" replace /> : <MobileDashboard user={user} authToken={token} />} />
-          <Route path="scanner" element={<MobileProductScanner user={user} authToken={token} />} />
-          <Route path="auth" element={(!isManagerOrAdmin && !hasAuthMenu) ? <Navigate to="/mobile/scanner" replace /> : <MobileAuthQueue user={user} authToken={token} />} />
-          <Route path="ecommerce" element={(!isManagerOrAdmin && !hasEcommerceAuth) ? <Navigate to="/mobile/scanner" replace /> : <MobileEcommerceQueue user={user} authToken={token} />} />
-          <Route path="suggested-orders" element={(!isManagerOrAdmin && !hasSmartOrderAuth) ? <Navigate to="/mobile/scanner" replace /> : <MobileSuggestedOrders user={user} authToken={token} />} />
-        </Route>
-      </Routes>
+          <Route path="/mobile" element={
+            user ? <MobileLayout user={user} onLogout={handleLogout} /> : <Navigate to="/" replace />
+          }>
+            <Route index element={<Navigate to={(!canAccessDashboard) ? "scanner" : "dashboard"} replace />} />
+            <Route path="dashboard" element={(!canAccessDashboard) ? <Navigate to="/mobile/scanner" replace /> : <MobileDashboard user={user} authToken={token} />} />
+            <Route path="scanner" element={<MobileProductScanner user={user} authToken={token} />} />
+            <Route path="auth" element={(!isManagerOrAdmin && !hasAuthMenu) ? <Navigate to="/mobile/scanner" replace /> : <MobileAuthQueue user={user} authToken={token} />} />
+            <Route path="ecommerce" element={(!isManagerOrAdmin && !hasEcommerceAuth) ? <Navigate to="/mobile/scanner" replace /> : <MobileEcommerceQueue user={user} authToken={token} />} />
+            <Route path="suggested-orders" element={(!isManagerOrAdmin && !hasSmartOrderAuth) ? <Navigate to="/mobile/scanner" replace /> : <MobileSuggestedOrders user={user} authToken={token} />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </Router>
   );
 }
