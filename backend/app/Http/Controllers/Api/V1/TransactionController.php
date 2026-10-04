@@ -166,8 +166,14 @@ class TransactionController extends Controller
                     }
                 }
 
+                $productIds = collect($validated['items'])->pluck('product_id')->unique();
+                $productsMap = \App\Models\Product::with(['assemblies', 'conversions'])
+                    ->whereIn('id', $productIds)
+                    ->get()
+                    ->keyBy('id');
+
                 foreach ($validated['items'] as $item) {
-                    $product = \App\Models\Product::with(['assemblies', 'conversions'])->find($item['product_id']);
+                    $product = $productsMap->get($item['product_id']);
 
                     // Check Auto-Conversion if stock is not enough (only for physical products)
                     if ($product && $product->product_type === 'physical') {
@@ -228,8 +234,8 @@ class TransactionController extends Controller
                         'original_transaction_id' => $item['originalTransactionId'] ?? $item['original_transaction_id'] ?? null,
                     ]);
 
-                    // Check Assembly
-                    if ($product && $product->assemblies()->exists()) {
+                    // Check Assembly (using in-memory relation, no extra query)
+                    if ($product && $product->assemblies && $product->assemblies->isNotEmpty()) {
                         foreach ($product->assemblies as $assembly) {
                             TransactionItem::create([
                                 'transaction_id' => $transaction->id,
@@ -243,7 +249,6 @@ class TransactionController extends Controller
                         }
                     }
 
-                    $product = \App\Models\Product::find($item['product_id']);
                     if ($product && $product->product_type === 'digital' && !empty($product->ppob_sku)) {
                         $customerNo = $item['customer_no'] ?? null;
                         if ($customerNo) {
@@ -408,12 +413,13 @@ class TransactionController extends Controller
             return response()->json(['message' => 'Transaksi tidak ditemukan.'], 404);
         }
 
+        $returnsMap = \App\Models\TransactionItem::where('original_transaction_id', $transaction->id)
+            ->groupBy('product_id')
+            ->selectRaw('product_id, SUM(quantity) as total_returned')
+            ->pluck('total_returned', 'product_id');
+
         foreach ($transaction->items as $item) {
-            $returnedQuantity = \App\Models\TransactionItem::where('original_transaction_id', $transaction->id)
-                ->where('product_id', $item->product_id)
-                ->sum('quantity');
-            
-            // return quantities are stored as negative numbers
+            $returnedQuantity = $returnsMap->get($item->product_id, 0);
             $item->returned_quantity = abs($returnedQuantity);
         }
 
@@ -430,10 +436,11 @@ class TransactionController extends Controller
         }
 
         $branchId = $user->branch_id;
-        $today = \Carbon\Carbon::today();
+        $todayStart = \Carbon\Carbon::today()->startOfDay();
+        $todayEnd = \Carbon\Carbon::today()->endOfDay();
 
         $transactions = Transaction::where('branch_id', $branchId)
-            ->whereDate('created_at', $today)
+            ->whereBetween('created_at', [$todayStart, $todayEnd])
             ->whereHas('ppobTransactions')
             ->with(['ppobTransactions', 'items.product', 'cashier'])
             ->orderBy('created_at', 'desc')

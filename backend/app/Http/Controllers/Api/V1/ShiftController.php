@@ -226,76 +226,14 @@ class ShiftController extends Controller
                 return response()->json(['message' => 'Shift sudah ditutup sebelumnya.'], 422);
             }
 
-            // Calculate sales during this shift including MULTI payments
-            $transactions = Transaction::where('shift_id', $shift->id)
-                ->where('is_voided', false)
-                ->get();
-
-            $cash_sales = 0;
-            $card_sales = 0;
-            $voucher_sales = 0;
-            $cash_returns = 0;
-            $card_returns = 0;
-            $cardSalesByBank = [];
-
-            foreach ($transactions as $tx) {
-                $amount = $tx->final_amount;
-            $tx_sales = 0;
-            $tx_returns = 0;
-            foreach ($tx->items as $item) {
-                if ($item->quantity > 0) {
-                    $tx_sales += ($item->quantity * $item->unit_price);
-                } else {
-                    $tx_returns += (abs($item->quantity) * $item->unit_price);
-                }
-            }
-            $tx_sales -= ($tx->manual_discount + $tx->promo_discount);
-            if ($tx_sales < 0) $tx_sales = 0;
-
-            $method = strtoupper($tx->payment_method);
-            
-            if ($method === 'CASH' || $method === 'POINT') {
-                $cash_sales += $tx_sales;
-                $cash_returns += $tx_returns;
-            } elseif ($method === 'CARD') {
-                $card_sales += $tx_sales;
-                $card_returns += $tx_returns;
-                $bankName = $tx->bank ? $tx->bank->name : 'EDC';
-                if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
-                $cardSalesByBank[$bankName] += $amount; // net amount for bank
-            } elseif ($method === 'VOUCHER') {
-                $voucher_sales += $tx_sales;
-            } elseif ($method === 'MULTI') {
-                $details = $tx->payment_details;
-                if (is_string($details)) $details = json_decode($details, true);
-                if (is_array($details)) {
-                    $cash_amt = collect($details)->where('method', 'CASH')->sum('amount');
-                    if ($cash_amt > 0) $cash_amt = max(0, $cash_amt - $tx->change_amount);
-                    
-                    $voucher_amt = collect($details)->where('method', 'VOUCHER')->sum('amount');
-                    $voucher_sales += $voucher_amt;
-                    
-                    $cash_returns += $tx_returns;
-                    $cash_sales += ($cash_amt + $tx_returns);
-                    
-                    $cardDetails = collect($details)->where('method', 'CARD');
-                    foreach ($cardDetails as $c) {
-                        $card_sales += $c['amount'];
-                        $bankName = $c['label'] ?? 'EDC';
-                        if (strpos($bankName, 'Card: ') === 0) $bankName = substr($bankName, 6);
-                        if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
-                        $cardSalesByBank[$bankName] += $c['amount'];
-                    }
-                }
-            }
-            }
+            $shiftData = $this->calculateShiftData($shift);
 
             $shift->end_time = now();
-            $shift->total_cash_sales = $cash_sales;
-            $shift->total_card_sales = $card_sales;
-            $shift->total_voucher_sales = $voucher_sales;
-            $shift->total_cash_returns = $cash_returns;
-            $shift->total_card_returns = $card_returns;
+            $shift->total_cash_sales = $shiftData['cash_sales'];
+            $shift->total_card_sales = $shiftData['card_sales'];
+            $shift->total_voucher_sales = $shiftData['voucher_sales'];
+            $shift->total_cash_returns = $shiftData['cash_returns'];
+            $shift->total_card_returns = $shiftData['card_returns'];
             $shift->actual_cash = $validated['actual_cash'];
             
             // Expected cash physical in drawer: Start + Cash In - Cash Out + Cash Sales - Cash Returns
@@ -308,63 +246,9 @@ class ShiftController extends Controller
             // Load cash movements and branch details for EOD report
             $shift->load(['user', 'terminal', 'cashMovements', 'branch.organization']);
             $shift->expected_cash = $expectedCash;
-
-            // 1. Sales by Bank is already calculated in the loop
-            $formattedCardSales = [];
-            foreach ($cardSalesByBank as $name => $total) {
-                $formattedCardSales[] = (object)['name' => $name, 'total_amount' => $total];
-            }
-
-            // 2. Returns Detail (Negative transactions or items with negative quantity)
-            $returns = Transaction::with(['items.product'])
-                ->where('shift_id', $shift->id)
-                ->where('is_voided', false)
-                ->get();
-            
-            $returnItems = [];
-            foreach ($returns as $tx) {
-                foreach ($tx->items as $item) {
-                    if ($item->quantity < 0) {
-                        $returnItems[] = [
-                            'product_name' => $item->product ? $item->product->name : 'Unknown Item',
-                            'quantity' => abs($item->quantity),
-                            'total' => abs($item->quantity * $item->unit_price)
-                        ];
-                    }
-                }
-            }
-
-            // 3. Discounts and Points Details
-            $shiftTransactions = Transaction::where('shift_id', $shift->id)
-                ->where('is_voided', false)
-                ->get();
-                
-            $totalManualDiscount = $shiftTransactions->sum('manual_discount');
-            $totalPromoDiscount = $shiftTransactions->sum('promo_discount');
-            $totalPointDeduction = $shiftTransactions->sum(function ($tx) {
-                $pointPayment = 0.0;
-                if (!empty($tx->payment_details)) {
-                    $details = $tx->payment_details;
-                    if (is_string($details)) $details = json_decode($details, true);
-                    if (is_array($details)) {
-                        $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
-                    }
-                } elseif (strtoupper($tx->payment_method) === 'POINT') {
-                    $pointPayment = (float) $tx->final_amount;
-                }
-                return $pointPayment;
-            });
-
-            $discountDetails = [
-                'manual_discount' => $totalManualDiscount,
-                'promo_discount' => $totalPromoDiscount,
-                'point_deduction' => $totalPointDeduction
-            ];
-
-            // Add these details dynamically to the shift object without saving to DB
-            $shift->card_sales_by_bank = $formattedCardSales;
-            $shift->returns_detail = $returnItems;
-            $shift->discount_details = $discountDetails;
+            $shift->card_sales_by_bank = $shiftData['formatted_card_sales'];
+            $shift->returns_detail = $shiftData['return_items'];
+            $shift->discount_details = $shiftData['discount_details'];
 
             return response()->json([
                 'message' => 'Shift berhasil ditutup.',
@@ -377,12 +261,35 @@ class ShiftController extends Controller
             ], 500);
         }
     }
+
     public function printEod(Shift $shift)
     {
         $shift->load(['user', 'terminal', 'cashMovements', 'branch.organization']);
 
-        // Calculate sales during this shift including MULTI payments
-        $transactions = Transaction::where('shift_id', $shift->id)
+        $shiftData = $this->calculateShiftData($shift);
+
+        $expectedCash = $shift->starting_cash + $shiftData['cash_sales'] - $shiftData['cash_returns'] + $shift->total_cash_in - $shift->total_cash_out;
+
+        $shift->expected_cash = $expectedCash;
+        $shift->total_cash_sales = $shiftData['cash_sales'];
+        $shift->total_card_sales = $shiftData['card_sales'];
+        $shift->total_voucher_sales = $shiftData['voucher_sales'];
+        $shift->total_cash_returns = $shiftData['cash_returns'];
+        $shift->total_card_returns = $shiftData['card_returns'];
+        $shift->card_sales_by_bank = $shiftData['formatted_card_sales'];
+        $shift->returns_detail = $shiftData['return_items'];
+        $shift->discount_details = $shiftData['discount_details'];
+
+        return view('print.eod-receipt', compact('shift'));
+    }
+
+    /**
+     * Efficiently calculate all shift transaction totals and returns with eager loaded relations.
+     */
+    private function calculateShiftData(Shift $shift)
+    {
+        $transactions = Transaction::with(['items.product', 'bank'])
+            ->where('shift_id', $shift->id)
             ->where('is_voided', false)
             ->get();
 
@@ -398,11 +305,20 @@ class ShiftController extends Controller
             $amount = $tx->final_amount;
             $tx_sales = 0;
             $tx_returns = 0;
+
             foreach ($tx->items as $item) {
+                $itemDiscount = (float) ($item->discount_per_item ?? 0);
+                $effectivePrice = max(0, (float) $item->unit_price - $itemDiscount);
+
                 if ($item->quantity > 0) {
-                    $tx_sales += ($item->quantity * ($item->unit_price - $item->discount_per_item));
+                    $tx_sales += ($item->quantity * $effectivePrice);
                 } else {
-                    $tx_returns += (abs($item->quantity) * ($item->unit_price - $item->discount_per_item));
+                    $tx_returns += (abs($item->quantity) * $effectivePrice);
+                    $returnItems[] = [
+                        'product_name' => $item->product ? $item->product->name : 'Unknown Item',
+                        'quantity' => abs($item->quantity),
+                        'total' => abs($item->quantity * $effectivePrice)
+                    ];
                 }
             }
             $tx_sales -= ($tx->manual_discount + $tx->promo_discount);
@@ -418,7 +334,7 @@ class ShiftController extends Controller
                 $card_returns += $tx_returns;
                 $bankName = $tx->bank ? $tx->bank->name : 'EDC';
                 if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
-                $cardSalesByBank[$bankName] += $amount; // net amount for bank
+                $cardSalesByBank[$bankName] += $amount;
             } elseif ($method === 'VOUCHER') {
                 $voucher_sales += $tx_sales;
             } elseif ($method === 'MULTI') {
@@ -444,28 +360,7 @@ class ShiftController extends Controller
                     }
                 }
             }
-
-            // Add to returnItems
-            foreach ($tx->items as $item) {
-                if ($item->quantity < 0) {
-                    $returnItems[] = [
-                        'product_name' => $item->product ? $item->product->name : 'Unknown Item',
-                        'quantity' => abs($item->quantity),
-                        'total' => abs($item->quantity * $item->unit_price)
-                    ];
-                }
-            }
         }
-
-        $expectedCash = $shift->starting_cash + $cash_sales - $cash_returns + $shift->total_cash_in - $shift->total_cash_out;
-        
-        // Dynamically assign for the view
-        $shift->expected_cash = $expectedCash;
-        $shift->total_cash_sales = $cash_sales;
-        $shift->total_card_sales = $card_sales;
-        $shift->total_voucher_sales = $voucher_sales;
-        $shift->total_cash_returns = $cash_returns;
-        $shift->total_card_returns = $card_returns;
 
         $formattedCardSales = [];
         foreach ($cardSalesByBank as $name => $total) {
@@ -488,16 +383,19 @@ class ShiftController extends Controller
             return $pointPayment;
         });
 
-        $discountDetails = [
-            'manual_discount' => $totalManualDiscount,
-            'promo_discount' => $totalPromoDiscount,
-            'point_deduction' => $totalPointDeduction
+        return [
+            'cash_sales' => $cash_sales,
+            'card_sales' => $card_sales,
+            'voucher_sales' => $voucher_sales,
+            'cash_returns' => $cash_returns,
+            'card_returns' => $card_returns,
+            'formatted_card_sales' => $formattedCardSales,
+            'return_items' => $returnItems,
+            'discount_details' => [
+                'manual_discount' => $totalManualDiscount,
+                'promo_discount' => $totalPromoDiscount,
+                'point_deduction' => $totalPointDeduction
+            ]
         ];
-
-        $shift->card_sales_by_bank = $formattedCardSales;
-        $shift->returns_detail = $returnItems;
-        $shift->discount_details = $discountDetails;
-
-        return view('print.eod-receipt', compact('shift'));
     }
 }

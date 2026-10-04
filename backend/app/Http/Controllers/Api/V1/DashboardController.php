@@ -24,36 +24,38 @@ class DashboardController extends Controller
         if (!$branchId) {
             return response()->json(['message' => 'Silakan pilih cabang terlebih dahulu.'], 400);
         }
-        $today = Carbon::today();
+        $todayStart = Carbon::today()->startOfDay();
+        $todayEnd = Carbon::today()->endOfDay();
 
-        // 1. Total Penjualan & Transaksi Hari Ini
-        $todayTransactions = Transaction::where('branch_id', $branchId)
-            ->whereDate('transaction_date', $today)
+        // 1. Total Penjualan, Transaksi, Cost (COGS) & Gross Profit Hari Ini (Single Aggregate Query)
+        $todayAgg = Transaction::where('branch_id', $branchId)
+            ->whereBetween('transaction_date', [$todayStart, $todayEnd])
             ->where('is_voided', false)
-            ->with('items.product')
-            ->get();
+            ->selectRaw('COALESCE(SUM(final_amount), 0) as today_sales, COUNT(id) as today_count, COALESCE(SUM(cogs), 0) as today_cogs')
+            ->first();
 
-        $todaySales = $todayTransactions->sum('final_amount');
-        $todayCount = $todayTransactions->count();
-
-        // 2. Total Cost (COGS) & Gross Profit Hari Ini
-        $todayCogs = $todayTransactions->sum('cogs');
+        $todaySales = (float) ($todayAgg->today_sales ?? 0);
+        $todayCount = (int) ($todayAgg->today_count ?? 0);
+        $todayCogs = (float) ($todayAgg->today_cogs ?? 0);
 
         $grossProfit = $todaySales - $todayCogs;
         $profitMargin = $todaySales > 0 ? ($grossProfit / $todaySales) * 100 : 0;
 
-        // 3. Produk Terlaris (Bulan Ini)
+        // 2. Produk Terlaris (Bulan Ini)
+        $monthStart = Carbon::now()->startOfMonth();
+        $monthEnd = Carbon::now()->endOfMonth();
         $topProducts = TransactionItem::join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
             ->join('products', 'transaction_items.product_id', '=', 'products.id')
             ->where('transactions.branch_id', $branchId)
-            ->whereMonth('transactions.transaction_date', Carbon::now()->month)
+            ->where('transactions.is_voided', false)
+            ->whereBetween('transactions.transaction_date', [$monthStart, $monthEnd])
             ->select('products.name', DB::raw('SUM(transaction_items.quantity) as total_sold'))
             ->groupBy('products.id', 'products.name')
             ->orderByDesc('total_sold')
             ->limit(5)
             ->get();
 
-        // 4. Grafik Transaksi (7 Hari Terakhir)
+        // 3. Grafik Transaksi (7 Hari Terakhir)
         $last7Days = [];
         for ($i = 6; $i >= 0; $i--) {
             $date = Carbon::today()->subDays($i);
@@ -64,9 +66,11 @@ class DashboardController extends Controller
             ];
         }
 
+        $sevenDaysAgo = Carbon::today()->subDays(6)->startOfDay();
         $weeklySales = Transaction::where('branch_id', $branchId)
-            ->whereDate('transaction_date', '>=', Carbon::today()->subDays(6))
-            ->select(DB::raw('DATE(transaction_date) as date'), DB::raw('SUM(total_amount) as total'))
+            ->where('is_voided', false)
+            ->where('transaction_date', '>=', $sevenDaysAgo)
+            ->select(DB::raw('DATE(transaction_date) as date'), DB::raw('SUM(final_amount) as total'))
             ->groupBy('date')
             ->get()
             ->keyBy('date');
@@ -76,22 +80,26 @@ class DashboardController extends Controller
                 $day['sales'] = (int) $weeklySales[$day['date']]->total;
             }
         }
-        
-        \Illuminate\Support\Facades\Log::info('Weekly Chart Data', ['last7Days' => $last7Days, 'weeklySales' => $weeklySales]);
 
-        // 5. Comparative Sales (Versus)
+        // 4. Comparative Sales (Versus) - Using index-friendly date boundaries
+        $yesterdayStart = Carbon::yesterday()->startOfDay();
+        $yesterdayEnd = Carbon::yesterday()->endOfDay();
         $yesterdaySales = Transaction::where('branch_id', $branchId)
-            ->whereDate('transaction_date', Carbon::yesterday())
+            ->whereBetween('transaction_date', [$yesterdayStart, $yesterdayEnd])
             ->where('is_voided', false)
             ->sum('final_amount');
 
+        $sameDayLastWeekStart = Carbon::today()->subWeek()->startOfDay();
+        $sameDayLastWeekEnd = Carbon::today()->subWeek()->endOfDay();
         $sameDayLastWeekSales = Transaction::where('branch_id', $branchId)
-            ->whereDate('transaction_date', Carbon::today()->subWeek())
+            ->whereBetween('transaction_date', [$sameDayLastWeekStart, $sameDayLastWeekEnd])
             ->where('is_voided', false)
             ->sum('final_amount');
 
+        $sameDateLastMonthStart = Carbon::today()->subMonthNoOverflow()->startOfDay();
+        $sameDateLastMonthEnd = Carbon::today()->subMonthNoOverflow()->endOfDay();
         $sameDateLastMonthSales = Transaction::where('branch_id', $branchId)
-            ->whereDate('transaction_date', Carbon::today()->subMonthNoOverflow())
+            ->whereBetween('transaction_date', [$sameDateLastMonthStart, $sameDateLastMonthEnd])
             ->where('is_voided', false)
             ->sum('final_amount');
 
