@@ -136,7 +136,7 @@ export const ReceiptPreview = ({ transaction, branchSettings, onPrint, onClose, 
                 <div className="item-name">{item.name}</div>
                 {item.customerNo && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563' }}>Tujuan: {item.customerNo}</div>}
                 {item.customerName && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563', fontWeight: 'bold' }}>Atas Nama: {item.customerName}</div>}
-                {item.sn && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563', fontWeight: 'bold' }}>SN: {item.sn}</div>}
+                {item.sn && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563', fontWeight: 'bold', wordBreak: 'break-all' }}>SN: {item.sn}</div>}
                 {item.ppobStatus && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563' }}>Status: {item.ppobStatus}</div>}
                 {item.ppobMessage && <div className="item-detail" style={{ fontSize: '10px', marginTop: '2px', color: '#4b5563' }}>Ket: {item.ppobMessage}</div>}
                 {item.ppobStatus === 'Pending' && (

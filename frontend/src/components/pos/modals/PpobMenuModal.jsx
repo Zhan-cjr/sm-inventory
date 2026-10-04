@@ -327,7 +327,7 @@ export const PpobMenuModal = ({
         </div>
 
         {/* TABLE CONTENT AREA */}
-        <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-card)' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', background: 'var(--bg-card)' }}>
           {isFetchingPpobTransactions && allPpobList.length === 0 ? (
             <div style={{
               display: 'flex',
@@ -390,7 +390,7 @@ export const PpobMenuModal = ({
               )}
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead style={{
                 position: 'sticky',
                 top: 0,
@@ -399,22 +399,22 @@ export const PpobMenuModal = ({
                 borderBottom: '1px solid var(--border-light)'
               }}>
                 <tr>
-                  <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <th style={{ width: '13%', padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Waktu / Nota
                   </th>
-                  <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <th style={{ width: '15%', padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Produk Digital
                   </th>
-                  <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <th style={{ width: '18%', padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     No. Tujuan / ID Pelanggan
                   </th>
-                  <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>
+                  <th style={{ width: '12%', padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>
                     Status
                   </th>
-                  <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <th style={{ width: '27%', padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     SN / No. Token
                   </th>
-                  <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>
+                  <th style={{ width: '15%', padding: '0.85rem 1.25rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>
                     Aksi
                   </th>
                 </tr>
@@ -500,10 +500,29 @@ export const PpobMenuModal = ({
                       </td>
 
                       {/* SN / No. Token */}
-                      <td style={{ padding: '0.9rem 1.25rem', verticalAlign: 'middle' }}>
+                      <td style={{ padding: '0.9rem 1.25rem', verticalAlign: 'middle', maxWidth: '300px' }}>
                         {ppob.sn ? (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-hover)', padding: '0.35rem 0.65rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-main)', letterSpacing: '0.04em' }}>
+                          <div style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '0.5rem', 
+                            background: 'var(--bg-hover)', 
+                            padding: '0.4rem 0.65rem', 
+                            borderRadius: '8px', 
+                            border: '1px solid var(--border-light)',
+                            maxWidth: '100%',
+                            boxSizing: 'border-box'
+                          }}>
+                            <span style={{ 
+                              fontFamily: 'monospace', 
+                              fontWeight: 600, 
+                              fontSize: '0.82rem', 
+                              color: 'var(--text-main)', 
+                              letterSpacing: '0.02em',
+                              wordBreak: 'break-all',
+                              overflowWrap: 'anywhere',
+                              lineHeight: 1.35
+                            }}>
                               {ppob.sn}
                             </span>
                             <button
@@ -517,6 +536,7 @@ export const PpobMenuModal = ({
                                 padding: 2,
                                 display: 'flex',
                                 alignItems: 'center',
+                                flexShrink: 0,
                                 color: isCopied ? '#10b981' : 'var(--text-muted)'
                               }}
                             >
@@ -529,8 +549,8 @@ export const PpobMenuModal = ({
                       </td>
 
                       {/* Aksi */}
-                      <td style={{ padding: '0.9rem 1.25rem', verticalAlign: 'middle', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                      <td style={{ padding: '0.9rem 1.25rem', verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
                           {isGagal && (
                             ppob.refund_status === 'REFUNDED' ? (
                               <span style={{ 

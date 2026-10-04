@@ -1991,10 +1991,10 @@ body {
    PPOB DASHBOARD MODAL STYLES
    ========================================================================== */
 .ppob-modal-card {
-  width: 95vw;
-  max-width: 1120px;
-  height: 86vh;
-  max-height: 860px;
+  width: 96vw;
+  max-width: 1240px;
+  height: 88vh;
+  max-height: 880px;
   background: var(--bg-card);
   border-radius: 20px;
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.45);
