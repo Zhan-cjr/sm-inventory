@@ -1,11 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useOfflineSync } from '../hooks/useOfflineSync';
+import { usePosShortcuts } from '../hooks/usePosShortcuts';
+import { usePosCatalog } from '../hooks/usePosCatalog';
+import { usePosShift } from '../hooks/usePosShift';
+import { usePosCart } from '../hooks/usePosCart';
+import { usePosPayment } from '../hooks/usePosPayment';
+import { usePosPpob } from '../hooks/usePosPpob';
+import { usePosBarcodeSearch } from '../hooks/usePosBarcodeSearch';
 import { DiscountEngine } from '../utils/DiscountEngine';
-import { AuthorizationModal } from './AuthorizationModal';
-import { ReturnItemModal } from './ReturnItemModal';
-import { ReceiptPreview } from './ReceiptPreview';
-import { EODReportPreview } from './EODReportPreview';
-import { initEcho } from '../utils/echo';
+import PosModalsContainer from './pos/PosModalsContainer';
+import PosHeader from './pos/PosHeader';
+import PosCartTable from './pos/PosCartTable';
+import PosActionSidebar from './pos/PosActionSidebar';
+import { PwpUpsellBanner } from './pos/PwpUpsellBanner';
 import {
   LogOut,
   ShoppingCart,
@@ -108,73 +115,23 @@ export const POSTransaction = ({
     return isNegative ? '-' + formatted : formatted;
   };
 
-  const [items, setItems] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('pos_active_cart') || '[]');
-    } catch (e) {
-      console.error('Failed to parse pos_active_cart:', e);
-      return [];
-    }
-  });
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [alertMsg, setAlertMsg] = useState(null);
-  const [pwpUpsellPrompt, setPwpUpsellPrompt] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [serverOffset, setServerOffset] = useState(parseInt(localStorage.getItem('pos_server_offset') || '0'));
-  const [currentTime, setCurrentTime] = useState(new Date(Date.now() + serverOffset));
   const barcodeInput = useRef(null);
+  const cartSetItemsRef = useRef(null);
+  const paymentOnAfterHoldRef = useRef(null);
 
-  // Auto dismiss PWP upsell prompt after 15 seconds
-  useEffect(() => {
-    if (pwpUpsellPrompt) {
-      const timer = setTimeout(() => {
-        setPwpUpsellPrompt(null);
-      }, 15000);
-      return () => clearTimeout(timer);
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
+  };
+
+  const handleSetItems = (updater) => {
+    if (typeof cartSetItemsRef.current === 'function') {
+      cartSetItemsRef.current(updater);
     }
-  }, [pwpUpsellPrompt]);
+  };
 
-  // New State for enhancements
-  const [queuedDiscount, setQueuedDiscount] = useState(null);
-  const [manualTotalDiscount, setManualTotalDiscount] = useState(0);
   const [isSubtotalMode, setIsSubtotalMode] = useState(false);
-  const [receivedAmount, setReceivedAmount] = useState('');
-  const [payments, setPayments] = useState([]); // Array of { method: 'CASH'|'CARD'|'VOUCHER', amount: number, bankId: string|null, voucherId: string|null, label: string }
-  const [isMultiPaymentModalOpen, setIsMultiPaymentModalOpen] = useState(false);
-  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
-  const [voucherInput, setVoucherInput] = useState('');
-  const [voucherSource, setVoucherSource] = useState(null); // 'MULTI' or null
-  const [isMultiCashModalOpen, setIsMultiCashModalOpen] = useState(false);
-  const [multiCashInput, setMultiCashInput] = useState('');
-
-  const [isPpobMenuOpen, setIsPpobMenuOpen] = useState(false);
-  const [ppobTransactions, setPpobTransactions] = useState([]);
-  const [isFetchingPpobTransactions, setIsFetchingPpobTransactions] = useState(false);
-  const [ppobSearchQuery, setPpobSearchQuery] = useState('');
-
-  // Direct Payment State
-  const [isDirectCashModalOpen, setIsDirectCashModalOpen] = useState(false);
-  const [directCashInput, setDirectCashInput] = useState('');
-  const [isDirectCardAmountModalOpen, setIsDirectCardAmountModalOpen] = useState(false);
-  const [directCardInput, setDirectCardInput] = useState('');
-
-  const [isOpenPriceModalOpen, setIsOpenPriceModalOpen] = useState(false);
-  const [openPriceTargetItem, setOpenPriceTargetItem] = useState(null);
-  const [newOpenPrice, setNewOpenPrice] = useState('');
-
-  // Point Redemption State
-  const [isRedeemPointModalOpen, setIsRedeemPointModalOpen] = useState(false);
-  const [pointsToRedeemInput, setPointsToRedeemInput] = useState('');
-  const [banks, setBanks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pos_cached_banks') || '[]'); } catch (e) { return []; }
-  });
-  const [selectedBank, setSelectedBank] = useState(null);
-  const [isBankSelectOpen, setIsBankSelectOpen] = useState(false);
-  const [isMultiBankSelectOpen, setIsMultiBankSelectOpen] = useState(false);
-  const [isMultiCardAmountModalOpen, setIsMultiCardAmountModalOpen] = useState(false);
-  const [multiCardInput, setMultiCardInput] = useState('');
-  const [pendingCardAmount, setPendingCardAmount] = useState(0);
 
   // Initialize terminalInfo: locked terminal takes absolute priority, then local storage cache
   const [terminalInfo, setTerminalInfo] = useState(() => {
@@ -185,7 +142,6 @@ export const POSTransaction = ({
   });
 
   const [theme, setTheme] = useState(() => localStorage.getItem('pos_theme') || 'dark');
-  const [changeModalInfo, setChangeModalInfo] = useState(null);
   const [isPrinterSettingsOpen, setIsPrinterSettingsOpen] = useState(false);
   const [localPrinterSettings, setLocalPrinterSettings] = useState(() => {
     try {
@@ -194,16 +150,6 @@ export const POSTransaction = ({
       return { autoPrint: false, printMode: 'TEXT', receiptType: 1, columns: 32, feedLines: 4, printerName: '' };
     }
   });
-  const [posSettings, setPosSettings] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pos_cached_settings') || '[]'); } catch (e) { return []; }
-  });
-  const [branchSettings, setBranchSettings] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pos_cached_branch_settings') || 'null'); } catch (e) { return null; }
-  });
-  const [searchResults, setSearchResults] = useState([]);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [inputValue, setInputValue] = useState('');
-  const [allTerminals, setAllTerminals] = useState([]);
 
   // Initialize terminal select modal state: if locked, it's permanently closed (false)
   const [isTerminalModalOpen, setIsTerminalModalOpen] = useState(() => {
@@ -212,105 +158,296 @@ export const POSTransaction = ({
     }
     return !localStorage.getItem('pos_terminal_id');
   });
-  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
-  const [lastTransaction, setLastTransaction] = useState(null);
-  const [heldTransactions, setHeldTransactions] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pos_held_transactions') || '[]'); } catch (e) { return []; }
-  });
-  const [isRecallModalOpen, setIsRecallModalOpen] = useState(false);
-  const [customers, setCustomers] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pos_cached_customers') || '[]'); } catch (e) { return []; }
-  });
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
-  const [memberSearchQuery, setMemberSearchQuery] = useState('');
-  const [lastScannedProductId, setLastScannedProductId] = useState(null);
-  const [activeShift, setActiveShift] = useState(null);
-  const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
-  const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
-  const [startingCash, setStartingCash] = useState('');
-  const [actualCash, setActualCash] = useState('');
-  const [selectedShiftName, setSelectedShiftName] = useState(localStorage.getItem('pos_preselected_shift') || 'Shift 1');
-  const [isCheckingShift, setIsCheckingShift] = useState(true);
   const [pendingAuthAction, setPendingAuthAction] = useState(null);
-  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
-  const [isReturnMode, setIsReturnMode] = useState(false);
-  const [discountModal, setDiscountModal] = useState(null);
-  const [discountInputVal, setDiscountInputVal] = useState('');
-  const [lockScreenInfo, setLockScreenInfo] = useState(null);
   const [branchMismatchInfo, setBranchMismatchInfo] = useState(null);
-
-  // New State for Qty and Reprint
-  const [nextItemQty, setNextItemQty] = useState('');
-  const [isQtyModalOpen, setIsQtyModalOpen] = useState(false);
-  const [isReprintOldModalOpen, setIsReprintOldModalOpen] = useState(false);
-  const [oldReceiptInput, setOldReceiptInput] = useState('');
-
-  // Cash Management State
-  const [isCashMovementModalOpen, setIsCashMovementModalOpen] = useState(false);
-  const [cashMovementType, setCashMovementType] = useState('CASH_IN');
-  const [cashMovementAmount, setCashMovementAmount] = useState('');
-  const [cashMovementDesc, setCashMovementDesc] = useState('');
-
-  // EOD Report State
-  const [eodReportData, setEodReportData] = useState(null);
-
-  // Digital Product Input State
-  const [isDigitalInputModalOpen, setIsDigitalInputModalOpen] = useState(false);
-  const [pendingDigitalProduct, setPendingDigitalProduct] = useState(null);
-  const [customerNoInput, setCustomerNoInput] = useState('');
-
-  // AI Upselling State
-  const [aprioriRules, setAprioriRules] = useState([]);
 
   const { storeLocalTransaction, syncTransactions, pendingCount, syncStatus } = useOfflineSync(branchId, authToken);
   const discountEngine = useRef(new DiscountEngine([]));
 
-  // --- IndexedDB Helper for Large Caches ---
-  const idbCache = {
-    async open() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open('POSCacheDB', 1);
-        req.onupgradeneeded = (e) => {
-          const db = e.target.result;
-          if (!db.objectStoreNames.contains('caches')) {
-            db.createObjectStore('caches');
-          }
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    },
-    async set(key, data) {
-      try {
-        const db = await this.open();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction('caches', 'readwrite');
-          const store = tx.objectStore('caches');
-          const req = store.put(data, key);
-          req.onsuccess = () => resolve();
-          req.onerror = () => reject(req.error);
-        });
-      } catch (e) {
-        console.warn('IDB Set Error:', e);
-      }
-    },
-    async get(key) {
-      try {
-        const db = await this.open();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction('caches', 'readonly');
-          const store = tx.objectStore('caches');
-          const req = store.get(key);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => reject(req.error);
-        });
-      } catch (e) {
-        console.warn('IDB Get Error:', e);
-        return null;
-      }
-    }
-  };
+  const {
+    activeShift,
+    setActiveShift,
+    isOpenShiftModalOpen,
+    setIsOpenShiftModalOpen,
+    isCloseShiftModalOpen,
+    setIsCloseShiftModalOpen,
+    startingCash,
+    setStartingCash,
+    actualCash,
+    setActualCash,
+    selectedShiftName,
+    setSelectedShiftName,
+    isCheckingShift,
+    setIsCheckingShift,
+    lockScreenInfo,
+    setLockScreenInfo,
+    isCashMovementModalOpen,
+    setIsCashMovementModalOpen,
+    cashMovementType,
+    setCashMovementType,
+    cashMovementAmount,
+    setCashMovementAmount,
+    cashMovementDesc,
+    setCashMovementDesc,
+    eodReportData,
+    setEodReportData,
+    checkActiveShift,
+    handleOpenShift,
+    handleCloseShift,
+    handleCashMovement
+  } = usePosShift({
+    authToken,
+    terminalInfo,
+    onLogout,
+    setAlertMsg,
+    localPrinterSettings,
+    syncTransactions
+  });
+
+  const {
+    dbProducts,
+    setDbProducts,
+    dbPromos,
+    setDbPromos,
+    banks,
+    setBanks,
+    branchSettings,
+    setBranchSettings,
+    posSettings,
+    setPosSettings,
+    customers,
+    setCustomers,
+    aprioriRules,
+    setAprioriRules,
+    allTerminals,
+    setAllTerminals,
+    serverOffset,
+    setServerOffset
+  } = usePosCatalog({
+    branchId,
+    branchName,
+    authToken,
+    lockedTerminalId,
+    lockedTerminalName,
+    userRole,
+    isOnline,
+    discountEngine,
+    setItems: handleSetItems,
+    checkActiveShift,
+    setActiveShift,
+    setTerminalInfo,
+    setIsCheckingShift,
+    setIsTerminalModalOpen,
+    setIsOpenShiftModalOpen,
+    setBranchMismatchInfo
+  });
+
+  const {
+    items,
+    setItems,
+    pwpUpsellPrompt,
+    setPwpUpsellPrompt,
+    queuedDiscount,
+    setQueuedDiscount,
+    manualTotalDiscount,
+    setManualTotalDiscount,
+    nextItemQty,
+    setNextItemQty,
+    isQtyModalOpen,
+    setIsQtyModalOpen,
+    isOpenPriceModalOpen,
+    setIsOpenPriceModalOpen,
+    openPriceTargetItem,
+    setOpenPriceTargetItem,
+    newOpenPrice,
+    setNewOpenPrice,
+    discountModal,
+    setDiscountModal,
+    discountInputVal,
+    setDiscountInputVal,
+    isDigitalInputModalOpen,
+    setIsDigitalInputModalOpen,
+    pendingDigitalProduct,
+    setPendingDigitalProduct,
+    customerNoInput,
+    setCustomerNoInput,
+    selectedCustomer,
+    setSelectedCustomer,
+    isMemberModalOpen,
+    setIsMemberModalOpen,
+    memberSearchQuery,
+    setMemberSearchQuery,
+    lastScannedProductId,
+    setLastScannedProductId,
+    isReturnModalOpen,
+    setIsReturnModalOpen,
+    isReturnMode,
+    setIsReturnMode,
+    heldTransactions,
+    setHeldTransactions,
+    isRecallModalOpen,
+    setIsRecallModalOpen,
+    subtotal,
+    totalDiscount,
+    appliedPromos,
+    finalAmount,
+    addItemToTransaction,
+    handleDigitalProductSubmit,
+    removeItem,
+    updateQuantity,
+    handleManualDiscountItem,
+    handleManualTotalDiscount,
+    applyEnteredDiscount,
+    handleHoldTransaction,
+    handleRecallTransaction,
+    handleReturnSuccess
+  } = usePosCart({
+    dbProducts,
+    dbPromos,
+    aprioriRules,
+    discountEngine,
+    setAlertMsg,
+    barcodeInput,
+    onAfterHold: () => paymentOnAfterHoldRef.current?.()
+  });
+  cartSetItemsRef.current = setItems;
+
+  const {
+    isPpobMenuOpen,
+    setIsPpobMenuOpen,
+    ppobTransactions,
+    setPpobTransactions,
+    isFetchingPpobTransactions,
+    setIsFetchingPpobTransactions,
+    ppobSearchQuery,
+    setPpobSearchQuery,
+    fetchPpobTransactions,
+    handleCheckPpobStatus
+  } = usePosPpob({ authToken, setAlertMsg });
+
+  const {
+    inputValue,
+    setInputValue,
+    searchResults,
+    setSearchResults,
+    highlightedIndex,
+    setHighlightedIndex,
+    handleInputChange,
+    handleClearInput,
+    handleBarcodeScan
+  } = usePosBarcodeSearch({
+    dbProducts,
+    isSubtotalMode,
+    setIsSubtotalMode,
+    barcodeInput,
+    addItemToTransaction,
+    setAlertMsg
+  });
+
+  const {
+    paymentMethod,
+    setPaymentMethod,
+    isProcessing,
+    setIsProcessing,
+    receivedAmount,
+    setReceivedAmount,
+    payments,
+    setPayments,
+    isMultiPaymentModalOpen,
+    setIsMultiPaymentModalOpen,
+    isVoucherModalOpen,
+    setIsVoucherModalOpen,
+    voucherInput,
+    setVoucherInput,
+    voucherSource,
+    setVoucherSource,
+    isMultiCashModalOpen,
+    setIsMultiCashModalOpen,
+    multiCashInput,
+    setMultiCashInput,
+    isDirectCashModalOpen,
+    setIsDirectCashModalOpen,
+    directCashInput,
+    setDirectCashInput,
+    isDirectCardAmountModalOpen,
+    setIsDirectCardAmountModalOpen,
+    directCardInput,
+    setDirectCardInput,
+    selectedBank,
+    setSelectedBank,
+    isBankSelectOpen,
+    setIsBankSelectOpen,
+    isMultiBankSelectOpen,
+    setIsMultiBankSelectOpen,
+    isMultiCardAmountModalOpen,
+    setIsMultiCardAmountModalOpen,
+    multiCardInput,
+    setMultiCardInput,
+    pendingCardAmount,
+    setPendingCardAmount,
+    isRedeemPointModalOpen,
+    setIsRedeemPointModalOpen,
+    pointsToRedeemInput,
+    setPointsToRedeemInput,
+    changeModalInfo,
+    setChangeModalInfo,
+    showReceiptPreview,
+    setShowReceiptPreview,
+    lastTransaction,
+    setLastTransaction,
+    isReprintOldModalOpen,
+    setIsReprintOldModalOpen,
+    oldReceiptInput,
+    setOldReceiptInput,
+    totalPaid,
+    changeAmount,
+    handleApplyPoints,
+    startPayment,
+    processTransaction,
+    mapApiTransactionToLocal,
+    handleReprintLast,
+    handleReprintOld,
+    handleReprintPpob
+  } = usePosPayment({
+    items,
+    setItems,
+    setPwpUpsellPrompt,
+    finalAmount,
+    totalDiscount,
+    manualTotalDiscount,
+    setManualTotalDiscount,
+    setIsReturnMode,
+    isReturnMode,
+    selectedCustomer,
+    setSelectedCustomer,
+    customers,
+    setCustomers,
+    pointConversionRate,
+    pointRedemptionValue,
+    minimumPointsToRedeem,
+    pointRedemptionEnabled,
+    appliedPromos,
+    terminalInfo,
+    activeShift,
+    branchCode,
+    branchName,
+    branchAddress,
+    orgName,
+    userName,
+    allTerminals,
+    serverOffset,
+    authToken,
+    isOnline,
+    storeLocalTransaction,
+    syncTransactions,
+    formatCurrency,
+    formatThousandSeparator,
+    setAlertMsg,
+    barcodeInput,
+    setInputValue,
+    setIsSubtotalMode
+  });
+  paymentOnAfterHoldRef.current = () => setPayments([]);
 
   useEffect(() => {
     if (window.electronAPI) {
@@ -358,11 +495,6 @@ export const POSTransaction = ({
     checkServerConnection();
     const connectionInterval = setInterval(checkServerConnection, 10000);
 
-    const timer = setInterval(() => {
-      const offset = parseInt(localStorage.getItem('pos_server_offset') || '0');
-      setCurrentTime(new Date(Date.now() + offset));
-    }, 1000);
-
     const handleGlobalKeyPress = (e) => {
       if (isPpobMenuOpen) {
         if (e.key === 'Escape') {
@@ -397,7 +529,6 @@ export const POSTransaction = ({
     return () => {
       window.removeEventListener('keydown', handleGlobalKeyPress);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      clearInterval(timer);
       clearInterval(connectionInterval);
     };
   }, [changeModalInfo, pendingCount, authToken]);
@@ -413,490 +544,6 @@ export const POSTransaction = ({
     safeSetItem('pos_active_cart', JSON.stringify(items));
   }, [items]);
 
-  useEffect(() => {
-    if (isOnline && activeShift && activeShift.is_offline && terminalInfo.id && authToken) {
-      console.log('Detecting online state with offline active shift. Registering shift on server...');
-
-      fetch('/api/v1/shifts/open', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          terminal_id: terminalInfo.id,
-          shift_name: activeShift.shift_name,
-          starting_cash: activeShift.starting_cash
-        })
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.shift) {
-            console.log('Offline shift successfully registered on server:', data.shift);
-            setActiveShift(data.shift);
-            safeSetItem('pos_active_shift', JSON.stringify(data.shift));
-            setAlertMsg({ text: `Shift offline Anda ("${activeShift.shift_name}") telah disinkronkan ke server secara otomatis!`, type: 'success' });
-            setTimeout(() => setAlertMsg(null), 5000);
-
-            // Trigger sync of pending transactions
-            syncTransactions();
-          } else {
-            console.error('Failed to register offline shift on server:', data.message);
-          }
-        })
-        .catch(err => console.error('Error registering offline shift:', err));
-    }
-  }, [isOnline, activeShift, terminalInfo.id, authToken]);
-
-  const [dbProducts, setDbProducts] = useState([]);
-  const [dbPromos, setDbPromos] = useState([]);
-
-  // --- Real-time WebSockets Integration (Laravel Reverb) ---
-  useEffect(() => {
-    if (branchId && authToken) {
-      let echoInstance = null;
-      try {
-        echoInstance = initEcho(authToken);
-
-        // Listen for Stock Updates
-        echoInstance.private(`branch.${branchId}.stock`)
-          .listen('.stock.updated', (e) => {
-            console.log('[WebSockets] StockUpdated received:', e);
-            setDbProducts(prev => {
-              const updated = prev.map(p => {
-                if (p.id === e.product_id) {
-                  const updatedStockData = { ...p, stock: e.quantity_on_hand };
-                  // If stock table overrides the price for this branch, apply it
-                  if (e.selling_price !== null && e.selling_price !== undefined && parseFloat(e.selling_price) > 0) {
-                    updatedStockData.selling_price = e.selling_price;
-                  }
-                  return updatedStockData;
-                }
-                return p;
-              });
-
-              idbCache.set('pos_cached_products', updated).catch(() => { });
-              return updated;
-            });
-
-            // Perbarui juga harga keranjang jika dipengaruhi harga cabang (stock override)
-            if (e.selling_price !== null && e.selling_price !== undefined && parseFloat(e.selling_price) > 0) {
-              setItems(prevItems => prevItems.map(item => {
-                if (item.productId === e.product_id) {
-                  return { ...item, unitPrice: parseFloat(e.selling_price) };
-                }
-                return item;
-              }));
-            }
-          });
-
-        // Listen for Transaction Creations (Other Terminals)
-        echoInstance.private(`branch.${branchId}.transactions`)
-          .listen('.transaction.created', (e) => {
-            console.log('[WebSockets] TransactionCreated received from another terminal:', e);
-            // Example: We can trigger a UI refresh, sync, or just show a tiny toast
-            // For now, let's just log it.
-          });
-
-        // Listen for Global Catalog Updates (e.g. price change)
-        echoInstance.channel(`catalog`)
-          .listen('.product.updated', (e) => {
-            console.log('[WebSockets] ProductUpdated received (Price/Details change):', e);
-            if (e.product) {
-              setDbProducts(prev => {
-                const updated = prev.map(p => {
-                  if (p.id === e.product.id) {
-                    // Update all product details (especially selling_price), but preserve local stock if any
-                    return { ...p, ...e.product, stock: p.stock };
-                  }
-                  return p;
-                });
-                idbCache.set('pos_cached_products', updated).catch(() => { });
-                return updated;
-              });
-
-              // [REVISI] Sesuai permintaan: harga global JANGAN otomatis menimpa keranjang. Patokan utama adalah harga Stok Cabang.
-              // Jika produk tersebut ada di keranjang, perbarui harganya di keranjang
-              /* setItems(prevItems => prevItems.map(item => {
-                if (item.productId === e.product.id) {
-                  return { ...item, unitPrice: parseFloat(e.product.selling_price) };
-                }
-                return item;
-              })); */
-            }
-          });
-
-      } catch (err) {
-        console.warn('Failed to initialize WebSockets connection:', err);
-      }
-
-      return () => {
-        if (echoInstance) {
-          echoInstance.leave(`branch.${branchId}.stock`);
-          echoInstance.leave(`branch.${branchId}.transactions`);
-          echoInstance.leave(`catalog`);
-          echoInstance.disconnect();
-        }
-      };
-    }
-  }, [branchId, authToken]);
-  // ---------------------------------------------------------
-
-  useEffect(() => {
-    fetch('/api/v1/server-time', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        const serverMs = data.timestamp;
-        const clientMs = Date.now();
-        const offset = serverMs - clientMs;
-        setServerOffset(offset);
-        safeSetItem('pos_server_offset', offset.toString());
-        safeSetItem('pos_last_sync_time', serverMs.toString());
-      })
-      .catch(err => console.error('Failed to sync server time:', err));
-
-    const fetchCatalog = () => {
-      fetch('/api/v1/products', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
-        .then(data => {
-          if (Array.isArray(data)) {
-            setDbProducts(prev => {
-              const services = prev.filter(p => p.is_service);
-              return [...data, ...services];
-            });
-            idbCache.set('pos_cached_products', data);
-          }
-        })
-        .catch(async err => {
-          console.warn('Failed to load products, using cache:', err);
-          const parsed = await idbCache.get('pos_cached_products');
-          if (parsed && Array.isArray(parsed)) {
-            setDbProducts(prev => {
-              const services = prev.filter(p => p.is_service);
-              return [...parsed, ...services];
-            });
-          }
-        });
-
-      fetch('/api/v1/promotions', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
-        .then(data => {
-          setDbPromos(data);
-          discountEngine.current = new DiscountEngine(data);
-          safeSetItem('pos_cached_promotions', JSON.stringify(data));
-        })
-        .catch(err => {
-          console.error('Failed to load promotions:', err);
-          const cached = localStorage.getItem('pos_cached_promotions');
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              setDbPromos(parsed);
-              discountEngine.current = new DiscountEngine(parsed);
-            } catch (e) { }
-          }
-        });
-
-      fetch('/api/v1/banks', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
-        .then(data => {
-          setBanks(data);
-          safeSetItem('pos_cached_banks', JSON.stringify(data));
-        })
-        .catch(err => {
-          console.error('Failed to load banks:', err);
-          const cached = localStorage.getItem('pos_cached_banks');
-          if (cached) {
-            try { setBanks(JSON.parse(cached)); } catch (e) { }
-          }
-        });
-
-      fetch('/api/v1/branches', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
-        .then(data => {
-          if (Array.isArray(data)) {
-            const activeBranch = data.find(b => b.id === branchId) || data[0];
-            if (activeBranch) {
-              setBranchSettings(activeBranch);
-              safeSetItem('pos_cached_branch_settings', JSON.stringify(activeBranch));
-            }
-          }
-        })
-        .catch(err => {
-          console.error('Failed to load branch settings:', err);
-          const cached = localStorage.getItem('pos_cached_branch_settings');
-          if (cached) {
-            try { setBranchSettings(JSON.parse(cached)); } catch (e) { }
-          }
-        });
-
-      fetch('/api/v1/pos-settings', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
-        .then(data => {
-          setPosSettings(data);
-          safeSetItem('pos_cached_settings', JSON.stringify(data));
-        })
-        .catch(err => {
-          console.error('Failed to load pos settings:', err);
-          const cached = localStorage.getItem('pos_cached_settings');
-          if (cached) {
-            try { setPosSettings(JSON.parse(cached)); } catch (e) { }
-          }
-        });
-
-      // Refresh user settings (e.g. allow_minus_stock) on load
-      fetch('/api/v1/user', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
-        .then(data => {
-          if (data.user) {
-            // Merge with existing pos_user to preserve token and other local properties
-            const existingUser = JSON.parse(localStorage.getItem('pos_user') || '{}');
-            const updatedUser = { ...existingUser, ...data.user };
-            safeSetItem('pos_user', JSON.stringify(updatedUser));
-          }
-        })
-        .catch(err => console.error('Failed to refresh user profile:', err));
-
-      fetch('/api/v1/customers', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
-        .then(data => {
-          setCustomers(data);
-          safeSetItem('pos_cached_customers', JSON.stringify(data));
-        })
-        .catch(err => {
-          console.error('Failed to load customers:', err);
-          const cached = localStorage.getItem('pos_cached_customers');
-          if (cached) {
-            try { setCustomers(JSON.parse(cached)); } catch (e) { }
-          }
-        });
-
-      // Fetch Apriori Rules for AI Upselling
-      fetch(`/api/v1/bi/apriori?branch_id=${branchId}`, {
-        headers: { 'Authorization': `Bearer ${authToken}`, 'Accept': 'application/json' }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            console.log('[AI Upsell] Rules loaded:', data);
-            setAprioriRules(data);
-          }
-        })
-        .catch(err => console.error('[AI Upsell] Failed to load apriori rules:', err));
-
-      fetch('/api/v1/services', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.json();
-        })
-        .then(data => {
-          if (Array.isArray(data)) {
-            const servicesAsProducts = data.map(s => ({
-              id: s.id,
-              sku: s.code,
-              barcode: s.code,
-              name: s.name + ' (Jasa)',
-              selling_price: s.price,
-              category_id: null,
-              is_service: true
-            }));
-            setDbProducts(prev => {
-              const productsOnly = prev.filter(p => !p.is_service);
-              return [...productsOnly, ...servicesAsProducts];
-            });
-            safeSetItem('pos_cached_services', JSON.stringify(data));
-          }
-        })
-        .catch(err => {
-          console.warn('Failed to load services, using cache:', err);
-          const cached = localStorage.getItem('pos_cached_services');
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              if (Array.isArray(parsed)) {
-                const servicesAsProducts = parsed.map(s => ({
-                  id: s.id,
-                  sku: s.code,
-                  barcode: s.code,
-                  name: s.name + ' (Jasa)',
-                  selling_price: s.price,
-                  category_id: null,
-                  is_service: true
-                }));
-                setDbProducts(prev => {
-                  const productsOnly = prev.filter(p => !p.is_service);
-                  return [...productsOnly, ...servicesAsProducts];
-                });
-              }
-            } catch (e) { }
-          }
-        });
-    };
-
-    fetchCatalog();
-    const catalogTimer = setInterval(() => {
-      if (navigator.onLine) fetchCatalog();
-    }, 60000); // 1 menit
-
-    fetch(`/api/v1/terminals?branch_id=${branchId}`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        setAllTerminals(data);
-        safeSetItem('pos_cached_terminals', JSON.stringify(data));
-
-        // Force bind locked terminal properties on startup if present
-        let activeTerminalId = lockedTerminalId || localStorage.getItem('pos_terminal_id');
-        if (lockedTerminalId) {
-          safeSetItem('pos_terminal_id', lockedTerminalId);
-          if (lockedTerminalName) safeSetItem('pos_terminal_name', lockedTerminalName);
-          safeSetItem('pos_terminal_branch_id', branchId);
-          safeSetItem('pos_terminal_branch_name', branchName);
-        }
-
-        if (activeTerminalId) {
-          const terminal = data.find(t => t.id === activeTerminalId);
-          if (terminal) {
-            setTerminalInfo(terminal);
-            checkActiveShift(activeTerminalId);
-          } else {
-            // Mismatch: previously saved terminal belongs to another branch!
-            if (userRole !== 'ADMIN') {
-              localStorage.removeItem('pos_terminal_id');
-              localStorage.removeItem('pos_terminal_name');
-              localStorage.removeItem('pos_terminal_branch_id');
-              localStorage.removeItem('pos_active_shift');
-              setBranchMismatchInfo({
-                userBranch: branchName || 'Cabang Anda',
-                terminalBranch: 'Cabang Terminal Lain'
-              });
-              setIsCheckingShift(false);
-            } else {
-              checkActiveShift(activeTerminalId);
-            }
-          }
-        } else {
-          setIsCheckingShift(false);
-          if (data.length > 0) {
-            setIsTerminalModalOpen(true);
-          }
-        }
-      })
-      .catch(err => {
-        console.error('Failed to load terminals:', err);
-        const cachedTerminals = localStorage.getItem('pos_cached_terminals');
-        let terminals = [];
-        if (cachedTerminals) {
-          try {
-            terminals = JSON.parse(cachedTerminals);
-            setAllTerminals(terminals);
-          } catch (e) {
-            console.error('Failed to parse cached terminals:', e);
-          }
-        }
-
-        // Force bind locked terminal properties offline if present
-        let activeTerminalId = lockedTerminalId || localStorage.getItem('pos_terminal_id');
-        if (lockedTerminalId) {
-          safeSetItem('pos_terminal_id', lockedTerminalId);
-          if (lockedTerminalName) safeSetItem('pos_terminal_name', lockedTerminalName);
-          safeSetItem('pos_terminal_branch_id', branchId);
-          safeSetItem('pos_terminal_branch_name', branchName);
-        }
-
-        const terminalBranchId = localStorage.getItem('pos_terminal_branch_id');
-
-        // Check for offline branch mismatch (skip validation if locked by backend)
-        if (!lockedTerminalId && activeTerminalId && terminalBranchId && terminalBranchId !== branchId && userRole !== 'ADMIN') {
-          localStorage.removeItem('pos_terminal_id');
-          localStorage.removeItem('pos_terminal_name');
-          localStorage.removeItem('pos_terminal_branch_id');
-          localStorage.removeItem('pos_active_shift');
-          setBranchMismatchInfo({
-            userBranch: branchName || 'Cabang Anda',
-            terminalBranch: 'Cabang Terminal Lain'
-          });
-          setIsCheckingShift(false);
-          return;
-        }
-
-        if (activeTerminalId) {
-          const terminal = terminals.find(t => t.id === activeTerminalId);
-          if (terminal) setTerminalInfo(terminal);
-
-          // Restore cached shift when offline
-          const cachedShift = localStorage.getItem('pos_active_shift');
-          if (cachedShift) {
-            try {
-              const parsed = JSON.parse(cachedShift);
-              if (parsed && parsed.terminal_id === activeTerminalId) {
-                setActiveShift(parsed);
-              } else {
-                setIsOpenShiftModalOpen(true);
-              }
-            } catch (e) {
-              setIsOpenShiftModalOpen(true);
-            }
-          } else {
-            setIsOpenShiftModalOpen(true);
-          }
-        } else {
-          if (terminals.length > 0) {
-            setIsTerminalModalOpen(true);
-          }
-        }
-        setIsCheckingShift(false);
-      });
-
-    return () => clearInterval(catalogTimer);
-  }, [authToken, branchId]);
-
   const handleSelectTerminal = (terminal) => {
     safeSetItem('pos_terminal_id', terminal.id);
     safeSetItem('pos_terminal_name', terminal.name);
@@ -909,787 +556,7 @@ export const POSTransaction = ({
 
 
 
-  const handleInputChange = (val) => {
-    setInputValue(val);
-    if (!isSubtotalMode && val.length > 1) {
-      const lowerVal = val.toLowerCase();
 
-      // Check for exact barcode or sku match first (isolated result)
-      const exactMatches = dbProducts.filter(p =>
-        p.barcode?.toLowerCase() === lowerVal ||
-        p.sku.toLowerCase() === lowerVal ||
-        (p.metadata && Array.isArray(p.metadata.additional_barcodes) && p.metadata.additional_barcodes.some(b => String(b).toLowerCase() === lowerVal))
-      );
-
-      if (exactMatches.length > 0) {
-        setSearchResults(exactMatches);
-        setHighlightedIndex(-1);
-        return;
-      }
-
-      // If no exact barcode/sku, score and sort the results
-      const scored = dbProducts.map(p => {
-        let score = 0;
-        const name = p.name.toLowerCase();
-        const sku = p.sku.toLowerCase();
-        const barcode = p.barcode?.toLowerCase() || '';
-        const additionalBarcodes = p.metadata?.additional_barcodes || [];
-
-        if (name === lowerVal) score = 100;
-        else if (name.startsWith(lowerVal)) score = 80;
-        else if (sku.startsWith(lowerVal)) score = 70;
-        else if (barcode.startsWith(lowerVal)) score = 60;
-        else if (Array.isArray(additionalBarcodes) && additionalBarcodes.some(b => String(b).toLowerCase().startsWith(lowerVal))) score = 55;
-        else if (name.includes(lowerVal)) score = 40;
-        else if (sku.includes(lowerVal)) score = 30;
-        else if (barcode.includes(lowerVal)) score = 20;
-        else if (Array.isArray(additionalBarcodes) && additionalBarcodes.some(b => String(b).toLowerCase().includes(lowerVal))) score = 15;
-
-        return { product: p, score };
-      }).filter(item => item.score > 0);
-
-      // Sort descending by score
-      scored.sort((a, b) => b.score - a.score);
-
-      setSearchResults(scored.slice(0, 10).map(item => item.product));
-      setHighlightedIndex(-1);
-    } else {
-      setSearchResults([]);
-      setHighlightedIndex(-1);
-    }
-  };
-
-  const handleClearInput = () => {
-    setInputValue('');
-    setSearchResults([]);
-    setHighlightedIndex(-1);
-    setIsSubtotalMode(false);
-    barcodeInput.current?.focus();
-  };
-
-  const handleBarcodeScan = async (barcode) => {
-    if (!barcode) return;
-    try {
-      let isScale = false;
-      let scaleItemCode = '';
-      let scaleQty = 1;
-
-      // Extract scale barcode settings
-      const userObj = JSON.parse(localStorage.getItem('pos_user')) || {};
-      const scaleEnabled = userObj.scale_barcode_enabled === true;
-
-      if (scaleEnabled) {
-        const prefix = userObj.scale_barcode_prefix || '20';
-        const itemCodeLen = parseInt(userObj.scale_barcode_item_code_length) || 5;
-        const weightLen = parseInt(userObj.scale_barcode_weight_length) || 5;
-        const weightDecimals = parseInt(userObj.scale_barcode_weight_decimal_places) || 3;
-        const expectedLen = prefix.length + itemCodeLen + weightLen + 1; // +1 for checksum
-
-        if (barcode.startsWith(prefix) && barcode.length === expectedLen) {
-          isScale = true;
-          scaleItemCode = barcode.substring(prefix.length, prefix.length + itemCodeLen);
-          const weightStr = barcode.substring(prefix.length + itemCodeLen, prefix.length + itemCodeLen + weightLen);
-          scaleQty = parseFloat(weightStr) / Math.pow(10, weightDecimals);
-        }
-      }
-
-      const searchCode = isScale ? scaleItemCode : barcode;
-      const product = dbProducts.find(p =>
-        p.sku === searchCode ||
-        p.barcode === searchCode ||
-        (p.metadata && Array.isArray(p.metadata.additional_barcodes) && p.metadata.additional_barcodes.includes(searchCode))
-      );
-
-      if (product) {
-        addItemToTransaction(product, isScale ? scaleQty : null);
-        setSearchResults([]);
-        setInputValue('');
-      } else {
-        setAlertMsg({ text: `Product "${barcode}" tidak ditemukan.`, type: 'error' });
-        setTimeout(() => setAlertMsg(null), 2000);
-      }
-    } catch (error) {
-      console.error('Product search failed:', error);
-    }
-  };
-
-  const checkActiveShift = (terminalId) => {
-    setIsCheckingShift(true);
-    setLockScreenInfo(null);
-    fetch(`/api/v1/shifts/active?terminal_id=${terminalId}`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        if (data.status === 'USER_HAS_OTHER_SHIFT' || data.status === 'TERMINAL_IN_USE') {
-          setLockScreenInfo({ status: data.status, message: data.message });
-          setActiveShift(null);
-          localStorage.removeItem('pos_active_shift');
-        } else if (data.shift) {
-          setActiveShift(data.shift);
-          safeSetItem('pos_active_shift', JSON.stringify(data.shift));
-          setAlertMsg({
-            text: `Melanjutkan ${data.shift.shift_name} yang belum ditutup. Harap tutup shift ini jika ingin membuka shift baru.`,
-            type: 'info',
-            persist: true
-          });
-          setTimeout(() => setAlertMsg(null), 7000);
-        } else {
-          localStorage.removeItem('pos_active_shift');
-          setIsOpenShiftModalOpen(true);
-        }
-      })
-      .catch(err => {
-        console.error('Failed to check shift:', err);
-        // Fallback to cached shift when offline
-        const cachedShift = localStorage.getItem('pos_active_shift');
-        if (cachedShift) {
-          try {
-            const parsed = JSON.parse(cachedShift);
-            if (parsed && parsed.terminal_id === terminalId) {
-              setActiveShift(parsed);
-              setAlertMsg({
-                text: `Melanjutkan ${parsed.shift_name} (Offline) yang belum ditutup. Harap tutup shift ini jika ingin membuka shift baru.`,
-                type: 'info',
-                persist: true
-              });
-              setTimeout(() => setAlertMsg(null), 7000);
-            } else {
-              setIsOpenShiftModalOpen(true);
-            }
-          } catch (e) {
-            setIsOpenShiftModalOpen(true);
-          }
-        } else {
-          setIsOpenShiftModalOpen(true);
-        }
-      })
-      .finally(() => setIsCheckingShift(false));
-  };
-
-  const handleOpenShift = () => {
-    if (!startingCash || isNaN(startingCash)) {
-      setAlertMsg({ text: 'Modal awal harus diisi dengan angka.', type: 'error' });
-      return;
-    }
-
-    const startingCashVal = parseFloat(startingCash);
-
-    // Create local offline shift if navigator is offline
-    if (!navigator.onLine) {
-      const localShift = {
-        id: null,
-        is_offline: true,
-        shift_name: selectedShiftName,
-        start_time: new Date().toISOString(),
-        starting_cash: startingCashVal,
-        status: 'OPEN'
-      };
-      setActiveShift(localShift);
-      safeSetItem('pos_active_shift', JSON.stringify(localShift));
-      setIsOpenShiftModalOpen(false);
-      if (window.electronAPI && window.electronAPI.openCashDrawer) {
-        window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
-      }
-      setAlertMsg({ text: 'Shift offline berhasil dibuka secara lokal. Selamat bertugas!', type: 'success' });
-      return;
-    }
-
-    fetch('/api/v1/shifts/open', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        terminal_id: terminalInfo.id,
-        shift_name: selectedShiftName,
-        starting_cash: startingCashVal
-      })
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        if (data.shift) {
-          setActiveShift(data.shift);
-          safeSetItem('pos_active_shift', JSON.stringify(data.shift));
-          setIsOpenShiftModalOpen(false);
-          if (window.electronAPI && window.electronAPI.openCashDrawer) {
-            window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
-          }
-          setAlertMsg({ text: 'Shift berhasil dibuka. Selamat bertugas!', type: 'success' });
-        } else {
-          setAlertMsg({ text: data.message || 'Gagal membuka shift.', type: 'error' });
-        }
-      })
-      .catch(err => {
-        console.error('Failed to open shift online, falling back to offline:', err);
-        const localShift = {
-          id: null,
-          is_offline: true,
-          shift_name: selectedShiftName,
-          start_time: new Date().toISOString(),
-          starting_cash: startingCashVal,
-          status: 'OPEN'
-        };
-        setActiveShift(localShift);
-        safeSetItem('pos_active_shift', JSON.stringify(localShift));
-        setIsOpenShiftModalOpen(false);
-        if (window.electronAPI && window.electronAPI.openCashDrawer) {
-          window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
-        }
-        setAlertMsg({ text: 'Gagal menghubungi server. Shift offline dibuka secara lokal.', type: 'success' });
-      });
-  };
-
-  const handleCashMovement = () => {
-    if (!cashMovementAmount || isNaN(cashMovementAmount) || cashMovementAmount <= 0) {
-      setAlertMsg({ text: 'Nominal harus lebih besar dari 0.', type: 'error' });
-      return;
-    }
-    if (!cashMovementDesc.trim()) {
-      setAlertMsg({ text: 'Keterangan wajib diisi.', type: 'error' });
-      return;
-    }
-    if (!activeShift) {
-      setAlertMsg({ text: 'Tidak ada shift aktif.', type: 'error' });
-      return;
-    }
-
-    setIsProcessing(true);
-    fetch('/api/v1/shifts/cash-movement', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        shift_id: activeShift.id,
-        terminal_id: terminalInfo.id,
-        type: cashMovementType,
-        amount: parseFloat(cashMovementAmount),
-        description: cashMovementDesc
-      })
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        setIsProcessing(false);
-        setAlertMsg({ text: data.message, type: 'success' });
-        setIsCashMovementModalOpen(false);
-        setCashMovementAmount('');
-        setCashMovementDesc('');
-        // Update local active shift total cash
-        const newShift = { ...activeShift };
-        if (cashMovementType === 'CASH_IN') {
-          newShift.total_cash_in = (newShift.total_cash_in || 0) + parseFloat(cashMovementAmount);
-        } else {
-          newShift.total_cash_out = (newShift.total_cash_out || 0) + parseFloat(cashMovementAmount);
-        }
-        setActiveShift(newShift);
-        safeSetItem('pos_active_shift', JSON.stringify(newShift));
-      })
-      .catch(err => {
-        setIsProcessing(false);
-        setAlertMsg({ text: 'Gagal mencatat manajemen kas (pastikan online).', type: 'error' });
-      });
-  };
-
-  const fetchPpobTransactions = async () => {
-    setIsFetchingPpobTransactions(true);
-    try {
-      const res = await fetch('/api/v1/transactions/ppob/today', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-      if (!res.ok) throw new Error('Gagal mengambil data PPOB hari ini');
-      const data = await res.json();
-      setPpobTransactions(data);
-    } catch (err) {
-      console.error(err);
-      setAlertMsg({ text: 'Error: ' + err.message, type: 'error' });
-    } finally {
-      setIsFetchingPpobTransactions(false);
-    }
-  };
-
-  const handleCheckPpobStatus = async (ppobId) => {
-    try {
-      const res = await fetch(`/api/v1/transactions/ppob/${ppobId}/check-status`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-      if (!res.ok) throw new Error('Gagal cek status PPOB');
-      const { data } = await res.json();
-
-      setPpobTransactions(prev => prev.map(tx => {
-        const updatedPpobs = tx.ppob_transactions.map(p => p.id === ppobId ? data : p);
-        return { ...tx, ppob_transactions: updatedPpobs };
-      }));
-      setAlertMsg({ text: 'Status berhasil dicek!', type: 'success' });
-      setTimeout(() => setAlertMsg(null), 2000);
-    } catch (err) {
-      console.error(err);
-      setAlertMsg({ text: 'Error: ' + err.message, type: 'error' });
-    }
-  };
-
-  const handleReprintPpob = (tx) => {
-    setLastTransaction({ ...mapApiTransactionToLocal(tx), isReprint: true });
-    setShowReceiptPreview(true);
-  };
-
-  const handleCloseShift = () => {
-    if (!activeShift) {
-      setAlertMsg({ text: 'Tidak ada shift aktif yang ditemukan.', type: 'error' });
-      return;
-    }
-
-    if (!actualCash || isNaN(actualCash)) {
-      setAlertMsg({ text: 'Uang fisik harus diisi dengan angka.', type: 'error' });
-      return;
-    }
-
-    setIsProcessing(true);
-
-    // If offline shift or navigator is offline, close locally
-    if (activeShift.is_offline || !navigator.onLine) {
-      localStorage.removeItem('pos_active_shift');
-      setActiveShift(null);
-      setIsCloseShiftModalOpen(false);
-      setIsProcessing(false);
-      setAlertMsg({ text: 'Shift offline berhasil ditutup (Lokal). Terima kasih!', type: 'success', persist: true });
-      setTimeout(() => onLogout(), 2000);
-      return;
-    }
-
-    fetch('/api/v1/shifts/close', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        shift_id: activeShift.id,
-        actual_cash: parseFloat(actualCash)
-      })
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(data => {
-        setIsProcessing(false);
-        if (data.shift) {
-          localStorage.removeItem('pos_active_shift');
-          setActiveShift(null);
-          setIsCloseShiftModalOpen(false);
-          setAlertMsg({ text: 'Shift berhasil ditutup. Menyiapkan Laporan EOD...', type: 'success' });
-          setEodReportData(data.shift);
-        } else {
-          setAlertMsg({ text: data.message || 'Gagal menutup shift.', type: 'error' });
-        }
-      })
-      .catch(err => {
-        console.error('Failed to close shift online, closing locally:', err);
-        localStorage.removeItem('pos_active_shift');
-        setActiveShift(null);
-        setIsCloseShiftModalOpen(false);
-        setIsProcessing(false);
-        setAlertMsg({ text: 'Koneksi terputus. Shift ditutup secara lokal. Terima kasih!', type: 'success', persist: true });
-        setTimeout(() => onLogout(), 2000);
-      });
-  };
-
-  const addItemToTransaction = (product, explicitQty = null, customerNo = null) => {
-    if (product.product_type === 'digital' && !customerNo) {
-      setPendingDigitalProduct({ product, explicitQty });
-      setCustomerNoInput('');
-      setIsDigitalInputModalOpen(true);
-      return;
-    }
-
-    const existingItem = items.find(i => i.productId === product.id && i.customerNo === customerNo);
-    let manualDiscount = 0;
-    const qtyToAdd = explicitQty !== null ? parseFloat(explicitQty) : (parseFloat(nextItemQty) || 1);
-
-    const allowMinusStock = (() => {
-      try {
-        const userObj = JSON.parse(localStorage.getItem('pos_user'));
-        return userObj?.allow_minus_stock !== false;
-      } catch (e) {
-        return true;
-      }
-    })();
-
-    if (!product.is_service && product.product_type !== 'digital') {
-      const currentQty = existingItem ? existingItem.quantity : 0;
-      if (!allowMinusStock && currentQty + qtyToAdd > (product.quantity_on_hand || 0)) {
-        setAlertMsg({ text: `Stok tidak mencukupi! Sisa stok: ${product.quantity_on_hand || 0}`, type: 'error' });
-        setTimeout(() => setAlertMsg(null), 3000);
-        return;
-      }
-    }
-
-    if (queuedDiscount) {
-      if (queuedDiscount.type === 'PERCENT') {
-        manualDiscount = (product.selling_price * queuedDiscount.value) / 100;
-      } else {
-        manualDiscount = queuedDiscount.value;
-      }
-      setQueuedDiscount(null);
-      setAlertMsg(null);
-    }
-
-    if (existingItem) {
-      const updatedItem = { ...existingItem, quantity: existingItem.quantity + qtyToAdd, manualDiscount: manualDiscount || existingItem.manualDiscount };
-      const otherItems = items.filter(i => !(i.productId === product.id && i.customerNo === customerNo));
-      setItems([updatedItem, ...otherItems]);
-    } else {
-      setItems([{
-        productId: product.id,
-        categoryId: product.category_id,
-        sku: product.sku,
-        name: product.name,
-        quantity: qtyToAdd,
-        unitPrice: product.selling_price,
-        manualDiscount: manualDiscount,
-        discountPerItem: 0,
-        isService: product.is_service || false,
-        productType: product.product_type || 'physical',
-        customerNo: customerNo
-      }, ...items]);
-    }
-
-    // Dismiss PWP / Bundling banner if this scanned product is the recommended product itself
-    if (pwpUpsellPrompt && String(pwpUpsellPrompt.rewardProduct?.id) === String(product.id)) {
-      setPwpUpsellPrompt(null);
-    }
-
-    // PWP (Subsidi Silang / Tebus Murah) & BUNDLING Notification & Upsell Prompt
-    let promoMatched = false;
-    if (dbPromos && dbPromos.length > 0 && dbProducts && dbProducts.length > 0) {
-      const addedId = String(product.id);
-      const now = new Date();
-
-      // 1. Cek Promo PWP (Subsidi Silang)
-      const pwpPromos = dbPromos.filter(p => {
-        if (!p.is_active || p.promo_type !== 'PWP') return false;
-        const from = new Date(p.valid_from);
-        const until = new Date(p.valid_until);
-        if (from > now || until < now) return false;
-        return String(p.promo_config?.pwp_trigger_product_id) === addedId;
-      });
-
-      if (pwpPromos.length > 0) {
-        for (const promo of pwpPromos) {
-          const rewardId = String(promo.promo_config?.pwp_reward_product_id);
-          const rewardProd = dbProducts.find(p => String(p.id) === rewardId);
-          if (rewardProd) {
-            const maxAllowed = promo.promo_config?.pwp_max_reward_per_transaction 
-              ? parseInt(promo.promo_config.pwp_max_reward_per_transaction, 10) 
-              : Infinity;
-            const currentRewardInCart = items.find(i => String(i.productId) === rewardId);
-            const currentRewardQty = currentRewardInCart ? currentRewardInCart.quantity : 0;
-
-            if (currentRewardQty < maxAllowed) {
-              const normalPrice = parseFloat(rewardProd.selling_price || 0);
-              const discType = promo.promo_config?.pwp_discount_type || 'SPECIAL_PRICE';
-              const discVal = parseFloat(promo.promo_config?.pwp_discount_value || 0);
-
-              let finalPrice = normalPrice;
-              let hemat = 0;
-              let hematText = '';
-
-              if (discType === 'SPECIAL_PRICE') {
-                finalPrice = discVal;
-                hemat = Math.max(0, normalPrice - discVal);
-                hematText = hemat > 0 ? `Hemat Rp ${Math.round(hemat).toLocaleString('id-ID')}` : '';
-              } else if (discType === 'DISCOUNT_NOMINAL') {
-                finalPrice = Math.max(0, normalPrice - discVal);
-                hemat = discVal;
-                hematText = `Hemat Rp ${Math.round(discVal).toLocaleString('id-ID')}`;
-              } else if (discType === 'DISCOUNT_PERCENT') {
-                finalPrice = Math.max(0, normalPrice * (1 - (discVal / 100)));
-                hemat = normalPrice - finalPrice;
-                hematText = `Diskon ${discVal}%`;
-              }
-
-              setPwpUpsellPrompt({
-                type: 'PWP',
-                promoId: promo.id,
-                promoName: promo.name,
-                triggerName: product.name,
-                rewardProduct: rewardProd,
-                rewardNormalPrice: normalPrice,
-                rewardFinalPrice: finalPrice,
-                hematText: hematText,
-                hematAmount: hemat
-              });
-              promoMatched = true;
-              break;
-            }
-          }
-        }
-      }
-
-      // 2. Cek Promo Bundling (Beli X Gratis Y / Paket Diskon)
-      if (!promoMatched) {
-        const bundlingPromos = dbPromos.filter(p => {
-          if (!p.is_active || p.promo_type !== 'BUNDLING') return false;
-          const from = new Date(p.valid_from);
-          const until = new Date(p.valid_until);
-          if (from > now || until < now) return false;
-
-          const rules = p.promo_config?.rules || [];
-          if (rules.length > 0) {
-            return rules.some(r => String(r.productId) === addedId);
-          }
-          if (p.promo_config?.buy_product_id && p.promo_config?.get_product_id) {
-            return String(p.promo_config.buy_product_id) === addedId || String(p.promo_config.get_product_id) === addedId;
-          }
-          return false;
-        });
-
-        for (const promo of bundlingPromos) {
-          let missingProductId = null;
-          const rules = promo.promo_config?.rules || [];
-
-          if (rules.length > 0) {
-            // Cari rule produk pasangan yang belum terpenuhi di keranjang
-            const missingRule = rules.find(r => {
-              const rId = String(r.productId);
-              const targetQty = parseInt(r.minQty, 10) || 1;
-              const inCart = items.find(i => String(i.productId) === rId);
-              const currentQty = inCart ? inCart.quantity : (rId === addedId ? qtyToAdd : 0);
-              return currentQty < targetQty;
-            });
-            if (missingRule) {
-              missingProductId = String(missingRule.productId);
-            }
-          } else if (promo.promo_config?.buy_product_id && promo.promo_config?.get_product_id) {
-            const buyId = String(promo.promo_config.buy_product_id);
-            const getId = String(promo.promo_config.get_product_id);
-            const partnerId = (addedId === buyId) ? getId : buyId;
-            const inCart = items.find(i => String(i.productId) === partnerId);
-            if (!inCart || inCart.quantity < 1) {
-              missingProductId = partnerId;
-            }
-          }
-
-          if (missingProductId && missingProductId !== addedId) {
-            const companionProd = dbProducts.find(p => String(p.id) === missingProductId);
-            if (companionProd) {
-              const bundleDiscount = parseFloat(promo.promo_config?.bundleDiscount || promo.discount_value || 0);
-              const compNormalPrice = parseFloat(companionProd.selling_price || 0);
-
-              setPwpUpsellPrompt({
-                type: 'BUNDLING',
-                promoId: promo.id,
-                promoName: promo.name,
-                triggerName: product.name,
-                rewardProduct: companionProd,
-                rewardNormalPrice: compNormalPrice,
-                rewardFinalPrice: compNormalPrice,
-                bundleDiscount: bundleDiscount,
-                hematText: bundleDiscount > 0 ? `Hemat Rp ${Math.round(bundleDiscount).toLocaleString('id-ID')}` : '',
-                hematAmount: bundleDiscount
-              });
-              promoMatched = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    // AI Upsell Recommendation Logic (hanya jika tidak ada promo PWP/Bundling aktif untuk produk ini)
-    if (!promoMatched && aprioriRules && aprioriRules.length > 0) {
-      const addedId = String(product.id).toLowerCase();
-      // Find a rule involving the added product
-      const rule = aprioriRules.find(r => String(r.product_id_1).toLowerCase() === addedId || String(r.product_id_2).toLowerCase() === addedId);
-
-      if (rule) {
-        const recId = String(rule.product_id_1).toLowerCase() === addedId ? String(rule.product_id_2).toLowerCase() : String(rule.product_id_1).toLowerCase();
-        const recName = String(rule.product_id_1).toLowerCase() === addedId ? rule.item2 : rule.item1;
-
-        // Check if the recommended product is already in the cart
-        // We use the existing 'items' state plus we know 'product.id' is just added.
-        // If recId is NOT in the current cart, and recId is NOT the product just added
-        const alreadyInCart = items.some(i => String(i.productId).toLowerCase() === recId) || addedId === recId;
-
-        if (!alreadyInCart) {
-          console.log('[AI Upsell] Match found! Recommending:', recName);
-          setAlertMsg({ text: `💡 AI Upsell: Konsumen biasanya juga membeli ${recName} (Peluang ${rule.confidence}).`, type: 'info', persist: true });
-          setTimeout(() => setAlertMsg(null), 8000);
-        }
-      }
-    }
-
-    // Reset nextItemQty back to empty
-    if (nextItemQty !== '') {
-      setNextItemQty('');
-    }
-    setLastScannedProductId(product.id);
-    setTimeout(() => setLastScannedProductId(null), 3000);
-  };
-
-  const handleDigitalProductSubmit = (e) => {
-    e.preventDefault();
-    if (!customerNoInput.trim()) {
-      setAlertMsg({ text: 'Nomor Tujuan harus diisi!', type: 'error' });
-      return;
-    }
-    if (pendingDigitalProduct) {
-      addItemToTransaction(pendingDigitalProduct.product, pendingDigitalProduct.explicitQty, customerNoInput);
-      setPendingDigitalProduct(null);
-      setIsDigitalInputModalOpen(false);
-      setCustomerNoInput('');
-    }
-  };
-
-  const removeItem = (productId) => {
-    setItems(items.filter(i => i.productId !== productId));
-  };
-
-  const updateQuantity = (productId, quantity) => {
-    if (!productId) return;
-    if (quantity <= 0) removeItem(productId);
-    else {
-      const item = items.find(i => i.productId === productId);
-      if (item && !item.isService) {
-        const prod = dbProducts.find(p => p.id === productId);
-        if (prod && prod.product_type === 'digital') {
-          // Skip stock validation for digital products
-        } else {
-          const allowMinusStock = (() => {
-            try {
-              const userObj = JSON.parse(localStorage.getItem('pos_user'));
-              return userObj?.allow_minus_stock !== false;
-            } catch (e) {
-              return true;
-            }
-          })();
-
-          if (prod && !allowMinusStock && quantity > (prod.quantity_on_hand || 0)) {
-            setAlertMsg({ text: `Stok tidak mencukupi! Sisa stok: ${prod.quantity_on_hand || 0}`, type: 'error' });
-            setTimeout(() => setAlertMsg(null), 3000);
-            return;
-          }
-        }
-      }
-      setItems(items.map(i => i.productId === productId ? { ...i, quantity } : i));
-    }
-  };
-
-  const subtotal = items.reduce((sum, item) => sum + (item.quantity * parseFloat(item.unitPrice)) - (item.quantity * (item.manualDiscount || 0)), 0);
-  const { totalDiscount, appliedPromos } = discountEngine.current.calculateTotalDiscount(
-    items,
-    selectedCustomer ? { memberTier: selectedCustomer.member_tier, tierDiscountPercent: selectedCustomer.tier_discount_percent } : { memberTier: 'REGULAR', tierDiscountPercent: 0 },
-    subtotal
-  );
-  const finalAmount = Math.round(subtotal - totalDiscount - manualTotalDiscount);
-  const totalPaid = payments.length > 0
-    ? payments.reduce((sum, p) => sum + p.amount, 0)
-    : (receivedAmount ? parseFloat(receivedAmount) : 0);
-  const changeAmount = totalPaid - finalAmount;
-
-  const handleManualDiscountItem = (type) => {
-    setDiscountModal({ target: 'ITEM', type });
-    setDiscountInputVal('');
-  };
-
-  const handleManualTotalDiscount = (type) => {
-    setDiscountModal({ target: 'TOTAL', type });
-    setDiscountInputVal('');
-  };
-
-  const applyEnteredDiscount = () => {
-    const rawVal = (discountModal && discountModal.type === 'RUPIAH') ? discountInputVal.replace(/\./g, '') : discountInputVal;
-    const val = parseFloat(rawVal);
-    if (isNaN(val) || val <= 0) {
-      setAlertMsg({ text: 'Nilai diskon harus berupa angka lebih besar dari 0!', type: 'error' });
-      setTimeout(() => setAlertMsg(null), 2000);
-      return;
-    }
-
-    if (discountModal.target === 'ITEM') {
-      setQueuedDiscount({ type: discountModal.type, value: val });
-      setAlertMsg({ text: `Diskon ${discountModal.type === 'PERCENT' ? val + '%' : 'Rp ' + val} disiapkan. Silakan scan barang.`, type: 'info', persist: true });
-    } else {
-      let discount = 0;
-      if (discountModal.type === 'PERCENT') {
-        discount = (subtotal * val) / 100;
-      } else {
-        discount = val;
-      }
-      setManualTotalDiscount(discount);
-      setAlertMsg({ text: `Diskon Total sebesar ${discountModal.type === 'PERCENT' ? val + '%' : 'Rp ' + val} berhasil diterapkan.`, type: 'success' });
-      setTimeout(() => setAlertMsg(null), 3000);
-    }
-
-    setDiscountModal(null);
-    setDiscountInputVal('');
-    setTimeout(() => barcodeInput.current?.focus(), 100);
-  };
-
-  const handleApplyPoints = () => {
-    if (!pointRedemptionEnabled) {
-      setAlertMsg({ text: 'Penukaran poin saat ini dinonaktifkan oleh Perusahaan.', type: 'error' });
-      setTimeout(() => setAlertMsg(null), 3000);
-      return;
-    }
-
-    const pointsToUse = parseInt(pointsToRedeemInput, 10);
-
-    if (isNaN(pointsToUse) || pointsToUse <= 0) {
-      setAlertMsg({ text: 'Jumlah poin tidak valid.', type: 'error' });
-      setTimeout(() => setAlertMsg(null), 3000);
-      return;
-    }
-
-    if (pointsToUse < minimumPointsToRedeem) {
-      setAlertMsg({ text: `Minimal penukaran adalah ${minimumPointsToRedeem} Poin.`, type: 'error' });
-      setTimeout(() => setAlertMsg(null), 3000);
-      return;
-    }
-
-    if (!selectedCustomer) return;
-
-    if (pointsToUse > selectedCustomer.points) {
-      setAlertMsg({ text: `Poin pelanggan tidak mencukupi (Sisa: ${selectedCustomer.points}).`, type: 'error' });
-      setTimeout(() => setAlertMsg(null), 3000);
-      return;
-    }
-
-    const valueInRp = pointsToUse * pointRedemptionValue;
-    const currentPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-    const remainingToPay = finalAmount - currentPaid;
-
-    if (valueInRp > remainingToPay && remainingToPay > 0) {
-      setAlertMsg({ text: `Nilai poin (Rp ${formatCurrency(valueInRp)}) melebihi sisa tagihan (Rp ${formatCurrency(remainingToPay)}). Kurangi poin yang ditukar.`, type: 'error' });
-      setTimeout(() => setAlertMsg(null), 3500);
-      return;
-    }
-
-    setPayments([...payments, {
-      method: 'POINT',
-      amount: valueInRp > remainingToPay ? remainingToPay : valueInRp,
-      points_deducted: pointsToUse,
-      label: `Tukar Poin (${pointsToUse})`
-    }]);
-
-    setAlertMsg({ text: `Berhasil menukar ${pointsToUse} poin senilai Rp ${formatCurrency(valueInRp > remainingToPay ? remainingToPay : valueInRp)}.`, type: 'success' });
-    setTimeout(() => setAlertMsg(null), 2500);
-    setIsRedeemPointModalOpen(false);
-    setPointsToRedeemInput('');
-  };
 
   const handleClearDiscount = () => {
     // Preserve items in the cart!
@@ -1736,329 +603,6 @@ export const POSTransaction = ({
     }
   };
 
-  const handleReturnSuccess = (returnItems, originalReceiptId) => {
-    setItems(prev => [...returnItems, ...prev]);
-    setIsReturnMode(true);
-    setIsReturnModalOpen(false);
-    setAlertMsg({ text: `Mode Retur Aktif untuk Nota: ${originalReceiptId}`, type: 'info', persist: true });
-    setTimeout(() => setAlertMsg(null), 5000);
-  };
-
-  const startPayment = (method) => {
-    setPaymentMethod(method);
-    if (method === 'CARD') {
-      setIsBankSelectOpen(true);
-    } else if (method === 'CASH') {
-      const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-      setDirectCashInput(sisa !== 0 ? formatThousandSeparator(sisa) : '');
-      setIsDirectCashModalOpen(true);
-    } else {
-      processTransaction(method);
-    }
-  };
-
-  const processTransaction = async (method = paymentMethod, bankId = selectedBank?.id, overrideReceived = null) => {
-    if (items.length === 0) return;
-    setIsProcessing(true);
-    try {
-      const nowCorrected = new Date(Date.now() + serverOffset);
-      const lastSync = parseInt(localStorage.getItem('pos_last_sync_time') || '0');
-
-      // Safety check: Prevent backdating or extreme forward dating
-      if (lastSync > 0) {
-        const driftLimit = 24 * 60 * 60 * 1000; // 24 hours
-        const diffFromLast = nowCorrected.getTime() - lastSync;
-
-        if (diffFromLast < -300000) { // More than 5 mins in the past compared to last sync
-          setAlertMsg({ text: 'Waktu sistem tidak valid (Mundur dari waktu terakhir). Mohon koreksi jam perangkat.', type: 'error' });
-          setIsProcessing(false);
-          return;
-        }
-
-        if (diffFromLast > driftLimit && !isOnline) {
-          setAlertMsg({ text: 'Waktu sistem terlalu jauh dari sinkronisasi terakhir. Mohon online-kan untuk kalibrasi jam.', type: 'error' });
-          setIsProcessing(false);
-          return;
-        }
-      }
-
-      const currentFinalAmount = finalAmount;
-
-      let finalPayments = [...payments];
-      if (overrideReceived !== null) {
-        finalPayments.push({ method, amount: parseFloat(overrideReceived), bankId, label: method === 'CASH' ? 'Tunai' : (method === 'CARD' ? 'Card' : method) });
-      } else if (payments.length === 0) {
-        finalPayments = [{ method, amount: parseFloat(receivedAmount) || finalAmount, bankId }];
-      }
-
-      const currentReceived = finalPayments.reduce((sum, p) => sum + p.amount, 0);
-
-      if (currentReceived < currentFinalAmount) {
-        setAlertMsg({ text: `Pembayaran kurang! Kurang: ${formatCurrency(currentFinalAmount - currentReceived)}`, type: 'error' });
-        setTimeout(() => setAlertMsg(null), 3000);
-        setIsProcessing(false);
-        return;
-      }
-
-      const currentChange = currentReceived - currentFinalAmount;
-
-      const grossTotal = items.reduce((sum, item) => sum + (item.quantity * parseFloat(item.unitPrice)), 0);
-      const totalItemManualDiscount = items.reduce((sum, item) => sum + (item.quantity * (item.manualDiscount || 0)), 0);
-
-      const actualPaymentMethod = finalPayments.length > 1 ? 'MULTI' : finalPayments[0].method;
-
-      const transaction = {
-        items,
-        totalAmount: grossTotal,
-        discountAmount: totalItemManualDiscount + totalDiscount + manualTotalDiscount,
-        manualDiscount: totalItemManualDiscount + manualTotalDiscount,
-        promoDiscount: totalDiscount,
-        finalAmount: currentFinalAmount,
-        paymentMethod: actualPaymentMethod,
-        payments: finalPayments,
-        bankId: bankId,
-        terminalId: terminalInfo.id,
-        terminalCode: terminalInfo?.code,
-        customerId: selectedCustomer?.id,
-        shiftId: activeShift?.id,
-        receivedAmount: currentReceived,
-        changeAmount: currentChange,
-        appliedPromos,
-        receipt_number: (branchCode || 'SMI') + '-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
-        transaction_type: isReturnMode ? 'RETURN' : 'SALES',
-      };
-
-      let localTx = null;
-      try {
-        localTx = await storeLocalTransaction(transaction);
-        if (!localTx) {
-          throw new Error('Gagal menyimpan transaksi ke penyimpanan lokal (IndexedDB). Transaksi DIBATALKAN.');
-        }
-      } catch (err) {
-        console.error('CRITICAL: Local transaction storage failed:', err);
-        setAlertMsg({ text: `TRANSAKSI GAGAL: ${err.message}. Struk DILARANG dicetak!`, type: 'error', persist: true });
-        setIsProcessing(false);
-        return;
-      }
-
-      let syncResult = null;
-      if (isOnline) {
-        syncResult = await syncTransactions();
-      }
-
-      let finalItemsForReceipt = [...transaction.items];
-      if (syncResult && syncResult.ppobData && syncResult.ppobData[localTx.localId]) {
-        const ppobList = syncResult.ppobData[localTx.localId];
-        finalItemsForReceipt = finalItemsForReceipt.map(item => {
-          if (item.productType === 'digital') {
-            const ppob = ppobList.find(p => p.productId == item.productId);
-            if (ppob) {
-              return {
-                ...item,
-                sn: ppob.sn,
-                ppobStatus: ppob.status,
-                ppobMessage: ppob.message
-              };
-            }
-          }
-          return item;
-        });
-      }
-
-      const currentCustomer = selectedCustomer;
-
-      // Clear states BEFORE showing modal to avoid flicker
-      setItems([]);
-      setPwpUpsellPrompt(null);
-      setPayments([]);
-      setManualTotalDiscount(0);
-      setReceivedAmount('');
-      setInputValue('');
-      setIsSubtotalMode(false);
-      setSelectedBank(null);
-
-      // Update customer points locally if selected (offline-safe)
-      if (currentCustomer) {
-        const earnedPoints = Math.floor(currentFinalAmount / pointConversionRate);
-        const updatedPoints = (currentCustomer.points || 0) + earnedPoints;
-
-        // Recalculate tier locally
-        let updatedTier = 'BRONZE';
-        if (updatedPoints >= 10000) updatedTier = 'PLATINUM';
-        else if (updatedPoints >= 5000) updatedTier = 'GOLD';
-        else if (updatedPoints >= 1000) updatedTier = 'SILVER';
-
-        const updatedCustomer = {
-          ...currentCustomer,
-          points: updatedPoints,
-          member_tier: updatedTier
-        };
-
-        const updatedCustomersList = customers.map(c =>
-          c.id === currentCustomer.id ? updatedCustomer : c
-        );
-
-        setCustomers(updatedCustomersList);
-        safeSetItem('pos_cached_customers', JSON.stringify(updatedCustomersList));
-      }
-
-      setSelectedCustomer(null);
-      setIsBankSelectOpen(false);
-      setIsReturnMode(false);
-
-      // Small delay to ensure the key event that triggered this doesn't immediately close the modal
-      setTimeout(() => {
-        setLastTransaction({
-          ...transaction,
-          items: finalItemsForReceipt,
-          branchName,
-          branchAddress,
-          orgName,
-          userName,
-          customerName: currentCustomer?.name,
-          timestamp: nowCorrected.toISOString(),
-        });
-        safeSetItem('pos_last_sync_time', nowCorrected.getTime().toString());
-        setChangeModalInfo({ amount: currentChange });
-      }, 100);
-
-      if (barcodeInput.current) {
-        barcodeInput.current.focus();
-      }
-    } catch (error) {
-      console.error('Transaction error:', error);
-      setAlertMsg({ text: `Error: ${error.message}`, type: 'error' });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleHoldTransaction = () => {
-    if (items.length === 0) return;
-
-    const newHeld = [
-      ...heldTransactions,
-      {
-        id: Date.now(),
-        items,
-        subtotal,
-        finalAmount,
-        timestamp: new Date().toISOString(),
-        itemCount: items.length
-      }
-    ];
-
-    setHeldTransactions(newHeld);
-    safeSetItem('pos_held_transactions', JSON.stringify(newHeld));
-    setItems([]);
-    setPwpUpsellPrompt(null);
-    setPayments([]);
-    setManualTotalDiscount(0);
-    setIsReturnMode(false);
-    setAlertMsg({ text: 'Transaksi ditunda (HOLD).', type: 'info' });
-    setTimeout(() => setAlertMsg(null), 2000);
-  };
-
-  const handleRecallTransaction = (held) => {
-    setItems(held.items);
-
-    const newHeld = heldTransactions.filter(h => h.id !== held.id);
-    setHeldTransactions(newHeld);
-    safeSetItem('pos_held_transactions', JSON.stringify(newHeld));
-    setIsRecallModalOpen(false);
-
-    setAlertMsg({ text: 'Transaksi berhasil dipanggil (RECALL).', type: 'info' });
-    setTimeout(() => setAlertMsg(null), 2000);
-  };
-
-  const mapApiTransactionToLocal = (data) => {
-    const ppobs = data.ppob_transactions ? [...data.ppob_transactions] : [];
-    return {
-      receiptNumber: data.receipt_number,
-      terminalId: data.terminal_id,
-      terminalCode: data.terminal?.code || data.terminal_code || allTerminals?.find(t => t.id === data.terminal_id)?.code || data.terminal_id?.substring(0, 8),
-      timestamp: data.created_at,
-      items: data.items.map(item => {
-        let sn = null;
-        let customerNo = null;
-        let customerName = null;
-        let ppobStatus = null;
-        let ppobMessage = null;
-        if (item.product?.product_type === 'digital' && ppobs.length > 0) {
-          const ppob = ppobs.shift();
-          sn = ppob.sn;
-          customerNo = ppob.customer_no;
-          customerName = ppob.customer_name;
-          ppobStatus = ppob.status;
-          ppobMessage = ppob.message;
-        }
-        return {
-          name: item.product ? item.product.name : item.product_name,
-          quantity: item.quantity,
-          unitPrice: item.unit_price,
-          manualDiscount: item.manual_discount || 0,
-          sn,
-          customerNo,
-          customerName,
-          ppobStatus,
-          ppobMessage
-        };
-      }),
-      totalAmount: data.total_amount,
-      totalDiscount: data.total_discount,
-      manualTotalDiscount: data.manual_discount || 0,
-      finalAmount: data.final_amount,
-      paymentMethod: data.payment_method,
-      receivedAmount: data.received_amount,
-      changeAmount: data.change_amount,
-      branchName: data.branch?.name || branchName,
-      branchAddress: data.branch?.address || branchAddress,
-      orgName: data.organization?.name || orgName,
-      userName: data.cashier?.name || userName,
-    };
-  };
-
-  const handleReprintLast = async () => {
-    try {
-      const res = await fetch('/api/v1/transactions/latest', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'X-Terminal-ID': terminalInfo?.id || ''
-        }
-      });
-      if (!res.ok) throw new Error('Tidak ada transaksi di kassa ini.');
-      const data = await res.json();
-
-      setLastTransaction({ ...mapApiTransactionToLocal(data), isReprint: true });
-      setShowReceiptPreview(true);
-    } catch (e) {
-      setAlertMsg({ text: e.message || 'Gagal memuat nota terakhir', type: 'error' });
-      setTimeout(() => setAlertMsg(null), 3000);
-    }
-  };
-
-  const handleReprintOld = async () => {
-    if (!oldReceiptInput) return;
-    try {
-      const res = await fetch(`/api/v1/transactions/receipt/${encodeURIComponent(oldReceiptInput)}`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-      if (!res.ok) throw new Error('Nota tidak ditemukan.');
-      const data = await res.json();
-
-      setLastTransaction({ ...mapApiTransactionToLocal(data), isReprint: true });
-      setIsReprintOldModalOpen(false);
-      setOldReceiptInput('');
-      setShowReceiptPreview(true);
-    } catch (e) {
-      setAlertMsg({ text: e.message || 'Gagal mencari nota', type: 'error' });
-      setTimeout(() => setAlertMsg(null), 3000);
-    }
-  };
-
-  const formatCurrency = (val) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
-  };
 
   const getShortcutHint = (keyName, fallback) => {
     const setting = posSettings?.find(s => s.key_name === keyName);
@@ -2079,175 +623,79 @@ export const POSTransaction = ({
   };
 
 
-  useEffect(() => {
-    const handleShortcuts = (e) => {
-      const settingsList = posSettings && posSettings.length > 0 ? posSettings : [
-        { key_name: 'btn_subtotal', shortcut_key: 'F9', is_active: 1 },
-        { key_name: 'btn_disc_item_rp', shortcut_key: 'F1', is_active: 1 },
-        { key_name: 'btn_disc_item_pct', shortcut_key: 'F2', is_active: 1 },
-        { key_name: 'btn_disc_total_rp', shortcut_key: 'F3', is_active: 1 },
-        { key_name: 'btn_disc_total_pct', shortcut_key: 'F4', is_active: 1 },
-        { key_name: 'btn_tunai', shortcut_key: 'F5', is_active: 1 },
-        { key_name: 'btn_card', shortcut_key: 'F6', is_active: 1 },
-        { key_name: 'btn_qty', shortcut_key: 'F7', is_active: 1 },
-        { key_name: 'btn_close_shift', shortcut_key: 'F8', is_active: 1 },
-        { key_name: 'btn_reprint_last', shortcut_key: 'F11', is_active: 1 },
-        { key_name: 'btn_reprint_old', shortcut_key: 'F12', is_active: 1 },
-        { key_name: 'btn_ppob_menu', shortcut_key: 'F10', is_active: 1 },
-        { key_name: 'btn_member', shortcut_key: 'Home', is_active: 1 },
-        { key_name: 'btn_retur', shortcut_key: 'End', is_active: 1 },
-        { key_name: 'btn_hold', shortcut_key: 'PageUp', is_active: 1 },
-        { key_name: 'btn_recall', shortcut_key: 'PageDown', is_active: 1 },
-        { key_name: 'btn_clear', shortcut_key: 'Insert', is_active: 1 },
-        { key_name: 'btn_void_item', shortcut_key: 'Delete', is_active: 1 },
-        { key_name: 'btn_void_all', shortcut_key: 'Escape', is_active: 1 },
-        { key_name: 'btn_voucher', shortcut_key: '', is_active: 1 },
-        { key_name: 'btn_multi_pay', shortcut_key: '', is_active: 1 },
-        { key_name: 'btn_open_price', shortcut_key: '', is_active: 1 },
-        { key_name: 'btn_kas', shortcut_key: '', is_active: 1 }
-      ];
-
-      // Find if the key pressed is one of the active registered shortcut keys (case-insensitive)
-      const setting = settingsList.find(s => s.shortcut_key && s.shortcut_key.toLowerCase() === e.key.toLowerCase());
-      const isActive = (val) => val === true || val === 1 || val === "1";
-
-      // Global Escape handler for modals
-      if (e.key === 'Escape') {
-        const modals = document.querySelectorAll('.change-modal-overlay, .modal-overlay');
-        if (modals.length > 0) {
-          const topModal = modals[modals.length - 1];
-          const batalBtn = Array.from(topModal.querySelectorAll('button')).find(btn => btn.textContent.toLowerCase().includes('batal'));
-          if (batalBtn) {
-            batalBtn.click();
-            return;
+  usePosShortcuts({
+    posSettings,
+    handlers: {
+      btn_pay: () => processTransaction(),
+      btn_subtotal: () => {
+        setIsSubtotalMode(true);
+        barcodeInput.current?.focus();
+      },
+      btn_disc_item_rp: () => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL')),
+      btn_disc_item_pct: () => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT')),
+      btn_disc_total_rp: () => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL')),
+      btn_disc_total_pct: () => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT')),
+      btn_tunai: () => startPayment('CASH'),
+      btn_card: () => startPayment('CARD'),
+      btn_voucher: () => requestAuthorization("VOUCHER", () => setIsVoucherModalOpen(true)),
+      btn_multi_pay: () => requestAuthorization("MULTI_PAYMENT", () => setIsMultiPaymentModalOpen(true)),
+      btn_open_price: () => {
+        requestAuthorization("OPEN_PRICE", () => {
+          if (items.length > 0) {
+            setOpenPriceTargetItem(items[items.length - 1]);
+            setIsOpenPriceModalOpen(true);
+          } else {
+            setAlertMsg({ text: 'Pilih item terlebih dahulu', type: 'error' });
+            setTimeout(() => setAlertMsg(null), 2000);
           }
+        });
+      },
+      btn_kas: () => {
+        if (window.electronAPI && window.electronAPI.openCashDrawer) {
+          window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
         }
-      }
-
-      if (!setting || !isActive(setting.is_active)) return;
-
-      // Block shortcuts if any modal overlay is present
-      if (document.querySelector('.change-modal-overlay') || document.querySelector('.modal-overlay')) {
-        return;
-      }
-
-      // If focusing on input, we only allow key presses that are exactly registered in settingsList
-      if (e.target.tagName === 'INPUT') {
-        const allowedKeys = settingsList
-          .filter(s => isActive(s.is_active) && s.shortcut_key)
-          .map(s => s.shortcut_key.toLowerCase());
-        if (!allowedKeys.includes(e.key.toLowerCase())) {
-          return;
+        setIsCashMovementModalOpen(true);
+      },
+      btn_void_item: () => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0)),
+      btn_void_all: () => {
+        requestAuthorization("VOID", () => {
+          setItems([]);
+          setPwpUpsellPrompt(null);
+          setPayments([]);
+          setManualTotalDiscount(0);
+          setIsReturnMode(false);
+        });
+      },
+      handleClearDiscount: () => handleClearDiscount(),
+      btn_clear: () => handleClearDiscount(),
+      btn_clear_discount: () => handleClearDiscount(),
+      btn_hold: () => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction()),
+      btn_hold_transaction: () => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction()),
+      handleHoldTransaction: () => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction()),
+      btn_recall: () => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true)),
+      btn_recall_transaction: () => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true)),
+      setIsRecallModalOpen: () => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true)),
+      btn_member: () => setIsMemberModalOpen(true),
+      setIsMemberModalOpen: () => setIsMemberModalOpen(true),
+      btn_retur: () => requestAuthorization("RETURN", () => setIsReturnModalOpen(true)),
+      btn_return: () => requestAuthorization("RETURN", () => setIsReturnModalOpen(true)),
+      setIsReturnModalOpen: () => requestAuthorization("RETURN", () => setIsReturnModalOpen(true)),
+      btn_qty: () => setIsQtyModalOpen(true),
+      btn_close_shift: () => {
+        if (window.electronAPI && window.electronAPI.openCashDrawer) {
+          window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
         }
+        setIsCloseShiftModalOpen(true);
+      },
+      btn_reprint_last: () => requestAuthorization("REPRINT_LAST", () => handleReprintLast()),
+      btn_reprint_old: () => requestAuthorization("REPRINT_OLD", () => setIsReprintOldModalOpen(true)),
+      btn_ppob_menu: () => {
+        setIsPpobMenuOpen(true);
+        fetchPpobTransactions();
       }
-
-      e.preventDefault();
-      switch (setting.key_name) {
-        case 'btn_pay':
-          processTransaction();
-          break;
-        case 'btn_subtotal':
-          setIsSubtotalMode(true);
-          barcodeInput.current?.focus();
-          break;
-        case 'btn_disc_item_rp':
-          requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL'));
-          break;
-        case 'btn_disc_item_pct':
-          requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT'));
-          break;
-        case 'btn_disc_total_rp':
-          requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL'));
-          break;
-        case 'btn_disc_total_pct':
-          requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT'));
-          break;
-        case 'btn_tunai':
-          startPayment('CASH');
-          break;
-        case 'btn_card':
-          startPayment('CARD');
-          break;
-        case 'btn_voucher':
-          requestAuthorization("VOUCHER", () => setIsVoucherModalOpen(true));
-          break;
-        case 'btn_multi_pay':
-          requestAuthorization("MULTI_PAYMENT", () => setIsMultiPaymentModalOpen(true));
-          break;
-        case 'btn_open_price':
-          requestAuthorization("OPEN_PRICE", () => {
-            if (items.length > 0) {
-              setOpenPriceTargetItem(items[items.length - 1]);
-              setIsOpenPriceModalOpen(true);
-            } else {
-              setAlertMsg({ text: 'Pilih item terlebih dahulu', type: 'error' });
-              setTimeout(() => setAlertMsg(null), 2000);
-            }
-          });
-          break;
-        case 'btn_kas':
-          if (window.electronAPI && window.electronAPI.openCashDrawer) {
-            window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
-          }
-          setIsCashMovementModalOpen(true);
-          break;
-        case 'btn_void_item':
-          requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0));
-          break;
-        case 'btn_void_all':
-          requestAuthorization("VOID", () => { setItems([]); setPwpUpsellPrompt(null); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); });
-          break;
-        case 'handleClearDiscount':
-        case 'btn_clear':
-        case 'btn_clear_discount':
-          handleClearDiscount();
-          break;
-        case 'btn_hold':
-        case 'btn_hold_transaction':
-        case 'handleHoldTransaction':
-          requestAuthorization("HOLD_RECALL", () => handleHoldTransaction());
-          break;
-        case 'btn_recall':
-        case 'btn_recall_transaction':
-        case 'setIsRecallModalOpen':
-          requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true));
-          break;
-        case 'btn_member':
-        case 'setIsMemberModalOpen':
-          setIsMemberModalOpen(true);
-          break;
-        case 'btn_retur':
-        case 'btn_return':
-        case 'setIsReturnModalOpen':
-          requestAuthorization("RETURN", () => setIsReturnModalOpen(true));
-          break;
-        case 'btn_qty':
-          setIsQtyModalOpen(true);
-          break;
-        case 'btn_close_shift':
-          if (window.electronAPI && window.electronAPI.openCashDrawer) {
-            window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
-          }
-          setIsCloseShiftModalOpen(true);
-          break;
-        case 'btn_reprint_last':
-          requestAuthorization("REPRINT_LAST", () => handleReprintLast());
-          break;
-        case 'btn_reprint_old':
-          requestAuthorization("REPRINT_OLD", () => setIsReprintOldModalOpen(true));
-          break;
-        case 'btn_ppob_menu':
-          setIsPpobMenuOpen(true);
-          fetchPpobTransactions();
-          break;
-        default:
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleShortcuts);
-    return () => window.removeEventListener('keydown', handleShortcuts);
-  }, [posSettings, items, isSubtotalMode, receivedAmount, activeShift, paymentMethod, subtotal, finalAmount, totalDiscount, manualTotalDiscount, dbProducts]);
+    },
+    dependencies: [items, isSubtotalMode, receivedAmount, activeShift, paymentMethod, subtotal, finalAmount, totalDiscount, manualTotalDiscount, dbProducts]
+  });
 
   if (isCheckingShift) {
     return (
@@ -2308,784 +756,192 @@ export const POSTransaction = ({
 
   return (
     <div className="pos-terminal-new">
-      {/* --- MODALS --- */}
-
-      {/* Terminal Selection Modal */}
-      {isTerminalModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content terminal-select-card fade-in">
-            <Settings size={48} className="text-primary" />
-            <h2>Pilih Terminal / Kassa</h2>
-            <p>Silakan pilih terminal yang digunakan saat ini.</p>
-            <div className="terminal-list-grid">
-              {allTerminals.length > 0 ? (
-                allTerminals.map(terminal => (
-                  <button key={terminal.id} className="terminal-item-btn" onClick={() => handleSelectTerminal(terminal)}>
-                    <span className="name">{terminal.name}</span>
-                    <span className="code">{terminal.code}</span>
-                  </button>
-                ))
-              ) : (
-                <p className="text-muted">Tidak ada terminal aktif untuk cabang ini.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Buka Shift Modal */}
-      {isOpenShiftModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <div className="modal-header-icon" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-              <LogIn size={40} />
-            </div>
-            <h2 style={{ textAlign: 'center' }}>Buka Shift Kasir</h2>
-            <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Pilih shift dan masukkan modal awal untuk memulai.</p>
-
-            <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Nama Shift</label>
-              <select
-                className="modern-barcode-input"
-                style={{ width: '100%', padding: '0.75rem' }}
-                value={selectedShiftName}
-                onChange={(e) => setSelectedShiftName(e.target.value)}
-              >
-                <option value="Shift 1">Shift 1</option>
-                <option value="Shift 2">Shift 2</option>
-                <option value="Shift 3">Shift 3</option>
-                <option value="Shift Umum">Shift Umum</option>
-              </select>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Modal Awal (Cash)</label>
-              <input
-                type="text"
-                className="modern-barcode-input"
-                style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem' }}
-                placeholder="0"
-                value={startingCash ? formatThousandSeparator(startingCash) : ''}
-                onChange={(e) => setStartingCash(e.target.value.replace(/[^0-9]/g, ''))}
-              />
-            </div>
-
-            <button className="btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }} onClick={handleOpenShift}>
-              BUKA SHIFT SEKARANG
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Tutup Shift Modal */}
-      {isCloseShiftModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '450px' }}>
-            <div className="modal-header-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-              <LogOut size={40} />
-            </div>
-            <h2 style={{ textAlign: 'center' }}>Tutup Kasir / End Shift</h2>
-
-            <div className="shift-summary-mini" style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Mulai Shift</span>
-                <span>{activeShift?.start_time ? new Date(activeShift.start_time).toLocaleTimeString('id-ID') : '-'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Modal Awal</span>
-                <span>{formatCurrency(activeShift?.starting_cash || 0)}</span>
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Uang Fisik di Laci (Cash)</label>
-              <input
-                type="text"
-                className="modern-barcode-input"
-                style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem' }}
-                placeholder="0"
-                value={actualCash ? formatThousandSeparator(actualCash) : ''}
-                onChange={(e) => setActualCash(e.target.value.replace(/[^0-9]/g, ''))}
-                autoFocus
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsCloseShiftModalOpen(false)}>BATAL</button>
-              <button
-                className="btn-danger"
-                style={{ flex: 2, background: isProcessing ? '#94a3b8' : '#ef4444' }}
-                onClick={handleCloseShift}
-                disabled={isProcessing}
-              >
-                {isProcessing ? 'MEMPROSES...' : 'TUTUP KASIR (BLIND CLOSE)'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Cash Movement (Kas Masuk/Keluar) Modal */}
-      {isCashMovementModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '450px' }}>
-            <div className="modal-header-icon" style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#eab308', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-              <Banknote size={40} />
-            </div>
-            <h2 style={{ textAlign: 'center' }}>Manajemen Kas</h2>
-            <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Catat pengeluaran atau penambahan kas laci (Petty Cash).</p>
-
-            <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Jenis Transaksi</label>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  className={`btn-${cashMovementType === 'CASH_IN' ? 'primary' : 'secondary'}`}
-                  style={{ flex: 1, padding: '0.75rem' }}
-                  onClick={() => setCashMovementType('CASH_IN')}
-                >
-                  <Plus size={16} style={{ display: 'inline', marginRight: '5px' }} /> KAS MASUK
-                </button>
-                <button
-                  className={`btn-${cashMovementType === 'CASH_OUT' ? 'danger' : 'secondary'}`}
-                  style={{ flex: 1, padding: '0.75rem' }}
-                  onClick={() => setCashMovementType('CASH_OUT')}
-                >
-                  <Minus size={16} style={{ display: 'inline', marginRight: '5px' }} /> KAS KELUAR
-                </button>
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Nominal (Rp)</label>
-              <input
-                type="number"
-                className="modern-barcode-input"
-                style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem' }}
-                placeholder="0"
-                value={cashMovementAmount}
-                onChange={(e) => setCashMovementAmount(e.target.value)}
-                autoFocus
-              />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Keterangan / Catatan</label>
-              <input
-                type="text"
-                className="modern-barcode-input"
-                style={{ width: '100%', padding: '0.75rem' }}
-                placeholder="Contoh: Beli air minum galon..."
-                value={cashMovementDesc}
-                onChange={(e) => setCashMovementDesc(e.target.value)}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsCashMovementModalOpen(false)}>BATAL</button>
-              <button
-                className="btn-primary"
-                style={{ flex: 2, background: isProcessing ? '#94a3b8' : undefined }}
-                onClick={handleCashMovement}
-                disabled={isProcessing}
-              >
-                {isProcessing ? 'MENYIMPAN...' : 'SIMPAN CATATAN KAS'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Printer Settings Modal */}
-      {isPrinterSettingsOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content settings-card fade-in" style={{ maxWidth: '450px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, fontSize: '1.25rem' }}>
-                <Printer size={24} className="text-primary" /> Pengaturan Printer Lokal
-              </h2>
-              <button onClick={() => setIsPrinterSettingsOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                <X size={24} />
-              </button>
-            </div>
-
-            <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Mode Tampilan Cetak</label>
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', flex: 1 }}>
-                  <input type="radio" name="autoPrint" checked={!localPrinterSettings.autoPrint} onChange={() => setLocalPrinterSettings(p => ({ ...p, autoPrint: false }))} />
-                  Preview Dahulu
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', flex: 1 }}>
-                  <input type="radio" name="autoPrint" checked={localPrinterSettings.autoPrint} onChange={() => setLocalPrinterSettings(p => ({ ...p, autoPrint: true }))} />
-                  Cetak Langsung
-                </label>
-              </div>
-
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Kualitas / Driver Cetak</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} title="Pilih ini jika menggunakan driver TM-U220 standar (Lambat tapi rapi)">
-                  <input type="radio" name="printMode" checked={localPrinterSettings.printMode === 'GRAPHIC'} onChange={() => setLocalPrinterSettings(p => ({ ...p, printMode: 'GRAPHIC' }))} />
-                  <span>
-                    <strong>Grafis (Driver Bawaan)</strong>
-                    <span style={{ display: 'block', fontSize: '0.8rem', color: '#64748b' }}>Cetak presisi, butuh setting auto-cut manual di printer.</span>
-                  </span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} title="Pilih ini jika menggunakan driver Generic / Text Only (Cepat & Buka laci)">
-                  <input type="radio" name="printMode" checked={localPrinterSettings.printMode === 'TEXT'} onChange={() => setLocalPrinterSettings(p => ({ ...p, printMode: 'TEXT' }))} />
-                  <span>
-                    <strong>Text Only (ESC/POS)</strong>
-                    <span style={{ display: 'block', fontSize: '0.8rem', color: '#64748b' }}>Sangat cepat, otomatis buka laci (khusus Generic Text Only).</span>
-                  </span>
-                </label>
-              </div>
-
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', marginTop: '1.5rem', color: '#334155' }}>Format Struk</label>
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', flex: 1 }}>
-                  <input type="radio" name="receiptType" checked={localPrinterSettings.receiptType !== 2} onChange={() => setLocalPrinterSettings(p => ({ ...p, receiptType: 1 }))} />
-                  Standar (Header di Atas)
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.5rem', border: '1px solid #cbd5e1', borderRadius: '6px', flex: 1 }}>
-                  <input type="radio" name="receiptType" checked={localPrinterSettings.receiptType === 2} onChange={() => setLocalPrinterSettings(p => ({ ...p, receiptType: 2 }))} />
-                  Hemat (Header di Bawah)
-                </label>
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Banyak Huruf (Kolom)</label>
-                  <input
-                    type="number"
-                    className="modern-barcode-input"
-                    value={localPrinterSettings.columns || 32}
-                    onChange={(e) => setLocalPrinterSettings(p => ({ ...p, columns: parseInt(e.target.value) || 32 }))}
-                    style={{ width: '100%', padding: '0.5rem' }}
-                  />
-                  <small style={{ color: '#64748b', fontSize: '0.75rem' }}>Biasa 32 atau 40 (Thermal 58mm/80mm)</small>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Tambahkan Feed</label>
-                  <input
-                    type="number"
-                    className="modern-barcode-input"
-                    value={localPrinterSettings.feedLines || 0}
-                    onChange={(e) => setLocalPrinterSettings(p => ({ ...p, feedLines: parseInt(e.target.value) || 0 }))}
-                    style={{ width: '100%', padding: '0.5rem' }}
-                  />
-                  <small style={{ color: '#64748b', fontSize: '0.75rem' }}>Baris kosong di bawah struk</small>
-                </div>
-              </div>
-
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem', color: '#334155' }}>Nama Printer Target (Opsional)</label>
-              <input
-                type="text"
-                className="modern-barcode-input"
-                placeholder="Biarkan kosong untuk default"
-                value={localPrinterSettings.printerName || ''}
-                onChange={(e) => setLocalPrinterSettings(p => ({ ...p, printerName: e.target.value }))}
-                style={{ width: '100%', padding: '0.5rem', marginBottom: '1.5rem' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button className="btn-secondary" onClick={() => {
-                const saved = JSON.parse(localStorage.getItem('pos_printer_settings')) || { autoPrint: false, printMode: 'TEXT', receiptType: 1 };
-                setLocalPrinterSettings(saved);
-                setIsPrinterSettingsOpen(false);
-              }}>Batal</button>
-              <button className="btn-primary" onClick={() => {
-                localStorage.setItem('pos_printer_settings', JSON.stringify(localPrinterSettings));
-                setIsPrinterSettingsOpen(false);
-              }}>Simpan</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* EOD Report Preview */}
-      {eodReportData && (
-        <EODReportPreview
-          eodData={eodReportData}
-          branchSettings={branchSettings}
-          onPrint={() => {
-            // Lakukan print (opsional: panggil handlePrint langsung di komponen jika butuh grafis khusus)
-            // Di sini kita delegasikan ke EODReportPreview
-          }}
-          onClose={() => {
-            setEodReportData(null);
-            onLogout();
-          }}
-        />
-      )}
-
-      {/* Recall (HOLD) Modal */}
-      {isRecallModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content bank-select-card fade-in" style={{ maxWidth: '600px' }}>
-            <History size={48} className="text-primary" />
-            <h2>Daftar Transaksi Ditunda (HOLD)</h2>
-            <div className="held-list-grid" style={{ maxHeight: '400px', overflowY: 'auto', width: '100%' }}>
-              {heldTransactions.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                  <p>Tidak ada transaksi yang ditunda.</p>
-                </div>
-              ) : (
-                heldTransactions.map(tx => (
-                  <div key={tx.id} className="held-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', marginBottom: '0.75rem' }}>
-                    <div className="held-info" style={{ textAlign: 'left' }}>
-                      <div style={{ fontWeight: '700' }}>#{String(tx.id).substring(0, 8)}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{tx.itemCount} Items | {formatCurrency(tx.finalAmount || tx.total)}</div>
-                      <small style={{ color: 'var(--text-muted)' }}>{new Date(tx.timestamp || tx.time).toLocaleTimeString('id-ID')}</small>
-                    </div>
-                    <div className="held-actions" style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn-primary-sm" onClick={() => handleRecallTransaction(tx)}>PANGGIL</button>
-                      <button className="btn-danger-sm" onClick={() => {
-                        const newHeld = heldTransactions.filter(h => h.id !== tx.id);
-                        setHeldTransactions(newHeld);
-                        safeSetItem('pos_held_transactions', JSON.stringify(newHeld));
-                      }}><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            <button className="btn-secondary" style={{ marginTop: '1rem', width: '100%' }} onClick={() => setIsRecallModalOpen(false)}>TUTUP (ESC)</button>
-          </div>
-        </div>
-      )}
-
-      {/* Member Selection Modal */}
-      {isMemberModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content bank-select-card fade-in" style={{ maxWidth: '600px' }}>
-            <User size={48} className="text-primary" />
-            <h2>Pilih Member</h2>
-            <div className="search-box-modern" style={{ width: '100%', marginTop: '1rem' }}>
-              <input
-                type="text"
-                placeholder="Cari member berdasarkan nama atau nomor HP..."
-                className="modern-barcode-input"
-                style={{ paddingLeft: '1rem', marginBottom: '1rem' }}
-                value={memberSearchQuery}
-                onChange={(e) => setMemberSearchQuery(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="member-list-results" style={{ maxHeight: '300px', overflowY: 'auto', width: '100%' }}>
-              {customers
-                .filter(c => c.name.toLowerCase().includes(memberSearchQuery.toLowerCase()) || c.phone?.includes(memberSearchQuery))
-                .map(customer => (
-                  <div key={customer.id} className="held-item" style={{ cursor: 'pointer', padding: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }} onClick={() => { setSelectedCustomer(customer); setIsMemberModalOpen(false); setMemberSearchQuery(''); }}>
-                    <div style={{ textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: '700', fontSize: '1rem', color: '#f8fafc' }}>{customer.name}</div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '2px' }}>
-                          No. HP: <span style={{ color: '#cbd5e1', fontWeight: '500' }}>{customer.phone || '-'}</span>
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 'bold' }}>{customer.points || 0} Pts</div>
-                        <div style={{ fontSize: '0.75rem', color: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', display: 'inline-block', fontWeight: '600' }}>
-                          {customer.member_tier || 'BRONZE'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', width: '100%' }}>
-              <button className="btn-danger" style={{ flex: 1 }} onClick={() => { setSelectedCustomer(null); setIsMemberModalOpen(false); }}>LEPAS MEMBER DARI STRUK</button>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsMemberModalOpen(false)}>TUTUP (ESC)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Point Redemption Modal */}
-      {isRedeemPointModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '450px' }}>
-            <div className="modal-header-icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-              <Wallet size={40} />
-            </div>
-            <h2 style={{ textAlign: 'center' }}>Penukaran Poin</h2>
-            {!pointRedemptionEnabled && (
-              <div className="device-auth-error-card" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center', fontSize: '0.85rem' }}>
-                <strong>Penukaran poin saat ini dinonaktifkan oleh Perusahaan.</strong>
-              </div>
-            )}
-            <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-              1 Poin = {formatCurrency(pointRedemptionValue)}<br />
-              Minimal Tukar = {minimumPointsToRedeem} Poin
-            </p>
-
-            <div className="shift-summary-mini" style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Sisa Poin Member</span>
-                <span style={{ fontWeight: 'bold' }}>{selectedCustomer?.points || 0}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Sisa Tagihan</span>
-                <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{formatCurrency(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0))}</span>
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Jumlah Poin yang Ditukar</label>
-              <input
-                type="number"
-                className="modern-barcode-input"
-                style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem', opacity: pointRedemptionEnabled ? 1 : 0.5 }}
-                placeholder="0"
-                value={pointsToRedeemInput}
-                onChange={(e) => setPointsToRedeemInput(e.target.value)}
-                disabled={!pointRedemptionEnabled}
-                autoFocus
-              />
-              {pointsToRedeemInput && !isNaN(parseInt(pointsToRedeemInput, 10)) && (
-                <div style={{ textAlign: 'center', marginTop: '0.5rem', color: '#10b981', fontWeight: 'bold' }}>
-                  Nilai Diskon: {formatCurrency(parseInt(pointsToRedeemInput, 10) * pointRedemptionValue)}
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setIsRedeemPointModalOpen(false)}>BATAL</button>
-              <button
-                className="btn-primary"
-                style={{ flex: 2, opacity: pointRedemptionEnabled ? 1 : 0.5 }}
-                onClick={handleApplyPoints}
-                disabled={!pointRedemptionEnabled}
-              >
-                TERAPKAN POIN
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Change Modal Overlay */}
-      {changeModalInfo && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in">
-            <CheckCircle size={64} className="text-online" />
-            <h2>Transaksi Berhasil!</h2>
-            <div className="change-amount-display">
-              <label>KEMBALIAN</label>
-              <div className="amount">{formatCurrency(changeModalInfo.amount)}</div>
-            </div>
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-              <button className="btn-secondary" onClick={() => setChangeModalInfo(null)}>TUTUP (ESC)</button>
-              <button className="btn-primary" onClick={() => { setChangeModalInfo(null); setShowReceiptPreview(true); }}>
-                {localPrinterSettings.autoPrint ? 'CETAK (ENTER)' : 'PREVIEW (ENTER)'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Receipt Preview */}
-      {showReceiptPreview && lastTransaction && (
-        <ReceiptPreview
-          transaction={lastTransaction}
-          branchSettings={branchSettings}
-          autoPrintSettings={localPrinterSettings}
-          onPrint={() => { window.print(); setShowReceiptPreview(false); }}
-          onClose={() => setShowReceiptPreview(false)}
-        />
-      )}
-
-      {/* Bank Selection Modal */}
-      {/* Bank Selection Modal */}
-      {isBankSelectOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content bank-select-card fade-in">
-            <CreditCard size={48} className="text-primary" />
-            <h2>Pilih Bank / Mesin EDC / QRIS</h2>
-            <div className="bank-grid-large">
-              {banks.map(bank => {
-                const minReq = parseFloat(bank.min_transaction_amount) || (bank.type === 'QRIS' ? 20000 : 50000);
-                return (
-                  <button key={bank.id} className="bank-item-btn" onClick={() => {
-                    setSelectedBank(bank);
-                    const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-                    setDirectCardInput(sisa !== 0 ? formatThousandSeparator(sisa) : '');
-                    setIsBankSelectOpen(false);
-                    setIsDirectCardAmountModalOpen(true);
-                  }}>
-                    <span className="bank-name">{bank.name}</span>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      <span className={`bank-type-badge ${bank.type === 'QRIS' ? 'qris' : (bank.type === 'TRANSFER' ? 'transfer' : 'edc')}`}>
-                        {bank.type || 'EDC'}
-                      </span>
-                      <span className="bank-min-badge">
-                        Min. {formatCurrency(minReq)}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <button className="btn-secondary" onClick={() => setIsBankSelectOpen(false)}>BATAL (ESC)</button>
-          </div>
-        </div>
-      )}
-
-      {/* Multi Payment Bank Selection Modal */}
-      {isMultiBankSelectOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content bank-select-card fade-in">
-            <CreditCard size={48} className="text-primary" />
-            <h2>Pilih Bank / Mesin EDC / QRIS (Multi Payment)</h2>
-            <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem', textAlign: 'center' }}>
-              Porsi Nominal yang Digesek: <strong style={{ color: '#2563eb' }}>{formatCurrency(pendingCardAmount)}</strong>
-            </p>
-            <div className="bank-grid-large">
-              {banks.map(bank => {
-                const minReq = parseFloat(bank.min_transaction_amount) || (bank.type === 'QRIS' ? 20000 : 50000);
-                const isBelowMin = pendingCardAmount < minReq;
-                return (
-                  <button key={bank.id} 
-                          className="bank-item-btn" 
-                          style={isBelowMin ? { opacity: 0.7, borderColor: 'rgba(239, 68, 68, 0.4)' } : {}}
-                          onClick={() => {
-                            if (isBelowMin) {
-                              setAlertMsg({
-                                text: `Nominal porsi pembayaran ${bank.name} minimal ${formatCurrency(minReq)}! (Diinput: ${formatCurrency(pendingCardAmount)})`,
-                                type: 'error'
-                              });
-                              setTimeout(() => setAlertMsg(null), 4000);
-                              return;
-                            }
-                            setPayments([...payments, { 
-                              method: 'CARD', 
-                              amount: pendingCardAmount, 
-                              bankId: bank.id, 
-                              label: `${bank.type === 'QRIS' ? 'QRIS' : 'Card'}: ${bank.name}` 
-                            }]);
-                            setIsMultiBankSelectOpen(false);
-                            setIsMultiPaymentModalOpen(true);
-                          }}>
-                    <span className="bank-name">{bank.name}</span>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      <span className={`bank-type-badge ${bank.type === 'QRIS' ? 'qris' : (bank.type === 'TRANSFER' ? 'transfer' : 'edc')}`}>
-                        {bank.type || 'EDC'}
-                      </span>
-                      <span className="bank-min-badge" style={isBelowMin ? { color: '#ef4444', borderColor: 'rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.1)' } : {}}>
-                        Min. {formatCurrency(minReq)}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <button className="btn-secondary" onClick={() => { setIsMultiBankSelectOpen(false); setIsMultiPaymentModalOpen(true); }}>BATAL (ESC)</button>
-          </div>
-        </div>
-      )}
+      <PosModalsContainer
+        isTerminalModalOpen={isTerminalModalOpen}
+        allTerminals={allTerminals}
+        handleSelectTerminal={handleSelectTerminal}
+        isOpenShiftModalOpen={isOpenShiftModalOpen}
+        selectedShiftName={selectedShiftName}
+        setSelectedShiftName={setSelectedShiftName}
+        startingCash={startingCash}
+        setStartingCash={setStartingCash}
+        handleOpenShift={handleOpenShift}
+        isCloseShiftModalOpen={isCloseShiftModalOpen}
+        setIsCloseShiftModalOpen={setIsCloseShiftModalOpen}
+        activeShift={activeShift}
+        actualCash={actualCash}
+        setActualCash={setActualCash}
+        handleCloseShift={handleCloseShift}
+        isProcessing={isProcessing}
+        isCashMovementModalOpen={isCashMovementModalOpen}
+        setIsCashMovementModalOpen={setIsCashMovementModalOpen}
+        cashMovementType={cashMovementType}
+        setCashMovementType={setCashMovementType}
+        cashMovementAmount={cashMovementAmount}
+        setCashMovementAmount={setCashMovementAmount}
+        cashMovementDesc={cashMovementDesc}
+        setCashMovementDesc={setCashMovementDesc}
+        handleCashMovement={handleCashMovement}
+        isPrinterSettingsOpen={isPrinterSettingsOpen}
+        setIsPrinterSettingsOpen={setIsPrinterSettingsOpen}
+        localPrinterSettings={localPrinterSettings}
+        setLocalPrinterSettings={setLocalPrinterSettings}
+        eodReportData={eodReportData}
+        setEodReportData={setEodReportData}
+        branchSettings={branchSettings}
+        onLogout={onLogout}
+        isRecallModalOpen={isRecallModalOpen}
+        setIsRecallModalOpen={setIsRecallModalOpen}
+        heldTransactions={heldTransactions}
+        setHeldTransactions={setHeldTransactions}
+        handleRecallTransaction={handleRecallTransaction}
+        safeSetItem={safeSetItem}
+        isMemberModalOpen={isMemberModalOpen}
+        setIsMemberModalOpen={setIsMemberModalOpen}
+        customers={customers}
+        setSelectedCustomer={setSelectedCustomer}
+        memberSearchQuery={memberSearchQuery}
+        setMemberSearchQuery={setMemberSearchQuery}
+        isRedeemPointModalOpen={isRedeemPointModalOpen}
+        setIsRedeemPointModalOpen={setIsRedeemPointModalOpen}
+        pointRedemptionEnabled={pointRedemptionEnabled}
+        pointRedemptionValue={pointRedemptionValue}
+        minimumPointsToRedeem={minimumPointsToRedeem}
+        selectedCustomer={selectedCustomer}
+        finalAmount={finalAmount}
+        payments={payments}
+        setPayments={setPayments}
+        pointsToRedeemInput={pointsToRedeemInput}
+        setPointsToRedeemInput={setPointsToRedeemInput}
+        handleApplyPoints={handleApplyPoints}
+        changeModalInfo={changeModalInfo}
+        setChangeModalInfo={setChangeModalInfo}
+        showReceiptPreview={showReceiptPreview}
+        setShowReceiptPreview={setShowReceiptPreview}
+        lastTransaction={lastTransaction}
+        isBankSelectOpen={isBankSelectOpen}
+        setIsBankSelectOpen={setIsBankSelectOpen}
+        banks={banks}
+        setSelectedBank={setSelectedBank}
+        setDirectCardInput={setDirectCardInput}
+        setIsDirectCardAmountModalOpen={setIsDirectCardAmountModalOpen}
+        isMultiBankSelectOpen={isMultiBankSelectOpen}
+        setIsMultiBankSelectOpen={setIsMultiBankSelectOpen}
+        pendingCardAmount={pendingCardAmount}
+        setPendingCardAmount={setPendingCardAmount}
+        pendingAuthAction={pendingAuthAction}
+        setPendingAuthAction={setPendingAuthAction}
+        authToken={authToken}
+        isOnline={isOnline}
+        isReturnModalOpen={isReturnModalOpen}
+        setIsReturnModalOpen={setIsReturnModalOpen}
+        handleReturnSuccess={handleReturnSuccess}
+        discountModal={discountModal}
+        setDiscountModal={setDiscountModal}
+        discountInputVal={discountInputVal}
+        setDiscountInputVal={setDiscountInputVal}
+        applyEnteredDiscount={applyEnteredDiscount}
+        isVoucherModalOpen={isVoucherModalOpen}
+        setIsVoucherModalOpen={setIsVoucherModalOpen}
+        voucherInput={voucherInput}
+        setVoucherInput={setVoucherInput}
+        voucherSource={voucherSource}
+        setVoucherSource={setVoucherSource}
+        isOpenPriceModalOpen={isOpenPriceModalOpen}
+        setIsOpenPriceModalOpen={setIsOpenPriceModalOpen}
+        openPriceTargetItem={openPriceTargetItem}
+        setOpenPriceTargetItem={setOpenPriceTargetItem}
+        newOpenPrice={newOpenPrice}
+        setNewOpenPrice={setNewOpenPrice}
+        items={items}
+        setItems={setItems}
+        isMultiPaymentModalOpen={isMultiPaymentModalOpen}
+        setIsMultiPaymentModalOpen={setIsMultiPaymentModalOpen}
+        processTransaction={processTransaction}
+        isDirectCashModalOpen={isDirectCashModalOpen}
+        setIsDirectCashModalOpen={setIsDirectCashModalOpen}
+        directCashInput={directCashInput}
+        setDirectCashInput={setDirectCashInput}
+        isDirectCardAmountModalOpen={isDirectCardAmountModalOpen}
+        directCardInput={directCardInput}
+        selectedBank={selectedBank}
+        isMultiCashModalOpen={isMultiCashModalOpen}
+        setIsMultiCashModalOpen={setIsMultiCashModalOpen}
+        multiCashInput={multiCashInput}
+        setMultiCashInput={setMultiCashInput}
+        isMultiCardAmountModalOpen={isMultiCardAmountModalOpen}
+        setIsMultiCardAmountModalOpen={setIsMultiCardAmountModalOpen}
+        multiCardInput={multiCardInput}
+        setMultiCardInput={setMultiCardInput}
+        isQtyModalOpen={isQtyModalOpen}
+        setIsQtyModalOpen={setIsQtyModalOpen}
+        nextItemQty={nextItemQty}
+        setNextItemQty={setNextItemQty}
+        isReprintOldModalOpen={isReprintOldModalOpen}
+        setIsReprintOldModalOpen={setIsReprintOldModalOpen}
+        oldReceiptInput={oldReceiptInput}
+        setOldReceiptInput={setOldReceiptInput}
+        handleReprintOld={handleReprintOld}
+        isPpobMenuOpen={isPpobMenuOpen}
+        setIsPpobMenuOpen={setIsPpobMenuOpen}
+        ppobSearchQuery={ppobSearchQuery}
+        setPpobSearchQuery={setPpobSearchQuery}
+        fetchPpobTransactions={fetchPpobTransactions}
+        isFetchingPpobTransactions={isFetchingPpobTransactions}
+        ppobTransactions={ppobTransactions}
+        handleCheckPpobStatus={handleCheckPpobStatus}
+        handleReprintPpob={handleReprintPpob}
+        isDigitalInputModalOpen={isDigitalInputModalOpen}
+        setIsDigitalInputModalOpen={setIsDigitalInputModalOpen}
+        pendingDigitalProduct={pendingDigitalProduct}
+        setPendingDigitalProduct={setPendingDigitalProduct}
+        customerNoInput={customerNoInput}
+        setCustomerNoInput={setCustomerNoInput}
+        handleDigitalProductSubmit={handleDigitalProductSubmit}
+        formatCurrency={formatCurrency}
+        formatThousandSeparator={formatThousandSeparator}
+        setAlertMsg={setAlertMsg}
+        barcodeInput={barcodeInput}
+      />
 
       {/* --- MAIN UI --- */}
+      <PosHeader
+        orgName={orgName}
+        branchName={branchName}
+        terminalInfo={terminalInfo}
+        activeShift={activeShift}
+        pendingCount={pendingCount}
+        isOnline={isOnline}
+        syncStatus={syncStatus}
+        syncTransactions={syncTransactions}
+        setIsPrinterSettingsOpen={setIsPrinterSettingsOpen}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        userName={userName}
+        setIsTerminalModalOpen={setIsTerminalModalOpen}
+        onLogout={onLogout}
+      />
 
-      <header className="pos-header-modern glassmorphism">
-        <div className="pos-branding">
-          <div className="logo-box">SM</div>
-          <div className="brand-info">
-            <h1>{orgName}</h1>
-            <p>{branchName} | {terminalInfo?.name || 'Terminal'}</p>
-            {activeShift && (
-              <div className="active-shift-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(36, 42, 122, 0.15)', color: 'var(--primary)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', marginTop: '4px', border: '1px solid rgba(36, 42, 122, 0.3)' }}>
-                <Clock size={12} />
-                <span>AKTIF: {activeShift.shift_name}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="pos-time-section">
-          <div className="time">{currentTime.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false })}</div>
-          <div className="date">{currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' })}</div>
-        </div>
-
-        <div className="pos-user-status">
-          {pendingCount > 0 && (
-            <div 
-              className={`sync-status mr-4 ${!isOnline ? 'warning-pulse' : ''}`} 
-              onClick={() => syncTransactions()}
-              title="Klik untuk paksa sinkronisasi antrean ke server"
-              style={{
-                background: !isOnline ? 'rgba(230, 0, 18, 0.2)' : 'rgba(36, 42, 122, 0.1)',
-                border: !isOnline ? '1px solid var(--danger)' : '1px solid var(--primary)',
-                padding: '4px 12px',
-                borderRadius: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: !isOnline ? 'var(--danger)' : 'var(--primary)',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              <RefreshCw size={18} className={syncStatus === 'syncing' ? 'spin' : ''} />
-              <span>Antrean: {pendingCount} {!isOnline && <span style={{ fontSize: '0.7rem' }}>(OFFLINE - sync otomatis)</span>}</span>
-            </div>
-          )}
-          <div className="status-indicator">
-            {isOnline ? <Wifi size={18} className="text-online" /> : <WifiOff size={18} className="text-offline" />}
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {!isOnline && <span className="status-dot-offline"></span>}
-              {isOnline && <span className="status-dot-online"></span>}
-              {isOnline ? 'Online' : 'Offline'}
-            </span>
-          </div>
-          {!window.electronAPI && (
-            <button className="btn-icon" onClick={() => setIsPrinterSettingsOpen(true)} title="Pengaturan Printer" style={{ background: 'transparent', padding: '4px', border: 'none' }}>
-              <Settings size={18} />
-            </button>
-          )}
-          <button className="btn-icon" onClick={toggleTheme} title="Ganti Tema (Terang/Gelap)" style={{ background: 'transparent', padding: '4px', border: 'none', color: 'inherit', cursor: 'pointer' }}>
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <div className="user-info" onClick={() => setIsTerminalModalOpen(true)} style={{ cursor: 'pointer' }} title="Ganti Terminal">
-            <User size={20} />
-            <span>{userName}</span>
-          </div>
-          <button onClick={() => onLogout()} className="btn-logout-icon" title="Logout Kasir (Istirahat)" style={{ color: 'var(--danger)' }}>
-            <LogOut size={18} />
-          </button>
-        </div>
-      </header>
-
-      {pwpUpsellPrompt && (
-        <div 
-          className="pwp-upsell-banner fade-in"
-          style={{
-            position: 'fixed',
-            top: '70px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 9998,
-            width: '94%',
-            maxWidth: '740px',
-            background: pwpUpsellPrompt.type === 'BUNDLING'
-              ? 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)'
-              : 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
-            color: '#ffffff',
-            border: pwpUpsellPrompt.type === 'BUNDLING' ? '2px solid #34d399' : '2px solid #fbbf24',
-            borderRadius: '14px',
-            padding: '12px 18px',
-            boxShadow: '0 14px 40px rgba(0, 0, 0, 0.5), 0 0 20px ' + (pwpUpsellPrompt.type === 'BUNDLING' ? 'rgba(52, 211, 153, 0.35)' : 'rgba(251, 191, 36, 0.35)'),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px',
-            animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ 
-              background: pwpUpsellPrompt.type === 'BUNDLING' ? '#34d399' : '#fbbf24', 
-              color: '#0f172a', 
-              borderRadius: '50%', 
-              width: '44px', 
-              height: '44px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              fontSize: '1.4rem', 
-              flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-            }}>
-              {pwpUpsellPrompt.type === 'BUNDLING' ? '📦' : '🎁'}
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: pwpUpsellPrompt.type === 'BUNDLING' ? '#a7f3d0' : '#fbbf24', fontWeight: '800' }}>
-                {pwpUpsellPrompt.type === 'BUNDLING' ? 'Promo Paket Bundling (Hemat Bersama)' : 'Promo Subsidi Silang (Tebus Murah)'}
-              </div>
-              <div style={{ fontSize: '0.95rem', fontWeight: '600', lineHeight: 1.35 }}>
-                {pwpUpsellPrompt.type === 'BUNDLING' ? (
-                  <>
-                    Tawarkan ke konsumen: Tambah <strong>{pwpUpsellPrompt.rewardProduct.name}</strong> untuk Diskon Paket <span style={{ color: '#4ade80', fontSize: '1.15rem', fontWeight: '800' }}>Rp {Math.round(pwpUpsellPrompt.bundleDiscount).toLocaleString('id-ID')}</span>!
-                  </>
-                ) : (
-                  <>
-                    Tawarkan ke konsumen: Tebus <strong>{pwpUpsellPrompt.rewardProduct.name}</strong> hanya <span style={{ color: '#4ade80', fontSize: '1.15rem', fontWeight: '800' }}>Rp {Math.round(pwpUpsellPrompt.rewardFinalPrice).toLocaleString('id-ID')}</span>
-                    {pwpUpsellPrompt.hematText && (
-                      <span style={{ marginLeft: '6px', background: 'rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700' }}>
-                        {pwpUpsellPrompt.hematText}
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '2px' }}>
-                {pwpUpsellPrompt.type === 'BUNDLING' 
-                  ? `(Paket: ${pwpUpsellPrompt.promoName} — Beli ${pwpUpsellPrompt.triggerName} + ${pwpUpsellPrompt.rewardProduct.name})`
-                  : `(Harga Normal: Rp ${Math.round(pwpUpsellPrompt.rewardNormalPrice).toLocaleString('id-ID')} — Syarat: Beli ${pwpUpsellPrompt.triggerName})`
-                }
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => {
-                const prod = pwpUpsellPrompt.rewardProduct;
-                const isBundling = pwpUpsellPrompt.type === 'BUNDLING';
-                setPwpUpsellPrompt(null);
-                addItemToTransaction(prod, 1);
-                setAlertMsg({ 
-                  text: isBundling 
-                    ? `📦 Produk bundling "${prod.name}" ditambahkan! Diskon paket diterapkan.`
-                    : `🎁 Produk tebus murah "${prod.name}" berhasil ditambahkan!`, 
-                  type: 'success' 
-                });
-                barcodeInput.current?.focus();
-              }}
-              style={{
-                background: '#10b981',
-                color: '#ffffff',
-                border: 'none',
-                padding: '9px 16px',
-                borderRadius: '8px',
-                fontWeight: '700',
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Plus size={16} />
-              {pwpUpsellPrompt.type === 'BUNDLING' ? '+ Tambahkan Paket' : '+ Tambahkan (Tebus)'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPwpUpsellPrompt(null);
-                barcodeInput.current?.focus();
-              }}
-              style={{
-                background: 'rgba(255, 255, 255, 0.12)',
-                color: '#cbd5e1',
-                border: 'none',
-                padding: '9px 12px',
-                borderRadius: '8px',
-                fontWeight: '600',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              title="Lewati penawaran"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+      <PwpUpsellBanner
+        pwpUpsellPrompt={pwpUpsellPrompt}
+        onAccept={(prompt) => {
+          const prod = prompt.rewardProduct;
+          const isBundling = prompt.type === 'BUNDLING';
+          setPwpUpsellPrompt(null);
+          addItemToTransaction(prod, 1);
+          setAlertMsg({ 
+            text: isBundling 
+              ? `📦 Produk bundling "${prod.name}" ditambahkan! Diskon paket diterapkan.`
+              : `🎁 Produk tebus murah "${prod.name}" berhasil ditambahkan!`, 
+            type: 'success' 
+          });
+          barcodeInput.current?.focus();
+        }}
+        onDismiss={() => {
+          setPwpUpsellPrompt(null);
+          barcodeInput.current?.focus();
+        }}
+      />
 
       {alertMsg && (
         <div className={`pos-toast slide-down ${alertMsg.type}`}>
@@ -3100,1014 +956,73 @@ export const POSTransaction = ({
         </div>
       )}
 
-      {pendingAuthAction && (
-        <AuthorizationModal
-          actionName={pendingAuthAction.name}
-          authToken={authToken}
-          isOnline={isOnline}
-          onSuccess={(user) => {
-            setPendingAuthAction(null);
-            pendingAuthAction.callback();
-          }}
-          onCancel={() => setPendingAuthAction(null)}
-        />
-      )}
-
-      {isReturnModalOpen && (
-        <ReturnItemModal
-          authToken={authToken}
-          onSuccess={handleReturnSuccess}
-          onCancel={() => setIsReturnModalOpen(false)}
-        />
-      )}
-
-      {discountModal && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              Masukkan Nilai Diskon ${discountModal.target === 'TOTAL' ? 'Total' : 'Item'} (${discountModal.type === 'PERCENT' ? 'Persen %' : 'Nominal Rp'})
-            </h3>
-            <input
-              type="text"
-              className="modern-barcode-input"
-              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
-              placeholder="0"
-              value={discountInputVal}
-              onChange={(e) => {
-                if (discountModal?.type === 'RUPIAH') {
-                  setDiscountInputVal(formatThousandSeparator(e.target.value));
-                } else {
-                  setDiscountInputVal(e.target.value.replace(/[^0-9.]/g, ''));
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  applyEnteredDiscount();
-                } else if (e.key === 'Escape') {
-                  setDiscountModal(null);
-                  setDiscountInputVal('');
-                  barcodeInput.current?.focus();
-                }
-              }}
-              autoFocus
-            />
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setDiscountModal(null); setDiscountInputVal(''); barcodeInput.current?.focus(); }}>BATAL (Esc)</button>
-              <button className="btn-success" style={{ flex: 1 }} onClick={applyEnteredDiscount}>OK (Enter)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-
-      {isVoucherModalOpen && (() => {
-        const handleProcessVoucher = async () => {
-          try {
-            const res = await fetch(`/api/v1/vouchers/validate?code=${voucherInput}`, {
-              headers: { 'Authorization': `Bearer ${authToken}` }
-            });
-            const data = await res.json();
-            if (!res.ok || !data.valid) {
-              setAlertMsg({ text: data.message || 'Voucher tidak valid', type: 'error' });
-              return;
-            }
-
-            setPayments(prev => [...prev, {
-              method: 'VOUCHER',
-              amount: parseFloat(data.voucher.nominal_value),
-              voucherId: data.voucher.id,
-              label: `Voucher: ${data.voucher.code}`
-            }]);
-            setAlertMsg({ text: `Voucher Rp ${formatCurrency(data.voucher.nominal_value)} ditambahkan!`, type: 'success' });
-            setIsVoucherModalOpen(false);
-            setVoucherInput('');
-            if (voucherSource === 'MULTI') {
-              setIsMultiPaymentModalOpen(true);
-              setVoucherSource(null);
-            } else {
-              setTimeout(() => barcodeInput.current?.focus(), 100);
-            }
-          } catch (err) {
-            setAlertMsg({ text: 'Gagal memvalidasi voucher (offline/error)', type: 'error' });
-          }
-        };
-
-        return (
-          <div className="change-modal-overlay">
-            <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-              <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Validasi Voucher</h3>
-              <input
-                type="text"
-                className="modern-barcode-input"
-                style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
-                placeholder="Masukkan Kode Voucher"
-                value={voucherInput}
-                onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleProcessVoucher();
-                  } else if (e.key === 'Escape') {
-                    setIsVoucherModalOpen(false);
-                    setVoucherInput('');
-                    if (voucherSource === 'MULTI') {
-                      setIsMultiPaymentModalOpen(true);
-                      setVoucherSource(null);
-                    } else {
-                      setTimeout(() => barcodeInput.current?.focus(), 100);
-                    }
-                  }
-                }}
-                autoFocus
-              />
-              <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-                <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsVoucherModalOpen(false); setVoucherInput(''); if (voucherSource === 'MULTI') { setIsMultiPaymentModalOpen(true); setVoucherSource(null); } else { barcodeInput.current?.focus(); } }}>BATAL (Esc)</button>
-                <button className="btn-success" style={{ flex: 1 }} onClick={handleProcessVoucher}>PROSES (Enter)</button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {isOpenPriceModalOpen && openPriceTargetItem && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Open Price</h3>
-            <div style={{ textAlign: 'center', marginBottom: '1rem', fontWeight: 'bold' }}>{openPriceTargetItem.name}</div>
-            <div style={{ textAlign: 'center', marginBottom: '1rem', fontSize: '0.85rem' }}>Harga Asli: {formatCurrency(openPriceTargetItem.originalUnitPrice || openPriceTargetItem.unitPrice)}</div>
-            <input
-              type="text"
-              className="modern-barcode-input"
-              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
-              placeholder="Harga Baru"
-              value={newOpenPrice}
-              onChange={(e) => setNewOpenPrice(e.target.value.replace(/[^0-9]/g, ''))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = parseFloat(newOpenPrice);
-                  if (!isNaN(val) && val >= 0) {
-                    setItems(items.map(i => i.productId === openPriceTargetItem.productId ? { ...i, unitPrice: val, originalUnitPrice: i.originalUnitPrice || i.unitPrice } : i));
-                    setAlertMsg({ text: 'Harga berhasil diubah', type: 'success' });
-                    setIsOpenPriceModalOpen(false);
-                    setNewOpenPrice('');
-                    setOpenPriceTargetItem(null);
-                    setTimeout(() => barcodeInput.current?.focus(), 100);
-                  }
-                } else if (e.key === 'Escape') {
-                  setIsOpenPriceModalOpen(false);
-                  setNewOpenPrice('');
-                  setOpenPriceTargetItem(null);
-                  setTimeout(() => barcodeInput.current?.focus(), 100);
-                }
-              }}
-              autoFocus
-            />
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsOpenPriceModalOpen(false); setNewOpenPrice(''); setOpenPriceTargetItem(null); barcodeInput.current?.focus(); }}>BATAL (Esc)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isMultiPaymentModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '600px', width: '90%' }}>
-            <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Multi Payment</h2>
-
-            <div style={{ background: 'rgba(36, 42, 122, 0.1)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
-                <span>Tagihan:</span>
-                <span style={{ fontWeight: 'bold' }}>{formatCurrency(finalAmount)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', marginBottom: '0.5rem', color: 'var(--accent)' }}>
-                <span>Total Dibayar:</span>
-                <span style={{ fontWeight: 'bold' }}>{formatCurrency(payments.reduce((sum, p) => sum + p.amount, 0))}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 'bold', color: payments.reduce((sum, p) => sum + p.amount, 0) >= finalAmount ? 'var(--accent)' : 'var(--danger)' }}>
-                <span>{payments.reduce((sum, p) => sum + p.amount, 0) >= finalAmount ? 'Kembali:' : 'Sisa:'}</span>
-                <span>{formatCurrency(Math.abs(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0)))}</span>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '1.5rem', maxHeight: '150px', overflowY: 'auto' }}>
-              {payments.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#6b7280', padding: '1rem' }}>Belum ada pembayaran ditambahkan</div>
-              ) : (
-                <table className="modern-table" style={{ width: '100%', fontSize: '0.9rem' }}>
-                  <tbody>
-                    {payments.map((p, idx) => (
-                      <tr key={idx}>
-                        <td>{p.label || p.method}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(p.amount)}</td>
-                        <td style={{ width: '40px', textAlign: 'center' }}>
-                          <button onClick={() => setPayments(payments.filter((_, i) => i !== idx))} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}><Trash2 size={16} /></button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-              <button className="btn-secondary" style={{ flex: 1, padding: '0.75rem', fontSize: '0.9rem' }} onClick={() => { setVoucherSource('MULTI'); setIsVoucherModalOpen(true); setIsMultiPaymentModalOpen(false); }}>+ Voucher</button>
-              <button className="btn-secondary" style={{ flex: 1, padding: '0.75rem', fontSize: '0.9rem' }} onClick={() => {
-                const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-                setMultiCashInput(sisa > 0 ? formatThousandSeparator(sisa) : '');
-                setIsMultiCashModalOpen(true);
-                setIsMultiPaymentModalOpen(false);
-              }}>+ Tunai</button>
-              <button className="btn-secondary" style={{ flex: 1, padding: '0.75rem', fontSize: '0.9rem' }} onClick={() => {
-                const sisa = finalAmount - payments.reduce((sum, p) => sum + p.amount, 0);
-                if (sisa > 0) {
-                  setMultiCardInput(formatThousandSeparator(sisa));
-                  setIsMultiCardAmountModalOpen(true);
-                  setIsMultiPaymentModalOpen(false);
-                }
-              }}>+ Card</button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsMultiPaymentModalOpen(false); barcodeInput.current?.focus(); }}>TUTUP</button>
-              <button className="btn-success" style={{ flex: 1 }} disabled={payments.reduce((sum, p) => sum + p.amount, 0) < finalAmount} onClick={() => { setIsMultiPaymentModalOpen(false); processTransaction('MULTI'); }}>PROSES BAYAR</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Direct Cash Modal */}
-      {isDirectCashModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Nominal Tunai</h3>
-            <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Tagihan: {formatCurrency(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0))}
-            </p>
-            <input
-              type="text"
-              className="modern-barcode-input"
-              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
-              value={directCashInput}
-              maxLength={11}
-              onChange={(e) => {
-                setDirectCashInput(formatThousandSeparator(e.target.value));
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = parseFloat(directCashInput.replace(/\./g, ''));
-                  if (!isNaN(val) && val !== 0) {
-                    const changeAmt = val - (finalAmount - payments.reduce((sum, p) => sum + p.amount, 0));
-                    if (changeAmt > 100000) {
-                      if (!window.confirm(`Peringatan: Kembalian terlalu besar (Rp ${formatThousandSeparator(changeAmt)}). Lanjutkan transaksi?`)) return;
-                    }
-                    setIsDirectCashModalOpen(false);
-                    processTransaction('CASH', null, val);
-                  }
-                } else if (e.key === 'Escape') {
-                  setIsDirectCashModalOpen(false);
-                  setDirectCashInput('');
-                }
-              }}
-              autoFocus
-              onFocus={(e) => e.target.select()}
-            />
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsDirectCashModalOpen(false); setDirectCashInput(''); }}>BATAL (Esc)</button>
-              <button className="btn-success" style={{ flex: 1 }} onClick={() => {
-                const val = parseFloat(directCashInput.replace(/\./g, ''));
-                if (!isNaN(val) && val !== 0) {
-                  const changeAmt = val - (finalAmount - payments.reduce((sum, p) => sum + p.amount, 0));
-                  if (changeAmt > 100000) {
-                    if (!window.confirm(`Peringatan: Kembalian terlalu besar (Rp ${formatThousandSeparator(changeAmt)}). Lanjutkan transaksi?`)) return;
-                  }
-                  setIsDirectCashModalOpen(false);
-                  processTransaction('CASH', null, val);
-                }
-              }}>BAYAR (Enter)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Direct Card Amount Modal */}
-      {isDirectCardAmountModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>Nominal Pembayaran {selectedBank?.name}</h3>
-            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-              <span style={{ 
-                fontSize: '0.75rem', 
-                fontWeight: '700', 
-                color: '#f59e0b', 
-                background: 'rgba(245,158,11,0.12)', 
-                border: '1px solid rgba(245,158,11,0.3)',
-                padding: '3px 10px', 
-                borderRadius: '6px' 
-              }}>
-                Minimal Transaksi: {formatCurrency(parseFloat(selectedBank?.min_transaction_amount) || (selectedBank?.type === 'QRIS' ? 20000 : 50000))}
-              </span>
-            </div>
-            <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Sisa Tagihan: {formatCurrency(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0))}
-            </p>
-            <input
-              type="text"
-              className="modern-barcode-input"
-              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
-              value={directCardInput}
-              onChange={(e) => {
-                setDirectCardInput(formatThousandSeparator(e.target.value));
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = parseFloat(directCardInput.replace(/\./g, ''));
-                  if (!isNaN(val) && val !== 0) {
-                    const minRequired = parseFloat(selectedBank?.min_transaction_amount) || (selectedBank?.type === 'QRIS' ? 20000 : 50000);
-                    if (val < minRequired) {
-                      setAlertMsg({
-                        text: `Nominal pembayaran via ${selectedBank?.name || 'Bank'} minimal ${formatCurrency(minRequired)}! (Diinput: ${formatCurrency(val)})`,
-                        type: 'error'
-                      });
-                      setTimeout(() => setAlertMsg(null), 4000);
-                      return;
-                    }
-                    setIsDirectCardAmountModalOpen(false);
-                    processTransaction('CARD', selectedBank?.id, val);
-                  }
-                } else if (e.key === 'Escape') {
-                  setIsDirectCardAmountModalOpen(false);
-                  setDirectCardInput('');
-                }
-              }}
-              autoFocus
-              onFocus={(e) => e.target.select()}
-            />
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsDirectCardAmountModalOpen(false); setDirectCardInput(''); }}>BATAL (Esc)</button>
-              <button className="btn-success" style={{ flex: 1 }} onClick={() => {
-                const val = parseFloat(directCardInput.replace(/\./g, ''));
-                if (!isNaN(val) && val !== 0) {
-                  const minRequired = parseFloat(selectedBank?.min_transaction_amount) || (selectedBank?.type === 'QRIS' ? 20000 : 50000);
-                  if (val < minRequired) {
-                    setAlertMsg({
-                      text: `Nominal pembayaran via ${selectedBank?.name || 'Bank'} minimal ${formatCurrency(minRequired)}! (Diinput: ${formatCurrency(val)})`,
-                      type: 'error'
-                    });
-                    setTimeout(() => setAlertMsg(null), 4000);
-                    return;
-                  }
-                  setIsDirectCardAmountModalOpen(false);
-                  processTransaction('CARD', selectedBank?.id, val);
-                }
-              }}>BAYAR (Enter)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isMultiCashModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Input Nominal Tunai</h3>
-            <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Sisa Tagihan: {formatCurrency(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0))}
-            </p>
-            <input
-              type="text"
-              className="modern-barcode-input"
-              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
-              placeholder="0"
-              value={multiCashInput}
-              maxLength={11}
-              onChange={(e) => setMultiCashInput(formatThousandSeparator(e.target.value))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = parseFloat(multiCashInput.replace(/\./g, ''));
-                  if (!isNaN(val) && val > 0) {
-                    const changeAmt = (payments.reduce((sum, p) => sum + p.amount, 0) + val) - finalAmount;
-                    if (changeAmt > 100000) {
-                      if (!window.confirm(`Peringatan: Kembalian terlalu besar (Rp ${formatThousandSeparator(changeAmt)}). Lanjutkan?`)) return;
-                    }
-                    setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
-                    setIsMultiCashModalOpen(false);
-                    setMultiCashInput('');
-                    setIsMultiPaymentModalOpen(true);
-                  }
-                } else if (e.key === 'Escape') {
-                  setIsMultiCashModalOpen(false);
-                  setMultiCashInput('');
-                  setIsMultiPaymentModalOpen(true);
-                }
-              }}
-              autoFocus
-              onFocus={(e) => e.target.select()}
-            />
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsMultiCashModalOpen(false); setMultiCashInput(''); setIsMultiPaymentModalOpen(true); }}>BATAL (Esc)</button>
-              <button className="btn-success" style={{ flex: 1 }} onClick={() => {
-                const val = parseFloat(multiCashInput.replace(/\./g, ''));
-                if (!isNaN(val) && val > 0) {
-                  const changeAmt = (payments.reduce((sum, p) => sum + p.amount, 0) + val) - finalAmount;
-                  if (changeAmt > 100000) {
-                    if (!window.confirm(`Peringatan: Kembalian terlalu besar (Rp ${formatThousandSeparator(changeAmt)}). Lanjutkan?`)) return;
-                  }
-                  setPayments([...payments, { method: 'CASH', amount: val, label: 'Tunai' }]);
-                  setIsMultiCashModalOpen(false);
-                  setMultiCashInput('');
-                  setIsMultiPaymentModalOpen(true);
-                }
-              }}>TAMBAH (Enter)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isMultiCardAmountModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Input Nominal Card</h3>
-            <p style={{ textAlign: 'center', fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Sisa Tagihan: {formatCurrency(finalAmount - payments.reduce((sum, p) => sum + p.amount, 0))}
-            </p>
-            <input
-              type="text"
-              className="modern-barcode-input"
-              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
-              placeholder="0"
-              value={multiCardInput}
-              onChange={(e) => setMultiCardInput(formatThousandSeparator(e.target.value))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = parseFloat(multiCardInput.replace(/\./g, ''));
-                  if (!isNaN(val) && val > 0) {
-                    setPendingCardAmount(val);
-                    setIsMultiCardAmountModalOpen(false);
-                    setMultiCardInput('');
-                    setIsMultiBankSelectOpen(true);
-                  }
-                } else if (e.key === 'Escape') {
-                  setIsMultiCardAmountModalOpen(false);
-                  setMultiCardInput('');
-                  setIsMultiPaymentModalOpen(true);
-                }
-              }}
-              autoFocus
-              onFocus={(e) => e.target.select()}
-            />
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsMultiCardAmountModalOpen(false); setMultiCardInput(''); setIsMultiPaymentModalOpen(true); }}>BATAL (Esc)</button>
-              <button className="btn-success" style={{ flex: 1 }} onClick={() => {
-                const val = parseFloat(multiCardInput.replace(/\./g, ''));
-                if (!isNaN(val) && val > 0) {
-                  setPendingCardAmount(val);
-                  setIsMultiCardAmountModalOpen(false);
-                  setMultiCardInput('');
-                  setIsMultiBankSelectOpen(true);
-                }
-              }}>LANJUT (Enter)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isQtyModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              Masukkan Qty Barang
-            </h3>
-            <input
-              type="number"
-              step="any"
-              className="modern-barcode-input"
-              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
-              placeholder="1"
-              value={nextItemQty}
-              onChange={(e) => setNextItemQty(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setIsQtyModalOpen(false);
-                  setTimeout(() => barcodeInput.current?.focus(), 100);
-                } else if (e.key === 'Escape') {
-                  setNextItemQty('');
-                  setIsQtyModalOpen(false);
-                  setTimeout(() => barcodeInput.current?.focus(), 100);
-                }
-              }}
-              autoFocus
-              onFocus={(e) => e.target.select()}
-            />
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setNextItemQty(''); setIsQtyModalOpen(false); barcodeInput.current?.focus(); }}>BATAL (Esc)</button>
-              <button className="btn-success" style={{ flex: 1 }} onClick={() => { setIsQtyModalOpen(false); setTimeout(() => barcodeInput.current?.focus(), 100); }}>OK (Enter)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isReprintOldModalOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '400px' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              Reprint Nota Lama
-            </h3>
-            <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '1rem', fontSize: '0.875rem' }}>
-              Masukkan nomor struk (Misal: SMI-ABCD12)
-            </p>
-            <input
-              type="text"
-              className="modern-barcode-input"
-              style={{ width: '100%', padding: '0.75rem', textAlign: 'center', fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1.5rem' }}
-              placeholder="SMI-..."
-              value={oldReceiptInput}
-              onChange={(e) => setOldReceiptInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleReprintOld();
-                } else if (e.key === 'Escape') {
-                  setIsReprintOldModalOpen(false);
-                  setOldReceiptInput('');
-                  setTimeout(() => barcodeInput.current?.focus(), 100);
-                }
-              }}
-              autoFocus
-            />
-            <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsReprintOldModalOpen(false); setOldReceiptInput(''); barcodeInput.current?.focus(); }}>BATAL (Esc)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isPpobMenuOpen && (
-        <div className="change-modal-overlay">
-          <div className="change-modal-content fade-in" style={{ maxWidth: '900px', width: '90vw' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0 }}>Menu PPOB Hari Ini</h3>
-              <button onClick={() => setIsPpobMenuOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
-                <X size={24} />
-              </button>
-            </div>
-
-            <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-              <div className="barcode-input-wrapper" style={{ flex: 1, maxWidth: '300px', position: 'relative' }}>
-                <div className="input-icon" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
-                  <Search size={18} />
-                </div>
-                <input
-                  type="text"
-                  className="barcode-input"
-                  placeholder="Cari No Tujuan/SN..."
-                  value={ppobSearchQuery}
-                  onChange={(e) => setPpobSearchQuery(e.target.value)}
-                  style={{ paddingLeft: '2.5rem', width: '100%', boxSizing: 'border-box' }}
-                />
-              </div>
-              <button className="btn-secondary" onClick={fetchPpobTransactions} disabled={isFetchingPpobTransactions}>
-                <RotateCcw size={16} style={{ marginRight: '0.5rem' }} /> Refresh
-              </button>
-            </div>
-
-            <div className="table-container" style={{ maxHeight: '60vh', overflowY: 'auto', background: 'var(--bg-card)', borderRadius: '0.5rem', border: '1px solid var(--border-light)' }}>
-              {isFetchingPpobTransactions ? (
-                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                  <RotateCcw size={32} className="spin" style={{ opacity: 0.5 }} />
-                  <span>Memuat data...</span>
-                </div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead style={{ backgroundColor: 'var(--bg-hover)', borderBottom: '2px solid var(--border-light)', position: 'sticky', top: 0, zIndex: 1 }}>
-                    <tr>
-                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>Waktu</th>
-                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>Produk</th>
-                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>No Tujuan</th>
-                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)', textAlign: 'center' }}>Status</th>
-                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>SN / Token</th>
-                      <th style={{ padding: '1rem', fontWeight: 600, color: 'var(--text-main)', textAlign: 'center' }}>Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      const filteredTxs = ppobTransactions.filter(tx => tx.ppob_transactions?.some(p => p.customer_no?.includes(ppobSearchQuery) || p.sn?.includes(ppobSearchQuery)));
-                      
-                      if (filteredTxs.length === 0) {
-                        return (
-                          <tr>
-                            <td colSpan="6" style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                                <Search size={48} style={{ opacity: 0.1 }} />
-                                <span>{ppobTransactions.length === 0 ? 'Tidak ada transaksi PPOB hari ini' : 'Tidak ada transaksi yang sesuai pencarian'}</span>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      }
-
-                      return filteredTxs.map(tx => {
-                        return tx.ppob_transactions.map(ppob => (
-                          <tr key={ppob.id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
-                            <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{new Date(tx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
-                            <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{tx.items.find(i => i.product?.ppob_sku === ppob.buyer_sku_code)?.product?.name || ppob.buyer_sku_code}</td>
-                            <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: 600 }}>{ppob.customer_no}</td>
-                            <td style={{ padding: '1rem', textAlign: 'center' }}>
-                              <span style={{
-                                padding: '0.35rem 0.75rem',
-                                borderRadius: '9999px',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                background: ppob.status === 'Gagal' ? '#ef444420' : (ppob.status === 'Sukses' ? '#10b98120' : '#f59e0b20'),
-                                color: ppob.status === 'Gagal' ? '#ef4444' : (ppob.status === 'Sukses' ? '#10b981' : '#f59e0b')
-                              }}>
-                                {ppob.status}
-                              </span>
-                            </td>
-                            <td style={{ padding: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                              {ppob.sn || '-'}
-                            </td>
-                            <td style={{ padding: '1rem', textAlign: 'center', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                              {ppob.status === 'Pending' && (
-                                <button className="btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', borderRadius: '6px' }} onClick={() => handleCheckPpobStatus(ppob.id)}>
-                                  <RotateCcw size={14} style={{ marginRight: '0.3rem' }} /> Cek
-                                </button>
-                              )}
-                              <button className="btn-success" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', borderRadius: '6px' }} onClick={() => { setIsPpobMenuOpen(false); handleReprintPpob(tx); }}>
-                                <Printer size={14} style={{ marginRight: '0.3rem' }} /> Print
-                              </button>
-                            </td>
-                          </tr>
-                        ));
-                      });
-                    })()}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="pos-main-layout" style={{ flex: 1, height: 'calc(100vh - 65px)', overflow: 'hidden', minHeight: 0 }}>
-        <main className="pos-cart-container" style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden' }}>
+        <PosCartTable
+          barcodeInput={barcodeInput}
+          items={items}
+          inputValue={inputValue}
+          handleInputChange={handleInputChange}
+          highlightedIndex={highlightedIndex}
+          setHighlightedIndex={setHighlightedIndex}
+          searchResults={searchResults}
+          addItemToTransaction={addItemToTransaction}
+          handleClearInput={handleClearInput}
+          handleBarcodeScan={handleBarcodeScan}
+          formatCurrency={formatCurrency}
+          lastScannedProductId={lastScannedProductId}
+          requestAuthorization={requestAuthorization}
+          removeItem={removeItem}
+          subtotal={subtotal}
+          totalDiscount={totalDiscount}
+          manualTotalDiscount={manualTotalDiscount}
+          selectedCustomer={selectedCustomer}
+          pointRedemptionEnabled={pointRedemptionEnabled}
+          minimumPointsToRedeem={minimumPointsToRedeem}
+          setPointsToRedeemInput={setPointsToRedeemInput}
+          setIsRedeemPointModalOpen={setIsRedeemPointModalOpen}
+          finalAmount={finalAmount}
+          isSubtotalMode={isSubtotalMode}
+          totalPaid={totalPaid}
+          changeAmount={changeAmount}
+        />
 
-          <div className="cart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexShrink: 0 }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}><ShoppingCart size={20} /> Keranjang Belanja</h3>
-            <span className="item-count">{items.length} Items | {items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)} Qty</span>
-          </div>
-
-          {/* TOP BARCODE SCANNER INPUT AREA */}
-          <div className="barcode-input-wrapper-top" style={{ marginBottom: '1rem', position: 'relative', zIndex: 9999, flexShrink: 0 }}>
-            <div className="input-icon" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)', zIndex: 5 }}>
-              <Search size={22} />
-            </div>
-            <input
-              ref={barcodeInput}
-              type="text"
-              className="modern-barcode-input"
-              style={{
-                width: '100%',
-                paddingLeft: '3.2rem',
-                paddingRight: '1rem',
-                height: '3.2rem',
-                fontSize: '1.1rem',
-                fontWeight: '600',
-                borderRadius: '12px',
-                border: '2px solid var(--primary)',
-                outline: 'none',
-                background: 'var(--bg-card)',
-                color: 'var(--text-main)'
-              }}
-              value={inputValue}
-              placeholder="⚡ Scan Barcode / Cari Nama Produk / SKU... [Tekan ENTER]"
-              onChange={(e) => handleInputChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  if (highlightedIndex < searchResults.length - 1) {
-                    const newIndex = highlightedIndex + 1;
-                    setHighlightedIndex(newIndex);
-                    setTimeout(() => {
-                      const items = document.querySelectorAll('.search-item');
-                      if (items[newIndex]) items[newIndex].scrollIntoView({ block: 'nearest' });
-                    }, 0);
-                  }
-                } else if (e.key === 'ArrowUp') {
-                  e.preventDefault();
-                  if (highlightedIndex > 0) {
-                    const newIndex = highlightedIndex - 1;
-                    setHighlightedIndex(newIndex);
-                    setTimeout(() => {
-                      const items = document.querySelectorAll('.search-item');
-                      if (items[newIndex]) items[newIndex].scrollIntoView({ block: 'nearest' });
-                    }, 0);
-                  }
-                } else if (e.key === 'Enter') {
-                  if (highlightedIndex >= 0 && highlightedIndex < searchResults.length) {
-                    addItemToTransaction(searchResults[highlightedIndex]);
-                    handleClearInput();
-                  } else if (searchResults.length === 1) {
-                    addItemToTransaction(searchResults[0]);
-                    handleClearInput();
-                  } else {
-                    handleBarcodeScan(e.target.value);
-                  }
-                }
-                if (e.key === 'Escape') handleClearInput();
-              }}
-              autoFocus
-            />
-            {searchResults.length > 0 && (
-              <div className="search-results-floating fade-in" style={{
-                top: '100%',
-                left: 0,
-                right: 0,
-                maxHeight: '360px',
-                overflowY: 'auto',
-                zIndex: 99999,
-                position: 'absolute',
-                background: '#ffffff',
-                border: '2px solid #059669',
-                borderRadius: '12px',
-                marginTop: '6px'
-              }}>
-                {searchResults.map((p, index) => (
-                  <div key={p.id}
-                    className={`search-item ${index === highlightedIndex ? 'highlighted' : ''}`}
-                    style={{
-                      padding: '12px 16px',
-                      cursor: 'pointer',
-                      borderBottom: '1px solid #e2e8f0',
-                      backgroundColor: index === highlightedIndex ? '#dbeafe' : '#ffffff',
-                      borderLeft: index === highlightedIndex ? '5px solid #059669' : '5px solid transparent',
-                      transition: 'all 0.1s ease-in-out',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                    onClick={() => { addItemToTransaction(p); handleClearInput(); }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span className="sku" style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.95rem' }}>{p.sku}</span>
-                      <span className="name" style={{ fontSize: '0.85rem', color: '#334155' }}>{p.name}</span>
-                    </div>
-                    <span className="price" style={{ fontWeight: '700', color: '#059669', fontSize: '1rem' }}>{formatCurrency(p.selling_price)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="cart-table-wrapper" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-            <table className="modern-table">
-              <thead>
-                <tr>
-                  <th>No</th>
-                  <th>Kode / Nama Barang</th>
-                  <th>Harga</th>
-                  <th>Qty</th>
-                  <th>Total</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="empty-state">
-                      <div className="empty-content">
-                        <Search size={48} />
-                        <p>Belum ada produk. Silakan scan barcode atau ketik SKU pada kolom di atas.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  items.map((item, index) => (
-                    <tr key={item.productId} className={`cart-row animate-slide-in ${item.productId === lastScannedProductId ? 'highlight-row' : ''}`}>
-                      <td>{index + 1}</td>
-                      <td>
-                        <div className="prod-cell">
-                          <span className="sku">{item.sku}</span>
-                          <span className="name">{item.name}</span>
-                          {item.manualDiscount > 0 && <span className="item-discount-tag">Manual Disc: -{formatCurrency(item.manualDiscount)}</span>}
-                        </div>
-                      </td>
-                      <td>{formatCurrency(item.unitPrice)}</td>
-                      <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                        <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{item.quantity}</span>
-                      </td>
-                      <td className="subtotal-cell">{formatCurrency((item.quantity * item.unitPrice) - (item.quantity * (item.manualDiscount || 0)))}</td>
-                      <td>
-                        <button className="btn-remove-item" onClick={() => requestAuthorization("VOID", () => removeItem(item.productId))}><Trash2 size={16} /></button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* BOTTOM SUMMARY BAR */}
-          <div className="bottom-summary-bar fade-in" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', background: 'rgba(5, 150, 105, 0.08)', padding: '1rem 1.25rem', borderRadius: '14px', border: '1.5px solid rgba(5, 150, 105, 0.3)' }}>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--border-light)', paddingBottom: '0.5rem' }}>
-              <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.95rem', color: 'var(--text-main)' }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Subtotal: </span>
-                  <span style={{ fontWeight: '700' }}>{formatCurrency(subtotal)}</span>
-                </div>
-                {(totalDiscount + manualTotalDiscount) > 0 && (
-                  <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Diskon: </span>
-                    <span style={{ fontWeight: '700', color: 'var(--danger)' }}>-{formatCurrency(totalDiscount + manualTotalDiscount)}</span>
-                  </div>
-                )}
-              </div>
-
-              {selectedCustomer && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-                  <span style={{ background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{selectedCustomer.member_tier}</span>
-                  <span style={{ fontWeight: '600', color: 'var(--text-main)' }}>{selectedCustomer.name}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>(Pts: {selectedCustomer.points})</span>
-                  {pointRedemptionEnabled && selectedCustomer.points >= minimumPointsToRedeem && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPointsToRedeemInput('');
-                        setIsRedeemPointModalOpen(true);
-                      }}
-                      style={{
-                        marginLeft: '0.25rem',
-                        padding: '3px 10px',
-                        fontSize: '0.75rem',
-                        borderRadius: '6px',
-                        background: 'var(--primary)',
-                        color: 'white',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        transition: 'opacity 0.2s'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.opacity = '0.85'}
-                      onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
-                    >
-                      Tukar Poin
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem' }}>
-              <div className="grand-total-box" style={{ border: 'none', padding: 0, marginTop: 0, background: 'transparent' }}>
-                <label style={{ fontSize: '0.8rem', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '2px', display: 'block', fontWeight: '700' }}>GRAND TOTAL</label>
-                <div className="total-amount" style={{ fontSize: '2.6rem', lineHeight: '1', fontWeight: '900', color: '#10b981' }}>{formatCurrency(finalAmount)}</div>
-              </div>
-
-              {isSubtotalMode && (
-                <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', fontWeight: '600' }}>DITERIMA</label>
-                    <div style={{ fontSize: '1.3rem', fontWeight: '700', color: 'var(--text-main)', lineHeight: '1' }}>{formatCurrency(totalPaid || 0)}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', fontWeight: '600' }}>KEMBALI</label>
-                    <div className={changeAmount >= 0 ? "text-online" : "text-danger"} style={{ fontSize: '1.6rem', fontWeight: '800', lineHeight: '1' }}>
-                      {formatCurrency(changeAmount)}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </main>
-
-        <aside className="pos-functions-sidebar" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%', minHeight: 0, overflowY: 'auto' }}>
-          <div className="function-grid" style={{ display: 'grid', gap: '8px', gridTemplateColumns: 'repeat(4, 1fr)', alignContent: 'start' }}>
-            {/* Row 1: Bayar */}
-            <button className={`func-btn payment ${paymentMethod === 'CASH' ? 'active' : ''}`} onClick={() => startPayment('CASH')}><Banknote size={16} />{renderBtnLabel('btn_tunai', 'Tunai', 'F5')}</button>
-            <button className={`func-btn payment ${paymentMethod === 'CARD' ? 'active' : ''}`} onClick={() => startPayment('CARD')}><CreditCard size={16} />{renderBtnLabel('btn_card', 'Card', 'F6')}</button>
-            <button className="func-btn payment" onClick={() => requestAuthorization("VOUCHER", () => setIsVoucherModalOpen(true))}><Ticket size={16} />{renderBtnLabel('btn_voucher', 'Voucher', '')}</button>
-            <button className="func-btn payment" onClick={() => requestAuthorization("MULTI_PAYMENT", () => setIsMultiPaymentModalOpen(true))}><Layers size={16} />{renderBtnLabel('btn_multi_pay', 'Multi Pay', '')}</button>
-
-            {/* Row 2: Subtotal & Diskon */}
-            <button className={`func-btn payment ${isSubtotalMode ? 'active' : ''}`} onClick={() => { setIsSubtotalMode(true); barcodeInput.current.focus(); }}><Calculator size={16} />{renderBtnLabel('btn_subtotal', 'Subtotal', 'F9')}</button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('NOMINAL'))}><Tag size={16} />{renderBtnLabel('btn_disc_item_rp', 'Disc Item Rp', 'F1')}</button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualDiscountItem('PERCENT'))}><Tag size={16} />{renderBtnLabel('btn_disc_item_pct', 'Disc Item %', 'F2')}</button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('NOMINAL'))}><Tag size={16} />{renderBtnLabel('btn_disc_total_rp', 'Disc Total Rp', 'F3')}</button>
-
-            {/* Row 3: Total Disc, Open Price, Qty, Hold */}
-            <button className="func-btn discount" onClick={() => requestAuthorization("DISCOUNT", () => handleManualTotalDiscount('PERCENT'))}><Tag size={16} />{renderBtnLabel('btn_disc_total_pct', 'Disc Total %', 'F4')}</button>
-            <button className="func-btn discount" onClick={() => requestAuthorization("OPEN_PRICE", () => {
-              if (items.length > 0) {
-                setOpenPriceTargetItem(items[items.length - 1]);
-                setIsOpenPriceModalOpen(true);
-              } else {
-                setAlertMsg({ text: 'Pilih item terlebih dahulu', type: 'error' });
-                setTimeout(() => setAlertMsg(null), 2000);
-              }
-            })}><Edit3 size={16} />{renderBtnLabel('btn_open_price', 'Open Price', '')}</button>
-            <button className="func-btn primary" onClick={() => setIsQtyModalOpen(true)}><Package size={16} />{renderBtnLabel('btn_qty', 'Ubah Qty', 'F7')}</button>
-            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => handleHoldTransaction())}><Lock size={16} />{renderBtnLabel('btn_hold', 'Hold', 'PgUp')}</button>
-
-            {/* Row 4: Recall, Member, Kas, Retur */}
-            <button className="func-btn action" onClick={() => requestAuthorization("HOLD_RECALL", () => setIsRecallModalOpen(true))}><History size={16} />{renderBtnLabel('btn_recall', 'Recall', 'PgDn')}</button>
-            <button className="func-btn action" onClick={() => setIsMemberModalOpen(true)}><User size={16} />{renderBtnLabel('btn_member', 'Member', 'Home')}</button>
-            <button className="func-btn action" onClick={() => {
-              if (window.electronAPI && window.electronAPI.openCashDrawer) {
-                window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
-              }
-              setIsCashMovementModalOpen(true);
-            }}><Wallet size={16} />{renderBtnLabel('btn_kas', 'Kas M/K', '')}</button>
-            <button className="func-btn secondary" onClick={() => requestAuthorization("RETURN", () => setIsReturnModalOpen(true))}><RotateCcw size={16} />{renderBtnLabel('btn_retur', 'Retur', 'End')}</button>
-
-            {/* Row 5: Reprint, PPOB, Void Item */}
-            <button className="func-btn secondary" onClick={() => requestAuthorization("REPRINT_LAST", () => handleReprintLast())}><History size={16} />{renderBtnLabel('btn_reprint_last', 'Reprint 1', 'F11')}</button>
-            <button className="func-btn action" onClick={() => requestAuthorization("REPRINT_OLD", () => setIsReprintOldModalOpen(true))}><Search size={16} />{renderBtnLabel('btn_reprint_old', 'Reprint L', 'F12')}</button>
-            <button className="func-btn primary" onClick={() => { setIsPpobMenuOpen(true); fetchPpobTransactions(); }}><Package size={16} />{renderBtnLabel('btn_ppob_menu', 'Menu PPOB', 'F10')}</button>
-            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => updateQuantity(items[items.length - 1]?.productId, 0))}><Eraser size={16} />{renderBtnLabel('btn_void_item', 'Void Item', 'Del')}</button>
-
-            {/* Row 6: Void All, Clear, Tutup Shift */}
-            <button className="func-btn danger" onClick={() => requestAuthorization("VOID", () => { setItems([]); setPwpUpsellPrompt(null); setPayments([]); setManualTotalDiscount(0); setIsReturnMode(false); })}><Trash2 size={16} />{renderBtnLabel('btn_void_all', 'Void All', 'Esc')}</button>
-            <button className="func-btn danger" onClick={handleClearDiscount}><X size={16} />{renderBtnLabel('btn_clear', 'Clear', 'Ins')}</button>
-            <button className="func-btn secondary" onClick={() => {
-              if (window.electronAPI && window.electronAPI.openCashDrawer) {
-                window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
-              }
-              setIsCloseShiftModalOpen(true);
-            }}><LogOut size={16} />{renderBtnLabel('btn_close_shift', 'Tutup Shift', 'F8')}</button>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border-light)' }}>
-            <a
-              href="https://api.whatsapp.com/send/?phone=6285861094485&text=Halo%20Zhan_soft,%20Saya%20ingin%20bertanya%20seputar%20Aplikasi%20Sistem%20POS%20Kasir"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                color: 'var(--text-muted)',
-                textDecoration: 'none',
-                fontSize: '0.75rem',
-                fontWeight: '500',
-                transition: 'color 0.2s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-main)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-            >
-              <svg width="16" height="16" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '4px' }}>
-                <defs>
-                  <linearGradient id="zGradPos" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#059669" />
-                    <stop offset="100%" stopColor="#10b981" />
-                  </linearGradient>
-                </defs>
-                <rect width="100" height="100" rx="30" fill="url(#zGradPos)" />
-                <path d="M30 30H70L30 70H70" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span>Zhan_soft &copy; {new Date().getFullYear()}</span>
-            </a>
-          </div>
-
-        </aside>
+        <PosActionSidebar
+          paymentMethod={paymentMethod}
+          startPayment={startPayment}
+          requestAuthorization={requestAuthorization}
+          setIsVoucherModalOpen={setIsVoucherModalOpen}
+          setIsMultiPaymentModalOpen={setIsMultiPaymentModalOpen}
+          isSubtotalMode={isSubtotalMode}
+          setIsSubtotalMode={setIsSubtotalMode}
+          barcodeInput={barcodeInput}
+          handleManualDiscountItem={handleManualDiscountItem}
+          handleManualTotalDiscount={handleManualTotalDiscount}
+          items={items}
+          setOpenPriceTargetItem={setOpenPriceTargetItem}
+          setIsOpenPriceModalOpen={setIsOpenPriceModalOpen}
+          setAlertMsg={setAlertMsg}
+          setIsQtyModalOpen={setIsQtyModalOpen}
+          handleHoldTransaction={handleHoldTransaction}
+          setIsRecallModalOpen={setIsRecallModalOpen}
+          setIsMemberModalOpen={setIsMemberModalOpen}
+          localPrinterSettings={localPrinterSettings}
+          setIsCashMovementModalOpen={setIsCashMovementModalOpen}
+          setIsReturnModalOpen={setIsReturnModalOpen}
+          handleReprintLast={handleReprintLast}
+          setIsReprintOldModalOpen={setIsReprintOldModalOpen}
+          setIsPpobMenuOpen={setIsPpobMenuOpen}
+          fetchPpobTransactions={fetchPpobTransactions}
+          updateQuantity={updateQuantity}
+          setItems={setItems}
+          setPwpUpsellPrompt={setPwpUpsellPrompt}
+          setPayments={setPayments}
+          setManualTotalDiscount={setManualTotalDiscount}
+          setIsReturnMode={setIsReturnMode}
+          handleClearDiscount={handleClearDiscount}
+          setIsCloseShiftModalOpen={setIsCloseShiftModalOpen}
+          renderBtnLabel={renderBtnLabel}
+        />
       </div>
-
-      {/* Digital Product Modal */}
-      {isDigitalInputModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm" style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', width: '400px' }}>
-            <h3 className="text-lg font-bold mb-4" style={{ marginBottom: '15px', color: 'black' }}>Input Data Tujuan</h3>
-            <p className="text-sm text-gray-600 mb-4" style={{ marginBottom: '15px', color: 'black' }}>Masukkan Nomor HP / ID Pelanggan untuk produk digital <b>{pendingDigitalProduct?.product?.name}</b></p>
-            <form onSubmit={handleDigitalProductSubmit}>
-              <input
-                type="text"
-                autoFocus
-                className="w-full border p-2 rounded mb-4 focus:ring-2 focus:ring-blue-500"
-                style={{ width: '100%', padding: '10px', marginBottom: '15px', border: '1px solid #ccc', borderRadius: '4px', color: 'black' }}
-                placeholder="Misal: 081234567890"
-                value={customerNoInput}
-                onChange={(e) => setCustomerNoInput(e.target.value)}
-              />
-              <div className="flex justify-end gap-2" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  type="button"
-                  style={{ padding: '8px 16px', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                  onClick={() => {
-                    setIsDigitalInputModalOpen(false);
-                    setPendingDigitalProduct(null);
-                  }}
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  style={{ padding: '8px 16px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  Lanjut
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };

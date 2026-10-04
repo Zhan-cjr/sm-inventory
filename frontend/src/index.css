@@ -1988,6 +1988,71 @@ body {
 }
 
 /* ==========================================================================
+   PPOB DASHBOARD MODAL STYLES
+   ========================================================================== */
+.ppob-modal-card {
+  width: 95vw;
+  max-width: 1120px;
+  height: 86vh;
+  max-height: 860px;
+  background: var(--bg-card);
+  border-radius: 20px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-light);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  text-align: left;
+  animation: popIn 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.ppob-search-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 0.65rem 2.2rem 0.65rem 2.5rem;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.ppob-search-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.ppob-filter-tab {
+  padding: 0.45rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: all 0.15s ease;
+}
+
+.ppob-filter-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.ppob-filter-tab.active {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+  color: var(--text-main);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* ==========================================================================
    MOBILE PWA LAYOUT (ULTRA PREMIUM PWA DESIGN SYSTEM)
    ========================================================================== */
 .mobile-layout {
