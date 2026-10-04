@@ -195,7 +195,8 @@ export const POSTransaction = ({
     checkActiveShift,
     handleOpenShift,
     handleCloseShift,
-    handleCashMovement
+    handleCashMovement,
+    closedShiftsToday
   } = usePosShift({
     authToken,
     terminalInfo,
@@ -764,6 +765,7 @@ export const POSTransaction = ({
         startingCash={startingCash}
         setStartingCash={setStartingCash}
         handleOpenShift={handleOpenShift}
+        closedShiftsToday={closedShiftsToday}
         isCloseShiftModalOpen={isCloseShiftModalOpen}
         setIsCloseShiftModalOpen={setIsCloseShiftModalOpen}
         activeShift={activeShift}

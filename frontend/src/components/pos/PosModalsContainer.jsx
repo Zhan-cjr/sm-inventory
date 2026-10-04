@@ -46,6 +46,7 @@ export const PosModalsContainer = ({
   startingCash,
   setStartingCash,
   handleOpenShift,
+  closedShiftsToday = [],
   isCloseShiftModalOpen,
   setIsCloseShiftModalOpen,
   activeShift,
@@ -251,6 +252,7 @@ export const PosModalsContainer = ({
           setStartingCash={setStartingCash}
           formatThousandSeparator={formatThousandSeparator}
           onOpenShift={handleOpenShift}
+          closedShifts={closedShiftsToday}
         />
       )}
 

@@ -145,8 +145,6 @@ export const Login = ({ onLoginSuccess }) => {
             >
               <option value="Shift 1">Shift 1</option>
               <option value="Shift 2">Shift 2</option>
-              <option value="Shift 3">Shift 3</option>
-              <option value="Shift Umum">Shift Umum</option>
             </select>
           </div>
           <button type="submit" className="btn-primary btn-login" disabled={isLoading} style={{ marginTop: '0.5rem' }}>

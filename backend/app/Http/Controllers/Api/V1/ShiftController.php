@@ -27,6 +27,20 @@ class ShiftController extends Controller
                 ], 403);
             }
         }
+
+        // Daftar shift yang sudah CLOSED hari ini (baik di terminal kassa ini ataupun oleh kasir ini)
+        $todayStart = Carbon::today();
+        $todayEnd = Carbon::tomorrow()->subSecond();
+
+        $closedQuery = Shift::where('status', 'CLOSED')
+            ->whereBetween('created_at', [$todayStart, $todayEnd])
+            ->where(function ($q) use ($terminalId, $userId) {
+                if ($terminalId) {
+                    $q->where('terminal_id', $terminalId);
+                }
+                $q->orWhere('user_id', $userId);
+            });
+        $closedShifts = $closedQuery->pluck('shift_name')->unique()->values()->toArray();
         
         // 1. Check if the user has an open shift anywhere
         $userActive = Shift::where('user_id', $userId)
@@ -45,14 +59,16 @@ class ShiftController extends Controller
                 // Ideal case: user is on their correct terminal with their active shift
                 return response()->json([
                     'status' => 'OK',
-                    'shift' => $userActive
+                    'shift' => $userActive,
+                    'closed_shifts' => $closedShifts
                 ]);
             } else {
                 // Complex conflict: user has shift on another terminal, and this terminal has a shift by someone else
                 return response()->json([
                     'status' => 'USER_HAS_OTHER_SHIFT',
                     'message' => "Akses Terkunci: Anda masih memiliki shift aktif ({$userActive->shift_name}) di kassa {$userActive->terminal->name}. Silakan kembali ke kassa tersebut untuk menutup shift Anda terlebih dahulu.",
-                    'shift' => null
+                    'shift' => null,
+                    'closed_shifts' => $closedShifts
                 ]);
             }
         }
@@ -62,7 +78,8 @@ class ShiftController extends Controller
             return response()->json([
                 'status' => 'USER_HAS_OTHER_SHIFT',
                 'message' => "Akses Terkunci: Anda masih memiliki shift aktif ({$userActive->shift_name}) di kassa {$userActive->terminal->name}. Silakan kembali ke kassa tersebut untuk menutup shift Anda terlebih dahulu.",
-                'shift' => null
+                'shift' => null,
+                'closed_shifts' => $closedShifts
             ]);
         }
 
@@ -71,14 +88,16 @@ class ShiftController extends Controller
             return response()->json([
                 'status' => 'TERMINAL_IN_USE',
                 'message' => "Akses Terkunci: Terminal kassa ini sedang digunakan oleh {$terminalActive->user->name} pada shift {$terminalActive->shift_name}. Silakan tunggu hingga kasir tersebut menutup shift-nya, atau login di kassa lain.",
-                'shift' => null
+                'shift' => null,
+                'closed_shifts' => $closedShifts
             ]);
         }
 
         // No active shifts for user or terminal -> Safe to open new shift
         return response()->json([
             'status' => 'NONE',
-            'shift' => null
+            'shift' => null,
+            'closed_shifts' => $closedShifts
         ]);
     }
 
@@ -86,8 +105,10 @@ class ShiftController extends Controller
     {
         $validated = $request->validate([
             'terminal_id' => 'required|uuid',
-            'shift_name' => 'required|string',
+            'shift_name' => 'required|string|in:Shift 1,Shift 2',
             'starting_cash' => 'required|numeric|min:0',
+        ], [
+            'shift_name.in' => 'Pilihan shift hanya diperbolehkan Shift 1 atau Shift 2.'
         ]);
 
         $user = auth()->user();
@@ -127,17 +148,32 @@ class ShiftController extends Controller
             ], 422);
         }
 
-        // Rule 1: Check if the cashier has already closed this shift name today
         $todayStart = Carbon::today();
         $todayEnd = Carbon::tomorrow()->subSecond();
 
-        $alreadyClosedToday = Shift::where('user_id', $user->id)
+        // Rule 1: Check if this shift name has already been closed on this terminal today (Option 1: Per Kassa)
+        $terminalClosedToday = Shift::where('terminal_id', $validated['terminal_id'])
+            ->where('shift_name', $validated['shift_name'])
+            ->where('status', 'CLOSED')
+            ->whereBetween('created_at', [$todayStart, $todayEnd])
+            ->with('user')
+            ->first();
+
+        if ($terminalClosedToday) {
+            $closedByName = $terminalClosedToday->user ? $terminalClosedToday->user->name : 'kasir sebelumnya';
+            return response()->json([
+                'message' => "Gagal Buka Shift: {$validated['shift_name']} di kassa ini sudah ditutup hari ini (oleh {$closedByName}). Kassa ini tidak dapat membuka kembali shift yang sama hari ini demi integritas laporan keuangan."
+            ], 422);
+        }
+
+        // Rule 1b: Also check if this cashier has already closed this shift name today elsewhere
+        $cashierClosedToday = Shift::where('user_id', $user->id)
             ->where('shift_name', $validated['shift_name'])
             ->where('status', 'CLOSED')
             ->whereBetween('created_at', [$todayStart, $todayEnd])
             ->first();
 
-        if ($alreadyClosedToday) {
+        if ($cashierClosedToday) {
             return response()->json([
                 'message' => "Gagal Buka Shift: Anda sudah menutup {$validated['shift_name']} hari ini. Sistem menolak pembukaan kembali shift yang sama pada hari yang sama demi integritas laporan keuangan."
             ], 422);

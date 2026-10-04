@@ -21,7 +21,10 @@ export const usePosShift = ({
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
   const [startingCash, setStartingCash] = useState('');
   const [actualCash, setActualCash] = useState('');
-  const [selectedShiftName, setSelectedShiftName] = useState(localStorage.getItem('pos_preselected_shift') || 'Shift 1');
+  const initialShift = localStorage.getItem('pos_preselected_shift');
+  const validInitialShift = (initialShift === 'Shift 1' || initialShift === 'Shift 2') ? initialShift : 'Shift 1';
+  const [selectedShiftName, setSelectedShiftName] = useState(validInitialShift);
+  const [closedShiftsToday, setClosedShiftsToday] = useState([]);
   const [isCheckingShift, setIsCheckingShift] = useState(true);
   const [lockScreenInfo, setLockScreenInfo] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -47,6 +50,15 @@ export const usePosShift = ({
         return res.json();
       })
       .then(data => {
+        if (data.closed_shifts) {
+          setClosedShiftsToday(data.closed_shifts);
+          if (data.closed_shifts.includes('Shift 1') && !data.closed_shifts.includes('Shift 2')) {
+            setSelectedShiftName('Shift 2');
+          } else if (!data.closed_shifts.includes('Shift 1')) {
+            setSelectedShiftName('Shift 1');
+          }
+        }
+
         if (data.status === 'USER_HAS_OTHER_SHIFT' || data.status === 'TERMINAL_IN_USE') {
           setLockScreenInfo({ status: data.status, message: data.message });
           setActiveShift(null);
@@ -135,9 +147,18 @@ export const usePosShift = ({
       return;
     }
 
+    if (closedShiftsToday.includes(selectedShiftName)) {
+      setAlertMsg({ 
+        text: `${selectedShiftName} sudah ditutup untuk hari ini. Silakan pilih shift yang belum ditutup.`, 
+        type: 'error',
+        persist: true
+      });
+      return;
+    }
+
     const startingCashVal = parseFloat(startingCash);
 
-    // If offline
+    // If genuinely offline (no network)
     if (!navigator.onLine) {
       const localShift = {
         id: null,
@@ -153,7 +174,7 @@ export const usePosShift = ({
       if (window.electronAPI && window.electronAPI.openCashDrawer) {
         window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
       }
-      setAlertMsg({ text: 'Shift offline berhasil dibuka secara lokal. Selamat bertugas!', type: 'success' });
+      setAlertMsg({ text: 'Tidak ada koneksi internet. Shift offline dibuka secara lokal.', type: 'info' });
       return;
     }
 
@@ -169,9 +190,16 @@ export const usePosShift = ({
         starting_cash: startingCashVal
       })
     })
-      .then(res => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
+      .then(async res => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw {
+            isServerResponse: true,
+            status: res.status,
+            message: data?.message || `Gagal membuka shift (Error ${res.status})`
+          };
+        }
+        return data;
       })
       .then(data => {
         if (data.shift) {
@@ -187,6 +215,17 @@ export const usePosShift = ({
         }
       })
       .catch(err => {
+        if (err.isServerResponse) {
+          // Penolakan resmi dari server (422, 403, 400 dll):
+          // JANGAN BUKA SHIFT OFFLINE DAN JANGAN TUTUP MODAL!
+          setAlertMsg({ text: err.message, type: 'error', persist: true });
+          if (terminalInfo?.id) {
+            checkActiveShift(terminalInfo.id);
+          }
+          return;
+        }
+
+        // Murni error jaringan / network failure
         console.error('Failed to open shift online, falling back to offline:', err);
         const localShift = {
           id: null,
@@ -202,7 +241,7 @@ export const usePosShift = ({
         if (window.electronAPI && window.electronAPI.openCashDrawer) {
           window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
         }
-        setAlertMsg({ text: 'Gagal menghubungi server. Shift offline dibuka secara lokal.', type: 'success' });
+        setAlertMsg({ text: 'Koneksi server terputus. Shift offline dibuka secara lokal.', type: 'info' });
       });
   };
 
@@ -353,6 +392,8 @@ export const usePosShift = ({
     checkActiveShift,
     handleOpenShift,
     handleCloseShift,
-    handleCashMovement
+    handleCashMovement,
+    closedShiftsToday,
+    setClosedShiftsToday
   };
 };

@@ -198,7 +198,8 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('pos_token');
     localStorage.removeItem('pos_user');
-    localStorage.removeItem('pos_active_shift');
+    // Note: pos_active_shift is preserved across temporary logout/rest breaks
+    // and is only removed when the cashier performs an explicit Close Shift.
     setToken(null);
     setUser(null);
   };
