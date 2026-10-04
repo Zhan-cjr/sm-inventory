@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bot, 
@@ -10,13 +10,13 @@ import {
   AlertTriangle, 
   QrCode, 
   ShieldCheck, 
-  Sparkles, 
-  ChevronRight,
-  Store,
-  ArrowUpRight,
-  Package
+  Store 
 } from 'lucide-react';
-import { SmartAssistant } from '../SmartAssistant';
+import { MobileWeeklySalesChart } from './MobileWeeklySalesChart';
+import { MobileTopProductsCard } from './MobileTopProductsCard';
+
+// Lazy-load SmartAssistant only when user opens AI assistant sheet
+const SmartAssistant = lazy(() => import('../SmartAssistant').then(m => ({ default: m.SmartAssistant })));
 
 export function MobileDashboard({ user, authToken }) {
   const navigate = useNavigate();
@@ -72,6 +72,29 @@ export function MobileDashboard({ user, authToken }) {
 
   const formatCurrency = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
 
+  const renderComparativeCell = (label, prev) => {
+    const today = metrics?.summary?.todaySales || 0;
+    const prevSales = prev || 0;
+    const diff = today - prevSales;
+    const isUp = diff >= 0;
+    const pctString = prevSales > 0 
+      ? `${isUp ? '+' : ''}${((diff / prevSales) * 100).toFixed(0)}%` 
+      : (today > 0 ? '+100%' : '0%');
+
+    return (
+      <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.6rem 0.4rem', borderRadius: '12px', textAlign: 'center' }}>
+        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: '0.78rem', fontWeight: 800, marginTop: '2px', color: 'var(--text-main)' }}>
+          {formatCurrency(prevSales)}
+        </div>
+        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: isUp ? '#10b981' : '#ef4444', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+          {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+          {pctString}
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', gap: '1rem' }}>
@@ -110,7 +133,14 @@ export function MobileDashboard({ user, authToken }) {
             </button>
           </div>
           <div style={{ flex: 1, padding: '1rem', overflowY: 'auto' }}>
-            <SmartAssistant user={user} authToken={authToken} />
+            <Suspense fallback={
+              <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                <div className="spin" style={{ width: '32px', height: '32px', border: '3px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', margin: '0 auto 0.75rem' }} />
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Memuat Smart Assistant...</div>
+              </div>
+            }>
+              <SmartAssistant user={user} authToken={authToken} />
+            </Suspense>
           </div>
         </div>
       )}
@@ -194,67 +224,11 @@ export function MobileDashboard({ user, authToken }) {
           </div>
         </div>
 
-        {/* Comparative Sales Breakdown (Versus) */}
+        {/* Comparative Sales Breakdown */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(16, 185, 129, 0.25)' }}>
-          {/* vs Kemarin */}
-          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.6rem 0.4rem', borderRadius: '12px', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>vs Kemarin</div>
-            <div style={{ fontSize: '0.78rem', fontWeight: 800, marginTop: '2px', color: 'var(--text-main)' }}>
-              {formatCurrency(metrics?.summary?.yesterdaySales || 0)}
-            </div>
-            {(() => {
-              const today = metrics?.summary?.todaySales || 0;
-              const prev = metrics?.summary?.yesterdaySales || 0;
-              const diff = today - prev;
-              const isUp = diff >= 0;
-              return (
-                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: isUp ? '#10b981' : '#ef4444', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
-                  {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                  {prev > 0 ? `${isUp ? '+' : ''}${((diff / prev) * 100).toFixed(0)}%` : (today > 0 ? '+100%' : '0%')}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* vs Minggu Lalu (Hari Sama) */}
-          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.6rem 0.4rem', borderRadius: '12px', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>vs Ming. Lalu</div>
-            <div style={{ fontSize: '0.78rem', fontWeight: 800, marginTop: '2px', color: 'var(--text-main)' }}>
-              {formatCurrency(metrics?.summary?.sameDayLastWeekSales || 0)}
-            </div>
-            {(() => {
-              const today = metrics?.summary?.todaySales || 0;
-              const prev = metrics?.summary?.sameDayLastWeekSales || 0;
-              const diff = today - prev;
-              const isUp = diff >= 0;
-              return (
-                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: isUp ? '#10b981' : '#ef4444', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
-                  {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                  {prev > 0 ? `${isUp ? '+' : ''}${((diff / prev) * 100).toFixed(0)}%` : (today > 0 ? '+100%' : '0%')}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* vs Bulan Lalu (Tgl Sama) */}
-          <div style={{ background: 'rgba(255,255,255,0.05)', padding: '0.6rem 0.4rem', borderRadius: '12px', textAlign: 'center' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>vs Bul. Lalu</div>
-            <div style={{ fontSize: '0.78rem', fontWeight: 800, marginTop: '2px', color: 'var(--text-main)' }}>
-              {formatCurrency(metrics?.summary?.sameDateLastMonthSales || 0)}
-            </div>
-            {(() => {
-              const today = metrics?.summary?.todaySales || 0;
-              const prev = metrics?.summary?.sameDateLastMonthSales || 0;
-              const diff = today - prev;
-              const isUp = diff >= 0;
-              return (
-                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: isUp ? '#10b981' : '#ef4444', marginTop: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
-                  {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                  {prev > 0 ? `${isUp ? '+' : ''}${((diff / prev) * 100).toFixed(0)}%` : (today > 0 ? '+100%' : '0%')}
-                </div>
-              );
-            })()}
-          </div>
+          {renderComparativeCell('vs Kemarin', metrics?.summary?.yesterdaySales)}
+          {renderComparativeCell('vs Ming. Lalu', metrics?.summary?.sameDayLastWeekSales)}
+          {renderComparativeCell('vs Bul. Lalu', metrics?.summary?.sameDateLastMonthSales)}
         </div>
       </div>
 
@@ -333,91 +307,15 @@ export function MobileDashboard({ user, authToken }) {
       </div>
 
       {/* 7-Day Sales Bar Chart */}
-      <div className="pwa-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
-            Penjualan 7 Hari Terakhir
-          </h3>
-          <span style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 600, background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '99px' }}>
-            Tren Positif
-          </span>
-        </div>
-
-        {metrics?.weeklyChart && metrics.weeklyChart.length > 0 ? (
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '110px', gap: '6px', paddingTop: '10px' }}>
-            {metrics.weeklyChart.map((day, idx) => {
-              const maxSales = Math.max(...metrics.weeklyChart.map(d => d.sales), 1);
-              const heightPct = Math.max((day.sales / maxSales) * 100, 6);
-              const isHighest = day.sales === maxSales && maxSales > 0;
-              return (
-                <div key={idx} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
-                  <div 
-                    title={`${day.day_name}: ${formatCurrency(day.sales)}`}
-                    style={{ 
-                      width: '100%', 
-                      background: isHighest ? 'linear-gradient(180deg, #10b981 0%, #059669 100%)' : 'rgba(16, 185, 129, 0.3)', 
-                      borderRadius: '6px 6px 0 0', 
-                      height: `${heightPct}%`, 
-                      transition: 'height 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isHighest ? '0 0 12px rgba(16, 185, 129, 0.4)' : 'none'
-                    }}
-                  ></div>
-                  <div style={{ fontSize: '0.65rem', color: isHighest ? '#10b981' : 'var(--text-muted)', fontWeight: isHighest ? 800 : 500 }}>
-                    {day.day_name}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem' }}>
-            Belum ada grafik penjualan.
-          </div>
-        )}
-      </div>
+      <MobileWeeklySalesChart 
+        weeklyChart={metrics?.weeklyChart} 
+        formatCurrency={formatCurrency} 
+      />
 
       {/* Top 5 Products List */}
-      <div className="pwa-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Package size={18} color="#6366f1" /> Top 5 Produk Terlaris
-          </h3>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Bulan Ini</span>
-        </div>
-
-        {(!metrics?.topProducts || metrics.topProducts.length === 0) ? (
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem' }}>
-            Belum ada data produk terlaris.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            {metrics.topProducts.map((prod, idx) => (
-              <div 
-                key={idx} 
-                style={{ 
-                  display: 'flex', 
-                  justify: 'space-between', 
-                  alignItems: 'center', 
-                  borderBottom: idx !== metrics.topProducts.length - 1 ? '1px solid var(--border-light)' : 'none', 
-                  paddingBottom: '0.65rem' 
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
-                  <div style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#6366f1', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>
-                    {idx + 1}
-                  </div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {prod.name}
-                  </div>
-                </div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', marginLeft: '0.5rem' }}>
-                  {prod.total_sold} <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-muted)' }}>terjual</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <MobileTopProductsCard 
+        topProducts={metrics?.topProducts} 
+      />
 
     </div>
   );
