@@ -133,20 +133,31 @@ class TransactionController extends Controller
                     }
                 }
 
+                $receivedAmount = (float) ($request->input('received_amount') ?? $request->input('receivedAmount') ?? $validated['final_amount']);
+                $changeAmount = (float) ($request->input('change_amount') ?? $request->input('changeAmount') ?? 0);
+                $terminalId = $request->input('terminal_id') ?? $request->header('X-Terminal-Id') ?? null;
+                $shiftId = $request->input('shift_id') ?? null;
+                $txType = $request->input('transaction_type', 'SALES');
+
                 $transaction = Transaction::create([
                     'organization_id' => $user->organization_id,
                     'branch_id' => $user->branch_id,
                     'customer_id' => $validated['customer_id'] ?? null,
-                    'transaction_type' => 'SALES',
+                    'terminal_id' => $terminalId,
+                    'shift_id' => $shiftId,
+                    'transaction_type' => $txType,
                     'transaction_date' => now(),
                     'cashier_id' => $user->id,
                     'total_amount' => $validated['total_amount'] ?? 0,
                     'discount_amount' => $validated['discount_amount'] ?? 0,
-                    'manual_discount' => $request->input('manualDiscount', $validated['discount_amount'] ?? 0),
-                    'promo_discount' => $request->input('promoDiscount', 0),
+                    'manual_discount' => $request->input('manualDiscount', $request->input('manual_discount', $validated['discount_amount'] ?? 0)),
+                    'promo_discount' => $request->input('promoDiscount', $request->input('promo_discount', 0)),
                     'final_amount' => $validated['final_amount'] ?? 0,
                     'payment_method' => $paymentMethod,
                     'payment_details' => $paymentDetails,
+                    'bank_id' => $bankId,
+                    'received_amount' => $receivedAmount,
+                    'change_amount' => $changeAmount,
                     'sync_status' => 'SYNCED',
                     'receipt_number' => $request->receipt_number ?? ('SMI-' . strtoupper(substr(uniqid(), -6))),
                 ]);
