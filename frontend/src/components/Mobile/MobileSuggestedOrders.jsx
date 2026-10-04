@@ -1,162 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   PackageSearch, 
   AlertCircle, 
-  TrendingDown, 
   TrendingUp, 
-  CheckCircle, 
-  PlusCircle, 
   ArrowRight,
   RefreshCw,
   Store,
   HelpCircle,
-  X,
   CheckCircle2,
   Minus,
   Plus
 } from 'lucide-react';
+import { useSuggestedOrders } from '../../hooks/useSuggestedOrders';
+import { SuggestedOrdersFaqModal } from '../modals/SuggestedOrdersFaqModal';
 
 export function MobileSuggestedOrders({ user, authToken }) {
-  const [suggestions, setSuggestions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [processing, setProcessing] = useState(false);
-  const [successMsg, setSuccessMsg] = useState(null);
-  
-  const [selectedItems, setSelectedItems] = useState(new Set());
-  const [showFaq, setShowFaq] = useState(false);
-  
-  const [branches, setBranches] = useState([]);
-  const [selectedBranchId, setSelectedBranchId] = useState('');
+  const {
+    suggestions,
+    branches,
+    selectedBranchId,
+    setSelectedBranchId,
+    loading,
+    processing,
+    error,
+    successMsg,
+    selectedItems,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    fetchSuggestions,
+    handleQtyChange,
+    handleCreateBulkPO,
+    showFaq,
+    setShowFaq
+  } = useSuggestedOrders({ user, authToken, filterOnlyReorder: true });
 
-  useEffect(() => {
-    fetchBranches();
-  }, []);
+  const isAllSelected = suggestions.length > 0 && selectedItems.size === suggestions.length;
 
-  useEffect(() => {
-    if (selectedBranchId) {
-      fetchSuggestions(selectedBranchId);
-    }
-  }, [selectedBranchId]);
-
-  const fetchBranches = async () => {
-    try {
-      const res = await fetch('/api/v1/branches', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setBranches(data);
-        if (data.length > 0) {
-          const deviceBranchId = localStorage.getItem('pos_device_branch_id');
-          const found = data.find(b => b.id === deviceBranchId);
-          setSelectedBranchId(found ? found.id : data[0].id);
-        } else {
-          const fallbackId = user?.branch_id || localStorage.getItem('pos_device_branch_id');
-          setSelectedBranchId(fallbackId);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch branches:', err);
-      setSelectedBranchId(user?.branch_id || localStorage.getItem('pos_device_branch_id'));
-    }
-  };
-
-  const fetchSuggestions = async (branchIdToFetch) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const branchId = branchIdToFetch || selectedBranchId || user?.branch_id || localStorage.getItem('pos_device_branch_id');
-      const url = branchId ? `/api/v1/suggested-orders?branch_id=${branchId}` : '/api/v1/suggested-orders';
-      
-      const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-      if (!res.ok) throw new Error('Gagal memuat rekomendasi order');
-      const data = await res.json();
-      
-      const needsReorder = (data.data || []).filter(item => item.status === 'REORDER' || item.status === 'CRITICAL');
-      needsReorder.sort((a, b) => {
-        if (a.status === 'CRITICAL' && b.status !== 'CRITICAL') return -1;
-        if (a.status !== 'CRITICAL' && b.status === 'CRITICAL') return 1;
-        return 0;
-      });
-      
-      setSuggestions(needsReorder);
-      const allIds = new Set(needsReorder.map(item => item.product_id));
-      setSelectedItems(allIds);
-      
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToggleSelect = (productId, e) => {
-    if (e) e.stopPropagation();
-    const newSelected = new Set(selectedItems);
-    if (newSelected.has(productId)) {
-      newSelected.delete(productId);
+  const toggleSelectAllMobile = () => {
+    if (isAllSelected) {
+      clearSelection();
     } else {
-      newSelected.add(productId);
-    }
-    setSelectedItems(newSelected);
-  };
-
-  const handleQtyChange = (productId, newQty) => {
-    setSuggestions(prev => prev.map(item => 
-      item.product_id === productId 
-        ? { ...item, edited_qty: newQty } 
-        : item
-    ));
-  };
-
-  const handleCreateBulkPO = async () => {
-    if (selectedItems.size === 0) return;
-    
-    setProcessing(true);
-    setError(null);
-    setSuccessMsg(null);
-    
-    const itemsToOrder = suggestions
-      .filter(item => selectedItems.has(item.product_id))
-      .map(item => ({
-        product_id: item.product_id,
-        suggested_qty: item.edited_qty !== undefined && item.edited_qty !== '' ? parseFloat(item.edited_qty) || 0 : item.suggested_qty,
-        original_qty: item.suggested_qty
-      }));
-      
-    try {
-      const branchId = selectedBranchId || user?.branch_id || localStorage.getItem('pos_device_branch_id');
-      const payload = { items: itemsToOrder };
-      if (branchId) payload.branch_id = branchId;
-
-      const res = await fetch('/api/v1/purchase-orders/create-bulk-from-suggestions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Gagal membuat Draft PO');
-      }
-      
-      const responseData = await res.json();
-      const poNumbers = responseData.po_numbers ? responseData.po_numbers.join(', ') : (responseData.po?.po_number || '');
-      setSuccessMsg(`${responseData.message} (${poNumbers})`);
-      
-      setSuggestions(prev => prev.filter(item => !selectedItems.has(item.product_id)));
-      setSelectedItems(new Set());
-      
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setProcessing(false);
+      selectAll(suggestions.map(i => i.product_id));
     }
   };
 
@@ -181,7 +66,7 @@ export function MobileSuggestedOrders({ user, authToken }) {
             <HelpCircle size={18} />
           </button>
           <button 
-            onClick={() => fetchSuggestions()} 
+            onClick={() => fetchSuggestions(selectedBranchId)} 
             style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-light)', width: 38, height: 38, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
           >
             <RefreshCw size={18} />
@@ -243,13 +128,10 @@ export function MobileSuggestedOrders({ user, authToken }) {
               Dipilih {selectedItems.size} dari {suggestions.length} produk
             </span>
             <button 
-              onClick={() => {
-                if (selectedItems.size === suggestions.length) setSelectedItems(new Set());
-                else setSelectedItems(new Set(suggestions.map(i => i.product_id)));
-              }}
+              onClick={toggleSelectAllMobile}
               style={{ background: 'none', border: 'none', color: '#10b981', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
             >
-              {selectedItems.size === suggestions.length ? 'Batal Pilih Semua' : 'Pilih Semua'}
+              {isAllSelected ? 'Batal Pilih Semua' : 'Pilih Semua'}
             </button>
           </div>
 
@@ -266,7 +148,7 @@ export function MobileSuggestedOrders({ user, authToken }) {
                   background: isSelected ? 'rgba(16, 185, 129, 0.05)' : 'var(--bg-card)',
                   cursor: 'pointer'
                 }}
-                onClick={(e) => handleToggleSelect(item.product_id, e)}
+                onClick={() => toggleSelect(item.product_id)}
               >
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
                   {/* Custom Checkbox Pill */}
@@ -279,7 +161,7 @@ export function MobileSuggestedOrders({ user, authToken }) {
                       background: isSelected ? '#10b981' : 'transparent',
                       display: 'flex', 
                       alignItems: 'center', 
-                      justify: 'center',
+                      justifyContent: 'center',
                       flexShrink: 0,
                       marginTop: '2px'
                     }}
@@ -384,7 +266,7 @@ export function MobileSuggestedOrders({ user, authToken }) {
           border: '1px solid var(--border-light)',
           borderRadius: '20px',
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           alignItems: 'center',
           boxShadow: '0 12px 32px rgba(0, 0, 0, 0.3)',
           zIndex: 1000
@@ -394,7 +276,7 @@ export function MobileSuggestedOrders({ user, authToken }) {
             <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' }}>{selectedItems.size} Produk</div>
           </div>
           <button 
-            onClick={handleCreateBulkPO}
+            onClick={() => handleCreateBulkPO({ redirectFilament: false })}
             disabled={processing}
             style={{ 
               display: 'flex', 
@@ -422,30 +304,8 @@ export function MobileSuggestedOrders({ user, authToken }) {
         </div>
       )}
 
-      {/* FAQ Guide Modal */}
-      {showFaq && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="pwa-card" style={{ width: '100%', maxWidth: '440px', padding: '1.5rem', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <HelpCircle color="#6366f1" size={20} /> Panduan Order Pintar
-              </h3>
-              <button onClick={() => setShowFaq(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={20} /></button>
-            </div>
-            <div style={{ color: 'var(--text-muted)', lineHeight: '1.5', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <p>Sistem AI menghitung rekomendasi restock berdasarkan ritme penjualan Average Daily Sales (ADS) 90 hari terakhir.</p>
-              <ul style={{ paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <li><strong>Stok Gudang:</strong> Sisa fisik barang di cabang.</li>
-                <li><strong>ADS Terjual/H:</strong> Kecepatan penjualan rata-rata per hari.</li>
-                <li><strong>Saran Order:</strong> Kuantitas pesanan optimal untuk menjaga persediaan selama 30 hari.</li>
-              </ul>
-            </div>
-            <button onClick={() => setShowFaq(false)} style={{ marginTop: '1.25rem', width: '100%', padding: '0.85rem', borderRadius: '14px', background: '#6366f1', border: 'none', color: 'white', fontWeight: 800, cursor: 'pointer' }}>
-              Tutup
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Shared FAQ Guide Modal */}
+      <SuggestedOrdersFaqModal isOpen={showFaq} onClose={() => setShowFaq(false)} />
 
     </div>
   );

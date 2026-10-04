@@ -1,169 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   ArrowLeft, 
   RefreshCw, 
   TrendingUp, 
   AlertTriangle, 
-  CheckCircle,
-  Package,
-  PlusCircle,
-  Search
+  PlusCircle, 
+  Search 
 } from 'lucide-react';
+import { useSuggestedOrders } from '../hooks/useSuggestedOrders';
+import { SuggestedOrdersFaqModal } from './modals/SuggestedOrdersFaqModal';
 
 export const SuggestedOrders = ({ user, authToken, onBack }) => {
-  const [suggestions, setSuggestions] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [supplierFilter, setSupplierFilter] = useState('');
-  const [selectedItems, setSelectedItems] = useState([]);
-  const [showFaq, setShowFaq] = useState(false);
-
-  const toggleSelect = (productId) => {
-    setSelectedItems(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId) 
-        : [...prev, productId]
-    );
-  };
+  const {
+    suggestions,
+    suppliers,
+    loading,
+    searchTerm,
+    setSearchTerm,
+    supplierFilter,
+    setSupplierFilter,
+    selectedItems,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    filteredSuggestions,
+    fetchSuggestions,
+    handleCreateSinglePO,
+    handleCreateBulkPO,
+    getStatusColor,
+    showFaq,
+    setShowFaq
+  } = useSuggestedOrders({ user, authToken, filterOnlyReorder: false });
 
   const toggleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedItems(filteredSuggestions.map(s => s.product_id));
+      selectAll(filteredSuggestions.map(s => s.product_id));
     } else {
-      setSelectedItems([]);
+      clearSelection();
     }
   };
 
-  const handleBulkCreatePO = () => {
-    const itemsToCreate = suggestions
-      .filter(s => selectedItems.includes(s.product_id) && s.suggested_qty > 0)
-      .map(s => ({
-        product_id: s.product_id,
-        suggested_qty: s.suggested_qty
-      }));
-
-    if (itemsToCreate.length === 0) {
-      alert('Pilih produk yang memiliki saran jumlah pesanan terlebih dahulu.');
-      return;
-    }
-
-    if (!confirm(`Buat satu draft Pesanan Pembelian untuk ${itemsToCreate.length} produk terpilih?`)) return;
-
-    setLoading(true);
-    fetch('/api/v1/purchase-orders/create-bulk-from-suggestions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ items: itemsToCreate })
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Gagal membuat Pesanan Pembelian Massal');
-      return res.json();
-    })
-    .then(data => {
-      alert(data.message);
-      setSelectedItems([]);
-      // Redirect to the Filament edit page for the newly created PO
-      window.location.href = `/admin/purchase-orders/${data.po.id}/edit`;
-    })
-    .catch(err => {
-      alert(err.message);
-      setLoading(false);
-    });
-  };
-
-  const fetchSuggestions = () => {
-    setLoading(true);
-    fetch('/api/v1/suggested-orders', {
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Gagal mengambil data peramalan');
-      return res.json();
-    })
-    .then(res => {
-      setSuggestions(res.data);
-      setLoading(false);
-    })
-    .catch(err => {
-      setError(err.message);
-      setLoading(false);
-    });
-  };
-
-  const handleCreatePO = (item) => {
-    if (!confirm(`Buat draft Pesanan Pembelian untuk ${item.name} sebanyak ${item.suggested_qty} unit?`)) return;
-
-    setLoading(true);
-    fetch('/api/v1/purchase-orders/create-from-suggestion', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        product_id: item.product_id,
-        suggested_qty: item.suggested_qty
-      })
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Gagal membuat Pesanan Pembelian');
-      return res.json();
-    })
-    .then(data => {
-      alert(data.message);
-      fetchSuggestions();
-    })
-    .catch(err => {
-      alert(err.message);
-      setLoading(false);
-    });
-  };
-
-  const fetchSuppliers = () => {
-    fetch('/api/v1/suppliers', {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    })
-    .then(res => res.json())
-    .then(data => setSuppliers(data))
-    .catch(err => console.error('Gagal mengambil data supplier', err));
-  };
-
-  useEffect(() => {
-    fetchSuggestions();
-    fetchSuppliers();
-  }, [authToken]);
-
-  const filteredSuggestions = suggestions.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         s.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSupplier = supplierFilter === '' || s.supplier_id === supplierFilter;
-    return matchesSearch && matchesSupplier;
-  });
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'CRITICAL': return '#ef4444';
-      case 'REORDER': return '#f59e0b';
-      case 'OK': return '#10b981';
-      default: return 'var(--text-muted)';
-    }
-  };
-
-  if (loading) return (
-    <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <div style={{ textAlign: 'center' }}>
-        <RefreshCw className="spin" size={48} color="var(--primary)" />
-        <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Menganalisis riwayat penjualan...</p>
+  if (loading) {
+    return (
+      <div className="app-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <RefreshCw className="spin" size={48} color="var(--primary)" />
+          <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Menganalisis riwayat penjualan...</p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  const selectedCount = selectedItems.size;
+  const isAllSelected = filteredSuggestions.length > 0 && selectedCount === filteredSuggestions.length;
 
   return (
     <div className="app-container">
@@ -181,16 +70,16 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
           <button onClick={() => setShowFaq(true)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
             <AlertTriangle size={16} /> Cara Membaca
           </button>
-          {selectedItems.length > 0 && (
+          {selectedCount > 0 && (
             <button 
-              onClick={handleBulkCreatePO} 
+              onClick={() => handleCreateBulkPO({ redirectFilament: true })} 
               className="btn-primary" 
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#10b981' }}
             >
-              <PlusCircle size={18} /> Buat PO Terpilih ({selectedItems.length})
+              <PlusCircle size={18} /> Buat PO Terpilih ({selectedCount})
             </button>
           )}
-          <button onClick={fetchSuggestions} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button onClick={() => fetchSuggestions()} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <RefreshCw size={16} /> Refresh
           </button>
         </div>
@@ -213,7 +102,7 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
         <div className="glass-panel" style={{ textAlign: 'center' }}>
           <div style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>ADS Tertinggi</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-            {suggestions.length > 0 ? Math.max(...suggestions.map(s => s.ads)) : 0} <span style={{fontSize:'0.9rem', fontWeight:400}}>unit/hr</span>
+            {suggestions.length > 0 ? Math.max(...suggestions.map(s => s.ads || 0)) : 0} <span style={{ fontSize: '0.9rem', fontWeight: 400 }}>unit/hr</span>
           </div>
         </div>
       </div>
@@ -257,7 +146,7 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
                   <input 
                     type="checkbox" 
                     onChange={toggleSelectAll}
-                    checked={filteredSuggestions.length > 0 && selectedItems.length === filteredSuggestions.length}
+                    checked={isAllSelected}
                   />
                 </th>
                 <th style={{ padding: '1rem' }}>Produk / SKU</th>
@@ -271,12 +160,12 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredSuggestions.map((item, i) => (
+              {filteredSuggestions.map((item) => (
                 <tr key={item.product_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
                   <td style={{ padding: '1rem' }}>
                     <input 
                       type="checkbox" 
-                      checked={selectedItems.includes(item.product_id)}
+                      checked={selectedItems.has(item.product_id)}
                       onChange={() => toggleSelect(item.product_id)}
                     />
                   </td>
@@ -316,7 +205,7 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
                   <td style={{ padding: '1rem' }}>
                     {item.suggested_qty > 0 && (
                       <button 
-                        onClick={() => handleCreatePO(item)}
+                        onClick={() => handleCreateSinglePO(item)}
                         className="btn-primary-sm" 
                         style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                       >
@@ -328,7 +217,7 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
               ))}
               {filteredSuggestions.length === 0 && (
                 <tr>
-                  <td colSpan="8" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan="9" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                     Tidak ada data saran pemesanan ditemukan.
                   </td>
                 </tr>
@@ -336,40 +225,9 @@ export const SuggestedOrders = ({ user, authToken, onBack }) => {
             </tbody>
           </table>
         </div>
-      {showFaq && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass-panel" style={{ maxWidth: '600px', width: '90%', padding: '2rem', borderRadius: '16px', position: 'relative' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem', color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <AlertTriangle color="#60a5fa" /> Panduan Membaca Saran Order AI
-            </h3>
-            <div style={{ color: 'var(--text-muted)', lineHeight: '1.6', fontSize: '0.95rem' }}>
-              <p style={{ marginBottom: '0.75rem' }}>
-                <strong>Saran Order AI (Smart Restock)</strong> memprediksi kebutuhan kulakan secara otomatis berdasarkan perputaran penjualan harian aktual di kasir, waktu pengiriman supplier, dan batas stok aman.
-              </p>
-              <h4 style={{ color: '#60a5fa', fontWeight: 600, margin: '0.75rem 0 0.25rem 0' }}>1. Penjelasan Kolom Data</h4>
-              <ul style={{ paddingLeft: '1.25rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <li><strong>Stok Saat Ini:</strong> Sisa stok fisik yang tercatat aktif di cabang saat ini.</li>
-                <li><strong>ADS (Average Daily Sales):</strong> Kecepatan rata-rata barang terjual per hari (dihitung dari total penjualan 30 hari terakhir, atau 90 hari jika stok sempat kosong).</li>
-                <li><strong>Titik Pesan (ROP):</strong> Batas minimal stok untuk mulai memesan barang kembali agar tidak kehabisan saat menunggu kiriman supplier.</li>
-                <li><strong>Target Stok (Hari):</strong> Target ketahanan persediaan di toko (default 14–30 hari).</li>
-                <li><strong>Saran Pesan:</strong> Estimasi jumlah unit yang direkomendasikan untuk dibeli hari ini.</li>
-              </ul>
-              <h4 style={{ color: '#60a5fa', fontWeight: 600, margin: '0.75rem 0 0.25rem 0' }}>2. Arti Status</h4>
-              <ul style={{ paddingLeft: '1.25rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <li><strong style={{ color: '#ef4444' }}>HABIS (CRITICAL):</strong> Stok sudah 0, minus, atau di bawah cadangan aman darurat.</li>
-                <li><strong style={{ color: '#f59e0b' }}>PERLU ORDER:</strong> Stok sudah menyentuh Titik Pesan (ROP). Segera buat PO.</li>
-                <li><strong style={{ color: '#10b981' }}>AMAN:</strong> Stok masih cukup, atau barang tidak bergerak (ADS = 0) sehingga tidak disarankan menambah stok mati.</li>
-              </ul>
-              <div style={{ background: 'rgba(59, 130, 246, 0.1)', borderLeft: '4px solid #3b82f6', padding: '0.75rem', borderRadius: '4px', color: '#93c5fd', fontSize: '0.85rem' }}>
-                <strong>💡 Tips:</strong> Anda dapat mencentang beberapa produk dan klik "Buat PO Terpilih". Sistem akan otomatis memecah draft PO sesuai Pemasok dan Sub Divisi masing-masing.
-              </div>
-            </div>
-            <button onClick={() => setShowFaq(false)} className="btn-secondary" style={{ marginTop: '1.5rem', width: '100%' }}>
-              Tutup
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
+
+      <SuggestedOrdersFaqModal isOpen={showFaq} onClose={() => setShowFaq(false)} />
     </div>
   );
 };
