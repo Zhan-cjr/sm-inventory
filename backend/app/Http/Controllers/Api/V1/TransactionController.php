@@ -46,6 +46,38 @@ class TransactionController extends Controller
 
     public function store(Request $request)
     {
+        // Normalisasi payload jika frontend mengirim camelCase (productId, unitPrice, dll)
+        $rawItems = $request->input('items', []);
+        if (is_array($rawItems)) {
+            $normalizedItems = [];
+            foreach ($rawItems as $item) {
+                $normalizedItems[] = [
+                    'product_id' => $item['product_id'] ?? $item['productId'] ?? null,
+                    'quantity' => $item['quantity'] ?? $item['qty'] ?? 1,
+                    'unit_price' => $item['unit_price'] ?? $item['unitPrice'] ?? $item['price'] ?? 0,
+                    'manual_discount' => $item['manual_discount'] ?? $item['manualDiscount'] ?? 0,
+                    'discount_per_item' => $item['discount_per_item'] ?? $item['discountPerItem'] ?? 0,
+                    'customer_no' => $item['customer_no'] ?? $item['customerNo'] ?? null,
+                    'customer_wa_phone' => $item['customer_wa_phone'] ?? $item['customerWaPhone'] ?? null,
+                    'promotionId' => $item['promotionId'] ?? $item['promotion_id'] ?? null,
+                    'originalTransactionId' => $item['originalTransactionId'] ?? $item['original_transaction_id'] ?? null,
+                ];
+            }
+            $request->merge(['items' => $normalizedItems]);
+        }
+        if ($request->has('paymentMethod') && !$request->has('payment_method')) {
+            $request->merge(['payment_method' => $request->input('paymentMethod')]);
+        }
+        if ($request->has('totalAmount') && !$request->has('total_amount')) {
+            $request->merge(['total_amount' => $request->input('totalAmount')]);
+        }
+        if ($request->has('finalAmount') && !$request->has('final_amount')) {
+            $request->merge(['final_amount' => $request->input('finalAmount')]);
+        }
+        if ($request->has('discountAmount') && !$request->has('discount_amount')) {
+            $request->merge(['discount_amount' => $request->input('discountAmount')]);
+        }
+
         $validated = $request->validate([
             'total_amount' => 'required|numeric',
             'discount_amount' => 'nullable|numeric',

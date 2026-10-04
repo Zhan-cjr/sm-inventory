@@ -17,9 +17,16 @@ export const usePosPpob = ({ authToken, branchId, terminalInfo, setAlertMsg }) =
     if (!isSilent) setIsFetchingPpobTransactions(true);
     try {
       const res = await fetch('/api/v1/transactions/ppob/today', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
+        headers: { 
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}` 
+        }
       });
       if (!res.ok) throw new Error('Gagal mengambil data PPOB hari ini');
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
       const data = await res.json();
       setPpobTransactions(data);
     } catch (err) {
@@ -115,9 +122,16 @@ export const usePosPpob = ({ authToken, branchId, terminalInfo, setAlertMsg }) =
     try {
       const res = await fetch(`/api/v1/transactions/ppob/${ppobId}/check-status`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${authToken}` }
+        headers: { 
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}` 
+        }
       });
       if (!res.ok) throw new Error('Gagal cek status PPOB');
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
       const { data } = await res.json();
 
       setPpobTransactions((prev) =>
@@ -156,6 +170,7 @@ export const usePosPpob = ({ authToken, branchId, terminalInfo, setAlertMsg }) =
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'Authorization': `Bearer ${authToken}`,
           'X-Terminal-Id': terminalInfo?.id || ''
         },
@@ -166,7 +181,8 @@ export const usePosPpob = ({ authToken, branchId, terminalInfo, setAlertMsg }) =
         })
       });
 
-      const json = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      const json = contentType.includes('application/json') ? await res.json() : {};
       if (!res.ok) {
         throw new Error(json.message || 'Gagal memproses refund');
       }

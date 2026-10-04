@@ -246,15 +246,20 @@ export const usePosPayment = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
             'Authorization': `Bearer ${authToken}`,
             'X-Terminal-Id': terminalInfo?.id || '',
           },
           body: JSON.stringify({
             items: currentItems.map(item => ({
+              product_id: item.productId,
               productId: item.productId,
               quantity: item.quantity,
+              unit_price: item.unitPrice,
               unitPrice: item.unitPrice,
+              manual_discount: item.manualDiscount || 0,
               manualDiscount: item.manualDiscount || 0,
+              discount_per_item: item.discountPerItem || 0,
               discountPerItem: item.discountPerItem || 0,
               promotionId: item.promotionId || null,
               originalTransactionId: item.originalTransactionId || null,
@@ -279,7 +284,15 @@ export const usePosPayment = ({
           })
         });
 
-        const directJson = await directRes.json();
+        let directJson = {};
+        const contentType = directRes.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          directJson = await directRes.json();
+        } else {
+          const rawText = await directRes.text();
+          throw new Error(`Server returned HTTP ${directRes.status}: ${rawText.substring(0, 100)}`);
+        }
+
         if (!directRes.ok) {
           if (directJson.error === 'PPOB_FAILED') {
             // PROVIDER GAGAL LANGSUNG (Nomor Salah / Gangguan).
@@ -300,25 +313,31 @@ export const usePosPayment = ({
         let finalItemsForReceipt = [...currentItems];
         try {
           const freshRes = await fetch(`/api/v1/transactions/receipt/${encodeURIComponent(transaction.receipt_number)}`, {
-            headers: { 'Authorization': `Bearer ${authToken}` }
+            headers: { 
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}` 
+            }
           });
           if (freshRes.ok) {
-            const freshData = await freshRes.json();
-            if (freshData.ppob_transactions) {
-              finalItemsForReceipt = finalItemsForReceipt.map(item => {
-                if (item.productType === 'digital') {
-                  const ppob = freshData.ppob_transactions.find(p => p.customer_no === item.customerNo);
-                  if (ppob) {
-                    return {
-                      ...item,
-                      sn: ppob.sn,
-                      ppobStatus: ppob.status,
-                      ppobMessage: ppob.message
-                    };
+            const freshContentType = freshRes.headers.get('content-type') || '';
+            if (freshContentType.includes('application/json')) {
+              const freshData = await freshRes.json();
+              if (freshData.ppob_transactions) {
+                finalItemsForReceipt = finalItemsForReceipt.map(item => {
+                  if (item.productType === 'digital') {
+                    const ppob = freshData.ppob_transactions.find(p => p.customer_no === item.customerNo);
+                    if (ppob) {
+                      return {
+                        ...item,
+                        sn: ppob.sn,
+                        ppobStatus: ppob.status,
+                        ppobMessage: ppob.message
+                      };
+                    }
                   }
-                }
-                return item;
-              });
+                  return item;
+                });
+              }
             }
           }
         } catch (e) {}
