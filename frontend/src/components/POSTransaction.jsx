@@ -604,23 +604,7 @@ export const POSTransaction = ({
   };
 
 
-  const getShortcutHint = (keyName, fallback) => {
-    const setting = posSettings?.find(s => s.key_name === keyName);
-    return setting && setting.is_active ? setting.shortcut_key : fallback;
-  };
 
-  const renderBtnLabel = (keyName, defaultName, defaultShortcut) => {
-    const setting = posSettings?.find(s => s.key_name === keyName);
-    const displayName = setting ? setting.display_name : defaultName;
-    const shortcut = setting ? setting.shortcut_key : defaultShortcut;
-
-    return (
-      <>
-        <span style={{ fontWeight: '600', fontSize: '0.8rem', lineHeight: '1.2', textAlign: 'center' }}>{displayName}</span>
-        {shortcut && <span style={{ fontSize: '0.65rem', opacity: 0.8, fontWeight: 'normal', lineHeight: '1' }}>({shortcut})</span>}
-      </>
-    );
-  };
 
 
   usePosShortcuts({
@@ -1020,7 +1004,7 @@ export const POSTransaction = ({
           setIsReturnMode={setIsReturnMode}
           handleClearDiscount={handleClearDiscount}
           setIsCloseShiftModalOpen={setIsCloseShiftModalOpen}
-          renderBtnLabel={renderBtnLabel}
+          posSettings={posSettings}
         />
       </div>
     </div>

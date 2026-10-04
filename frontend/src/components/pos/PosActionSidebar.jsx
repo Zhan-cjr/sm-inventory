@@ -54,8 +54,21 @@ const PosActionSidebar = ({
   setIsReturnMode,
   handleClearDiscount,
   setIsCloseShiftModalOpen,
-  renderBtnLabel
+  renderBtnLabel,
+  posSettings
 }) => {
+  const renderLabel = renderBtnLabel || ((keyName, defaultName, defaultShortcut) => {
+    const setting = posSettings?.find(s => s.key_name === keyName);
+    const displayName = setting ? setting.display_name : defaultName;
+    const shortcut = setting ? setting.shortcut_key : defaultShortcut;
+
+    return (
+      <>
+        <span style={{ fontWeight: '600', fontSize: '0.8rem', lineHeight: '1.2', textAlign: 'center' }}>{displayName}</span>
+        {shortcut && <span style={{ fontSize: '0.65rem', opacity: 0.8, fontWeight: 'normal', lineHeight: '1' }}>({shortcut})</span>}
+      </>
+    );
+  });
   return (
     <aside
       className="pos-functions-sidebar"
@@ -84,28 +97,28 @@ const PosActionSidebar = ({
           onClick={() => startPayment('CASH')}
         >
           <Banknote size={16} />
-          {renderBtnLabel('btn_tunai', 'Tunai', 'F5')}
+          {renderLabel('btn_tunai', 'Tunai', 'F5')}
         </button>
         <button
           className={`func-btn payment ${paymentMethod === 'CARD' ? 'active' : ''}`}
           onClick={() => startPayment('CARD')}
         >
           <CreditCard size={16} />
-          {renderBtnLabel('btn_card', 'Card', 'F6')}
+          {renderLabel('btn_card', 'Card', 'F6')}
         </button>
         <button
           className="func-btn payment"
           onClick={() => requestAuthorization('VOUCHER', () => setIsVoucherModalOpen(true))}
         >
           <Ticket size={16} />
-          {renderBtnLabel('btn_voucher', 'Voucher', '')}
+          {renderLabel('btn_voucher', 'Voucher', '')}
         </button>
         <button
           className="func-btn payment"
           onClick={() => requestAuthorization('MULTI_PAYMENT', () => setIsMultiPaymentModalOpen(true))}
         >
           <Layers size={16} />
-          {renderBtnLabel('btn_multi_pay', 'Multi Pay', '')}
+          {renderLabel('btn_multi_pay', 'Multi Pay', '')}
         </button>
 
         {/* Row 2: Subtotal & Diskon */}
@@ -117,28 +130,28 @@ const PosActionSidebar = ({
           }}
         >
           <Calculator size={16} />
-          {renderBtnLabel('btn_subtotal', 'Subtotal', 'F9')}
+          {renderLabel('btn_subtotal', 'Subtotal', 'F9')}
         </button>
         <button
           className="func-btn discount"
           onClick={() => requestAuthorization('DISCOUNT', () => handleManualDiscountItem('NOMINAL'))}
         >
           <Tag size={16} />
-          {renderBtnLabel('btn_disc_item_rp', 'Disc Item Rp', 'F1')}
+          {renderLabel('btn_disc_item_rp', 'Disc Item Rp', 'F1')}
         </button>
         <button
           className="func-btn discount"
           onClick={() => requestAuthorization('DISCOUNT', () => handleManualDiscountItem('PERCENT'))}
         >
           <Tag size={16} />
-          {renderBtnLabel('btn_disc_item_pct', 'Disc Item %', 'F2')}
+          {renderLabel('btn_disc_item_pct', 'Disc Item %', 'F2')}
         </button>
         <button
           className="func-btn discount"
           onClick={() => requestAuthorization('DISCOUNT', () => handleManualTotalDiscount('NOMINAL'))}
         >
           <Tag size={16} />
-          {renderBtnLabel('btn_disc_total_rp', 'Disc Total Rp', 'F3')}
+          {renderLabel('btn_disc_total_rp', 'Disc Total Rp', 'F3')}
         </button>
 
         {/* Row 3: Total Disc, Open Price, Qty, Hold */}
@@ -147,7 +160,7 @@ const PosActionSidebar = ({
           onClick={() => requestAuthorization('DISCOUNT', () => handleManualTotalDiscount('PERCENT'))}
         >
           <Tag size={16} />
-          {renderBtnLabel('btn_disc_total_pct', 'Disc Total %', 'F4')}
+          {renderLabel('btn_disc_total_pct', 'Disc Total %', 'F4')}
         </button>
         <button
           className="func-btn discount"
@@ -164,18 +177,18 @@ const PosActionSidebar = ({
           }
         >
           <Edit3 size={16} />
-          {renderBtnLabel('btn_open_price', 'Open Price', '')}
+          {renderLabel('btn_open_price', 'Open Price', '')}
         </button>
         <button className="func-btn primary" onClick={() => setIsQtyModalOpen(true)}>
           <Package size={16} />
-          {renderBtnLabel('btn_qty', 'Ubah Qty', 'F7')}
+          {renderLabel('btn_qty', 'Ubah Qty', 'F7')}
         </button>
         <button
           className="func-btn action"
           onClick={() => requestAuthorization('HOLD_RECALL', () => handleHoldTransaction())}
         >
           <Lock size={16} />
-          {renderBtnLabel('btn_hold', 'Hold', 'PgUp')}
+          {renderLabel('btn_hold', 'Hold', 'PgUp')}
         </button>
 
         {/* Row 4: Recall, Member, Kas, Retur */}
@@ -184,11 +197,11 @@ const PosActionSidebar = ({
           onClick={() => requestAuthorization('HOLD_RECALL', () => setIsRecallModalOpen(true))}
         >
           <History size={16} />
-          {renderBtnLabel('btn_recall', 'Recall', 'PgDn')}
+          {renderLabel('btn_recall', 'Recall', 'PgDn')}
         </button>
         <button className="func-btn action" onClick={() => setIsMemberModalOpen(true)}>
           <User size={16} />
-          {renderBtnLabel('btn_member', 'Member', 'Home')}
+          {renderLabel('btn_member', 'Member', 'Home')}
         </button>
         <button
           className="func-btn action"
@@ -202,14 +215,14 @@ const PosActionSidebar = ({
           }}
         >
           <Wallet size={16} />
-          {renderBtnLabel('btn_kas', 'Kas M/K', '')}
+          {renderLabel('btn_kas', 'Kas M/K', '')}
         </button>
         <button
           className="func-btn secondary"
           onClick={() => requestAuthorization('RETURN', () => setIsReturnModalOpen(true))}
         >
           <RotateCcw size={16} />
-          {renderBtnLabel('btn_retur', 'Retur', 'End')}
+          {renderLabel('btn_retur', 'Retur', 'End')}
         </button>
 
         {/* Row 5: Reprint, PPOB, Void Item */}
@@ -218,14 +231,14 @@ const PosActionSidebar = ({
           onClick={() => requestAuthorization('REPRINT_LAST', () => handleReprintLast())}
         >
           <History size={16} />
-          {renderBtnLabel('btn_reprint_last', 'Reprint 1', 'F11')}
+          {renderLabel('btn_reprint_last', 'Reprint 1', 'F11')}
         </button>
         <button
           className="func-btn action"
           onClick={() => requestAuthorization('REPRINT_OLD', () => setIsReprintOldModalOpen(true))}
         >
           <Search size={16} />
-          {renderBtnLabel('btn_reprint_old', 'Reprint L', 'F12')}
+          {renderLabel('btn_reprint_old', 'Reprint L', 'F12')}
         </button>
         <button
           className="func-btn primary"
@@ -235,7 +248,7 @@ const PosActionSidebar = ({
           }}
         >
           <Package size={16} />
-          {renderBtnLabel('btn_ppob_menu', 'Menu PPOB', 'F10')}
+          {renderLabel('btn_ppob_menu', 'Menu PPOB', 'F10')}
         </button>
         <button
           className="func-btn danger"
@@ -244,7 +257,7 @@ const PosActionSidebar = ({
           }
         >
           <Eraser size={16} />
-          {renderBtnLabel('btn_void_item', 'Void Item', 'Del')}
+          {renderLabel('btn_void_item', 'Void Item', 'Del')}
         </button>
 
         {/* Row 6: Void All, Clear, Tutup Shift */}
@@ -261,11 +274,11 @@ const PosActionSidebar = ({
           }
         >
           <Trash2 size={16} />
-          {renderBtnLabel('btn_void_all', 'Void All', 'Esc')}
+          {renderLabel('btn_void_all', 'Void All', 'Esc')}
         </button>
         <button className="func-btn danger" onClick={handleClearDiscount}>
           <X size={16} />
-          {renderBtnLabel('btn_clear', 'Clear', 'Ins')}
+          {renderLabel('btn_clear', 'Clear', 'Ins')}
         </button>
         <button
           className="func-btn secondary"
@@ -279,7 +292,7 @@ const PosActionSidebar = ({
           }}
         >
           <LogOut size={16} />
-          {renderBtnLabel('btn_close_shift', 'Tutup Shift', 'F8')}
+          {renderLabel('btn_close_shift', 'Tutup Shift', 'F8')}
         </button>
       </div>
 
