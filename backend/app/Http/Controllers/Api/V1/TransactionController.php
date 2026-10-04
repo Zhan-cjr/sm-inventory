@@ -414,7 +414,7 @@ class TransactionController extends Controller
                 }
                 $hasPending = true;
 
-                $res = $ppobServices[$ppob->provider]->topup($ppob->buyer_sku_code, $ppob->customer_no, $ppob->ref_id);
+                $res = $ppobServices[$ppob->provider]->checkStatus($ppob->buyer_sku_code, $ppob->customer_no, $ppob->ref_id);
 
                 if (isset($res['data'])) {
                     $newStatus = $res['data']['status'] ?? 'Pending';

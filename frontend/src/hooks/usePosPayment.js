@@ -242,6 +242,7 @@ export const usePosPayment = ({
       }
 
       if (hasDigitalProducts && isOnline) {
+        setAlertMsg({ text: 'Sedang memproses produk digital ke provider...', type: 'info', persist: true });
         const directRes = await fetch('/api/v1/transactions', {
           method: 'POST',
           headers: {
@@ -393,7 +394,7 @@ export const usePosPayment = ({
         };
 
         setLastTransaction(fullTransactionData);
-        setShowReceiptPreview(true);
+        setChangeModalInfo({ amount: currentChange });
         setAlertMsg({ text: 'Transaksi berhasil disimpan!', type: 'success' });
         setTimeout(() => setAlertMsg(null), 3000);
         setIsProcessing(false);

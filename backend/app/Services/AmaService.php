@@ -27,7 +27,7 @@ class AmaService implements PpobProviderInterface
                     CURLOPT_SSL_CIPHER_LIST => 'DEFAULT@SECLEVEL=0',
                     CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_0,
                 ],
-                'timeout' => 60,
+                'timeout' => 15,
             ]);
     }
 
