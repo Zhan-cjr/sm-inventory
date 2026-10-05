@@ -224,22 +224,36 @@ HTML;
                                 $due_days = $supplier->default_due_days ?? 0;
                             }
                         }
-                        
-                        $gr = \App\Models\GoodsReceipt::create([
-                            'warehouse_check_id' => $record->id,
-                            'purchase_order_id' => $po->id,
-                            'supplier_id' => $po->supplier_id,
-                            'branch_id' => $record->branch_id,
-                            'receipt_number' => 'GR-' . date('YmdHis'),
-                            'receipt_date' => now(),
-                            'due_date' => now()->addDays($due_days),
-                            'received_by' => $record->checker->name,
-                            'status' => 'DRAFT',
-                            'total_amount' => 0,
-                            'include_tax' => $po->include_tax,
-                        ]);
+
+                        // Cek apakah sudah ada Goods Receipt berstatus DRAFT untuk pengecekan ini
+                        $existingDraftGr = \App\Models\GoodsReceipt::where('warehouse_check_id', $record->id)
+                            ->where('status', 'DRAFT')
+                            ->first();
+
+                        $isNewGr = false;
+                        if ($existingDraftGr) {
+                            $gr = $existingDraftGr;
+                            // Hapus item draft lama untuk diisi ulang dengan data fisik terbaru
+                            $gr->items()->delete();
+                        } else {
+                            $isNewGr = true;
+                            $gr = \App\Models\GoodsReceipt::create([
+                                'warehouse_check_id' => $record->id,
+                                'purchase_order_id' => $po->id,
+                                'supplier_id' => $po->supplier_id,
+                                'branch_id' => $record->branch_id,
+                                'receipt_number' => 'GR-' . date('YmdHis'),
+                                'receipt_date' => now(),
+                                'due_date' => now()->addDays($due_days),
+                                'received_by' => $record->checker->name,
+                                'status' => 'DRAFT',
+                                'total_amount' => 0,
+                                'include_tax' => $po->include_tax,
+                            ]);
+                        }
 
                         $existingGrIds = \App\Models\GoodsReceipt::where('status', '!=', 'CANCELLED')
+                            ->where('id', '!=', $gr->id)
                             ->where(function ($q) use ($record) {
                                 $q->where('warehouse_check_id', $record->id);
                                 if ($record->purchase_order_id) {
@@ -249,7 +263,6 @@ HTML;
                                     });
                                 }
                             })
-                            ->where('id', '!=', $gr->id)
                             ->pluck('id');
 
                         $total = 0;
@@ -266,10 +279,10 @@ HTML;
                             $remainingQty = max(0, $checkItem->qty_scanned - $alreadyReceived);
                             $totalReceivedSoFar += ($alreadyReceived + $remainingQty);
 
-                            // If there are remaining items or it's the first GR
+                            // If there are other finalized GRs, use remainingQty; otherwise full scanned qty
                             $qtyToInsert = ($existingGrIds->count() > 0) ? $remainingQty : $checkItem->qty_scanned;
 
-                            if ($checkItem->qty_scanned > 0) {
+                            if ($qtyToInsert > 0) {
                                 $poItem = $po->items()->where('product_id', $checkItem->product_id)->first();
                                 $price = $poItem ? ($poItem->unit_cost ?? 0) : 0;
                                 $subtotal = $price * $qtyToInsert;
@@ -283,6 +296,18 @@ HTML;
                                 ]);
                                 $total += $subtotal;
                             }
+                        }
+
+                        // Jika tidak ada item tersisa dan tadi membuat GR baru, hapus GR kosong dan tandai processed
+                        if ($gr->items()->count() === 0 && $isNewGr) {
+                            $gr->delete();
+                            $record->update(['status' => 'processed']);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Sudah Diproses')
+                                ->body('Semua barang pada pengecekan ini sudah pernah dibuatkan Goods Receipt sebelumnya.')
+                                ->info()
+                                ->send();
+                            return null;
                         }
 
                         $taxAmount = 0;
@@ -303,70 +328,138 @@ HTML;
                         return redirect()->to(\App\Filament\Resources\GoodsReceipts\GoodsReceiptResource::getUrl('edit', ['record' => $gr]));
                     }),
 
-                Action::make('edit_rejected')
-                    ->label('Revisi / Edit')
+                Action::make('edit')
+                    ->label('Edit Qty')
                     ->icon('heroicon-o-pencil-square')
                     ->color('warning')
-                    ->visible(fn (WarehouseCheck $record) => $record->status === 'rejected')
-                    ->modalHeading('Revisi Pengecekan Gudang')
-                    ->modalDescription('Anda dapat mengedit Qty Fisik atau menghapus barang. Jika total qty masih melebihi PO, akan kembali meminta otorisasi.')
+                    ->visible(fn (WarehouseCheck $record) => $record->isEditable())
+                    ->modalHeading('Edit / Revisi Qty Pengecekan Gudang')
+                    ->modalDescription('Anda dapat mengedit Qty Fisik penerimaan jika terdapat salah ketik. Perhatian: Jika ada barang yang melebihi Qty Order / Sisa PO, dokumen akan otomatis membutuhkan Otorisasi ulang dari Supervisor.')
+                    ->modalWidth('4xl')
                     ->mountUsing(function ($form, WarehouseCheck $record) {
                         $record->load('items.product');
                         $form->fill([
                             'items' => $record->items->map(fn($item) => [
                                 'id' => $item->id,
                                 'product_id' => $item->product_id,
+                                'barcode' => $item->product ? ($item->product->barcode ?: '-') : '-',
                                 'product_name' => $item->product ? $item->product->name : (\Illuminate\Support\Facades\DB::table('products')->where('id', $item->product_id)->value('name') ?? 'Unknown'),
-                                'qty_po' => $item->qty_po,
-                                'qty_scanned' => $item->qty_scanned,
+                                'qty_po' => floatval($item->qty_po) == intval($item->qty_po) ? intval($item->qty_po) : floatval($item->qty_po),
+                                'qty_scanned' => floatval($item->qty_scanned) == intval($item->qty_scanned) ? intval($item->qty_scanned) : floatval($item->qty_scanned),
                             ])->toArray()
                         ]);
                     })
                     ->form([
                         \Filament\Forms\Components\Repeater::make('items')
-                            ->label('Daftar Barang')
+                            ->label('Daftar Barang Penerimaan')
                             ->schema([
                                 \Filament\Forms\Components\Hidden::make('id'),
                                 \Filament\Forms\Components\Hidden::make('product_id'),
+                                \Filament\Forms\Components\TextInput::make('barcode')
+                                    ->disabled()
+                                    ->label('Barcode')
+                                    ->columnSpan(3),
                                 \Filament\Forms\Components\TextInput::make('product_name')
                                     ->disabled()
-                                    ->label('Barang'),
+                                    ->label('Nama Barang')
+                                    ->columnSpan(5),
                                 \Filament\Forms\Components\TextInput::make('qty_po')
                                     ->disabled()
-                                    ->label('Sisa PO'),
+                                    ->label('Sisa PO')
+                                    ->columnSpan(2),
                                 \Filament\Forms\Components\TextInput::make('qty_scanned')
                                     ->numeric()
+                                    ->minValue(0)
                                     ->required()
-                                    ->label('Qty Fisik'),
+                                    ->label('Qty Fisik')
+                                    ->helperText(fn ($get) => 'Maks PO: ' . $get('qty_po'))
+                                    ->columnSpan(2),
                             ])
                             ->disableItemCreation()
-                            ->columns(3)
+                            ->columns(12)
                     ])
                     ->action(function (WarehouseCheck $record, array $data) {
                         $submittedIds = collect($data['items'])->pluck('id')->filter()->toArray();
-                        // Hapus item yang dibuang dari repeater
                         $record->items()->whereNotIn('id', $submittedIds)->delete();
                 
                         $hasOverQty = false;
                         foreach ($data['items'] as $itemData) {
                             $checkItem = $record->items()->where('id', $itemData['id'])->first();
                             if ($checkItem) {
+                                $qty = floatval($itemData['qty_scanned'] ?? 0);
                                 $checkItem->update([
-                                    'qty_scanned' => $itemData['qty_scanned']
+                                    'qty_scanned' => $qty,
                                 ]);
                                 
-                                if ($itemData['qty_scanned'] > $checkItem->qty_po) {
+                                if ($qty > floatval($checkItem->qty_po)) {
                                     $hasOverQty = true;
                                 }
                             }
                         }
+
+                        // Batalkan persetujuan pending lama jika ada
+                        $record->cancelPendingApprovals();
                 
                         if ($hasOverQty) {
-                            $record->requestApproval('Revisi: Terdapat kuantitas barang yang melebihi sisa PO.', 1);
-                            \Filament\Notifications\Notification::make()->title('Disimpan: Menunggu Otorisasi lagi karena Qty > PO')->warning()->send();
+                            $record->requestApproval('Revisi: Terdapat kuantitas penerimaan barang yang melebihi sisa PO.', 1);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Pengecekan Disimpan')
+                                ->body('Karena terdapat barang yang melebihi Qty Order / Sisa PO, dokumen wajib diotorisasi ulang oleh Supervisor.')
+                                ->warning()
+                                ->send();
                         } else {
-                            $record->update(['status' => 'approved', 'notes' => 'Direvisi oleh Gudang (Qty sesuai PO)']);
-                            \Filament\Notifications\Notification::make()->title('Disimpan: Otomatis Disetujui (Sesuai PO)')->success()->send();
+                            $record->update([
+                                'status' => 'approved',
+                                'notes' => ($record->notes ? $record->notes . ' | ' : '') . 'Koreksi Qty oleh ' . auth()->user()->name . ' (Sesuai PO)',
+                            ]);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Pengecekan Disimpan')
+                                ->body('Kuantitas berhasil diperbarui dan otomatis disetujui (Sesuai PO).')
+                                ->success()
+                                ->send();
+                        }
+                    }),
+
+                Action::make('scan_edit')
+                    ->label('Buka Scanner')
+                    ->icon('heroicon-o-qr-code')
+                    ->color('gray')
+                    ->visible(fn (WarehouseCheck $record) => $record->isEditable())
+                    ->url(fn (WarehouseCheck $record) => route('warehouse.receive.scan', ['po_id' => $record->purchase_order_id, 'check_id' => $record->id]))
+                    ->openUrlInNewTab(),
+
+                Action::make('sync_status')
+                    ->label('Sync Status')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('gray')
+                    ->visible(fn (WarehouseCheck $record) => in_array($record->status, ['approved', 'partially_processed', 'processed']))
+                    ->action(function (WarehouseCheck $record) {
+                        $oldStatus = $record->status;
+                        $record->syncStatus();
+                        $record->refresh();
+
+                        $statusLabels = [
+                            'pending' => 'Pending',
+                            'pending_approval' => 'Menunggu Otorisasi',
+                            'approved' => 'Disetujui',
+                            'partially_processed' => 'Dibuat GR Sebagian',
+                            'rejected' => 'Ditolak',
+                            'processed' => 'Sudah Dibuat GR',
+                        ];
+                        $label = $statusLabels[$record->status] ?? $record->status;
+
+                        if ($oldStatus !== $record->status) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Status Diperbarui')
+                                ->body("Status berubah dari '{$oldStatus}' menjadi: {$label}")
+                                ->success()
+                                ->send();
+                        } else {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Status Sudah Sesuai')
+                                ->body("Status dokumen sudah sesuai: {$label}")
+                                ->info()
+                                ->send();
                         }
                     }),
             ])

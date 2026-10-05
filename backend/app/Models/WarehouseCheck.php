@@ -40,6 +40,16 @@ class WarehouseCheck extends Model
         return $this->hasMany(WarehouseCheckItem::class);
     }
 
+    public function goodsReceipts(): HasMany
+    {
+        return $this->hasMany(GoodsReceipt::class, 'warehouse_check_id');
+    }
+
+    public function isEditable(): bool
+    {
+        return in_array($this->status, ['pending', 'pending_approval', 'approved', 'rejected']);
+    }
+
     public function syncStatus(): void
     {
         if (in_array($this->status, ['pending', 'pending_approval', 'rejected'])) {

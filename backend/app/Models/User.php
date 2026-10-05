@@ -59,8 +59,28 @@ class User extends Authenticatable implements FilamentUser
 
     public function hasCustomAuthorization(string $action): bool
     {
-        $auths = $this->custom_authorizations ?? [];
-        return in_array($action, $auths);
+        $auths = $this->custom_authorizations;
+        if (is_string($auths)) {
+            $auths = json_decode($auths, true) ?: [];
+        }
+        if (is_array($auths) && in_array($action, $auths)) {
+            return true;
+        }
+
+        // Cek langsung ke database jika data session belum direfresh
+        if ($this->exists && !empty($this->id)) {
+            $dbAuths = \Illuminate\Support\Facades\DB::table('users')->where('id', $this->id)->value('custom_authorizations');
+            if ($dbAuths) {
+                if (is_string($dbAuths)) {
+                    $dbAuths = json_decode($dbAuths, true) ?: [];
+                }
+                if (is_array($dbAuths) && in_array($action, $dbAuths)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public function getRoleAttribute($value): string

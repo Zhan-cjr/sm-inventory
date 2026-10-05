@@ -58,6 +58,12 @@ class GoodsReceiptPos extends Component
     public $gr_requires_po = false;
     public $taxRate = 11;
 
+    public function hasPoBypassAuthorization(): bool
+    {
+        $user = auth()->user() ?? \Filament\Facades\Filament::auth()->user();
+        return $user ? $user->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED') : false;
+    }
+
     public function mount($goodsReceipt = null)
     {
         $this->taxRate = (float) (\App\Models\Organization::first()?->tax_rate ?? 11);
@@ -348,7 +354,7 @@ class GoodsReceiptPos extends Component
         }
 
         if ($this->gr_requires_po && empty($this->purchase_order_id)) {
-            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+            if (!$this->hasPoBypassAuthorization()) {
                 $this->searchResults = [];
                 return;
             }
@@ -412,14 +418,14 @@ class GoodsReceiptPos extends Component
         }
 
         if (!empty($this->purchase_order_id)) {
-            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+            if (!$this->hasPoBypassAuthorization()) {
                 Notification::make()->title('Tidak dapat menambah barang baru saat menggunakan PO.')->warning()->send();
                 return;
             }
         }
 
         if (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)) {
-            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+            if (!$this->hasPoBypassAuthorization()) {
                 Notification::make()->title('Tidak dapat menambah barang baru pada penerimaan dari Pengecekan Gudang.')->warning()->send();
                 return;
             }
@@ -452,21 +458,21 @@ class GoodsReceiptPos extends Component
         }
 
         if ($this->gr_requires_po && empty($this->purchase_order_id)) {
-            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+            if (!$this->hasPoBypassAuthorization()) {
                 Notification::make()->title('Penerimaan barang wajib dengan PO untuk Pemasok ini.')->warning()->send();
                 return;
             }
         }
 
         if (!empty($this->purchase_order_id)) {
-            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+            if (!$this->hasPoBypassAuthorization()) {
                 Notification::make()->title('Tidak dapat menambah barang baru saat menggunakan PO.')->warning()->send();
                 return;
             }
         }
 
         if (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)) {
-            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+            if (!$this->hasPoBypassAuthorization()) {
                 Notification::make()->title('Tidak dapat menambah barang baru pada penerimaan dari Pengecekan Gudang.')->warning()->send();
                 return;
             }
@@ -563,7 +569,7 @@ class GoodsReceiptPos extends Component
     public function updateRow($index, $field, $value)
     {
         if ($field === 'qty_received' && (!empty($this->purchase_order_id) || (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)))) {
-            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+            if (!$this->hasPoBypassAuthorization()) {
                 Notification::make()->title('Qty terima disinkronkan dari Cek Gudang / PO dan tidak dapat diubah secara manual.')->warning()->send();
                 return;
             }
@@ -598,14 +604,14 @@ class GoodsReceiptPos extends Component
         }
 
         if (!empty($this->purchase_order_id)) {
-            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+            if (!$this->hasPoBypassAuthorization()) {
                 Notification::make()->title('Tidak dapat menambah barang melalui scan AI saat menggunakan PO.')->warning()->send();
                 return;
             }
         }
 
         if (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)) {
-            if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+            if (!$this->hasPoBypassAuthorization()) {
                 Notification::make()->title('Tidak dapat menambah barang melalui scan AI pada penerimaan dari Pengecekan Gudang.')->warning()->send();
                 return;
             }
@@ -782,6 +788,20 @@ class GoodsReceiptPos extends Component
         if (count($parts) === 2) {
             $index = $parts[0];
             $field = $parts[1];
+
+            if ($field === 'qty_received' && (!empty($this->purchase_order_id) || (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)))) {
+                if (!$this->hasPoBypassAuthorization()) {
+                    Notification::make()->title('Qty terima disinkronkan dari Cek Gudang / PO dan tidak dapat diubah tanpa izin otorisasi Bypass Wajib PO.')->warning()->send();
+                    if ($this->goodsReceipt) {
+                        $origItem = $this->goodsReceipt->items()->where('product_id', $this->cart[$index]['product_id'])->first();
+                        $this->cart[$index]['qty_received'] = $origItem ? $origItem->quantity_received : ($this->cart[$index]['qty_ordered'] ?? 0);
+                    } else {
+                        $this->cart[$index]['qty_received'] = $this->cart[$index]['qty_ordered'] ?? 0;
+                    }
+                    $this->recalculateRow($index);
+                    return;
+                }
+            }
             
             if ($field === 'subtotal') {
                 $qty = (float) ($this->cart[$index]['qty_received'] ?? 0);

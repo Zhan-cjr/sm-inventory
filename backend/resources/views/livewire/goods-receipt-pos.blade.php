@@ -454,21 +454,25 @@
                     $isSearchDisabled = true;
                     $searchDisabledReason = 'Pilih Pemasok terlebih dahulu.';
                 } else {
+                    $currentUser = auth()->user() ?? \Filament\Facades\Filament::auth()->user();
+                    $canBypassPo = $currentUser ? $currentUser->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED') : false;
                     if ($gr_requires_po && empty($purchase_order_id)) {
-                        if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                        if (!$canBypassPo) {
                             $isSearchDisabled = true;
                             $searchDisabledReason = 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';
                         }
                     }
                 }
                 
+                $currentUser = auth()->user() ?? \Filament\Facades\Filament::auth()->user();
+                $canBypassPo = $currentUser ? $currentUser->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED') : false;
                 if (!empty($purchase_order_id)) {
-                    if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                    if (!$canBypassPo) {
                         $isSearchDisabled = true;
                         $searchDisabledReason = 'Item dikunci sesuai PO yang dipilih.';
                     }
                 } elseif (!empty($goodsReceipt) && !empty($goodsReceipt->warehouse_check_id)) {
-                    if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
+                    if (!$canBypassPo) {
                         $isSearchDisabled = true;
                         $searchDisabledReason = 'Item dikunci dari Pengecekan Gudang.';
                     }
@@ -620,12 +624,19 @@
                         @endif
                         @if(in_array('qty_ordered', $visibleColumns)) <td class="pos-grid-td dark:text-gray-400" style="text-align: right; color: #6b7280;">{{ $item['qty_ordered'] > 0 ? number_format($item['qty_ordered'], 0) : '-' }}</td> @endif
                         @if(in_array('qty_received', $visibleColumns))
+                        @php
+                            $currentUser = auth()->user() ?? \Filament\Facades\Filament::auth()->user();
+                            $isPoBound = (!empty($purchase_order_id) || (!empty($goodsReceipt) && !empty($goodsReceipt->warehouse_check_id)));
+                            $canBypassPo = $currentUser ? $currentUser->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED') : false;
+                            $isQtyDisabled = $isPoBound && !$canBypassPo;
+                        @endphp
                         <td class="pos-grid-td" style="padding: 0.25rem; {{ ($item['qty_ordered'] > 0 && $item['qty_received'] != $item['qty_ordered']) ? 'background-color: #fee2e2; border-left: 3px solid #ef4444;' : '' }}">
-                            <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right; font-weight: 700; color: {{ ($item['qty_ordered'] > 0 && $item['qty_received'] != $item['qty_ordered']) ? '#ef4444' : '#2563eb' }};" 
+                            <input onfocus="this.select()" type="number" step="any" id="qty-{{ $index }}" class="pos-input pos-grid-input {{ $isQtyDisabled ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed opacity-80' : '' }}" style="text-align: right; font-weight: 700; color: {{ ($item['qty_ordered'] > 0 && $item['qty_received'] != $item['qty_ordered']) ? '#ef4444' : '#2563eb' }};" 
                                    wire:model.lazy="cart.{{ $index }}.qty_received"
                                    wire:change="recalculateRow({{ $index }})"
                                    x-on:keydown.space.prevent="openCalc($event)"
-                                   {{ (!empty($purchase_order_id) || (!empty($goodsReceipt) && !empty($goodsReceipt->warehouse_check_id))) ? 'disabled' : '' }}>
+                                   title="{{ $isPoBound ? ($canBypassPo ? 'Otorisasi Bypass PO Aktif: Anda dapat mengubah Qty Terima' : 'Qty dikunci dari Cek Gudang / PO. Memerlukan izin Bypass Wajib PO.') : '' }}"
+                                   {{ $isQtyDisabled ? 'disabled' : '' }}>
                         </td>
                         @endif
                         @if(in_array('unit_price', $visibleColumns))

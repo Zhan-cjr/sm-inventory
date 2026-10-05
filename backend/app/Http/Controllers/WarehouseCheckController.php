@@ -34,7 +34,19 @@ class WarehouseCheckController extends Controller
         $supplierIds = $purchaseOrders->pluck('supplier_id')->unique();
         $suppliers = \App\Models\Supplier::whereIn('id', $supplierIds)->get();
 
-        return view('warehouse.receive.index', compact('suppliers', 'purchaseOrders', 'branches'));
+        // Recent warehouse checks
+        $recentChecksQuery = WarehouseCheck::with(['purchaseOrder.supplier', 'checker', 'items'])
+            ->orderBy('created_at', 'desc');
+
+        if ($user && $user->branch_id) {
+            $recentChecksQuery->where('branch_id', $user->branch_id);
+        } elseif ($request->has('branch_id') && $request->branch_id) {
+            $recentChecksQuery->where('branch_id', $request->branch_id);
+        }
+
+        $recentChecks = $recentChecksQuery->take(10)->get();
+
+        return view('warehouse.receive.index', compact('suppliers', 'purchaseOrders', 'branches', 'recentChecks'));
     }
 
     public function search(Request $request)
@@ -57,28 +69,54 @@ class WarehouseCheckController extends Controller
             return back()->with('error', 'Purchase Order tidak ditemukan, belum di-approve, atau bukan milik cabang Anda.');
         }
 
-        if ($po->remainingQuantity() <= 0) {
+        $editableCheck = WarehouseCheck::where('purchase_order_id', $po->id)
+            ->whereIn('status', ['pending', 'pending_approval', 'approved', 'rejected'])
+            ->latest()
+            ->first();
+
+        if ($po->remainingQuantity() <= 0 && !$editableCheck) {
             return back()->with('error', 'Semua barang di PO ini sudah diproses pengecekan gudang.');
         }
 
-        return redirect()->route('warehouse.receive.scan', ['po_id' => $po->id]);
+        $params = ['po_id' => $po->id];
+        if ($editableCheck && $po->remainingQuantity() <= 0) {
+            $params['check_id'] = $editableCheck->id;
+        }
+
+        return redirect()->route('warehouse.receive.scan', $params);
     }
 
-    public function scan($po_id)
+    public function scan(Request $request, $po_id)
     {
         $po = PurchaseOrder::with(['items.product'])->findOrFail($po_id);
         
-        $rejectedCheck = WarehouseCheck::with('items')->where('purchase_order_id', $po->id)->where('status', 'rejected')->first();
+        $checkId = $request->query('check_id');
+        $targetCheck = null;
+        if ($checkId) {
+            $targetCheck = WarehouseCheck::with('items')->where('id', $checkId)->where('purchase_order_id', $po->id)->first();
+        }
+        if (!$targetCheck) {
+            $targetCheck = WarehouseCheck::with('items')->where('purchase_order_id', $po->id)
+                ->whereIn('status', ['rejected', 'pending_approval', 'pending', 'approved'])
+                ->latest()
+                ->first();
+        }
+
         $previousScans = [];
-        if ($rejectedCheck) {
-            foreach ($rejectedCheck->items as $item) {
+        if ($targetCheck) {
+            foreach ($targetCheck->items as $item) {
                 $previousScans[$item->product_id] = floatval($item->qty_scanned);
             }
         }
 
-        $previousChecks = WarehouseCheck::with('items')->where('purchase_order_id', $po->id)
-            ->whereIn('status', ['pending', 'pending_approval', 'approved', 'processed'])
-            ->get();
+        $previousChecksQuery = WarehouseCheck::with('items')->where('purchase_order_id', $po->id)
+            ->whereIn('status', ['pending', 'pending_approval', 'approved', 'processed']);
+            
+        if ($targetCheck) {
+            $previousChecksQuery->where('id', '!=', $targetCheck->id);
+        }
+
+        $previousChecks = $previousChecksQuery->get();
             
         $alreadyScanned = [];
         foreach ($previousChecks as $c) {
@@ -111,7 +149,7 @@ class WarehouseCheckController extends Controller
             ];
         });
 
-        return view('warehouse.receive.scan', compact('po', 'items', 'rejectedCheck'));
+        return view('warehouse.receive.scan', compact('po', 'items', 'targetCheck'));
     }
 
     public function submit(Request $request, $po_id)
@@ -124,10 +162,21 @@ class WarehouseCheckController extends Controller
             return back()->with('error', 'Tidak ada barang yang di-scan.');
         }
 
-        $check = WarehouseCheck::where('purchase_order_id', $po->id)->where('status', 'rejected')->first();
+        $checkId = $request->check_id;
+        $check = null;
+        if ($checkId) {
+            $check = WarehouseCheck::where('id', $checkId)->where('purchase_order_id', $po->id)->first();
+        }
+        if (!$check) {
+            $check = WarehouseCheck::where('purchase_order_id', $po->id)
+                ->whereIn('status', ['rejected', 'pending_approval', 'pending', 'approved'])
+                ->latest()
+                ->first();
+        }
         
-        if ($check) {
+        if ($check && $check->isEditable()) {
             // Update existing check
+            $check->cancelPendingApprovals();
             $check->update([
                 'checked_by' => Auth::id(),
                 'status' => 'pending',
@@ -148,6 +197,7 @@ class WarehouseCheckController extends Controller
         $hasOverQty = false;
 
         $previousChecks = WarehouseCheck::with('items')->where('purchase_order_id', $po->id)
+            ->where('id', '!=', $check->id)
             ->whereIn('status', ['pending', 'pending_approval', 'approved', 'processed'])
             ->get();
             
@@ -177,7 +227,7 @@ class WarehouseCheckController extends Controller
         }
 
         if ($hasOverQty) {
-            $check->requestApproval('Terdapat kuantitas barang yang melebihi sisa PO.', 1);
+            $check->requestApproval('Revisi: Terdapat kuantitas barang yang melebihi sisa PO.', 1);
             return redirect()->route('warehouse.receive.index')->with('warning', 'Pengecekan berhasil disimpan, namun karena ada barang yang melebihi Sisa PO, membutuhkan Otorisasi Supervisor.');
         } else {
             $check->update(['status' => 'approved']);

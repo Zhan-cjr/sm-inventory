@@ -301,6 +301,34 @@
         </div>
     </div>
 
+    @if(isset($targetCheck) && $targetCheck)
+        @php
+            $badgeBg = 'rgba(245, 158, 11, 0.15)';
+            $badgeBorder = 'rgba(245, 158, 11, 0.3)';
+            $badgeColor = '#f59e0b';
+            $statusMsg = 'Edit Pengecekan: Anda sedang mengubah kuantitas penerimaan barang. Jika melebihi PO, wajib otorisasi lagi.';
+            if ($targetCheck->status === 'rejected') {
+                $badgeBg = 'rgba(239, 68, 68, 0.15)';
+                $badgeBorder = 'rgba(239, 68, 68, 0.3)';
+                $badgeColor = '#ef4444';
+                $statusMsg = 'Revisi Pengecekan: Perbaiki kuantitas barang yang sebelumnya ditolak oleh supervisor.';
+            } elseif ($targetCheck->status === 'pending_approval') {
+                $statusMsg = 'Edit Pengecekan: Dokumen ini sedang menunggu otorisasi. Anda dapat mengoreksi jika ada salah ketik.';
+            } elseif ($targetCheck->status === 'approved') {
+                $badgeBg = 'rgba(16, 185, 129, 0.15)';
+                $badgeBorder = 'rgba(16, 185, 129, 0.3)';
+                $badgeColor = '#10b981';
+                $statusMsg = 'Edit Pengecekan: Mengoreksi hasil pengecekan yang sudah disetujui (Belum dibuat Goods Receipt).';
+            }
+        @endphp
+        <div style="background-color: {{ $badgeBg }}; border: 1px solid {{ $badgeBorder }}; border-radius: 16px; padding: 12px 16px; margin-bottom: 16px; color: {{ $badgeColor }}; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>{{ $statusMsg }}</span>
+        </div>
+    @endif
+
     <!-- Mode Switcher -->
     <div class="segmented-switch">
         <button id="btn-camera" class="btn-mode active" onclick="setMode('camera')">
@@ -333,12 +361,13 @@
     <div class="wh-card">
         <form id="submit-form" action="{{ route('warehouse.receive.submit', $po->id) }}" method="POST">
             @csrf
+            <input type="hidden" name="check_id" value="{{ $targetCheck->id ?? '' }}">
             <input type="hidden" name="scanned_items" id="scanned_items_input">
             <div style="margin-bottom: 16px;">
                 <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">CATATAN PENGECEKAN (OPSIONAL)</label>
-                <textarea name="notes" oninput="saveLocalDraft()" placeholder="Tuliskan catatan kondisi fisik barang jika ada..." style="width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color); font-family: inherit; resize: none; box-sizing: border-box;" rows="2"></textarea>
+                <textarea name="notes" oninput="saveLocalDraft()" placeholder="Tuliskan catatan kondisi fisik barang jika ada..." style="width: 100%; padding: 12px; border-radius: 14px; border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-color); font-family: inherit; resize: none; box-sizing: border-box;" rows="2">{{ $targetCheck->notes ?? '' }}</textarea>
             </div>
-            <button type="button" class="btn-submit-all" onclick="submitCheck()">SIMPAN RESULT PENGECEKAN</button>
+            <button type="button" class="btn-submit-all" onclick="submitCheck()">{{ isset($targetCheck) && $targetCheck ? 'SIMPAN PERUBAHAN PENGECEKAN' : 'SIMPAN RESULT PENGECEKAN' }}</button>
         </form>
     </div>
 </div>
@@ -347,8 +376,8 @@
     const itemsData = @json($items);
     const scannedState = {};
     const isItemVisible = {};
-    const rejectedCheck = @json($rejectedCheck ?? null);
-    const DRAFT_KEY = 'wh_scan_draft_po_{{ $po->id }}';
+    const targetCheck = @json($targetCheck ?? null);
+    const DRAFT_KEY = 'wh_scan_draft_po_{{ $po->id }}_check_{{ $targetCheck->id ?? "new" }}';
 
     itemsData.forEach(item => {
         scannedState[item.product_id] = item.qty_scanned || 0;

@@ -247,6 +247,59 @@
             </button>
         </form>
     </div>
+
+    @if(isset($recentChecks) && $recentChecks->count() > 0)
+    <div class="wh-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="font-weight: 800; font-size: 1.1rem; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#10b981">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Pengecekan Terbaru</span>
+            </div>
+            <a href="{{ url('/admin/warehouse-checks') }}" style="font-size: 0.8rem; font-weight: 700; color: #10b981; text-decoration: none;">Lihat Semua &rarr;</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            @foreach($recentChecks as $rc)
+                <div style="background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 16px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-color);">{{ $rc->purchaseOrder->po_number ?? '-' }}</span>
+                            @php
+                                $statusBadge = match($rc->status) {
+                                    'pending' => ['bg' => 'rgba(245, 158, 11, 0.15)', 'color' => '#f59e0b', 'label' => 'Pending'],
+                                    'pending_approval' => ['bg' => 'rgba(245, 158, 11, 0.15)', 'color' => '#f59e0b', 'label' => 'Menunggu Otorisasi'],
+                                    'approved' => ['bg' => 'rgba(16, 185, 129, 0.15)', 'color' => '#10b981', 'label' => 'Disetujui'],
+                                    'partially_processed' => ['bg' => 'rgba(59, 130, 246, 0.15)', 'color' => '#3b82f6', 'label' => 'GR Sebagian'],
+                                    'processed' => ['bg' => 'rgba(99, 102, 241, 0.15)', 'color' => '#6366f1', 'label' => 'Sudah Dibuat GR'],
+                                    'rejected' => ['bg' => 'rgba(239, 68, 68, 0.15)', 'color' => '#ef4444', 'label' => 'Ditolak'],
+                                    default => ['bg' => 'rgba(156, 163, 175, 0.15)', 'color' => '#9ca3af', 'label' => $rc->status]
+                                };
+                            @endphp
+                            <span style="background: {{ $statusBadge['bg'] }}; color: {{ $statusBadge['color'] }}; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 99px;">
+                                {{ $statusBadge['label'] }}
+                            </span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
+                            {{ $rc->purchaseOrder->supplier->name ?? 'Supplier Umum' }} &bull; {{ $rc->created_at->format('d/m H:i') }} &bull; Oleh: {{ $rc->checker->name ?? '-' }}
+                        </div>
+                    </div>
+                    <div>
+                        @if($rc->isEditable())
+                            <a href="{{ route('warehouse.receive.scan', ['po_id' => $rc->purchase_order_id, 'check_id' => $rc->id]) }}" 
+                               style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #f59e0b; border-radius: 12px; font-size: 0.82rem; font-weight: 800; text-decoration: none; transition: all 0.2s;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                <span>Edit Qty</span>
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
 </div>
 
 <script>
