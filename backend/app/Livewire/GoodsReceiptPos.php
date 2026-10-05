@@ -371,6 +371,7 @@ class GoodsReceiptPos extends Component
         if (strlen($value) >= 2) {
             // 1. Prioritaskan exact match barcode/SKU di database yang terdaftar di cabang ini
             $exactMatches = Product::query()
+                ->select(['id', 'sku', 'barcode', 'name', 'cost_price', 'is_taxable'])
                 ->where('is_active', true)
                 ->whereHas('stocks', fn($sq) => $sq->where('branch_id', $this->branch_id))
                 ->where(function ($q) use ($value) {
@@ -389,6 +390,7 @@ class GoodsReceiptPos extends Component
             // 2. Jika bukan exact match, cari berdasarkan potongan barcode (awal/tengah/akhir), SKU, nama, atau metadata
             $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $value);
             $this->searchResults = Product::query()
+                ->select(['id', 'sku', 'barcode', 'name', 'cost_price', 'is_taxable'])
                 ->where('is_active', true)
                 ->whereHas('stocks', fn($sq) => $sq->where('branch_id', $this->branch_id))
                 ->where(function ($q) use ($escaped) {
@@ -683,28 +685,6 @@ class GoodsReceiptPos extends Component
                                     $this->recalculateRow(count($this->cart) - 1);
                                 }
                             }
-                        } else {
-                            $this->cart[] = [
-                                'product_id' => null,
-                                'raw_name' => $item['raw_name'],
-                                'sku' => '-',
-                                'barcode' => '-',
-                                'name' => '⚠️ ' . $item['raw_name'] . ' (Pilih Produk)',
-                                'qty_ordered' => 0,
-                                'qty_received' => $item['qty'],
-                                'unit_price' => $item['unit_price'],
-                                'harga_jual_1' => 0,
-                                'margin_gol_1' => 0,
-                                'harga_jual_2' => 0,
-                                'margin_gol_2' => 0,
-                                'harga_jual_3' => 0,
-                                'margin_gol_3' => 0,
-                                'discount_1' => $item['discount_1'] ?? 0,
-                                'discount_2' => $item['discount_2'] ?? 0,
-                                'discount_3' => $item['discount_3'] ?? 0,
-                                'subtotal' => $item['subtotal'] ?? 0,
-                                'needs_mapping' => true
-                            ];
                         }
                     }
                     $this->calculateTotals();
@@ -722,51 +702,6 @@ class GoodsReceiptPos extends Component
 
         $this->scan_loading = false;
         $this->scan_image = null; // reset
-    }
-
-    public function mapProduct($index, $productId)
-    {
-        $product = Product::find($productId);
-        if (!$product) return;
-        
-        $item = $this->cart[$index];
-        $rawName = $item['raw_name'] ?? null;
-        
-        if ($rawName && $this->supplier_id) {
-            \Illuminate\Support\Facades\DB::table('supplier_item_mappings')->insertOrIgnore([
-                'id' => \Illuminate\Support\Str::uuid(),
-                'supplier_id' => $this->supplier_id,
-                'raw_name' => $rawName,
-                'product_id' => $productId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        // Replace the unmapped item with the real product
-        $stock = null;
-        if ($this->branch_id) {
-            $stock = Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->first();
-        }
-
-        $this->cart[$index]['product_id'] = $product->id;
-        $this->cart[$index]['sku'] = $product->sku;
-        $this->cart[$index]['barcode'] = $product->barcode;
-        $this->cart[$index]['name'] = $product->name;
-        $this->cart[$index]['is_taxable'] = (bool) ($product->is_taxable ?? true);
-        $this->cart[$index]['needs_mapping'] = false;
-        
-        $this->cart[$index]['harga_jual_1'] = ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($product->harga_jual_1 ?? 0);
-        $this->cart[$index]['margin_gol_1'] = ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($product->margin_gol_1 ?? 0);
-        $this->cart[$index]['harga_jual_2'] = ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($product->harga_jual_2 ?? 0);
-        $this->cart[$index]['margin_gol_2'] = ($stock && $stock->margin_gol_2 > 0) ? $stock->margin_gol_2 : ($product->margin_gol_2 ?? 0);
-        $this->cart[$index]['harga_jual_3'] = ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($product->harga_jual_3 ?? 0);
-        $this->cart[$index]['margin_gol_3'] = ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($product->margin_gol_3 ?? 0);
-        
-        $this->recalculateRow($index);
-        $this->calculateTotals();
-        
-        Notification::make()->title('Produk berhasil dipetakan!')->success()->send();
     }
 
     public function removeExistingImage($index)

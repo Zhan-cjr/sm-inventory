@@ -109,12 +109,6 @@
      }"
      @item-added.window="focusRowQty($event.detail.index)">
 
-    <script>
-        if (!window.posAllProducts) {
-            window.posAllProducts = {!! json_encode(\App\Models\Product::select('id', 'name', 'sku', 'barcode')->orderBy('name')->get()) !!};
-        }
-    </script>
-
     <!-- Mini Calculator Popup -->
     <div x-show="calcOpen" @click.away="closeCalc()" 
          style="display: none; position: fixed; z-index: 9999; width: 232px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border-radius: 8px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #4a4a4a; border: 1px solid #333;" 
@@ -481,7 +475,7 @@
             <input onfocus="this.select()" type="text" id="search-input" class="pos-input" style="font-size: 1rem; padding: 0.5rem 1rem; {{ $isSearchDisabled ? 'background-color: #f3f4f6; cursor: not-allowed;' : '' }}"
                    placeholder="{{ $isSearchDisabled ? $searchDisabledReason : 'Scan barcode atau ketik nama produk... tekan Enter' }}"
                    {{ $isSearchDisabled ? 'disabled' : '' }}
-                   wire:model.live.debounce.150ms="searchQuery"
+                   wire:model.live.debounce.300ms="searchQuery"
                    @input="highlightedIndex = -1; $nextTick(() => updateHighlight())"
                    @keydown.arrow-down.prevent="moveDown()"
                    @keydown.arrow-up.prevent="moveUp()"
@@ -562,74 +556,19 @@
                         @if(in_array('barcode', $visibleColumns)) <td class="pos-grid-td">{{ $item['barcode'] }}</td> @endif
                         @if(in_array('name', $visibleColumns)) 
                             <td class="pos-grid-td" style="font-weight: 500;">
-                                @if(isset($item['needs_mapping']) && $item['needs_mapping'])
-                                    <div class="flex flex-col gap-1">
-                                        <div class="text-red-600 dark:text-red-400 font-semibold text-xs whitespace-normal line-height-1.2">
-                                            {{ $item['name'] }}
-                                        </div>
-                                        <div class="flex gap-1" x-data="{ 
-                                            open: false, 
-                                            search: '', 
-                                            selectedId: '',
-                                            selectedName: '-- Ketik untuk cari produk --',
-                                            get filteredProducts() {
-                                                if (this.search === '') return [];
-                                                let q = this.search.toLowerCase();
-                                                return window.posAllProducts.filter(p => 
-                                                    p.name.toLowerCase().includes(q) || 
-                                                    (p.sku && p.sku.toLowerCase().includes(q)) ||
-                                                    (p.barcode && p.barcode.toLowerCase().includes(q))
-                                                ).slice(0, 50);
-                                            },
-                                            selectProduct(id, name) {
-                                                this.selectedId = id;
-                                                this.selectedName = name;
-                                                this.open = false;
-                                                this.search = '';
-                                            }
-                                        }" style="position: relative; flex: 1;">
-                                            <div @click="open = !open" class="pos-input text-xs flex-between cursor-pointer bg-white dark:bg-gray-800" style="padding: 0.35rem 0.5rem; min-height: 28px; display: flex; justify-content: space-between; align-items: center;">
-                                                <span x-text="selectedName" class="truncate dark:text-gray-200"></span>
-                                                <svg style="width: 12px; height: 12px; color: #9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                                            </div>
-                                            
-                                            <div x-show="open" @click.away="open = false" style="position: absolute; left: 0; top: 100%; z-index: 50; width: 350px; margin-top: 2px; max-height: 200px;" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700 shadow-lg rounded">
-                                                <div style="padding: 0.25rem; border-bottom: 1px solid #e5e7eb;" class="dark:border-gray-700 bg-white dark:bg-gray-800 sticky top-0">
-                                                    <input type="text" x-model="search" class="pos-input text-xs dark:bg-gray-900" style="width: 100%;" placeholder="Ketik nama, SKU, atau barcode..." @keydown.escape="open = false" autofocus>
-                                                </div>
-                                                <div style="max-height: 160px; overflow-y: auto;" class="bg-white dark:bg-gray-800">
-                                                    <template x-for="p in filteredProducts" :key="p.id">
-                                                        <div @click="selectProduct(p.id, p.name)" class="text-xs hover:bg-blue-50 dark:hover:bg-gray-700 cursor-pointer" style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #f3f4f6;">
-                                                            <div x-text="p.name" style="font-weight: 500;" class="text-gray-900 dark:text-gray-200"></div>
-                                                            <div style="font-size: 0.65rem;" class="text-gray-500 dark:text-gray-400">
-                                                                <span x-show="p.sku" x-text="'SKU: ' + p.sku"></span>
-                                                                <span x-show="p.sku && p.barcode"> | </span>
-                                                                <span x-show="p.barcode" x-text="'Bar: ' + p.barcode"></span>
-                                                            </div>
-                                                        </div>
-                                                    </template>
-                                                    <div x-show="search !== '' && filteredProducts.length === 0" style="padding: 0.5rem; text-align: center; font-size: 0.7rem;" class="text-gray-400">Tidak ditemukan</div>
-                                                    <div x-show="search === ''" style="padding: 0.5rem; text-align: center; font-size: 0.7rem;" class="text-gray-400">Ketik untuk mencari (maks 50 tampil)</div>
-                                                </div>
-                                            </div>
-                                            <button type="button" @click="if(selectedId) $wire.mapProduct({{ $index }}, selectedId)" class="bg-blue-600 text-white px-2 py-1 rounded text-xs ml-1 whitespace-nowrap" :disabled="!selectedId" :class="!selectedId ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'">Simpan</button>
-                                        </div>
-                                    </div>
-                                @else
-                                     <div style="white-space: normal; word-break: break-word; line-height: 1.35; min-width: 220px; font-weight: 600;" class="text-gray-900 dark:text-gray-100">
-                                         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                             <span>{{ $item['name'] }}</span>
-                                             @php
-                                                 $isTaxable = $item['is_taxable'] ?? (!empty($item['product_id']) ? (\App\Models\Product::find($item['product_id'])?->is_taxable ?? true) : true);
-                                             @endphp
-                                             @if($isTaxable)
-                                                 <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; letter-spacing: 0.02em;" title="Produk Kena PPN (11%)">PPN</span>
-                                             @else
-                                                 <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; letter-spacing: 0.02em;" title="Produk Non-PPN (Bebas Pajak)">NonPPN</span>
-                                             @endif
-                                         </div>
+                                 <div style="white-space: normal; word-break: break-word; line-height: 1.35; min-width: 220px; font-weight: 600;" class="text-gray-900 dark:text-gray-100">
+                                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                         <span>{{ $item['name'] }}</span>
+                                         @php
+                                             $isTaxable = $item['is_taxable'] ?? (!empty($item['product_id']) ? (\App\Models\Product::find($item['product_id'])?->is_taxable ?? true) : true);
+                                         @endphp
+                                         @if($isTaxable)
+                                             <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; letter-spacing: 0.02em;" title="Produk Kena PPN (11%)">PPN</span>
+                                         @else
+                                             <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; letter-spacing: 0.02em;" title="Produk Non-PPN (Bebas Pajak)">NonPPN</span>
+                                         @endif
                                      </div>
-                                @endif
+                                 </div>
                             </td> 
                         @endif
                         @if(in_array('qty_ordered', $visibleColumns)) <td class="pos-grid-td dark:text-gray-400" style="text-align: right; color: #6b7280;">{{ $item['qty_ordered'] > 0 ? number_format($item['qty_ordered'], 0) : '-' }}</td> @endif
