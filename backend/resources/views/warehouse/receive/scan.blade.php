@@ -347,7 +347,7 @@
     <!-- USB Scanner Section -->
     <div id="usb-section" style="display: none;" class="wh-card">
         <form onsubmit="event.preventDefault(); submitBarcode();" style="margin:0;">
-            <input type="text" inputmode="numeric" pattern="[0-9]*" id="manual-barcode" class="input-barcode" placeholder="Arahkan kursor kesini lalu scan barcode..." autocomplete="off">
+            <input type="text" id="manual-barcode" class="input-barcode" placeholder="Arahkan kursor kesini lalu scan barcode..." autocomplete="off">
         </form>
         <div id="error-msg"></div>
     </div>
@@ -377,6 +377,7 @@
     const scannedState = {};
     const isItemVisible = {};
     const targetCheck = @json($targetCheck ?? null);
+    const rejectedCheck = (targetCheck && targetCheck.status === 'rejected') ? targetCheck : null;
     const DRAFT_KEY = 'wh_scan_draft_po_{{ $po->id }}_check_{{ $targetCheck->id ?? "new" }}';
 
     itemsData.forEach(item => {
@@ -630,27 +631,28 @@
     }
 
     function handleScan(barcodeStr) {
-        document.getElementById('error-msg').innerText = '';
-        const barcode = barcodeStr.trim().toLowerCase();
+        const errEl = document.getElementById('error-msg');
+        if (errEl) errEl.innerText = '';
+        const barcode = (barcodeStr || '').toString().trim().toLowerCase();
         if (!barcode) return;
 
         const item = itemsData.find(i => {
-            const bc = (i.barcode || '').toLowerCase();
-            const sku = (i.sku || '').toLowerCase();
+            const bc = String(i.barcode || '').trim().toLowerCase();
+            const sku = String(i.sku || '').trim().toLowerCase();
             let addBc = [];
             if (Array.isArray(i.additional_barcodes)) {
                 addBc = i.additional_barcodes.map(b => String(b).trim().toLowerCase());
             } else if (typeof i.additional_barcodes === 'string') {
                 addBc = i.additional_barcodes.split(',').map(b => b.trim().toLowerCase());
             }
-            return bc === barcode || sku === barcode || addBc.includes(barcode);
+            return (bc && bc === barcode) || (sku && sku === barcode) || addBc.includes(barcode);
         });
         if (item) {
             if (rejectedCheck && item.qty_scanned === item.qty_po && item.qty_po > 0) {
-                document.getElementById('error-msg').innerText = 'Barang ini sudah sesuai pada pengecekan sebelumnya!';
+                if (errEl) errEl.innerText = 'Barang ini sudah sesuai pada pengecekan sebelumnya!';
                 beepErr.play().catch(e => {});
                 setTimeout(() => {
-                    document.getElementById('error-msg').innerText = '';
+                    if (errEl) errEl.innerText = '';
                 }, 3000);
                 return;
             }
@@ -658,7 +660,7 @@
             isItemVisible[item.product_id] = true;
             
             const li = document.getElementById('item-' + item.product_id);
-            if (li) {
+            if (li && li.parentNode) {
                 li.parentNode.prepend(li);
             }
 
@@ -679,27 +681,32 @@
                 }
             }, 50);
         } else {
-            document.getElementById('error-msg').innerText = 'Barcode tidak ditemukan di PO ini!';
+            if (errEl) errEl.innerText = 'Barcode tidak ditemukan di PO ini!';
             beepErr.play().catch(e => {});
             setTimeout(() => {
-                document.getElementById('error-msg').innerText = '';
+                if (errEl) errEl.innerText = '';
             }, 3000);
         }
     }
 
     function submitBarcode() {
         const manualInput = document.getElementById('manual-barcode');
-        handleScan(manualInput.value);
+        if (!manualInput) return;
+        const val = manualInput.value;
+        if (!val || !val.trim()) return;
         manualInput.value = '';
+        handleScan(val);
     }
     
     const manualInput = document.getElementById('manual-barcode');
-    manualInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.keyCode === 13) {
-            e.preventDefault();
-            submitBarcode();
-        }
-    });
+    if (manualInput) {
+        manualInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.keyCode === 13) {
+                e.preventDefault();
+                submitBarcode();
+            }
+        });
+    }
 
     let html5QrcodeScanner;
     function initCamera() {
