@@ -92,7 +92,8 @@ class GoodsReceiptsTable
                     ->icon('heroicon-o-printer')
                     ->color('info')
                     ->url(fn (\App\Models\GoodsReceipt $record) => route('print.document', ['type' => 'receipt', 'ids' => [$record->id]]))
-                    ->openUrlInNewTab(),
+                    ->openUrlInNewTab()
+                    ->visible(fn (\App\Models\GoodsReceipt $record) => strtoupper((string) $record->status) !== 'DRAFT'),
                 EditAction::make(),
             ])
             ->bulkActions([
@@ -103,10 +104,10 @@ class GoodsReceiptsTable
                         ->icon('heroicon-o-printer')
                         ->color('info')
                         ->action(function (Collection $records) {
-                            $ids = $records->pluck('id')->toArray();
+                            $ids = $records->filter(fn ($r) => strtoupper((string) $r->status) !== 'DRAFT')->pluck('id')->toArray();
                             if (empty($ids)) return;
                         })
-                        ->url(fn (Collection $records) => route('print.document', ['type' => 'receipt', 'ids' => $records->pluck('id')->toArray()]))
+                        ->url(fn (Collection $records) => route('print.document', ['type' => 'receipt', 'ids' => $records->filter(fn ($r) => strtoupper((string) $r->status) !== 'DRAFT')->pluck('id')->toArray()]))
                         ->openUrlInNewTab()
                         ->deselectRecordsAfterCompletion(),
                 ]),
