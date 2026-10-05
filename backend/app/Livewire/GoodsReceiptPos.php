@@ -257,6 +257,7 @@ class GoodsReceiptPos extends Component
                             'sku' => $checkItem->product->sku,
                             'barcode' => $checkItem->product->barcode,
                             'name' => $checkItem->product->name,
+                            'is_taxable' => (bool) ($checkItem->product->is_taxable ?? true),
                             'qty_ordered' => (float) $checkItem->qty_po,
                             'qty_received' => (float) $qtyToDefault,
                             'unit_price' => $unitPrice,
@@ -298,6 +299,7 @@ class GoodsReceiptPos extends Component
                             'sku' => $item->product->sku,
                             'barcode' => $item->product->barcode,
                             'name' => $item->product->name,
+                            'is_taxable' => (bool) ($item->product->is_taxable ?? true),
                             'qty_ordered' => (float) $item->quantity_ordered,
                             'qty_received' => (float) $qtyToDefault,
                             'unit_price' => (float) ($item->unit_cost ?? 0),
@@ -662,6 +664,7 @@ class GoodsReceiptPos extends Component
                                         'sku' => $product->sku,
                                         'barcode' => $product->barcode,
                                         'name' => $product->name,
+                                        'is_taxable' => (bool) ($product->is_taxable ?? true),
                                         'qty_ordered' => 0,
                                         'qty_received' => $item['qty'],
                                         'unit_price' => $item['unit_price'],
@@ -750,6 +753,7 @@ class GoodsReceiptPos extends Component
         $this->cart[$index]['sku'] = $product->sku;
         $this->cart[$index]['barcode'] = $product->barcode;
         $this->cart[$index]['name'] = $product->name;
+        $this->cart[$index]['is_taxable'] = (bool) ($product->is_taxable ?? true);
         $this->cart[$index]['needs_mapping'] = false;
         
         $this->cart[$index]['harga_jual_1'] = ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($product->harga_jual_1 ?? 0);

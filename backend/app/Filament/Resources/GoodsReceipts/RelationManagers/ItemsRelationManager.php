@@ -124,6 +124,7 @@ class ItemsRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('product.name')
                     ->label('Produk')
+                    ->description(fn (\App\Models\GoodsReceiptItem $record): string => ($record->product?->is_taxable ?? true) ? 'PPN' : 'NonPPN')
                     ->searchable(),
                 TextColumn::make('quantity_ordered')
                     ->label('Pesanan')

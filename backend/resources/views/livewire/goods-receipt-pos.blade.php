@@ -498,7 +498,14 @@
                      style="padding: 0.75rem; cursor: pointer; border-bottom: 1px solid #f9fafb; display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <div class="font-bold text-gray-800 dark:text-gray-200">{{ $result->sku }}</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ $result->name }}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
+                            <span>{{ $result->name }}</span>
+                            @if($result->is_taxable)
+                                <span style="font-size: 0.6rem; font-weight: 800; padding: 0.5px 5px; border-radius: 3px; background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0;">PPN</span>
+                            @else
+                                <span style="font-size: 0.6rem; font-weight: 800; padding: 0.5px 5px; border-radius: 3px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1;">NonPPN</span>
+                            @endif
+                        </div>
                     </div>
                     <div style="font-weight: 600; color: #3b82f6;">Rp {{ number_format($result->cost_price, 0) }}</div>
                 </div>
@@ -617,7 +624,17 @@
                                     </div>
                                 @else
                                      <div style="white-space: normal; word-break: break-word; line-height: 1.35; min-width: 220px; font-weight: 600;" class="text-gray-900 dark:text-gray-100">
-                                         {{ $item['name'] }}
+                                         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                             <span>{{ $item['name'] }}</span>
+                                             @php
+                                                 $isTaxable = $item['is_taxable'] ?? (!empty($item['product_id']) ? (\App\Models\Product::find($item['product_id'])?->is_taxable ?? true) : true);
+                                             @endphp
+                                             @if($isTaxable)
+                                                 <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; letter-spacing: 0.02em;" title="Produk Kena PPN (11%)">PPN</span>
+                                             @else
+                                                 <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; letter-spacing: 0.02em;" title="Produk Non-PPN (Bebas Pajak)">NonPPN</span>
+                                             @endif
+                                         </div>
                                      </div>
                                 @endif
                             </td> 
