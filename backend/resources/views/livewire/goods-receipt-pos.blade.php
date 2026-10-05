@@ -237,19 +237,6 @@
                             <div style="font-size: 0.7rem; color: #6b7280; margin-top: 0.25rem;">Bisa pilih >1 file. Maks 10MB/file. Gambar dikompres otomatis.</div>
                             @error('faktur_image.*') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                             <div wire:loading wire:target="faktur_image" class="text-xs text-blue-500 mt-1">Mengupload...</div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="pos-label" style="color: #4f46e5; font-weight: 700;">✨ Scan Faktur (AI)</td>
-                        <td>
-                            <div style="display: flex; gap: 0.5rem; align-items: center; background-color: #eef2ff; padding: 0.5rem; border-radius: 0.375rem; border: 1px dashed #6366f1;" class="dark:bg-indigo-900/20 dark:border-indigo-800">
-                                <input type="file" class="pos-input" wire:model="scan_image" accept="image/jpeg, image/png" style="flex: 1; padding-top: 0.25rem; background-color: white;" class="dark:bg-gray-800">
-                                <button type="button" wire:click="scanInvoiceAction" wire:loading.attr="disabled" wire:target="scan_image, scanInvoiceAction" style="background-color: #4f46e5; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.25rem; cursor: pointer; font-weight: 600; white-space: nowrap; transition: opacity 0.2s;">
-                                    <span wire:loading.remove wire:target="scanInvoiceAction">Proses Scan</span>
-                                    <span wire:loading wire:target="scanInvoiceAction">Memproses...</span>
-                                </button>
-                            </div>
-                            @error('scan_image') <div style="color: #ef4444; font-size: 0.75rem; margin-top: 0.25rem;">{{ $message }}</div> @enderror
 
                             <!-- Daftar Foto Lama (Jika sedang Edit) -->
                             @if(count($existing_faktur_image) > 0)
