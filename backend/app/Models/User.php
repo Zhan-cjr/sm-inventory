@@ -62,4 +62,22 @@ class User extends Authenticatable implements FilamentUser
         $auths = $this->custom_authorizations ?? [];
         return in_array($action, $auths);
     }
+
+    public function getRoleAttribute($value): string
+    {
+        $spatieRoles = array_map('strtolower', $this->roles->pluck('name')->toArray());
+        if (in_array('superadmin', $spatieRoles) || in_array('super_admin', $spatieRoles) || in_array('super-admin', $spatieRoles) || strtolower((string)$value) === 'superadmin' || strtolower((string)$value) === 'super_admin') {
+            return 'SUPER_ADMIN';
+        }
+        if (in_array('admin', $spatieRoles) || strtolower((string)$value) === 'admin') {
+            return 'ADMIN';
+        }
+        if (in_array('manager', $spatieRoles) || strtolower((string)$value) === 'manager') {
+            return 'MANAGER';
+        }
+        if (in_array('supervisor', $spatieRoles) || in_array('spv', $spatieRoles) || strtolower((string)$value) === 'supervisor' || strtolower((string)$value) === 'spv') {
+            return 'SUPERVISOR';
+        }
+        return $value ?: 'CASHIER';
+    }
 }

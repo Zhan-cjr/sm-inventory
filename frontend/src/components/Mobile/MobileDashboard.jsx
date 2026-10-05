@@ -50,6 +50,7 @@ export function MobileDashboard({ user, authToken }) {
     if (showBranchSelector && !selectedBranchId) return;
 
     setLoading(true);
+    setError(null);
     fetch(`/api/v1/dashboard/metrics?branch_id=${selectedBranchId}`, {
       headers: {
         'Authorization': `Bearer ${authToken}`
@@ -111,6 +112,26 @@ export function MobileDashboard({ user, authToken }) {
         <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem', color: '#ef4444' }}>Gagal Memuat Dashboard</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{error}</p>
         <p style={{ fontSize: '0.75rem', marginTop: '0.75rem', color: 'var(--text-muted)' }}>Pastikan Anda memiliki izin akses Supervisi/Manager.</p>
+        <button 
+          onClick={() => {
+            setError(null);
+            setLoading(true);
+            fetch(`/api/v1/dashboard/metrics?branch_id=${selectedBranchId}`, {
+              headers: { 'Authorization': `Bearer ${authToken}` }
+            })
+              .then(res => {
+                if (!res.ok) throw new Error('Gagal memuat data dashboard');
+                return res.json();
+              })
+              .then(data => setMetrics(data))
+              .catch(err => setError(err.message))
+              .finally(() => setLoading(false));
+          }}
+          className="btn-pwa-primary"
+          style={{ marginTop: '1rem', padding: '0.5rem 1.25rem', fontSize: '0.85rem', cursor: 'pointer', borderRadius: '8px' }}
+        >
+          Coba Lagi
+        </button>
       </div>
     );
   }

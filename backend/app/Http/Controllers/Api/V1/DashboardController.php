@@ -16,9 +16,13 @@ class DashboardController extends Controller
         $user = $request->user();
         // If user has no branch_id (like ADMIN) or is an admin, allow them to specify branch_id
         $branchId = $user->branch_id;
-        $isAdmin = in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN']);
+        $isAdmin = in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'MANAGER']);
         if (!$branchId || $isAdmin) {
             $branchId = $request->query('branch_id') ?: $branchId;
+        }
+
+        if (!$branchId) {
+            $branchId = \App\Models\Branch::first()?->id;
         }
 
         if (!$branchId) {
@@ -27,16 +31,23 @@ class DashboardController extends Controller
         $todayStart = Carbon::today()->startOfDay();
         $todayEnd = Carbon::today()->endOfDay();
 
-        // 1. Total Penjualan, Transaksi, Cost (COGS) & Gross Profit Hari Ini (Single Aggregate Query)
+        // 1. Total Penjualan & Transaksi Hari Ini
         $todayAgg = Transaction::where('branch_id', $branchId)
             ->whereBetween('transaction_date', [$todayStart, $todayEnd])
             ->where('is_voided', false)
-            ->selectRaw('COALESCE(SUM(final_amount), 0) as today_sales, COUNT(id) as today_count, COALESCE(SUM(cogs), 0) as today_cogs')
+            ->selectRaw('COALESCE(SUM(final_amount), 0) as today_sales, COUNT(id) as today_count')
             ->first();
 
         $todaySales = (float) ($todayAgg->today_sales ?? 0);
         $todayCount = (int) ($todayAgg->today_count ?? 0);
-        $todayCogs = (float) ($todayAgg->today_cogs ?? 0);
+
+        // 2. Hitung COGS Hari Ini dari transaksi yang aktif
+        $todayTransactions = Transaction::where('branch_id', $branchId)
+            ->whereBetween('transaction_date', [$todayStart, $todayEnd])
+            ->where('is_voided', false)
+            ->with(['items.product'])
+            ->get();
+        $todayCogs = (float) $todayTransactions->sum('cogs');
 
         $grossProfit = $todaySales - $todayCogs;
         $profitMargin = $todaySales > 0 ? ($grossProfit / $todaySales) * 100 : 0;
@@ -130,9 +141,13 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $branchId = $user->branch_id;
-        $isAdmin = in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN']);
+        $isAdmin = in_array(strtoupper($user->role), ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'MANAGER']);
         if (!$branchId || $isAdmin) {
             $branchId = $request->query('branch_id') ?: $branchId;
+        }
+
+        if (!$branchId) {
+            $branchId = \App\Models\Branch::first()?->id;
         }
 
         if (!$branchId) {
