@@ -312,9 +312,11 @@ class OpnamePublicController extends Controller
     public function submitCount2(Request $request, string $sessionToken, string $rackId)
     {
         $request->validate([
-            'checker_name' => 'required|string|max:100',
-            'quantities'   => 'nullable|array',
-            'quantities.*' => 'nullable|numeric|min:0',
+            'checker_name'     => 'required|string|max:100',
+            'quantities'       => 'nullable|array',
+            'quantities.*'     => 'nullable|numeric|min:0',
+            'new_quantities'   => 'nullable|array',
+            'new_quantities.*' => 'nullable|numeric|min:0',
         ]);
 
         $session = StockOpnameSession::where('session_token', $sessionToken)->firstOrFail();

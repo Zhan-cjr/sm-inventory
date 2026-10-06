@@ -647,6 +647,7 @@
         const status = document.getElementById('scan-status');
         let found = null;
 
+        productItems = document.querySelectorAll('#product-list .product-item');
         found = [...productItems].find(el => {
             const bc = (el.dataset.barcode || '').toLowerCase();
             const sku = (el.dataset.sku || '').toLowerCase();
@@ -719,7 +720,6 @@
                         
                         markAsScanned(div);
                         highlightAndFocus(div, status, code);
-                    }
                 })
                 .catch(err => {
                     status.className = 'scan-status notfound';
