@@ -1,6 +1,6 @@
 <x-filament-panels::page>
     <style>
-        /* Premium Custom Cards & Grid for Stock Opname Dashboard */
+        /* Base Grid & Containers */
         .opname-grid-3 {
             display: grid;
             grid-template-columns: 1fr;
@@ -8,14 +8,10 @@
             margin-bottom: 1.5rem;
         }
         @media (min-width: 640px) {
-            .opname-grid-3 {
-                grid-template-columns: repeat(2, 1fr);
-            }
+            .opname-grid-3 { grid-template-columns: repeat(2, 1fr); }
         }
         @media (min-width: 1024px) {
-            .opname-grid-3 {
-                grid-template-columns: repeat(3, 1fr);
-            }
+            .opname-grid-3 { grid-template-columns: repeat(3, 1fr); }
         }
 
         .opname-grid-2 {
@@ -25,35 +21,44 @@
             margin-bottom: 1.5rem;
         }
         @media (min-width: 1024px) {
-            .opname-grid-2 {
-                grid-template-columns: repeat(2, 1fr);
-            }
+            .opname-grid-2 { grid-template-columns: repeat(2, 1fr); }
         }
 
+        .opname-container {
+            border-radius: 1.25rem;
+            border: 1px solid #e2e8f0;
+            background-color: #ffffff;
+            padding: 1.75rem;
+            margin-bottom: 1.75rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+        }
+        .dark .opname-container {
+            border-color: #1e293b;
+            background-color: #0f172a;
+        }
+
+        /* Top Stats Cards */
         .opname-card {
-            position: relative;
-            overflow: hidden;
-            border-radius: 1rem;
+            border-radius: 1.25rem;
             border: 1px solid #e2e8f0;
             background-color: #ffffff;
             padding: 1.5rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            transition: all 0.25s ease;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
         }
         .opname-card:hover {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
-            border-color: #4f46e5;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.06);
+            border-color: #6366f1;
+            transform: translateY(-2px);
         }
         .dark .opname-card {
             border-color: #1e293b;
             background-color: #0f172a;
         }
-        .dark .opname-card:hover {
-            border-color: #6366f1;
-        }
+        .dark .opname-card:hover { border-color: #818cf8; }
 
         .opname-card-header {
             display: flex;
@@ -61,26 +66,6 @@
             justify-content: space-between;
             width: 100%;
         }
-
-        .opname-icon-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 2.75rem;
-            height: 2.75rem;
-            border-radius: 0.75rem;
-            flex-shrink: 0;
-        }
-        
-        .opname-icon-indigo { background-color: #eff6ff; color: #3b82f6; }
-        .dark .opname-icon-indigo { background-color: rgba(30, 41, 59, 0.5); color: #60a5fa; }
-        
-        .opname-icon-blue { background-color: #f0fdf4; color: #10b981; }
-        .dark .opname-icon-blue { background-color: rgba(6, 78, 59, 0.2); color: #34d399; }
-        
-        .opname-icon-amber { background-color: #fffbeb; color: #f59e0b; }
-        .dark .opname-icon-amber { background-color: rgba(120, 53, 4, 0.2); color: #fbbf24; }
-
         .opname-card-title {
             font-size: 0.75rem;
             font-weight: 700;
@@ -91,164 +76,244 @@
         }
         .opname-card-value {
             font-size: 1.5rem;
-            font-weight: 700;
+            font-weight: 800;
             color: #0f172a;
-            margin-top: 0.25rem;
+            margin-top: 0.35rem;
+            letter-spacing: -0.02em;
         }
-        .dark .opname-card-value {
-            color: #ffffff;
-        }
+        .dark .opname-card-value { color: #ffffff; }
 
-        .opname-container {
-            border-radius: 1rem;
-            border: 1px solid #e2e8f0;
-            background-color: #ffffff;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-        }
-        .dark .opname-container {
-            border-color: #1e293b;
-            background-color: #0f172a;
-        }
-
-        .opname-progress-row {
+        .opname-icon-wrapper {
             display: flex;
-            flex-direction: column;
-            gap: 1.25rem;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.875rem;
+            flex-shrink: 0;
         }
-        @media (min-width: 768px) {
-            .opname-progress-row {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
+        .opname-icon-indigo { background-color: #eff6ff; color: #3b82f6; }
+        .dark .opname-icon-indigo { background-color: rgba(30, 41, 59, 0.6); color: #60a5fa; }
+        .opname-icon-blue   { background-color: #f0fdf4; color: #10b981; }
+        .dark .opname-icon-blue   { background-color: rgba(6, 78, 59, 0.3); color: #34d399; }
+        .opname-icon-amber  { background-color: #fffbeb; color: #f59e0b; }
+        .dark .opname-icon-amber  { background-color: rgba(120, 53, 4, 0.3); color: #fbbf24; }
 
+        /* Progress Real-time Cards */
         .opname-progress-card {
             padding: 1.25rem;
             border-radius: 1rem;
             border: 1px solid #f1f5f9;
         }
-        .dark .opname-progress-card {
-            border-color: #1e293b;
-        }
-        .opname-progress-card.sky { background-color: rgba(240, 249, 255, 0.5); border-color: #e0f2fe; }
-        .dark .opname-progress-card.sky { background-color: rgba(8, 47, 73, 0.1); border-color: rgba(14, 165, 233, 0.15); }
-        .opname-progress-card.amber { background-color: rgba(255, 251, 235, 0.5); border-color: #fef3c7; }
-        .dark .opname-progress-card.amber { background-color: rgba(120, 53, 4, 0.05); border-color: rgba(245, 158, 11, 0.15); }
-        .opname-progress-card.rose { background-color: rgba(255, 241, 242, 0.5); border-color: #ffe4e6; }
-        .dark .opname-progress-card.rose { background-color: rgba(136, 19, 55, 0.05); border-color: rgba(244, 63, 94, 0.15); }
-        .opname-progress-card.emerald { background-color: rgba(240, 253, 244, 0.5); border-color: #dcfce7; }
-        .dark .opname-progress-card.emerald { background-color: rgba(6, 78, 59, 0.05); border-color: rgba(16, 185, 129, 0.15); }
+        .opname-progress-card.sky { background-color: #f0f9ff; border-color: #bae6fd; }
+        .dark .opname-progress-card.sky { background-color: rgba(8, 47, 73, 0.2); border-color: rgba(14, 165, 233, 0.2); }
+        .opname-progress-card.amber { background-color: #fffbeb; border-color: #fde68a; }
+        .dark .opname-progress-card.amber { background-color: rgba(120, 53, 4, 0.15); border-color: rgba(245, 158, 11, 0.2); }
+        .opname-progress-card.rose { background-color: #fff1f2; border-color: #fecdd3; }
+        .dark .opname-progress-card.rose { background-color: rgba(136, 19, 55, 0.15); border-color: rgba(244, 63, 94, 0.2); }
+        .opname-progress-card.emerald { background-color: #f0fdf4; border-color: #bbf7d0; }
+        .dark .opname-progress-card.emerald { background-color: rgba(6, 78, 59, 0.15); border-color: rgba(16, 185, 129, 0.2); }
 
         .opname-progress-bar-bg {
             width: 100%;
-            background-color: #e2e8f0;
+            background-color: rgba(0, 0, 0, 0.08);
             border-radius: 9999px;
             height: 0.625rem;
             overflow: hidden;
             margin-top: 0.5rem;
         }
-        .dark .opname-progress-bar-bg {
-            background-color: #334155;
-        }
+        .dark .opname-progress-bar-bg { background-color: rgba(255, 255, 255, 0.1); }
         .opname-progress-bar-fill {
             height: 100%;
             border-radius: 9999px;
             transition: width 0.5s ease;
         }
-        .opname-progress-bar-fill.sky { background-color: #0ea5e9; }
-        .opname-progress-bar-fill.amber { background-color: #f59e0b; }
+        .opname-progress-bar-fill.sky   { background: linear-gradient(90deg, #0284c7, #38bdf8); }
+        .opname-progress-bar-fill.amber { background: linear-gradient(90deg, #d97706, #fbbf24); }
 
-        /* Custom badges */
+        /* Badges */
         .opname-badge {
             display: inline-flex;
             align-items: center;
-            padding: 0.25rem 0.75rem;
+            gap: 4px;
+            padding: 4px 10px;
             border-radius: 9999px;
-            font-size: 0.75rem;
+            font-size: 11px;
             font-weight: 700;
             line-height: 1;
+            white-space: nowrap;
         }
-        .opname-badge-success { background-color: #d1fae5; color: #065f46; }
-        .dark .opname-badge-success { background-color: rgba(6, 78, 59, 0.4); color: #34d399; }
-        .opname-badge-warning { background-color: #fef3c7; color: #92400e; }
-        .dark .opname-badge-warning { background-color: rgba(120, 53, 4, 0.4); color: #fbbf24; }
-        .opname-badge-danger { background-color: #fee2e2; color: #991b1b; }
-        .dark .opname-badge-danger { background-color: rgba(153, 27, 27, 0.4); color: #f87171; }
-        .opname-badge-info { background-color: #e0f2fe; color: #0369a1; }
-        .dark .opname-badge-info { background-color: rgba(3, 105, 161, 0.4); color: #38bdf8; }
+        .opname-badge-success { background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+        .dark .opname-badge-success { background-color: rgba(6, 78, 59, 0.4); color: #4ade80; border-color: rgba(74, 222, 128, 0.2); }
+        .opname-badge-danger { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+        .dark .opname-badge-danger { background-color: rgba(153, 27, 27, 0.4); color: #f87171; border-color: rgba(248, 113, 113, 0.2); }
+        .opname-badge-warning { background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+        .dark .opname-badge-warning { background-color: rgba(120, 53, 4, 0.4); color: #fbbf24; border-color: rgba(251, 191, 36, 0.2); }
+        .opname-badge-info { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+        .dark .opname-badge-info { background-color: rgba(3, 105, 161, 0.4); color: #38bdf8; border-color: rgba(56, 189, 248, 0.2); }
 
-        /* Rack cards & listings */
+        /* Action Buttons */
+        .opname-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            border: none;
+            white-space: nowrap;
+        }
+        .opname-btn:hover { transform: translateY(-1px); }
+        .opname-btn:active { transform: translateY(0); }
+        .opname-btn-sm { padding: 6px 12px; font-size: 11px; }
+        .opname-btn-xs { padding: 4px 10px; font-size: 10px; }
+        .opname-btn-success {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+        }
+        .opname-btn-success:hover { background: linear-gradient(135deg, #047857, #059669); }
+        .opname-btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+        }
+        .opname-btn-primary:hover { background: linear-gradient(135deg, #4338ca, #4f46e5); }
+        .opname-btn-info {
+            background: #eff6ff;
+            color: #2563eb !important;
+            border: 1px solid #bfdbfe;
+        }
+        .opname-btn-info:hover { background: #dbeafe; }
+        .dark .opname-btn-info { background: rgba(30, 58, 138, 0.4); color: #60a5fa !important; border-color: #1e40af; }
+        .opname-btn-outline {
+            background: transparent;
+            color: #64748b !important;
+            border: 1px solid #cbd5e1;
+        }
+        .opname-btn-outline:hover { background: #f8fafc; color: #1e293b !important; }
+        .dark .opname-btn-outline { color: #94a3b8 !important; border-color: #334155; }
+        .dark .opname-btn-outline:hover { background: #1e293b; color: #ffffff !important; }
+        .opname-btn-gray {
+            background: #f1f5f9;
+            color: #475569 !important;
+            border: 1px solid #e2e8f0;
+        }
+        .opname-btn-gray:hover { background: #e2e8f0; }
+        .dark .opname-btn-gray { background: #1e293b; color: #cbd5e1 !important; border-color: #334155; }
+        .dark .opname-btn-gray:hover { background: #334155; }
+
+        /* Rack Cards Grid & Structure */
         .opname-rack-grid {
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 1.25rem;
-            margin-top: 1.25rem;
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 16px;
         }
-        @media (min-width: 640px) {
-            .opname-rack-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        @media (min-width: 1024px) {
-            .opname-rack-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
-
         .opname-rack-card {
             border: 1px solid #e2e8f0;
             background-color: #ffffff;
-            border-radius: 1rem;
+            border-radius: 1.25rem;
             padding: 1.25rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            transition: all 0.3s;
+            transition: all 0.25s ease;
         }
         .opname-rack-card:hover {
             border-color: #6366f1;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.1);
+            transform: translateY(-2px);
         }
         .dark .opname-rack-card {
             border-color: #1e293b;
             background-color: #0f172a;
         }
-        .dark .opname-rack-card:hover {
-            border-color: #818cf8;
-        }
+        .dark .opname-rack-card:hover { border-color: #818cf8; }
 
-        /* Scroll container for P1 QR list */
-        .opname-scroll-container {
+        .opname-rack-head {
             display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            max-height: 20rem;
-            overflow-y: auto;
-            padding-right: 0.25rem;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
         }
-
-        .opname-scroll-item {
+        .opname-rack-info-box {
             display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            background-color: #ffffff;
+            align-items: center;
+            gap: 12px;
+        }
+        .opname-rack-icon-wrap {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
             border: 1px solid #e2e8f0;
-            border-radius: 1rem;
-            padding: 1rem;
         }
-        .dark .opname-scroll-item {
-            background-color: #020617;
+        .dark .opname-rack-icon-wrap {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        .opname-rack-code {
+            font-family: 'Courier New', monospace;
+            font-weight: 800;
+            font-size: 16px;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+        .dark .opname-rack-code { color: #f8fafc; }
+        .opname-rack-name {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+        .dark .opname-rack-name { color: #94a3b8; }
+
+        .opname-rack-status-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 14px 0;
+        }
+        .opname-rack-status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #f1f5f9;
+            font-size: 12px;
+        }
+        .dark .opname-rack-status-row {
+            background: #020617;
             border-color: #1e293b;
         }
-        @media (min-width: 640px) {
-            .opname-scroll-item {
-                flex-direction: row;
-                align-items: center;
-            }
+        .opname-rack-status-lbl {
+            color: #64748b;
+            font-weight: 600;
         }
+        .dark .opname-rack-status-lbl { color: #94a3b8; }
+
+        .opname-rack-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 12px;
+            margin-top: 4px;
+        }
+        .dark .opname-rack-footer { border-top-color: #1e293b; }
 
         /* Drawer elements */
         .opname-drawer-backdrop {
@@ -271,7 +336,7 @@
         .opname-drawer-content {
             pointer-events: auto;
             width: 100vw;
-            max-width: 42rem;
+            max-width: 44rem;
             height: 100%;
             background-color: #ffffff;
             box-shadow: -10px 0 25px -5px rgba(0, 0, 0, 0.1), -10px 0 10px -5px rgba(0, 0, 0, 0.04);
@@ -313,30 +378,198 @@
             border-color: #1e293b;
         }
 
-        /* Flex & typography utilities */
-        .opname-flex-between {
+        /* Rekap Table Styling - High Contrast & Polished */
+        .opname-table-wrapper {
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+        .dark .opname-table-wrapper {
+            border-color: #1e293b;
+            background: #0f172a;
+        }
+
+        .opname-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 13px;
+            text-align: left;
+        }
+        .opname-table thead tr {
+            background: #f8fafc;
+        }
+        .dark .opname-table thead tr {
+            background: #0b1329;
+        }
+        .opname-table th {
+            padding: 12px 14px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #475569;
+            border-bottom: 2px solid #e2e8f0;
+            white-space: nowrap;
+        }
+        .dark .opname-table th {
+            color: #94a3b8;
+            border-bottom-color: #1e293b;
+        }
+        .opname-table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #1e293b;
+            vertical-align: middle;
+        }
+        .dark .opname-table td {
+            border-bottom-color: #1e293b;
+            color: #e2e8f0;
+        }
+        .opname-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .opname-table tbody tr:hover td {
+            background-color: #f8fafc;
+        }
+        .dark .opname-table tbody tr:hover td {
+            background-color: rgba(30, 41, 59, 0.5);
+        }
+        .opname-table tbody tr.is-discrepancy td {
+            background-color: rgba(254, 242, 242, 0.45);
+        }
+        .dark .opname-table tbody tr.is-discrepancy td {
+            background-color: rgba(127, 29, 29, 0.15);
+        }
+        .opname-table tbody tr.is-discrepancy:hover td {
+            background-color: rgba(254, 226, 226, 0.65);
+        }
+        .dark .opname-table tbody tr.is-discrepancy:hover td {
+            background-color: rgba(127, 29, 29, 0.25);
+        }
+
+        /* Number alignments & pills */
+        .num-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+        }
+        .disc-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            white-space: nowrap;
+        }
+        .disc-pill.negative {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        .dark .disc-pill.negative {
+            background: rgba(220, 38, 38, 0.2);
+            color: #f87171;
+            border-color: rgba(248, 113, 113, 0.3);
+        }
+        .disc-pill.positive {
+            background: #dcfce7;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+        .dark .disc-pill.positive {
+            background: rgba(22, 163, 74, 0.2);
+            color: #4ade80;
+            border-color: rgba(74, 222, 128, 0.3);
+        }
+        .disc-pill.zero {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        .dark .disc-pill.zero {
+            background: #1e293b;
+            color: #94a3b8;
+        }
+
+        /* Rekap Toolbar */
+        .rekap-toolbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
         }
-        .opname-flex-gap-3 {
+        .rekap-search-input {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 9px 14px;
+            font-size: 13px;
+            color: #1e293b;
+            outline: none;
+            width: 100%;
+            max-width: 340px;
+            transition: all 0.2s;
+        }
+        .rekap-search-input:focus {
+            border-color: #6366f1;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+        .dark .rekap-search-input {
+            background: #020617;
+            border-color: #334155;
+            color: #f1f5f9;
+        }
+        .dark .rekap-search-input:focus {
+            border-color: #818cf8;
+            box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+        }
+        .rekap-filter-tabs {
             display: flex;
-            align-items: center;
-            gap: 0.75rem;
+            gap: 6px;
+            flex-wrap: wrap;
         }
-        .opname-text-title {
-            font-weight: 750;
-            color: #0f172a;
-        }
-        .dark .opname-text-title {
-            color: #f8fafc;
-        }
-        .opname-text-muted {
+        .rekap-tab-btn {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
             color: #64748b;
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
         }
-        .dark .opname-text-muted {
+        .rekap-tab-btn:hover {
+            color: #1e293b;
+            background: #e2e8f0;
+        }
+        .rekap-tab-btn.active {
+            background: #4f46e5;
+            border-color: #4f46e5;
+            color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+        }
+        .dark .rekap-tab-btn {
+            background: #1e293b;
+            border-color: #334155;
             color: #94a3b8;
         }
+        .dark .rekap-tab-btn:hover { background: #334155; color: #ffffff; }
+        .dark .rekap-tab-btn.active { background: #6366f1; border-color: #6366f1; color: #ffffff !important; }
+
+        /* Typography & layout helpers */
+        .opname-text-title { font-weight: 800; color: #0f172a; }
+        .dark .opname-text-title { color: #f8fafc; }
+        .opname-flex-between { display: flex; align-items: center; justify-content: space-between; }
     </style>
 
     <div class="space-y-6">
@@ -496,12 +729,22 @@
                                  height="128"
                                  class="rounded-lg shadow-sm" />
                         </div>
-                        <div class="flex-1 min-w-0 w-full">
-                            <p class="text-xs text-gray-500 mb-1.5">URL Portal Sesi:</p>
-                            <div class="flex items-center gap-2">
+                        <div class="flex-1 min-w-0 w-full" x-data="{ copied: false }">
+                            <p class="text-xs text-gray-500 mb-1.5 font-medium">URL Portal Sesi:</p>
+                            <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                                 <p class="font-mono text-xs bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 px-3 py-2 rounded-xl break-all text-gray-700 dark:text-gray-300 flex-1">
                                     {{ url('/opname/' . $this->record->session_token) }}
                                 </p>
+                                <button type="button" 
+                                        @click="navigator.clipboard.writeText('{{ url('/opname/' . $this->record->session_token) }}'); copied = true; setTimeout(() => copied = false, 2500)"
+                                        class="opname-btn opname-btn-sm opname-btn-primary flex-shrink-0">
+                                    <span x-show="!copied">📋 Salin</span>
+                                    <span x-show="copied" style="display: none;">✓ Tersalin</span>
+                                </button>
+                                <a href="{{ url('/opname/' . $this->record->session_token) }}" target="_blank"
+                                   class="opname-btn opname-btn-sm opname-btn-outline flex-shrink-0">
+                                    🔗 Buka
+                                </a>
                             </div>
                             <div class="mt-4 text-[11px] text-gray-500 space-y-1.5">
                                 <p>📌 Bagikan QR ini ke <strong>Pengecek ke-2 (Independent Auditor)</strong></p>
@@ -569,7 +812,7 @@
             <p class="text-xs text-gray-500 mb-6">Klik tombol detail pada masing-masing rak untuk melihat tabel item dan kuantitas hasil opname.</p>
 
             <div x-data="{ activeRack: null }" class="relative">
-                <div class="opname-rack-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div class="opname-rack-grid">
                     @foreach($this->record->rackSessions()->with('rack')->get() as $rs)
                     @php
                         $isCountingActive = $rs->active_count_at && $rs->active_count_at->gt(now()->subMinutes(5)) && $rs->count1_status !== 'DONE';
@@ -577,72 +820,70 @@
                         $items = $rs->items()->with('product.category')->get()->sortBy('product.name');
                     @endphp
                     <!-- Card Rak -->
-                    <div class="opname-rack-card relative overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/40 p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-indigo-400 dark:hover:border-indigo-800 flex flex-col justify-between">
-                        
+                    <div class="opname-rack-card">
                         <div>
                             <!-- Header Card -->
-                            <div class="flex items-start justify-between gap-3 mb-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center border border-gray-100 dark:border-gray-800 text-lg">
+                            <div class="opname-rack-head">
+                                <div class="opname-rack-info-box">
+                                    <div class="opname-rack-icon-wrap">
                                         📦
                                     </div>
                                     <div>
-                                        <p class="font-mono font-bold text-base text-gray-900 dark:text-white leading-tight">{{ $rs->rack?->rack_code }}</p>
-                                        <p class="text-xs text-gray-400 mt-0.5">{{ $rs->rack?->rack_name }}</p>
+                                        <p class="opname-rack-code">{{ $rs->rack?->rack_code }}</p>
+                                        <p class="opname-rack-name">{{ $rs->rack?->rack_name }}</p>
                                     </div>
                                 </div>
                                 <div class="flex flex-col items-end gap-1.5">
                                     @if($isCountingActive)
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 ring-1 ring-emerald-600/20 animate-pulse">
-                                        <span class="w-1 h-1 rounded-full bg-emerald-500"></span> P1 Hitung
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> P1 Hitung
                                     </span>
                                     @endif
                                     @if($isCheckingActive)
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/20 dark:text-purple-400 ring-1 ring-purple-600/20 animate-pulse">
-                                        <span class="w-1 h-1 rounded-full bg-purple-500"></span> P2 Cek
+                                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span> P2 Cek
                                     </span>
                                     @endif
                                 </div>
                             </div>
 
                             <!-- Status User Count & Check -->
-                            <div class="space-y-2.5 my-4 text-xs">
-                                <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-900/60 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800">
-                                    <span class="text-gray-400 font-medium">Penghitung 1 (P1):</span>
+                            <div class="opname-rack-status-box">
+                                <div class="opname-rack-status-row">
+                                    <span class="opname-rack-status-lbl">Penghitung 1 (P1):</span>
                                     @if($rs->count1_status === 'DONE')
-                                        <span class="font-bold text-emerald-600 dark:text-emerald-400 text-[11px] truncate max-w-[140px]" title="{{ $rs->count1_by_name }} ({{ $rs->count1_at?->format('H:i') }})">
-                                            ✅ {{ $rs->count1_by_name }}
+                                        <span class="opname-badge opname-badge-success" title="{{ $rs->count1_by_name }} ({{ $rs->count1_at?->format('H:i') }})">
+                                            ✓ {{ $rs->count1_by_name }}
                                         </span>
                                     @else
-                                        <span class="font-semibold text-gray-400 dark:text-gray-600 bg-gray-100/50 dark:bg-gray-950 px-2 py-0.5 rounded-md">Belum</span>
+                                        <span class="opname-badge opname-badge-neutral">Belum</span>
                                     @endif
                                 </div>
 
-                                <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-900/60 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800">
-                                    <span class="text-gray-400 font-medium">Pengecek 2 (P2):</span>
+                                <div class="opname-rack-status-row">
+                                    <span class="opname-rack-status-lbl">Pengecek 2 (P2):</span>
                                     @if($rs->count2_status === 'DONE')
-                                        <span class="font-bold text-indigo-600 dark:text-indigo-400 text-[11px] truncate max-w-[140px]" title="{{ $rs->count2_by_name }} ({{ $rs->count2_at?->format('H:i') }})">
-                                            ✅ {{ $rs->count2_by_name }}
+                                        <span class="opname-badge opname-badge-info" title="{{ $rs->count2_by_name }} ({{ $rs->count2_at?->format('H:i') }})">
+                                            ✓ {{ $rs->count2_by_name }}
                                         </span>
                                     @else
-                                        <span class="font-semibold text-gray-400 dark:text-gray-600 bg-gray-100/50 dark:bg-gray-950 px-2 py-0.5 rounded-md">Belum</span>
+                                        <span class="opname-badge opname-badge-neutral">Belum</span>
                                     @endif
                                 </div>
                             </div>
                         </div>
 
                         <!-- Footer Card Action -->
-                        <div class="mt-2 flex items-center justify-between border-t border-gray-100 dark:border-gray-800 pt-3">
+                        <div class="opname-rack-footer">
                             <div class="text-left">
-                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item Barang</span>
-                                <p class="text-sm font-extrabold text-gray-900 dark:text-white mt-0.5">{{ $items->count() }}</p>
+                                <span style="font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Item Barang</span>
+                                <p style="font-size: 15px; font-weight: 800; color: #0f172a; margin: 0;" class="dark:text-white">{{ $items->count() }}</p>
                             </div>
                             <button type="button" @click="activeRack = '{{ $rs->id }}'"
                                     class="opname-btn opname-btn-sm opname-btn-success">
                                 📊 Detail Item & Qty
                             </button>
                         </div>
-
                     </div>
 
                     <!-- Slide-over Drawer Component for Rack -->
@@ -792,47 +1033,139 @@
 
         {{-- Summary Produk (tampil sejak COUNTING untuk memantau progress) --}}
         @if(in_array($this->record->status, ['COUNTING', 'CHECKING', 'FINAL_CHECK', 'COMPLETED']))
-        <div class="opname-container rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
-            <h3 class="opname-text-title text-lg font-bold text-gray-900 dark:text-white mb-1">Rekap Produk Lintas Rak</h3>
-            <p class="text-xs text-gray-500 mb-6">Akumulasi seluruh hitungan fisik produk di semua rak dibandingkan dengan sistem</p>
+        @php
+            $productSummaries = $this->record->getProductSummary();
+            $totalProducts = $productSummaries->count();
+            $discCountSum = $productSummaries->where('is_discrepancy', true)->count();
+            $matchCountSum = $totalProducts - $discCountSum;
+        @endphp
+        <div class="opname-container rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm"
+             x-data="{
+                search: '',
+                filterTab: 'all',
+                matchesRow(sku, name, isDisc) {
+                    const q = this.search.trim().toLowerCase();
+                    const matchesSearch = !q || (sku && sku.toLowerCase().includes(q)) || (name && name.toLowerCase().includes(q));
+                    if (!matchesSearch) return false;
+                    if (this.filterTab === 'selisih') return Boolean(isDisc);
+                    if (this.filterTab === 'cocok') return !isDisc;
+                    return true;
+                }
+             }">
+            
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                <div>
+                    <h3 class="opname-text-title text-lg font-bold text-gray-900 dark:text-white">Rekap Produk Lintas Rak</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Akumulasi seluruh hitungan fisik produk di semua rak dibandingkan dengan sistem</p>
+                </div>
 
-            <div class="overflow-x-auto">
-                <table class="opname-table w-full text-sm text-left border-collapse">
+                <!-- Quick Summary Badges -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                        Total: {{ $totalProducts }} Produk
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> {{ $matchCountSum }} Cocok
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                        <span class="w-2 h-2 rounded-full bg-rose-500"></span> {{ $discCountSum }} Selisih
+                    </span>
+                </div>
+            </div>
+
+            <!-- Toolbar: Search & Filter Tabs -->
+            <div class="rekap-toolbar">
+                <div class="relative flex-1 max-w-sm">
+                    <input type="text"
+                           x-model="search"
+                           placeholder="Cari SKU atau nama produk..."
+                           class="rekap-search-input pl-9" />
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">
+                        🔍
+                    </span>
+                    <button type="button" x-show="search" @click="search = ''"
+                            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                            style="display: none;">
+                        ✕
+                    </button>
+                </div>
+
+                <div class="rekap-filter-tabs">
+                    <button type="button"
+                            @click="filterTab = 'all'"
+                            :class="{ 'active': filterTab === 'all' }"
+                            class="rekap-tab-btn">
+                        Semua ({{ $totalProducts }})
+                    </button>
+                    <button type="button"
+                            @click="filterTab = 'selisih'"
+                            :class="{ 'active': filterTab === 'selisih' }"
+                            class="rekap-tab-btn">
+                        ⚠️ Selisih ({{ $discCountSum }})
+                    </button>
+                    <button type="button"
+                            @click="filterTab = 'cocok'"
+                            :class="{ 'active': filterTab === 'cocok' }"
+                            class="rekap-tab-btn">
+                        ✓ Cocok ({{ $matchCountSum }})
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table Wrapper -->
+            <div class="opname-table-wrapper overflow-x-auto">
+                <table class="opname-table">
                     <thead>
-                        <tr class="bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                            <th>SKU</th>
-                            <th>Produk</th>
-                            <th class="text-right">Sistem</th>
-                            <th class="text-right">Total P1</th>
-                            <th class="text-right">Total P2</th>
-                            <th class="text-right">Final SPV</th>
-                            <th class="text-right">Selisih Final</th>
-                            <th class="text-center">Status</th>
+                        <tr>
+                            <th style="min-width: 140px;">SKU</th>
+                            <th style="min-width: 240px;">Produk</th>
+                            <th class="text-right" style="min-width: 100px;">Sistem</th>
+                            <th class="text-right" style="min-width: 100px;">Total P1</th>
+                            <th class="text-right" style="min-width: 100px;">Total P2</th>
+                            <th class="text-right" style="min-width: 110px;">Final SPV</th>
+                            <th class="text-right" style="min-width: 120px;">Selisih Final</th>
+                            <th class="text-center" style="min-width: 90px;">Status</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800/60">
-                        @foreach($this->record->getProductSummary() as $summary)
-                        <tr class="hover:bg-gray-50/40 dark:hover:bg-gray-950/40 transition-colors {{ $summary['is_discrepancy'] ? 'bg-rose-50/15 dark:bg-rose-950/5' : '' }}">
-                            <td class="font-mono text-xs text-gray-700 dark:text-gray-300">{{ $summary['sku'] }}</td>
-                            <td class="font-semibold text-gray-900 dark:text-white">
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    <span>{{ $summary['name'] }}</span>
-                                    @if(!empty($summary['is_new_to_branch']))
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                                            Baru di Cabang
+                    <tbody>
+                        @forelse($productSummaries as $summary)
+                        <tr class="{{ $summary['is_discrepancy'] ? 'is-discrepancy' : '' }}"
+                            x-show="matchesRow('{{ addslashes($summary['sku'] ?? '') }}', '{{ addslashes($summary['name'] ?? '') }}', {{ $summary['is_discrepancy'] ? 'true' : 'false' }})">
+                            <td class="font-mono text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                <span class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md inline-block">
+                                    {{ $summary['sku'] ?? '-' }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="font-bold text-gray-900 dark:text-white">{{ $summary['name'] ?? '-' }}</div>
+                                @if(!empty($summary['is_new_to_branch']))
+                                    <div class="mt-1">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                            ✨ Baru di Cabang
                                         </span>
-                                    @endif
-                                </div>
+                                    </div>
+                                @endif
                             </td>
-                            <td class="text-right font-mono text-gray-600 dark:text-gray-400">{{ number_format($summary['system_qty'], 0) }}</td>
-                            <td class="text-right font-mono text-gray-650 dark:text-gray-450">{{ number_format($summary['total_count1'], 0) }}</td>
-                            <td class="text-right font-mono text-gray-650 dark:text-gray-450">{{ number_format($summary['total_count2'], 0) }}</td>
-                            <td class="text-right font-mono font-bold text-gray-950 dark:text-white">
-                                {{ $summary['total_final'] > 0 ? number_format($summary['total_final'], 0) : '-' }}
+                            <td class="num-cell text-gray-600 dark:text-gray-400">
+                                {{ number_format($summary['system_qty'], 0, ',', '.') }}
                             </td>
-                            <td class="text-right font-mono font-extrabold
-                                {{ $summary['final_disc'] < 0 ? 'text-rose-600' : ($summary['final_disc'] > 0 ? 'text-emerald-600' : 'text-gray-400') }}">
-                                {{ $summary['final_disc'] != 0 ? ($summary['final_disc'] > 0 ? '+' : '') . number_format($summary['final_disc'], 0, ',', '.') : '0' }}
+                            <td class="num-cell text-gray-700 dark:text-gray-300">
+                                {{ number_format($summary['total_count1'], 0, ',', '.') }}
+                            </td>
+                            <td class="num-cell text-gray-700 dark:text-gray-300">
+                                {{ number_format($summary['total_count2'], 0, ',', '.') }}
+                            </td>
+                            <td class="num-cell font-bold text-gray-950 dark:text-white">
+                                {{ $summary['total_final'] > 0 ? number_format($summary['total_final'], 0, ',', '.') : '-' }}
+                            </td>
+                            <td class="num-cell">
+                                @if($summary['final_disc'] < 0)
+                                    <span class="disc-pill negative">{{ number_format($summary['final_disc'], 0, ',', '.') }}</span>
+                                @elseif($summary['final_disc'] > 0)
+                                    <span class="disc-pill positive">+{{ number_format($summary['final_disc'], 0, ',', '.') }}</span>
+                                @else
+                                    <span class="disc-pill zero">0</span>
+                                @endif
                             </td>
                             <td class="text-center">
                                 @if($summary['is_discrepancy'])
@@ -842,7 +1175,13 @@
                                 @endif
                             </td>
                         </tr>
-                        @endforeach
+                        @empty
+                        <tr>
+                            <td colspan="8" class="text-center py-8 text-gray-400 italic">
+                                Belum ada data produk dalam sesi ini.
+                            </td>
+                        </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>

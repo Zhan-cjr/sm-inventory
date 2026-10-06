@@ -558,9 +558,18 @@
             return;
         }
         
-        proceedSubmit();
+        e.preventDefault();
+        confirmAndProceedSubmit();
     });
     
+    function confirmAndProceedSubmit() {
+        const rackCode = "{{ $rack->rack_code }}";
+        if (!confirm(`⚠️ Konfirmasi Simpan Hasil Hitung:\n\nApakah Anda yakin ingin menyimpan dan mengirim data hitungan untuk Rak ${rackCode}?\n\nSetelah disimpan, data rak ini akan TERKUNCI dan tidak dapat diubah lagi.`)) {
+            return;
+        }
+        proceedSubmit();
+    }
+
     function proceedSubmit() {
         localStorage.removeItem(storageKey); // Clear draft on submit
         const btn = document.getElementById('submit-btn');
@@ -632,7 +641,7 @@
         });
         
         closeReviewModal();
-        proceedSubmit();
+        confirmAndProceedSubmit();
     };
 
     // ─── Barcode scan & highlight logic ───

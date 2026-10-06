@@ -670,6 +670,11 @@
             return;
         }
 
+        if (!confirm('⚖️ Konfirmasi Simpan Verifikasi Final:\n\nApakah Anda yakin ingin menyimpan seluruh hasil verifikasi fisik ini?\n\nData fisik ini akan dijadikan acuan kuantitas akhir Stok Opname.')) {
+            e.preventDefault();
+            return;
+        }
+
         const btn = document.getElementById('btn-submit');
         if (btn) {
             btn.disabled = true;

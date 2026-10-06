@@ -218,6 +218,7 @@ class OpnamePublicController extends Controller
         return redirect()->route('opname.done', [
             'role'      => 'penghitung',
             'rack_code' => $rackSession->rack?->rack_code,
+            'next_url'  => route('opname.portal', $rackSession->session->session_token),
         ]);
     }
 

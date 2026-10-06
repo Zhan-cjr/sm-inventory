@@ -68,13 +68,53 @@
 
     @if($role === 'penghitung')
     <p class="note">🎉 Terima kasih! Lanjutkan ke rak berikutnya dengan scan QR rak selanjutnya.</p>
-    @elseif($role === 'pengecek' && $next_url)
+    @if(!empty($next_url))
+    <a href="{{ $next_url }}" class="btn btn-green">📋 Kembali ke Portal Opname</a>
+    @endif
+    @elseif($role === 'pengecek' && !empty($next_url))
     <a href="{{ $next_url }}" class="btn btn-purple">🔍 Cek Rak Lainnya</a>
-    @elseif($role === 'final' && $next_url)
+    @elseif($role === 'final' && !empty($next_url))
     <a href="{{ $next_url }}" class="btn btn-purple">📋 Kembali ke Daftar Selisih</a>
     @endif
 
-    <a href="javascript:window.close()" class="btn btn-gray">Tutup Halaman</a>
+    <button type="button" onclick="closeThisTab()" class="btn btn-gray" id="btn-close-tab">✕ Tutup Halaman</button>
+
+    <div id="close-blocked-msg" style="display:none; margin-top:14px; padding:12px 14px; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.25); border-radius:12px; font-size:12px; color:#fca5a5; line-height:1.5; text-align:center;">
+        🔒 <strong>Tab tidak dapat ditutup otomatis:</strong><br>
+        Browser Anda membatasi penutupan tab secara otomatis demi keamanan. Silakan tutup tab ini secara manual melalui tombol (✕) tab browser Anda.
+    </div>
 </div>
+
+<script>
+function closeThisTab() {
+    // 1. Coba window.close standar
+    try {
+        window.close();
+    } catch(e) {}
+
+    // 2. Coba hack self-close window
+    setTimeout(function() {
+        try {
+            window.open('', '_self', '');
+            window.close();
+        } catch(e) {}
+
+        // 3. Jika browser tetap memblokir penutupan otomatis (kebijakan keamanan browser),
+        // tampilkan instruksi ramah atau fallback ke history/next_url
+        const blockedMsg = document.getElementById('close-blocked-msg');
+        if (blockedMsg) {
+            blockedMsg.style.display = 'block';
+        }
+
+        @if(!empty($next_url))
+        setTimeout(function() {
+            if (confirm('Tab tidak dapat ditutup otomatis oleh browser. Apakah Anda ingin kembali ke portal?')) {
+                window.location.href = "{{ $next_url }}";
+            }
+        }, 600);
+        @endif
+    }, 250);
+}
+</script>
 </body>
 </html>

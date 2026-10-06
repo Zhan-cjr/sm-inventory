@@ -557,8 +557,17 @@
             return;
         }
 
-        proceedSubmit();
+        e.preventDefault();
+        confirmAndProceedSubmit();
     });
+
+    function confirmAndProceedSubmit() {
+        const rackCode = "{{ $rack->rack_code }}";
+        if (!confirm(`⚠️ Konfirmasi Simpan Hasil Pengecekan:\n\nApakah Anda yakin ingin menyimpan dan mengirim data pengecekan untuk Rak ${rackCode}?\n\nSetelah disimpan, data pengecekan rak ini akan TERKUNCI dan tidak dapat diubah lagi.`)) {
+            return;
+        }
+        proceedSubmit();
+    }
 
     function proceedSubmit() {
         localStorage.removeItem(storageKey); // Clear draft on submit
@@ -633,7 +642,7 @@
         });
         
         closeReviewModal();
-        proceedSubmit();
+        confirmAndProceedSubmit();
     };
 
     // ─── Barcode match & focus ───
