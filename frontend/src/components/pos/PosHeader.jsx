@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, RefreshCw, Wifi, WifiOff, Settings, Sun, Moon, User, LogOut, AlertTriangle } from 'lucide-react';
+import { Clock, RefreshCw, Wifi, WifiOff, Settings, Sun, Moon, User, LogOut, AlertTriangle, BarChart3 } from 'lucide-react';
 import LiveClock from './LiveClock';
 
 const PosHeader = ({
@@ -17,6 +17,7 @@ const PosHeader = ({
   theme,
   toggleTheme,
   userName,
+  userRole,
   setIsTerminalModalOpen,
   onLogout
 }) => {
@@ -130,6 +131,17 @@ const PosHeader = ({
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
+
+        {["MANAGER", "ADMIN", "SUPERVISOR", "SPV", "EDP", "SUPERADMIN", "SUPER_ADMIN"].includes(userRole?.toUpperCase()) && (
+          <button
+            className="btn-icon"
+            onClick={() => window.location.href = "/dashboard"}
+            title="Buka Dashboard BI / Analitik"
+            style={{ background: "transparent", padding: "4px", border: "none", color: "var(--primary)", cursor: "pointer" }}
+          >
+            <BarChart3 size={18} />
+          </button>
+        )}
 
         <div
           className="user-info"

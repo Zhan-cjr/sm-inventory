@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { POSTransaction } from './components/POSTransaction';
 import { Login } from './components/Login';
+import { isRealMobileDevice } from './utils/deviceHelper';
 import './index.css';
 
 // Code splitting (Lazy loading) for non-critical initial chunks
@@ -57,10 +58,10 @@ function App() {
   const [deviceError, setDeviceError] = useState(null); // Branch mismatch error messages
   const [copied, setCopied] = useState(false);
 
-  const [isMobileDevice, setIsMobileDevice] = useState(window.innerWidth <= 768);
+  const [isMobileDevice, setIsMobileDevice] = useState(() => isRealMobileDevice());
 
   useEffect(() => {
-    const handleResize = () => setIsMobileDevice(window.innerWidth <= 768);
+    const handleResize = () => setIsMobileDevice(isRealMobileDevice());
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -191,6 +192,15 @@ function App() {
     setDeviceError(null);
     localStorage.setItem('pos_token', newToken);
     localStorage.setItem('pos_user', JSON.stringify(userData));
+
+    // Reset route according to device: Desktop goes to /pos, Mobile goes to /mobile
+    const isMobile = isRealMobileDevice();
+    if (!isMobile && window.location.pathname.startsWith('/mobile')) {
+      window.history.replaceState(null, '', '/pos');
+    } else if (isMobile && (window.location.pathname === '/pos' || window.location.pathname === '/')) {
+      window.history.replaceState(null, '', '/mobile');
+    }
+
     setToken(newToken);
     setUser(userData);
   };
@@ -331,7 +341,21 @@ function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={
-            isMobileDevice ? <Navigate to="/mobile" replace /> : (canAccessDashboard ? <Navigate to="/dashboard" replace /> : (user.can_access_pos ? <Navigate to="/pos" replace /> : <div style={{ padding: '2rem', textAlign: 'center', marginTop: '10vh' }}><h2>Akses Ditolak</h2><p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p><button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px' }}>Logout</button></div>))
+            isMobileDevice ? (
+              <Navigate to="/mobile" replace />
+            ) : (
+              user.can_access_pos ? (
+                <Navigate to="/pos" replace />
+              ) : canAccessDashboard ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <div style={{ padding: '2rem', textAlign: 'center', marginTop: '10vh' }}>
+                  <h2>Akses Ditolak</h2>
+                  <p>Anda tidak memiliki izin untuk mengakses kasir (access_pos). Hubungi Admin.</p>
+                  <button onClick={handleLogout} style={{ padding: '10px 20px', marginTop: '20px' }}>Logout</button>
+                </div>
+              )
+            )
           } />
 
           <Route path="/pos" element={
@@ -358,7 +382,7 @@ function App() {
 
           <Route path="/dashboard" element={
             canAccessDashboard ? (
-              <BIDashboard user={user} authToken={token} onBack={() => window.location.href = '/mobile'} />
+              <BIDashboard user={user} authToken={token} onBack={() => { window.location.href = isMobileDevice ? '/mobile' : '/pos'; }} />
             ) : <Navigate to="/pos" replace />
           } />
 

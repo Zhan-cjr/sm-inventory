@@ -934,6 +934,7 @@ export const POSTransaction = ({
         theme={theme}
         toggleTheme={toggleTheme}
         userName={userName}
+        userRole={userRole}
         setIsTerminalModalOpen={setIsTerminalModalOpen}
         onLogout={onLogout}
       />
