@@ -38,7 +38,7 @@ class GoodsReceiptPos extends Component
     public $tax_amount = 0;
     public $cetak_nota = false;
 
-    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'harga_jual_1', 'margin_gol_1', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
+    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'unit_price_tax', 'harga_jual_1', 'margin_gol_1', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
 
     public $searchQuery = '';
     public $cart = [];
@@ -66,7 +66,7 @@ class GoodsReceiptPos extends Component
 
     public function mount($goodsReceipt = null)
     {
-        $this->taxRate = (float) (\App\Models\Organization::first()?->tax_rate ?? 11);
+        $this->taxRate = (float) \App\Services\RetailIntelligenceService::getActiveTaxRate();
 
         if ($goodsReceipt) {
             $this->goodsReceipt = $goodsReceipt;
@@ -85,21 +85,60 @@ class GoodsReceiptPos extends Component
             $this->existing_faktur_image = is_array($goodsReceipt->faktur_image) ? $goodsReceipt->faktur_image : ($goodsReceipt->faktur_image ? [$goodsReceipt->faktur_image] : []);
             $this->faktur_image = [];
 
+            $taxMultiplier = 1 + ($this->taxRate / 100);
+
+            // Cek apakah draft ini berasal dari Warehouse Check / PO lama yang unit_price nya terisi harga include PPN (cost_price_tax)
+            $isDraftFromCheck = ($goodsReceipt->status === 'DRAFT' || !empty($goodsReceipt->warehouse_check_id));
+            $hasTaxable = false;
+            foreach ($goodsReceipt->items as $item) {
+                if ($item->product?->is_taxable ?? true) {
+                    $hasTaxable = true;
+                    break;
+                }
+            }
+            if ($isDraftFromCheck && !$this->include_tax && $hasTaxable) {
+                $this->include_tax = true;
+            }
+
             foreach ($goodsReceipt->items as $item) {
                 $stock = null;
                 if ($this->branch_id) {
                     $stock = Stock::where('product_id', $item->product_id)->where('branch_id', $this->branch_id)->first();
                 }
 
+                $isTaxable = (bool) ($item->product?->is_taxable ?? true);
+                $rawPrice = (float) $item->unit_price;
+
+                if ($isDraftFromCheck && $isTaxable) {
+                    $stockTax = $stock ? (float) $stock->cost_price_tax : 0;
+                    $prodTax = $item->product ? (float) $item->product->cost_price_tax : 0;
+
+                    // Jika rawPrice sama dengan cost_price_tax (harga include PPN) atau draft GR tersimpan tanpa include_tax
+                    if (($stockTax > 0 && abs($stockTax - $rawPrice) < 1.0) || ($prodTax > 0 && abs($prodTax - $rawPrice) < 1.0) || !$goodsReceipt->include_tax) {
+                        $unitPriceTax = $rawPrice;
+                        $unitPrice = round($rawPrice / $taxMultiplier, 4);
+                    } else {
+                        $unitPrice = $rawPrice;
+                        $unitPriceTax = round($rawPrice * $taxMultiplier, 2);
+                    }
+                } elseif ($isTaxable) {
+                    $unitPrice = $rawPrice;
+                    $unitPriceTax = round($rawPrice * $taxMultiplier, 2);
+                } else {
+                    $unitPrice = $rawPrice;
+                    $unitPriceTax = $rawPrice;
+                }
+
                 $this->cart[] = [
                     'product_id' => $item->product_id,
-                    'sku' => $item->product->sku,
-                    'barcode' => $item->product->barcode,
-                    'name' => $item->product->name,
-                    'is_taxable' => (bool) ($item->product->is_taxable ?? true),
+                    'sku' => $item->product ? $item->product->sku : '',
+                    'barcode' => $item->product ? $item->product->barcode : '',
+                    'name' => $item->product ? $item->product->name : '',
+                    'is_taxable' => $isTaxable,
                     'qty_ordered' => $item->quantity_ordered,
                     'qty_received' => $item->quantity_received,
-                    'unit_price' => $item->unit_price,
+                    'unit_price' => $unitPrice,
+                    'unit_price_tax' => $unitPriceTax,
                     'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($item->product->harga_jual_1 ?? 0),
                     'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($item->product->margin_gol_1 ?? 0),
                     'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($item->product->harga_jual_2 ?? 0),
@@ -109,8 +148,9 @@ class GoodsReceiptPos extends Component
                     'discount_1' => $item->discount_1,
                     'discount_2' => $item->discount_2,
                     'discount_3' => $item->discount_3,
-                    'subtotal' => $item->subtotal
+                    'subtotal' => 0,
                 ];
+                $this->recalculateRow(count($this->cart) - 1, false);
             }
         } else {
             $this->receipt_number = 'GR-' . date('YmdHis');
@@ -246,21 +286,38 @@ class GoodsReceiptPos extends Component
                             $stock = Stock::where('product_id', $checkItem->product_id)->where('branch_id', $this->branch_id)->first();
                         }
 
+                        $isTaxable = (bool) ($checkItem->product->is_taxable ?? true);
+                        $taxMultiplier = 1 + ($this->taxRate / 100);
+
                         $poItem = $po->items->firstWhere('product_id', $checkItem->product_id);
-                        $unitPrice = $poItem ? (float) ($poItem->unit_cost ?? 0) : 0;
+                        $poCost = $poItem ? (float) ($poItem->unit_cost ?? 0) : 0;
                         $disc1 = $poItem ? (float) ($poItem->discount_1 ?? 0) : 0;
                         $disc2 = $poItem ? (float) ($poItem->discount_2 ?? 0) : 0;
                         $disc3 = $poItem ? (float) ($poItem->discount_3 ?? 0) : 0;
+
+                        if ($isTaxable) {
+                            // PO unit_cost di sistem ini selalu menyimpan harga include PPN (cost_price_tax)
+                            $unitPriceTax = $poCost;
+                            if ($stock && $stock->cost_price > 0 && abs(round($stock->cost_price * $taxMultiplier, 2) - $poCost) < 1.0) {
+                                $unitPrice = (float) $stock->cost_price;
+                            } else {
+                                $unitPrice = round($poCost / $taxMultiplier, 4);
+                            }
+                        } else {
+                            $unitPrice = $poCost;
+                            $unitPriceTax = $poCost;
+                        }
 
                         $this->cart[] = [
                             'product_id' => $checkItem->product_id,
                             'sku' => $checkItem->product->sku,
                             'barcode' => $checkItem->product->barcode,
                             'name' => $checkItem->product->name,
-                            'is_taxable' => (bool) ($checkItem->product->is_taxable ?? true),
+                            'is_taxable' => $isTaxable,
                             'qty_ordered' => (float) $checkItem->qty_po,
                             'qty_received' => (float) $qtyToDefault,
                             'unit_price' => $unitPrice,
+                            'unit_price_tax' => $unitPriceTax,
                             'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($checkItem->product->harga_jual_1 ?? 0),
                             'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($checkItem->product->margin_gol_1 ?? 0),
                             'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($checkItem->product->harga_jual_2 ?? 0),
@@ -272,7 +329,7 @@ class GoodsReceiptPos extends Component
                             'discount_3' => $disc3,
                             'subtotal' => 0,
                         ];
-                        $this->recalculateRow(count($this->cart) - 1);
+                        $this->recalculateRow(count($this->cart) - 1, false);
                     }
                 } else {
                     foreach ($po->items as $item) {
@@ -294,15 +351,29 @@ class GoodsReceiptPos extends Component
                             $stock = Stock::where('product_id', $item->product_id)->where('branch_id', $this->branch_id)->first();
                         }
 
+                        $isTaxable = (bool) ($item->product?->is_taxable ?? true);
+                        $taxMultiplier = 1 + ($this->taxRate / 100);
+                        $poCost = (float) ($item->unit_cost ?? 0);
+
+                        if ($isTaxable) {
+                            // PO unit_cost di sistem ini selalu menyimpan harga include PPN (cost_price_tax)
+                            $unitPriceTax = $poCost;
+                            $unitPrice = round($poCost / $taxMultiplier, 4);
+                        } else {
+                            $unitPrice = $poCost;
+                            $unitPriceTax = $poCost;
+                        }
+
                         $this->cart[] = [
                             'product_id' => $item->product_id,
                             'sku' => $item->product->sku,
                             'barcode' => $item->product->barcode,
                             'name' => $item->product->name,
-                            'is_taxable' => (bool) ($item->product->is_taxable ?? true),
+                            'is_taxable' => $isTaxable,
                             'qty_ordered' => (float) $item->quantity_ordered,
                             'qty_received' => (float) $qtyToDefault,
-                            'unit_price' => (float) ($item->unit_cost ?? 0),
+                            'unit_price' => $unitPrice,
+                            'unit_price_tax' => $unitPriceTax,
                             'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($item->product->harga_jual_1 ?? 0),
                             'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($item->product->margin_gol_1 ?? 0),
                             'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($item->product->harga_jual_2 ?? 0),
@@ -314,12 +385,12 @@ class GoodsReceiptPos extends Component
                             'discount_3' => (float) ($item->discount_3 ?? 0),
                             'subtotal' => 0,
                         ];
-                        $this->recalculateRow(count($this->cart) - 1);
+                        $this->recalculateRow(count($this->cart) - 1, false);
                     }
                 }
 
-                $this->include_tax = $po->include_tax;
-                $this->tax_amount = $po->tax_amount;
+                $hasTaxableInCart = collect($this->cart)->contains(fn($ci) => (bool) ($ci['is_taxable'] ?? true));
+                $this->include_tax = $hasTaxableInCart;
                 $this->calculateTotals();
             }
         }
@@ -543,17 +614,26 @@ class GoodsReceiptPos extends Component
                 $stock = Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->first();
             }
 
-            $costPrice = ($stock && $stock->cost_price > 0) ? $stock->cost_price : $product->cost_price;
+            $isTaxable = (bool) ($product->is_taxable ?? true);
+            $taxMultiplier = 1 + ($this->taxRate / 100);
+
+            $costPrice = ($stock && $stock->cost_price > 0) ? (float) $stock->cost_price : (float) ($product->cost_price ?? 0);
+            $costPriceTax = ($stock && $stock->cost_price_tax > 0) ? (float) $stock->cost_price_tax : ($isTaxable ? round($costPrice * $taxMultiplier, 2) : $costPrice);
+
+            if (!$isTaxable) {
+                $costPriceTax = $costPrice;
+            }
 
             $this->cart[] = [
                 'product_id' => $product->id,
                 'sku' => $product->sku,
                 'barcode' => $product->barcode,
                 'name' => $product->name,
-                'is_taxable' => (bool) ($product->is_taxable ?? true),
+                'is_taxable' => $isTaxable,
                 'qty_ordered' => 0,
                 'qty_received' => 1,
                 'unit_price' => $costPrice,
+                'unit_price_tax' => $costPriceTax,
                 'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($product->harga_jual_1 ?? 0),
                 'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($product->margin_gol_1 ?? 0),
                 'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($product->harga_jual_2 ?? 0),
@@ -563,7 +643,7 @@ class GoodsReceiptPos extends Component
                 'discount_1' => 0,
                 'discount_2' => 0,
                 'discount_3' => 0,
-                'subtotal' => $product->cost_price
+                'subtotal' => $costPrice
             ];
         }
 
@@ -578,6 +658,29 @@ class GoodsReceiptPos extends Component
                 return;
             }
         }
+
+        if ($field === 'unit_price_tax') {
+            $taxVal = (float) $value;
+            $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
+            $taxMultiplier = 1 + ($this->taxRate / 100);
+            
+            $this->cart[$index]['unit_price_tax'] = $taxVal;
+            $this->cart[$index]['unit_price'] = $isTaxable ? ($taxMultiplier > 0 ? round($taxVal / $taxMultiplier, 4) : $taxVal) : $taxVal;
+            $this->recalculateRow($index, false);
+            return;
+        }
+
+        if ($field === 'unit_price') {
+            $dppVal = (float) $value;
+            $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
+            $taxMultiplier = 1 + ($this->taxRate / 100);
+            
+            $this->cart[$index]['unit_price'] = $dppVal;
+            $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($dppVal * $taxMultiplier, 2) : $dppVal;
+            $this->recalculateRow($index, false);
+            return;
+        }
+
         $this->cart[$index][$field] = $value;
         $this->recalculateRow($index);
         $this->calculateTotals();
@@ -630,7 +733,21 @@ class GoodsReceiptPos extends Component
                 }
             }
             
-            if ($field === 'subtotal') {
+            if ($field === 'unit_price_tax') {
+                $taxVal = (float) $value;
+                $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
+                $taxMultiplier = 1 + ($this->taxRate / 100);
+                $this->cart[$index]['unit_price_tax'] = $taxVal;
+                $this->cart[$index]['unit_price'] = $isTaxable ? ($taxMultiplier > 0 ? round($taxVal / $taxMultiplier, 4) : $taxVal) : $taxVal;
+                $this->recalculateRow($index, false);
+            } elseif ($field === 'unit_price') {
+                $dppVal = (float) $value;
+                $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
+                $taxMultiplier = 1 + ($this->taxRate / 100);
+                $this->cart[$index]['unit_price'] = $dppVal;
+                $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($dppVal * $taxMultiplier, 2) : $dppVal;
+                $this->recalculateRow($index, false);
+            } elseif ($field === 'subtotal') {
                 $qty = (float) ($this->cart[$index]['qty_received'] ?? 0);
                 $subtotal = (float) $value;
                 if ($qty > 0) {
@@ -643,6 +760,10 @@ class GoodsReceiptPos extends Component
                     $baseTotal = $subtotal / ($f1 * $f2 * $f3);
                     $this->cart[$index]['unit_price'] = round($baseTotal / $qty, 4);
                     $this->cart[$index]['subtotal'] = $subtotal;
+                    
+                    $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
+                    $taxMultiplier = 1 + ($this->taxRate / 100);
+                    $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($this->cart[$index]['unit_price'] * $taxMultiplier, 2) : $this->cart[$index]['unit_price'];
                 }
             } else {
                 $this->recalculateRow($index);
@@ -684,11 +805,17 @@ class GoodsReceiptPos extends Component
         }
     }
 
-    public function recalculateRow($index)
+    public function recalculateRow($index, $syncTaxPrice = true)
     {
         $item = $this->cart[$index];
         $qty = (float) ($item['qty_received'] ?? 0);
         $price = (float) ($item['unit_price'] ?? 0);
+        $isTaxable = (bool) ($item['is_taxable'] ?? true);
+        $taxMultiplier = 1 + ($this->taxRate / 100);
+
+        if ($syncTaxPrice) {
+            $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($price * $taxMultiplier, 2) : $price;
+        }
         
         $baseTotal = $qty * $price;
         
@@ -873,7 +1000,7 @@ class GoodsReceiptPos extends Component
                 $gr = GoodsReceipt::create($data);
             }
 
-            $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
+            $taxRate = (float) ($this->taxRate ?? \App\Services\RetailIntelligenceService::getActiveTaxRate());
             $taxMultiplier = 1 + ($taxRate / 100);
 
             foreach ($this->cart as $item) {
@@ -889,12 +1016,12 @@ class GoodsReceiptPos extends Component
                     'subtotal' => $item['subtotal']
                 ]);
 
+                $product = Product::find($item['product_id']);
                 $netPrice = $item['qty_received'] > 0 ? ($item['subtotal'] / $item['qty_received']) : $item['unit_price'];
                 $isTaxable = (bool) ($item['is_taxable'] ?? ($product?->is_taxable ?? true));
                 $costPriceTax = ($this->include_tax && $isTaxable) ? round($netPrice * $taxMultiplier, 2) : $netPrice;
 
                 // 1. Selalu update Produk Global (Master Data) agar harga global tetap up-to-date
-                $product = Product::find($item['product_id']);
                 if ($product) {
                     $updateData = [
                         'cost_price' => $netPrice,

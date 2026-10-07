@@ -300,10 +300,15 @@ class StocksRelationManager extends RelationManager
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('cost_price')
-                    ->label('Harga Beli (Cabang)')
+                    ->label('Harga Beli (DPP)')
                     ->money('IDR')
                     ->sortable()
                     ->placeholder(fn ($record) => $record && $record->product ? 'Default: Rp ' . number_format($record->product->cost_price, 0, ',', '.') : 'Rp 0'),
+                TextColumn::make('cost_price_tax')
+                    ->label('Harga Beli (+PPN)')
+                    ->money('IDR')
+                    ->sortable()
+                    ->placeholder(fn ($record) => $record && $record->product ? 'Default: Rp ' . number_format($record->product->cost_price_tax, 0, ',', '.') : 'Rp 0'),
                 TextColumn::make('selling_price')
                     ->label('Harga Jual (Cabang)')
                     ->money('IDR')

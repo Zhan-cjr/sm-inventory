@@ -12,6 +12,7 @@ use App\Models\TransactionItem;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -20,6 +21,8 @@ use Illuminate\Support\Str;
 
 class PerformaListing extends Page
 {
+    use HasPageShield;
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar-square';
     protected static ?string $navigationLabel = 'Performa Listing';
     protected static ?string $title = 'Dashboard Performa Listing';
@@ -39,20 +42,6 @@ class PerformaListing extends Page
         'listing_id' => ['except' => ''],
         'active_tab' => ['except' => 'breakdown'],
     ];
-
-    public static function canAccess(): bool
-    {
-        $user = auth()->user();
-        if (!$user) {
-            return false;
-        }
-
-        if ($user->hasRole(['superadmin', 'super_admin', 'super-admin'])) {
-            return true;
-        }
-
-        return true;
-    }
 
     public function mount(): void
     {

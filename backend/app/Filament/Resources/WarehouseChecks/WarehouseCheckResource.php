@@ -225,6 +225,10 @@ HTML;
                             }
                         }
 
+                        $taxRate = (float) \App\Services\RetailIntelligenceService::getActiveTaxRate();
+                        $taxMultiplier = 1 + ($taxRate / 100);
+                        $hasTaxableItems = $record->items->contains(fn($ci) => (bool) ($ci->product?->is_taxable ?? true));
+
                         // Cek apakah sudah ada Goods Receipt berstatus DRAFT untuk pengecekan ini
                         $existingDraftGr = \App\Models\GoodsReceipt::where('warehouse_check_id', $record->id)
                             ->where('status', 'DRAFT')
@@ -233,6 +237,7 @@ HTML;
                         $isNewGr = false;
                         if ($existingDraftGr) {
                             $gr = $existingDraftGr;
+                            $gr->update(['include_tax' => $hasTaxableItems]);
                             // Hapus item draft lama untuk diisi ulang dengan data fisik terbaru
                             $gr->items()->delete();
                         } else {
@@ -248,7 +253,7 @@ HTML;
                                 'received_by' => $record->checker->name,
                                 'status' => 'DRAFT',
                                 'total_amount' => 0,
-                                'include_tax' => $po->include_tax,
+                                'include_tax' => $hasTaxableItems,
                             ]);
                         }
 
@@ -284,14 +289,24 @@ HTML;
 
                             if ($qtyToInsert > 0) {
                                 $poItem = $po->items()->where('product_id', $checkItem->product_id)->first();
-                                $price = $poItem ? ($poItem->unit_cost ?? 0) : 0;
-                                $subtotal = $price * $qtyToInsert;
+                                $poCost = $poItem ? (float) ($poItem->unit_cost ?? 0) : 0;
+                                $isTaxable = (bool) ($checkItem->product?->is_taxable ?? true);
+
+                                // PO unit_cost selalu menyimpan harga include PPN (cost_price_tax).
+                                // Untuk produk kena PPN pada faktur bertarif PPN, pecah ke DPP (unit_price)
+                                if ($isTaxable && $hasTaxableItems) {
+                                    $unitPriceDpp = round($poCost / $taxMultiplier, 4);
+                                } else {
+                                    $unitPriceDpp = $poCost;
+                                }
+
+                                $subtotal = round($unitPriceDpp * $qtyToInsert, 2);
                                 
                                 $gr->items()->create([
                                     'product_id' => $checkItem->product_id,
                                     'quantity_ordered' => $checkItem->qty_po,
                                     'quantity_received' => $qtyToInsert,
-                                    'unit_price' => $price,
+                                    'unit_price' => $unitPriceDpp,
                                     'subtotal' => $subtotal,
                                 ]);
                                 $total += $subtotal;
@@ -312,13 +327,16 @@ HTML;
 
                         $taxAmount = 0;
                         if ($gr->include_tax) {
-                            $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
-                            $taxAmount = $total * ($taxRate / 100);
+                            foreach ($gr->items as $gi) {
+                                if ($gi->product?->is_taxable ?? true) {
+                                    $taxAmount += round($gi->subtotal * ($taxRate / 100), 2);
+                                }
+                            }
                         }
                         
                         $gr->update([
-                            'total_amount' => $total + $taxAmount,
-                            'tax_amount' => $taxAmount
+                            'total_amount' => round($total + $taxAmount, 2),
+                            'tax_amount' => round($taxAmount, 2)
                         ]);
 
                         // Determine status: if total received across all GRs >= total scanned, mark processed

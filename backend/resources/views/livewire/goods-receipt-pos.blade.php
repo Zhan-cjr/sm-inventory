@@ -497,8 +497,8 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M1 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zM1 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V7zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V7zM1 12a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-2z"/></svg>
                     Pilih Kolom
                 </button>
-                <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border-radius: 0.5rem; padding: 0.5rem; width: 12rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
-                    @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga Satuan', 'harga_jual_1' => 'Harga Jual 1', 'margin_gol_1' => 'Margin 1', 'harga_jual_2' => 'Harga Jual 2', 'margin_gol_2' => 'Margin 2', 'harga_jual_3' => 'Harga Jual 3', 'margin_gol_3' => 'Margin 3', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
+                <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border-radius: 0.5rem; padding: 0.5rem; width: 13rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
+                    @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga (DPP)', 'unit_price_tax' => 'Harga (+PPN)', 'harga_jual_1' => 'Harga Jual 1', 'margin_gol_1' => 'Margin 1', 'harga_jual_2' => 'Harga Jual 2', 'margin_gol_2' => 'Margin 2', 'harga_jual_3' => 'Harga Jual 3', 'margin_gol_3' => 'Margin 3', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
                         <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                             <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
                             <span class="text-xs text-gray-800 dark:text-gray-200">{{ $label }}</span>
@@ -520,7 +520,8 @@
                     @if(in_array('name', $visibleColumns)) <th class="pos-grid-th" style="min-width: 16rem; width: 25%;">Nama Produk</th> @endif
                     @if(in_array('qty_ordered', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Qty PO</th> @endif
                     @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Qty Terima</th> @endif
-                    @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9.5rem; text-align: right;">Harga Satuan</th> @endif
+                    @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9.5rem; text-align: right;">Harga (DPP)</th> @endif
+                    @if(in_array('unit_price_tax', $visibleColumns)) <th class="pos-grid-th" style="width: 9.5rem; text-align: right; background-color: #f0fdf4;" class="dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">Harga (+PPN)</th> @endif
 
                     @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Jual 1</th> @endif
                     @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 4.25rem; text-align: right;">Margin 1 (%)</th> @endif
@@ -550,7 +551,7 @@
                                              $isTaxable = $item['is_taxable'] ?? (!empty($item['product_id']) ? (\App\Models\Product::find($item['product_id'])?->is_taxable ?? true) : true);
                                          @endphp
                                          @if($isTaxable)
-                                             <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; letter-spacing: 0.02em;" title="Produk Kena PPN (11%)">PPN</span>
+                                             <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; letter-spacing: 0.02em;" title="Produk Kena PPN ({{ (float)($taxRate ?? 11) }}%)">PPN</span>
                                          @else
                                              <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; letter-spacing: 0.02em;" title="Produk Non-PPN (Bebas Pajak)">NonPPN</span>
                                          @endif
@@ -577,9 +578,20 @@
                         @endif
                         @if(in_array('unit_price', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <div x-data="{ raw: @entangle('cart.' . $index . '.unit_price'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                            <div x-data="{ raw: @entangle('cart.' . $index . '.unit_price'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.updateRow({{ $index }}, 'unit_price', this.raw); } }">
                                 <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="price-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
-                                       x-on:keydown.space.prevent="openCalc($event)">
+                                       x-on:keydown.space.prevent="openCalc($event)"
+                                       title="Harga satuan sebelum PPN (DPP)">
+                            </div>
+                        </td>
+                        @endif
+
+                        @if(in_array('unit_price_tax', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem; background-color: #f0fdf4;" class="dark:bg-emerald-950/20">
+                            <div x-data="{ raw: @entangle('cart.' . $index . '.unit_price_tax'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.updateRow({{ $index }}, 'unit_price_tax', this.raw); } }">
+                                <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="price-tax-{{ $index }}" class="pos-input pos-grid-input font-semibold text-emerald-700 dark:text-emerald-400" style="text-align: right;" 
+                                       x-on:keydown.space.prevent="openCalc($event)"
+                                       title="Harga satuan sudah include PPN (sesuai faktur fisik)">
                             </div>
                         </td>
                         @endif
@@ -735,7 +747,7 @@
             <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
                 <label class="flex items-center gap-2 cursor-pointer whitespace-nowrap">
                     <input type="checkbox" wire:model.live="include_tax" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Include PPN ({{ (float)($taxRate ?? 11) }}%)</span>
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Faktur Kena PPN ({{ (float)($taxRate ?? 11) }}%)</span>
                 </label>
             </div>
 

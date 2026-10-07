@@ -28,7 +28,7 @@ class GoodsReceiptItemObserver
         $stock->increment('quantity_on_hand', $item->quantity_received);
 
         // Calculate true cost price (net after discount + PPN)
-        $taxRate = \App\Models\Organization::first()->tax_rate ?? 11;
+        $taxRate = (float) \App\Services\RetailIntelligenceService::getActiveTaxRate();
         $taxMultiplier = 1 + ($taxRate / 100);
         
         // $item->subtotal is already after discounts. 

@@ -14,31 +14,31 @@ class ProductListingPolicy
 
     public function viewAny(AuthUser $authUser): bool
     {
-        return $authUser->can('ViewAny:Product') || $authUser->hasRole('super_admin');
+        return $authUser->can('ViewAny:ProductListing');
     }
 
     public function view(AuthUser $authUser, ProductListing $listing): bool
     {
-        return $authUser->can('View:Product') || $authUser->hasRole('super_admin');
+        return $authUser->can('View:ProductListing');
     }
 
     public function create(AuthUser $authUser): bool
     {
-        return $authUser->can('Create:Product') || $authUser->hasRole('super_admin');
+        return $authUser->can('Create:ProductListing');
     }
 
     public function update(AuthUser $authUser, ProductListing $listing): bool
     {
-        return $authUser->can('Update:Product') || $authUser->hasRole('super_admin');
+        return $authUser->can('Update:ProductListing');
     }
 
     public function delete(AuthUser $authUser, ProductListing $listing): bool
     {
-        return $authUser->can('Delete:Product') || $authUser->hasRole('super_admin');
+        return $authUser->can('Delete:ProductListing');
     }
 
     public function deleteAny(AuthUser $authUser): bool
     {
-        return $authUser->can('DeleteAny:Product') || $authUser->hasRole('super_admin');
+        return $authUser->can('DeleteAny:ProductListing');
     }
 }

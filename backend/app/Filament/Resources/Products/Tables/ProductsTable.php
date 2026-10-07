@@ -44,7 +44,6 @@ class ProductsTable
                         $q->where('branch_id', $branchId);
                     }], 'quantity_on_hand');
                 } else {
-                    $query->with('stocks.racks');
                     $query->withSum('stocks', 'quantity_on_hand');
                 }
                 
@@ -122,6 +121,7 @@ class ProductsTable
                     ->badge()
                     ->separator(',')
                     ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
+                    ->visible(fn (\Filament\Tables\Contracts\HasTable $livewire) => static::resolveActiveBranchId($livewire) !== null)
                     ->toggleable(),
                 TextColumn::make('supplier.name')
                     ->label('Pemasok')

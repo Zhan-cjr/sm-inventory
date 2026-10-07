@@ -593,11 +593,13 @@ body {
 
 /* Dropdown Menus */
 .fi-dropdown-panel {
+    background-color: #ffffff !important;
     border-radius: 12px !important;
     border: 1px solid #e2e8f0 !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
     z-index: 99999 !important;
-    max-height: 280px !important;
+    max-height: 420px !important;
+    overflow-y: auto !important;
 }
 .dark .fi-dropdown-panel {
     border-color: #1e293b !important;
