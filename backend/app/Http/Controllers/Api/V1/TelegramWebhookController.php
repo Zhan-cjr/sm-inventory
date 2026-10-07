@@ -29,7 +29,7 @@ class TelegramWebhookController extends Controller
             $telegramUsername = $update['message']['from']['username'] ?? 'Unknown';
 
             // 1. Verify Authorization
-            $user = User::where('telegram_chat_id', (string) $chatId)->first();
+            $user = User::where('telegram_chat_id', (string) $chatId)->where('is_active', true)->first();
             $branchId = null;
             $botToken = env('TELEGRAM_BOT_TOKEN');
 
@@ -229,7 +229,7 @@ class TelegramWebhookController extends Controller
         }
 
         // Authorization Check
-        $user = User::where('telegram_chat_id', (string) $telegramUserId)->first();
+        $user = User::where('telegram_chat_id', (string) $telegramUserId)->where('is_active', true)->first();
         $isAuthorized = false;
         $approverId = null;
         $approverName = $telegramName;
@@ -337,7 +337,7 @@ class TelegramWebhookController extends Controller
         }
 
         // Authorization Check
-        $user = User::where('telegram_chat_id', (string) $telegramUserId)->first();
+        $user = User::where('telegram_chat_id', (string) $telegramUserId)->where('is_active', true)->first();
         $isAuthorized = false;
 
         if ($user && is_array($user->pos_authorizations) && in_array($authRequest->action, $user->pos_authorizations)) {

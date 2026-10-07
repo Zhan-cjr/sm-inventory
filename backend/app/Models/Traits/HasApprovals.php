@@ -41,7 +41,8 @@ trait HasApprovals
             $requiredAuth = 'APPROVE_GR_OVERQUANTITY';
         }
         
-        $supervisors = \App\Models\User::whereNotNull('telegram_chat_id')
+        $supervisors = \App\Models\User::where('is_active', true)
+            ->whereNotNull('telegram_chat_id')
             ->whereJsonContains('custom_authorizations', $requiredAuth)
             ->get();
 

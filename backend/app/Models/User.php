@@ -16,7 +16,7 @@ use Spatie\Permission\Traits\HasRoles;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 
-#[Fillable(['name', 'username', 'email', 'password', 'organization_id', 'branch_id', 'role', 'pos_authorizations', 'custom_authorizations', 'telegram_chat_id'])]
+#[Fillable(['name', 'username', 'email', 'password', 'organization_id', 'branch_id', 'role', 'pos_authorizations', 'custom_authorizations', 'telegram_chat_id', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
@@ -35,6 +35,7 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'pos_authorizations' => 'array',
             'custom_authorizations' => 'array',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -50,6 +51,10 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
+        if ($this->is_active === false || $this->is_active === 0) {
+            return false;
+        }
+
         if ($this->hasRole(['superadmin', 'super_admin', 'super-admin'])) {
             return true;
         }

@@ -108,7 +108,8 @@ class SendDailyReport extends Command
 
         // Fetch users to send report to
         // Assuming Super Admin, Manager or Owner gets the report
-        $recipients = User::whereNotNull('telegram_chat_id')
+        $recipients = User::where('is_active', true)
+            ->whereNotNull('telegram_chat_id')
             ->whereIn('role', ['superadmin', 'super_admin', 'super-admin', 'owner', 'manager'])
             ->get();
 

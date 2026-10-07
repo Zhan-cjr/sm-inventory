@@ -48,6 +48,13 @@ class CustomLogin extends BaseLogin
 
         $user = \Filament\Facades\Filament::auth()->user();
         
+        if ($user && ($user->is_active === false || $user->is_active === 0)) {
+            \Filament\Facades\Filament::auth()->logout();
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'data.username' => __('Akun pengguna ini telah dinonaktifkan. Silakan hubungi administrator.'),
+            ]);
+        }
+
         $panel = \Filament\Facades\Filament::getCurrentPanel() ?? app('filament')->getPanel('admin');
         if ($user && !$user->canAccessPanel($panel)) {
             \Filament\Facades\Filament::auth()->logout();

@@ -46,7 +46,8 @@ class RemindPendingPO extends Command
             $this->warn('No telegram_group_po_approval configured in Organization. Falling back to individual supervisors.');
         }
 
-        $supervisors = \App\Models\User::whereNotNull('telegram_chat_id')
+        $supervisors = \App\Models\User::where('is_active', true)
+            ->whereNotNull('telegram_chat_id')
             ->whereJsonContains('custom_authorizations', 'APPROVE_PO')
             ->get();
 

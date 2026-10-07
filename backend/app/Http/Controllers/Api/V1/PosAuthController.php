@@ -13,7 +13,8 @@ class PosAuthController extends Controller
     {
         $branchId = auth()->user()->branch_id;
         
-        $authorizers = User::whereNotNull('pos_authorizations')
+        $authorizers = User::where('is_active', true)
+            ->whereNotNull('pos_authorizations')
             ->where('pos_authorizations', '!=', '[]')
             ->when($branchId, function ($q) use ($branchId) {
                 $q->where('branch_id', $branchId)->orWhereNull('branch_id'); // Admin might have no branch
@@ -39,6 +40,13 @@ class PosAuthController extends Controller
                 'authorized' => false,
                 'message' => 'Username atau Password salah.'
             ], 401);
+        }
+
+        if ($user->is_active === false || $user->is_active === 0) {
+            return response()->json([
+                'authorized' => false,
+                'message' => 'Akun pengguna ini telah dinonaktifkan.'
+            ], 403);
         }
 
         // Authorize based strictly on the specific pos_authorizations

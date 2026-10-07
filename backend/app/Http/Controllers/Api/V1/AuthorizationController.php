@@ -36,7 +36,8 @@ class AuthorizationController extends Controller
         // Send Telegram Notification
         $token = env('TELEGRAM_BOT_TOKEN');
         if ($token) {
-            $supervisors = \App\Models\User::whereNotNull('telegram_chat_id')
+            $supervisors = \App\Models\User::where('is_active', true)
+                ->whereNotNull('telegram_chat_id')
                 ->where(function($q) use ($user) {
                     $q->where('branch_id', $user->branch_id)
                       ->orWhereNull('branch_id');

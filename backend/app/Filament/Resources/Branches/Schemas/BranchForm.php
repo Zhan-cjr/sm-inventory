@@ -27,7 +27,7 @@ class BranchForm
                 TextInput::make('phone')
                     ->tel(),
                 Select::make('manager_id')
-                    ->options(\App\Models\User::pluck('name', 'id'))
+                    ->options(\App\Models\User::where('is_active', true)->pluck('name', 'id'))
                     ->searchable(),
                 Toggle::make('is_active')
                     ->required(),

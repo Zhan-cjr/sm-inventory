@@ -62,6 +62,16 @@ class UserForm
                     ->label('Telegram Chat ID')
                     ->numeric()
                     ->helperText('ID unik Telegram pengguna. Gunakan fitur pesan pribadi untuk menerima notifikasi otorisasi.'),
+                \Filament\Forms\Components\Toggle::make('is_active')
+                    ->label('Status Aktif')
+                    ->default(true)
+                    ->disabled(fn (?\Illuminate\Database\Eloquent\Model $record): bool => $record?->id === auth()->id())
+                    ->dehydrated(fn (?\Illuminate\Database\Eloquent\Model $record): bool => $record?->id !== auth()->id())
+                    ->helperText(fn (?\Illuminate\Database\Eloquent\Model $record): string => 
+                        $record?->id === auth()->id() 
+                            ? 'Anda tidak dapat menonaktifkan akun sendiri.' 
+                            : 'Nonaktifkan jika pengguna sudah tidak bekerja atau dilarang mengakses sistem backend dan kasir.'
+                    ),
                 \Filament\Schemas\Components\Tabs::make('Authorizations')
                     ->tabs([
                         \Filament\Schemas\Components\Tabs\Tab::make('Otorisasi POS Kasir')

@@ -27,6 +27,12 @@ class AuthController extends Controller
             ], 401);
         }
 
+        if ($user->is_active === false || $user->is_active === 0) {
+            return response()->json([
+                'message' => 'Akun pengguna ini telah dinonaktifkan. Silakan hubungi administrator.'
+            ], 403);
+        }
+
         $spatieRoles = array_map('strtolower', $user->roles->pluck('name')->toArray());
         $dbRole = $user->role;
         $role = $dbRole ?: 'CASHIER';
@@ -84,6 +90,13 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
+        
+        if ($user->is_active === false || $user->is_active === 0) {
+            $user->tokens()->delete();
+            return response()->json([
+                'message' => 'Akun pengguna ini telah dinonaktifkan.'
+            ], 403);
+        }
         
         $spatieRoles = array_map('strtolower', $user->roles->pluck('name')->toArray());
         $dbRole = $user->role;

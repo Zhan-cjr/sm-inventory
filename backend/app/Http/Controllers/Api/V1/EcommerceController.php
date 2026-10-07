@@ -723,7 +723,8 @@ class EcommerceController extends Controller
             // Send Telegram Notification
             $token = env('TELEGRAM_BOT_TOKEN');
             if ($token) {
-                $supervisors = \App\Models\User::whereNotNull('telegram_chat_id')
+                $supervisors = \App\Models\User::where('is_active', true)
+                    ->whereNotNull('telegram_chat_id')
                     ->where(function($q) use ($order) {
                         if ($order->branch_id) {
                             $q->where('branch_id', $order->branch_id)
