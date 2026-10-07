@@ -72,12 +72,6 @@ class LaporanServiceLevelSupplier extends Page
         }
     }
 
-    public static function canAccess(): bool
-    {
-        $user = Auth::user();
-        return $user && $user->hasRole(['superadmin', 'super_admin', 'super-admin', 'admin', 'owner', 'manager', 'purchasing', 'buyer', 'spv', 'supervisor']);
-    }
-
     protected function getService(): SupplierServiceLevelService
     {
         return app(SupplierServiceLevelService::class);

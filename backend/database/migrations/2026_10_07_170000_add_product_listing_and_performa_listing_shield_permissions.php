@@ -25,6 +25,7 @@ return new class extends Migration
             'Replicate:ProductListing',
             'Reorder:ProductListing',
             'View:PerformaListing',
+            'View:LaporanServiceLevelSupplier',
         ];
 
         foreach ($permissions as $permissionName) {
@@ -60,6 +61,7 @@ return new class extends Migration
             'Replicate:ProductListing',
             'Reorder:ProductListing',
             'View:PerformaListing',
+            'View:LaporanServiceLevelSupplier',
         ];
 
         Permission::whereIn('name', $permissions)->delete();
