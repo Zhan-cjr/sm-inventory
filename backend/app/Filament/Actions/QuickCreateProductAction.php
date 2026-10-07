@@ -290,7 +290,8 @@ class QuickCreateProductAction
                         $sku = $prefixSku . $seqStr;
                         $barcode = $prefixBarcode . $seqStr;
 
-                        $costTax = $isTaxable ? round($costPrice * 1.11, 2) : $costPrice;
+                        $taxRate = \App\Services\RetailIntelligenceService::getActiveTaxRate();
+                        $costTax = $isTaxable ? round($costPrice * (1 + ($taxRate / 100)), 2) : $costPrice;
                         $margin = ($costTax > 0 && $sellingPrice > 0) 
                             ? round((($sellingPrice - $costTax) / $costTax) * 100, 2) 
                             : 0;

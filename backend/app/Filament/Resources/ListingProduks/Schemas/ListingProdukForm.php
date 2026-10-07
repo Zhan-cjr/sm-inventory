@@ -228,7 +228,9 @@ class ListingProdukForm
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                         $cost = (float) str_replace(',', '.', str_replace('.', '', (string)$state));
-                                        $taxed_cost = round($cost * 1.11, 2);
+                                        $isTaxable = (bool) ($get('is_taxable') ?? true);
+                                        $taxRate = \App\Services\RetailIntelligenceService::getActiveTaxRate();
+                                        $taxed_cost = $isTaxable ? round($cost * (1 + ($taxRate / 100)), 2) : $cost;
                                         $set('cost_price_tax', str_replace('.', ',', (string)$taxed_cost));
                                         foreach([1, 2, 3] as $i) {
                                             $harga_jual_state = $get("harga_jual_{$i}");
@@ -245,7 +247,21 @@ class ListingProdukForm
                                 TextInput::make('cost_price_tax')
                                     ->label('Harga Beli + PPN')
                                     ->hiddenLabel()
-                                    ->rupiah(),
+                                    ->rupiah()
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                        $taxed_cost = (float) str_replace(',', '.', str_replace('.', '', (string)$state));
+                                        if ($taxed_cost > 0) {
+                                            foreach([1, 2, 3] as $i) {
+                                                $harga_jual_state = $get("harga_jual_{$i}");
+                                                $price = (float) str_replace(',', '.', str_replace('.', '', (string)$harga_jual_state));
+                                                if ($price > 0) {
+                                                    $new_margin = round((($price - $taxed_cost) / $taxed_cost) * 100, 2);
+                                                    $set("margin_gol_{$i}", str_replace('.', ',', (string)$new_margin));
+                                                }
+                                            }
+                                        }
+                                    }),
 
                                 TextInput::make('harga_jual_1')
                                     ->label('Harga Jual')

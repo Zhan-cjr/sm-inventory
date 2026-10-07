@@ -1974,13 +1974,18 @@ class ReportPrintController extends Controller
             $totalReturJual = $totalReturJualPos + $totalReturJualEcom;
 
             $stock = \App\Models\Stock::where('product_id', $productId)->where('branch_id', $kontrabon->branch_id)->first();
-            $fallbackPrice = $stock && $stock->cost_price_tax > 0 
-                ? (float)$stock->cost_price_tax 
-                : ($stock && $stock->cost_price > 0 
-                    ? (float)$stock->cost_price 
-                    : ($firstProduct && $firstProduct->cost_price_tax > 0 
-                        ? (float)$firstProduct->cost_price_tax 
-                        : (float)($firstProduct->cost_price ?? 0)));
+            $latestBatch = \App\Models\StockBatch::where('product_id', $productId)
+                ->where('branch_id', $kontrabon->branch_id)
+                ->orderByDesc('entry_date')
+                ->first() ?: \App\Models\StockBatch::where('product_id', $productId)->orderByDesc('entry_date')->first();
+
+            if ($latestBatch && (float) $latestBatch->cost_price > 0) {
+                $fallbackPrice = (float) $latestBatch->cost_price;
+            } elseif ($firstProduct && !$firstProduct->is_taxable) {
+                $fallbackPrice = (float) (($stock && $stock->cost_price > 0) ? $stock->cost_price : ($firstProduct->cost_price ?? 0));
+            } else {
+                $fallbackPrice = (float) (($stock && $stock->cost_price_tax > 0) ? $stock->cost_price_tax : (($stock && $stock->cost_price > 0) ? $stock->cost_price : ($firstProduct && $firstProduct->cost_price_tax > 0 ? $firstProduct->cost_price_tax : ($firstProduct->cost_price ?? 0))));
+            }
 
             $amountOwed = 0;
             foreach ($pItems as $it) {

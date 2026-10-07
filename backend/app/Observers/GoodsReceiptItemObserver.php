@@ -34,8 +34,9 @@ class GoodsReceiptItemObserver
         // $item->subtotal is already after discounts. 
         $netPrice = $item->quantity_received > 0 ? ((float)$item->subtotal / $item->quantity_received) : $item->unit_price;
         
-        // If GR includes tax, HPP must include tax (as per Laporan HPP requirements)
-        $finalCostPrice = $gr->include_tax ? round($netPrice * $taxMultiplier, 2) : $netPrice;
+        // If GR includes tax and product is taxable, HPP must include tax (as per Laporan HPP requirements)
+        $isTaxable = (bool) ($item->product?->is_taxable ?? true);
+        $finalCostPrice = ($gr->include_tax && $isTaxable) ? round($netPrice * $taxMultiplier, 2) : $netPrice;
 
         // Create Stock Batch for FIFO
         StockBatch::create([

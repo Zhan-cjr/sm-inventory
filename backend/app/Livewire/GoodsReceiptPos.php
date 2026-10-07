@@ -890,7 +890,8 @@ class GoodsReceiptPos extends Component
                 ]);
 
                 $netPrice = $item['qty_received'] > 0 ? ($item['subtotal'] / $item['qty_received']) : $item['unit_price'];
-                $costPriceTax = $this->include_tax ? round($netPrice * $taxMultiplier, 2) : $netPrice;
+                $isTaxable = (bool) ($item['is_taxable'] ?? ($product?->is_taxable ?? true));
+                $costPriceTax = ($this->include_tax && $isTaxable) ? round($netPrice * $taxMultiplier, 2) : $netPrice;
 
                 // 1. Selalu update Produk Global (Master Data) agar harga global tetap up-to-date
                 $product = Product::find($item['product_id']);

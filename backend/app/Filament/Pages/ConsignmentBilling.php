@@ -181,7 +181,18 @@ class ConsignmentBilling extends Page implements HasForms
             // Tagihan dihitung berdasarkan HPP dari Batch
             $amountOwed = 0;
             $stock = \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->first();
-            $fallbackPrice = $stock && $stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock && $stock->cost_price > 0 ? $stock->cost_price : ($product->cost_price_tax > 0 ? $product->cost_price_tax : $product->cost_price));
+            $latestBatch = \App\Models\StockBatch::where('product_id', $product->id)
+                ->where('branch_id', $this->branch_id)
+                ->orderByDesc('entry_date')
+                ->first() ?: \App\Models\StockBatch::where('product_id', $product->id)->orderByDesc('entry_date')->first();
+
+            if ($latestBatch && (float) $latestBatch->cost_price > 0) {
+                $fallbackPrice = (float) $latestBatch->cost_price;
+            } elseif (!$product->is_taxable) {
+                $fallbackPrice = (float) (($stock && $stock->cost_price > 0) ? $stock->cost_price : ($product->cost_price ?? 0));
+            } else {
+                $fallbackPrice = (float) (($stock && $stock->cost_price_tax > 0) ? $stock->cost_price_tax : (($stock && $stock->cost_price > 0) ? $stock->cost_price : ($product->cost_price_tax > 0 ? $product->cost_price_tax : ($product->cost_price ?? 0))));
+            }
 
             foreach ($unbilledPosItems as $item) {
                 $batchCogs = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')

@@ -296,10 +296,32 @@ class ProductForm
                             }),
 
                         Toggle::make('is_taxable')
-                            ->label('Kena PPN (11%)')
+                            ->label(fn () => 'Kena PPN (' . \App\Services\RetailIntelligenceService::getActiveTaxRate() . '%)')
                             ->default(true)
                             ->required()
-                            ->disabled($isBranchUser),
+                            ->live()
+                            ->disabled($isBranchUser)
+                            ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                $cost = (float) str_replace(',', '.', str_replace('.', '', (string)$get('cost_price')));
+                                if ($cost > 0) {
+                                    if (!$state) {
+                                        $costWithTax = $cost;
+                                    } else {
+                                        $taxRate = \App\Services\RetailIntelligenceService::getActiveTaxRate();
+                                        $costWithTax = round($cost * (1 + ($taxRate / 100)), 2);
+                                    }
+                                    $set('cost_price_tax', str_replace('.', ',', (string)$costWithTax));
+
+                                    foreach ([1, 2, 3] as $i) {
+                                        $margin = (float) str_replace(',', '.', str_replace('.', '', (string) $get("margin_gol_{$i}")));
+                                        if ($margin > 0) {
+                                            $price = round($costWithTax * (1 + ($margin / 100)), 2);
+                                            $set("harga_jual_{$i}", str_replace('.', ',', (string)$price));
+                                            if ($i === 1) $set('selling_price', $price);
+                                        }
+                                    }
+                                }
+                            }),
                         Toggle::make('is_active')
                             ->label('Status Aktif di Sistem')
                             ->default(true)
@@ -346,25 +368,46 @@ class ProductForm
                                 ->required()
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
-                                    $cost = (float) str_replace(',', '.', str_replace('.', '', $state));
-                                    $isTaxable = $get('is_taxable');
+                                    $cost = (float) str_replace(',', '.', str_replace('.', '', (string)$state));
+                                    $isTaxable = (bool) $get('is_taxable');
                                     $taxRate = \App\Services\RetailIntelligenceService::getActiveTaxRate();
                                     $ppn = $isTaxable ? (1 + ($taxRate / 100)) : 1.0;
                                     $costWithTax = round($cost * $ppn, 2);
                                     $set('cost_price_tax', str_replace('.', ',', (string)$costWithTax));
                                     
-                                    $margin1 = (float) str_replace(',', '.', str_replace('.', '', (string) $get('margin_gol_1')));
-                                    if ($margin1 > 0) {
-                                        $price1 = round($costWithTax * (1 + ($margin1 / 100)), 2);
-                                        $set('harga_jual_1', str_replace('.', ',', (string)$price1));
-                                        $set('selling_price', $price1);
+                                    foreach ([1, 2, 3] as $i) {
+                                        $margin = (float) str_replace(',', '.', str_replace('.', '', (string) $get("margin_gol_{$i}")));
+                                        if ($margin > 0) {
+                                            $price = round($costWithTax * (1 + ($margin / 100)), 2);
+                                            $set("harga_jual_{$i}", str_replace('.', ',', (string)$price));
+                                            if ($i === 1) $set('selling_price', $price);
+                                        }
                                     }
                                 }),
                             TextInput::make('cost_price_tax')
-                                ->label('HPP + PPN (11%)')
+                                ->label(fn () => 'HPP + PPN (' . \App\Services\RetailIntelligenceService::getActiveTaxRate() . '%)')
                                 ->rupiah()
-                                ->readOnly()
-                                ->helperText('Dihitung otomatis dari HPP + PPN'),
+                                ->helperText('Dapat diedit manual. Untuk barang non-PPN nilainya sama dengan HPP.')
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                    $hppTax = (float) str_replace(',', '.', str_replace('.', '', (string)$state));
+                                    if ($hppTax > 0) {
+                                        foreach ([1, 2, 3] as $i) {
+                                            $margin = (float) str_replace(',', '.', str_replace('.', '', (string) $get("margin_gol_{$i}")));
+                                            if ($margin > 0) {
+                                                $price = round($hppTax * (1 + ($margin / 100)), 2);
+                                                $set("harga_jual_{$i}", str_replace('.', ',', (string)$price));
+                                                if ($i === 1) $set('selling_price', $price);
+                                            } else {
+                                                $harga = (float) str_replace(',', '.', str_replace('.', '', (string) $get("harga_jual_{$i}")));
+                                                if ($harga > 0) {
+                                                    $new_margin = round((($harga - $hppTax) / $hppTax) * 100, 2);
+                                                    $set("margin_gol_{$i}", str_replace('.', ',', (string)$new_margin));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }),
                             Hidden::make('qty_min_gol_1')->default(1),
                             TextInput::make('margin_gol_1')
                                 ->label('Margin Gol 1 (Ecer %)')
