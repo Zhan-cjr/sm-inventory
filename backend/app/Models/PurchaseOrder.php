@@ -91,6 +91,10 @@ class PurchaseOrder extends Model
     {
         return $this->hasMany(WarehouseCheck::class);
     }
+public function goodsReceipts(): HasMany
+    {
+        return $this->hasMany(GoodsReceipt::class);
+    }
 
     public function remainingQuantity(): float
     {
