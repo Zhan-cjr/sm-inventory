@@ -99,6 +99,8 @@ class UserForm
                                         'TOGGLE_SUPPLIER_GR_PO' => 'Ubah Wajib PO di Pemasok',
                                         'BYPASS_GR_PO_REQUIRED' => 'Bypass Wajib PO (Penerimaan Barang)',
                                         'QUICK_CREATE_PRODUCT' => 'Tambah Produk Cepat (Batch & Paste Teks)',
+                                        'EDIT_PRODUCT_MASTER' => 'Ubah Data Master Produk',
+                                        'EDIT_BRANCH_STOCK' => 'Ubah Data & Harga Stok Cabang',
                                     ])
                                     ->columns(2)
                                     ->helperText('Centang izin khusus untuk backend, berlaku spesifik untuk user ini (termasuk Admin/Superadmin wajib dicentang).'),

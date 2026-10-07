@@ -23,6 +23,9 @@ class StocksRelationManager extends RelationManager
 
     public function form(Schema $schema): Schema
     {
+        $cannotEditStock = fn () => ! (auth()->user()?->hasRole(['superadmin', 'super_admin', 'super-admin']) 
+            || auth()->user()?->hasCustomAuthorization('EDIT_BRANCH_STOCK'));
+
         return $schema
             ->components([
                 \Filament\Forms\Components\Select::make('branch_id')
@@ -81,6 +84,7 @@ class StocksRelationManager extends RelationManager
                                 ->label('Harga Beli Cabang')
                                 ->helperText('Kosongkan untuk menggunakan harga default produk')
                                 ->rupiah()
+                                ->disabled($cannotEditStock)
                                 ->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->cost_price))
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, \Filament\Resources\RelationManagers\RelationManager $livewire, $state) {
@@ -103,6 +107,7 @@ class StocksRelationManager extends RelationManager
                             \Filament\Forms\Components\TextInput::make('cost_price_tax')
                                 ->label(fn () => 'Harga Beli + PPN (' . \App\Services\RetailIntelligenceService::getActiveTaxRate() . '%)')
                                 ->rupiah()
+                                ->disabled($cannotEditStock)
                                 ->default(fn (\Filament\Resources\RelationManagers\RelationManager $livewire) => str_replace('.', ',', (string) $livewire->ownerRecord?->cost_price_tax))
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
@@ -232,32 +237,38 @@ class StocksRelationManager extends RelationManager
                     ->label('Min. Stok')
                     ->required()
                     ->numeric()
-                    ->default(3),
+                    ->default(3)
+                    ->disabled($cannotEditStock),
                 TextInput::make('max_qty')
                     ->label('Max. Stok')
                     ->required()
                     ->numeric()
-                    ->default(15),
+                    ->default(15)
+                    ->disabled($cannotEditStock),
                 TextInput::make('lead_time')
                     ->label('Lead Time (Hari)')
                     ->helperText('Waktu pengiriman dari supplier')
                     ->numeric()
                     ->default(3)
-                    ->suffix('Hari'),
+                    ->suffix('Hari')
+                    ->disabled($cannotEditStock),
                 TextInput::make('safety_stock')
                     ->label('Safety Stock')
                     ->helperText('Stok cadangan minimum')
                     ->numeric()
-                    ->default(0),
+                    ->default(0)
+                    ->disabled($cannotEditStock),
                 TextInput::make('desired_inventory_days')
                     ->label('Target Inventori (Hari)')
                     ->helperText('Berapa hari stok yang ingin dipertahankan')
                     ->numeric()
                     ->default(14)
-                    ->suffix('Hari'),
+                    ->suffix('Hari')
+                    ->disabled($cannotEditStock),
                 \Filament\Forms\Components\Toggle::make('is_active')
                     ->label('Aktif di Cabang Ini')
-                    ->default(true),
+                    ->default(true)
+                    ->disabled($cannotEditStock),
             ]);
     }
 
@@ -325,6 +336,7 @@ class StocksRelationManager extends RelationManager
                     ->toggleable(isToggledHiddenByDefault: true),
                 \Filament\Tables\Columns\ToggleColumn::make('is_active')
                     ->label('Status Cabang')
+                    ->disabled(fn () => ! (auth()->user()?->hasRole(['superadmin', 'super_admin', 'super-admin']) || auth()->user()?->hasCustomAuthorization('EDIT_BRANCH_STOCK')))
                     ->sortable(),
             ])
             ->filters([
@@ -333,18 +345,21 @@ class StocksRelationManager extends RelationManager
             ->headerActions([
                 CreateAction::make()
                     ->label('Tambah Stok Cabang')
-                    ->visible(fn () => auth()->user()->branch_id === null),
+                    ->visible(fn () => auth()->user()?->hasRole(['superadmin', 'super_admin', 'super-admin']) 
+                        || (auth()->user()?->branch_id === null && auth()->user()?->hasCustomAuthorization('EDIT_BRANCH_STOCK'))),
             ])
             ->actions([
                 EditAction::make(),
                 DeleteAction::make()
                     ->label('Hapus dari Cabang')
-                    ->visible(fn () => auth()->user()->branch_id === null),
+                    ->visible(fn () => auth()->user()?->hasRole(['superadmin', 'super_admin', 'super-admin']) 
+                        || (auth()->user()?->branch_id === null && auth()->user()?->hasCustomAuthorization('EDIT_BRANCH_STOCK'))),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->visible(fn () => auth()->user()->branch_id === null),
+                        ->visible(fn () => auth()->user()?->hasRole(['superadmin', 'super_admin', 'super-admin']) 
+                            || (auth()->user()?->branch_id === null && auth()->user()?->hasCustomAuthorization('EDIT_BRANCH_STOCK'))),
                 ]),
             ]);
     }

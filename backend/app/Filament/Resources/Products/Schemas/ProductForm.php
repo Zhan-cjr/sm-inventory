@@ -18,7 +18,10 @@ class ProductForm
 {
     public static function configure(Schema $schema): Schema
     {
-        $isBranchUser = \Illuminate\Support\Facades\Auth::user()?->branch_id !== null;
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $canEditMaster = $user?->hasRole(['superadmin', 'super_admin', 'super-admin']) 
+            || $user?->hasCustomAuthorization('EDIT_PRODUCT_MASTER');
+        $isBranchUser = ! $canEditMaster;
 
         return $schema
             ->components([

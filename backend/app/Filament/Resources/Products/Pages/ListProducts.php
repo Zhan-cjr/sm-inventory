@@ -15,23 +15,26 @@ class ListProducts extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        $isBranchUser = auth()->user()->branch_id !== null;
+        $user = auth()->user();
+        $isSuperAdmin = $user?->hasRole(['superadmin', 'super_admin', 'super-admin']);
+        $canCreateProduct = $isSuperAdmin || $user?->hasCustomAuthorization('EDIT_PRODUCT_MASTER');
+        $canEditStock = $isSuperAdmin || $user?->hasCustomAuthorization('EDIT_BRANCH_STOCK');
 
         return [
             ImportAction::make('import_products')
                 ->label('Import Produk')
                 ->importer(ProductImporter::class)
                 ->icon('heroicon-o-shopping-bag')
-                ->visible(!$isBranchUser),
+                ->visible(fn () => $canCreateProduct && auth()->user()?->branch_id === null),
             ImportAction::make('import_stocks')
                 ->label('Import Stok Cabang')
                 ->importer(\App\Filament\Imports\StockImporter::class)
                 ->icon('heroicon-o-building-storefront')
                 ->color('info')
-                ->visible(!$isBranchUser),
+                ->visible(fn () => $canEditStock),
             \App\Filament\Actions\QuickCreateProductAction::make(),
             CreateAction::make()
-                ->visible(!$isBranchUser),
+                ->visible(fn () => $canCreateProduct && auth()->user()?->branch_id === null),
         ];
     }
 

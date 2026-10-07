@@ -53,7 +53,8 @@ class EditProduct extends EditRecord
     {
         return [
             DeleteAction::make()
-                ->visible(fn () => auth()->user()?->branch_id === null),
+                ->visible(fn () => auth()->user()?->hasRole(['superadmin', 'super_admin', 'super-admin']) 
+                    || (auth()->user()?->branch_id === null && auth()->user()?->hasCustomAuthorization('EDIT_PRODUCT_MASTER'))),
         ];
     }
 
@@ -72,7 +73,10 @@ class EditProduct extends EditRecord
 
     protected function getFormActions(): array
     {
-        if (auth()->user()?->branch_id !== null) {
+        $canEditMaster = auth()->user()?->hasRole(['superadmin', 'super_admin', 'super-admin']) 
+            || auth()->user()?->hasCustomAuthorization('EDIT_PRODUCT_MASTER');
+
+        if (! $canEditMaster) {
             return [];
         }
 
