@@ -106,11 +106,11 @@ class FixStockBatchPrices extends Command
                 }
             }
 
-            // 3. Hitung ulang total tagihan Kontrabon Konsinyasi (KBC)
+            // 3. Hitung ulang total tagihan Kontrabon Konsinyasi (KBC) jika nomor kontrabon ditentukan
             $specificKb = $this->option('kontrabon');
             $kontrabons = $specificKb 
                 ? Kontrabon::where('kontrabon_number', $specificKb)->get()
-                : Kontrabon::where('kontrabon_number', 'LIKE', 'KBC-%')->where('status', 'UNPAID')->get();
+                : collect();
 
             foreach ($kontrabons as $kb) {
                 $posItems = \App\Models\TransactionItem::where('kontrabon_id', $kb->id)->get();
