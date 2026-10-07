@@ -121,15 +121,17 @@ class FixStockBatchPrices extends Command
                 foreach ($allProductIds as $pId) {
                     $p = Product::find($pId);
                     $stock = Stock::where('product_id', $pId)->where('branch_id', $kb->branch_id)->first();
-                    $latestBatch = StockBatch::where('product_id', $pId)->where('branch_id', $kb->branch_id)->orderByDesc('entry_date')->first()
-                        ?: StockBatch::where('product_id', $pId)->orderByDesc('entry_date')->first();
-
-                    if ($latestBatch && (float) $latestBatch->cost_price > 0) {
-                        $fallback = (float) $latestBatch->cost_price;
-                    } elseif ($p && !$p->is_taxable) {
-                        $fallback = (float) (($stock && $stock->cost_price > 0) ? $stock->cost_price : ($p->cost_price ?? 0));
+                    
+                    // Prioritas fallback jika transaksi tidak memiliki potongan batch FIFO: HPP dari Stok Cabang
+                    if ($stock && (float) $stock->cost_price > 0) {
+                        $fallback = (float) ((!$p || !$p->is_taxable) 
+                            ? $stock->cost_price 
+                            : ($stock->cost_price_tax > 0 ? $stock->cost_price_tax : $stock->cost_price));
                     } else {
-                        $fallback = (float) (($stock && $stock->cost_price_tax > 0) ? $stock->cost_price_tax : (($stock && $stock->cost_price > 0) ? $stock->cost_price : ($p && $p->cost_price_tax > 0 ? $p->cost_price_tax : ($p->cost_price ?? 0))));
+                        // Cadangan terakhir: Master Produk
+                        $fallback = (float) ((!$p || !$p->is_taxable) 
+                            ? ($p?->cost_price ?? 0) 
+                            : ($p->cost_price_tax > 0 ? $p->cost_price_tax : ($p->cost_price ?? 0)));
                     }
 
                     $pItems = $posItems->where('product_id', $pId);

@@ -1974,17 +1974,17 @@ class ReportPrintController extends Controller
             $totalReturJual = $totalReturJualPos + $totalReturJualEcom;
 
             $stock = \App\Models\Stock::where('product_id', $productId)->where('branch_id', $kontrabon->branch_id)->first();
-            $latestBatch = \App\Models\StockBatch::where('product_id', $productId)
-                ->where('branch_id', $kontrabon->branch_id)
-                ->orderByDesc('entry_date')
-                ->first() ?: \App\Models\StockBatch::where('product_id', $productId)->orderByDesc('entry_date')->first();
-
-            if ($latestBatch && (float) $latestBatch->cost_price > 0) {
-                $fallbackPrice = (float) $latestBatch->cost_price;
-            } elseif ($firstProduct && !$firstProduct->is_taxable) {
-                $fallbackPrice = (float) (($stock && $stock->cost_price > 0) ? $stock->cost_price : ($firstProduct->cost_price ?? 0));
+            
+            // Prioritas fallback jika transaksi tidak memiliki potongan batch FIFO: HPP dari Stok Cabang
+            if ($stock && (float) $stock->cost_price > 0) {
+                $fallbackPrice = (float) ((!$firstProduct || !$firstProduct->is_taxable) 
+                    ? $stock->cost_price 
+                    : ($stock->cost_price_tax > 0 ? $stock->cost_price_tax : $stock->cost_price));
             } else {
-                $fallbackPrice = (float) (($stock && $stock->cost_price_tax > 0) ? $stock->cost_price_tax : (($stock && $stock->cost_price > 0) ? $stock->cost_price : ($firstProduct && $firstProduct->cost_price_tax > 0 ? $firstProduct->cost_price_tax : ($firstProduct->cost_price ?? 0))));
+                // Cadangan terakhir: Master Produk
+                $fallbackPrice = (float) ((!$firstProduct || !$firstProduct->is_taxable) 
+                    ? ($firstProduct?->cost_price ?? 0) 
+                    : ($firstProduct->cost_price_tax > 0 ? $firstProduct->cost_price_tax : ($firstProduct->cost_price ?? 0)));
             }
 
             $amountOwed = 0;
