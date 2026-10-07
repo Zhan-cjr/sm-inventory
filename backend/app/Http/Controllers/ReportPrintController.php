@@ -44,6 +44,7 @@ class ReportPrintController extends Controller
             'laporan-rekap-tipe-suplier' => $this->printLaporanRekapTipeSuplier($filters),
             'produk' => $this->printProduk($filters),
             'laporan-ppob' => $this->printLaporanPpob($filters),
+            'service-level-supplier' => $this->printSupplierServiceLevel($request),
             default => abort(404, 'Tipe laporan tidak ditemukan'),
         };
 
@@ -2422,5 +2423,74 @@ class ReportPrintController extends Controller
             'columns' => $columns,
             'rows' => $rows
         ]);
+    }
+
+    private function printSupplierServiceLevel(Request $request)
+    {
+        $startDate = $request->input('start_date') ?: Carbon::now()->subMonths(3)->startOfMonth()->format('Y-m-d');
+        $endDate = $request->input('end_date') ?: Carbon::now()->format('Y-m-d');
+        $branchId = $request->input('branch_id', 'ALL');
+        $supplierId = $request->input('supplier_id', 'ALL');
+        $activeTab = $request->input('active_tab', 'scorecard');
+        $statusFilter = $request->input('status', 'ALL');
+        $gradeFilter = $request->input('grade', 'ALL');
+        $discrepancyType = $request->input('discrepancy_type', 'ALL');
+        $discrepancySort = $request->input('discrepancy_sort', 'impact_desc');
+        $search = $request->input('search', '');
+
+        $payload = [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'branch_id' => $branchId,
+            'supplier_id' => $supplierId,
+            'status' => $statusFilter,
+            'grade' => $gradeFilter,
+            'discrepancy_type' => $discrepancyType,
+            'discrepancy_sort' => $discrepancySort,
+            'search' => $search,
+            'scorecard_per_page' => 1000,
+            'recon_per_page' => 1000,
+            'discrepancy_per_page' => 1000,
+        ];
+
+        $service = app(\App\Services\SupplierServiceLevelService::class);
+        $kpi = $service->getKpiSummary($payload);
+
+        $scorecards = null;
+        $reconciliations = null;
+        $discrepancies = null;
+
+        if ($activeTab === 'scorecard') {
+            $scorecards = $service->getSupplierScorecards($payload);
+            $reportTitle = 'Laporan Evaluasi & Rapor Kinerja Supplier';
+            $tabLabel = '1. Rapor Kinerja Supplier';
+        } elseif ($activeTab === 'reconciliation') {
+            $reconciliations = $service->getPoReconciliations($payload);
+            $reportTitle = 'Laporan Rekonsiliasi PO vs Penerimaan & Faktur';
+            $tabLabel = '2. Rekonsiliasi PO vs Penerimaan';
+        } else {
+            $discrepancies = $service->getItemDiscrepancies($payload);
+            $reportTitle = 'Laporan Audit Selisih Barang, Harga & Reject';
+            $tabLabel = '3. Audit Selisih Barang & Harga';
+        }
+
+        $branchName = 'Semua Cabang';
+        if ($branchId !== 'ALL') {
+            $b = \App\Models\Branch::find($branchId);
+            if ($b) $branchName = $b->name;
+        }
+
+        $supplierName = 'Semua Supplier';
+        if ($supplierId !== 'ALL') {
+            $s = \App\Models\Supplier::find($supplierId);
+            if ($s) $supplierName = $s->name;
+        }
+
+        $organization = \App\Models\Organization::first();
+
+        return view('print.reports.service-level-supplier', compact(
+            'startDate', 'endDate', 'branchId', 'branchName', 'supplierId', 'supplierName',
+            'activeTab', 'reportTitle', 'tabLabel', 'kpi', 'scorecards', 'reconciliations', 'discrepancies', 'organization'
+        ));
     }
 }
