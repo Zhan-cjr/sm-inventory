@@ -757,6 +757,52 @@
             border-color: #1e293b;
         }
 
+        /* Dark mode typography and contrast helpers */
+        .sl-supplier-name {
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .dark .sl-supplier-name {
+            color: #ffffff !important;
+        }
+        .sl-recommendation-text {
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: #334155;
+        }
+        .dark .sl-recommendation-text {
+            color: #e2e8f0 !important;
+        }
+        .sl-toolbar-heading {
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: #475569;
+        }
+        .dark .sl-toolbar-heading {
+            color: #cbd5e1 !important;
+        }
+
+        /* Dark mode overrides for hardcoded inline colors in dashboard */
+        .dark .sl-dashboard [style*="color: #0f172a"] {
+            color: #ffffff !important;
+        }
+        .dark .sl-dashboard [style*="color: #334155"] {
+            color: #e2e8f0 !important;
+        }
+        .dark .sl-dashboard [style*="color: #475569"] {
+            color: #cbd5e1 !important;
+        }
+        .dark .sl-dashboard [style*="background: #ffffff"] {
+            background: #111827 !important;
+        }
+        .dark .sl-dashboard [style*="background: #f8fafc"] {
+            background: #0b1120 !important;
+        }
+        .dark .sl-dashboard [style*="border: 1px solid #e2e8f0"],
+        .dark .sl-dashboard [style*="border: 1px solid #cbd5e1"] {
+            border-color: #1f293d !important;
+        }
+
         /* ============================================================
            PERFECT PRINT CSS FOR FILAMENT V3 & BROWSER PRINTER
            ============================================================ */
@@ -1270,7 +1316,7 @@
             <div class="sl-card space-y-0">
                 {{-- Toolbar / Per-Page Control --}}
                 <div class="sl-tab-toolbar no-print">
-                    <div style="font-size: 0.74rem; font-weight: 700; color: #475569;" class="dark:text-gray-300">
+                    <div class="sl-toolbar-heading">
                         Evaluasi Rapor Kinerja Mitra Supplier Terdaftar
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.35rem;">
@@ -1319,7 +1365,7 @@
                                         </span>
                                     </td>
                                     <td>
-                                        <div style="font-weight: 800; color: #0f172a;" class="dark:text-white">{{ $row['supplier_name'] }}</div>
+                                        <div class="sl-supplier-name">{{ $row['supplier_name'] }}</div>
                                         <span style="font-size: 0.68rem; color: #94a3b8; font-family: monospace;">{{ $row['supplier_code'] }}</span>
                                     </td>
                                     <td style="text-align: center; font-weight: 800;">
@@ -1357,7 +1403,7 @@
                                         {{ $row['avg_lead_time'] }} hari
                                     </td>
                                     <td>
-                                        <div style="font-size: 0.74rem; font-weight: 700; color: #334155;" class="dark:text-gray-200">
+                                        <div class="sl-recommendation-text">
                                             {{ $row['recommendation'] }}
                                         </div>
                                         @if($row['rejected_qty'] > 0 || $row['price_dev_count'] > 0)
@@ -1489,7 +1535,7 @@
 
                 {{-- Toolbar / Per-Page Control --}}
                 <div class="sl-tab-toolbar no-print">
-                    <div style="font-size: 0.74rem; font-weight: 700; color: #475569;" class="dark:text-gray-300">
+                    <div class="sl-toolbar-heading">
                         Daftar Surat Pesanan (PO) & Rekonsiliasi Penerimaan Faktur
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.35rem;">
@@ -1808,7 +1854,7 @@
                                             -
                                         @endif
                                     </td>
-                                    <td style="text-align: right; font-weight: 800; color: #0f172a;" class="dark:text-white">
+                                    <td style="text-align: right; font-weight: 800;" class="sl-supplier-name">
                                         Rp {{ number_format($item['impact_amount'], 0, ',', '.') }}
                                     </td>
                                 </tr>
@@ -1857,7 +1903,7 @@
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <span style="font-size: 1.1rem;">⚖️</span>
                                 <div>
-                                    <div style="font-size: 0.82rem; font-weight: 800; color: #0f172a;" class="dark:text-white">
+                                    <div style="font-size: 0.82rem;" class="sl-supplier-name">
                                         Rekonsiliasi Hubungan Nilai PO, Realisasi Faktur & Selisih Fisik
                                     </div>
                                     <div style="font-size: 0.7rem; color: #64748b;">
@@ -1908,7 +1954,7 @@
                             {{-- 5. Selisih Bersih --}}
                             <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.65rem 0.85rem;" class="dark:bg-gray-800 dark:border-gray-700">
                                 <div style="font-size: 0.68rem; font-weight: 700; color: #475569; text-transform: uppercase;">5. Selisih Bersih (PO - Faktur)</div>
-                                <div style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-top: 0.2rem;" class="dark:text-white">
+                                <div style="font-size: 1.05rem; margin-top: 0.2rem;" class="sl-supplier-name">
                                     Rp {{ number_format($discRecon['net_diff'], 0, ',', '.') }}
                                 </div>
                                 <div style="font-size: 0.65rem; color: #64748b;">Klop dengan Tab 1 & Tab 2</div>
@@ -1961,7 +2007,7 @@
                 <div class="sl-modal-header">
                     <div>
                         <div style="display: flex; align-items: center; gap: 0.6rem;">
-                            <h2 style="font-size: 1.1rem; font-weight: 900; margin: 0; color: #0f172a;" class="dark:text-white">Detail PO: {{ $poDetail['po_number'] }}</h2>
+                            <h2 style="font-size: 1.1rem; margin: 0;" class="sl-supplier-name">Detail PO: {{ $poDetail['po_number'] }}</h2>
                             <span class="sl-kpi-badge sl-badge-blue">{{ $poDetail['supplier_name'] }}</span>
                             @if($poDetail['is_closed'])
                                 <span class="sl-kpi-badge" style="background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1;">Status: Closed / Sisa Dihanguskan</span>
