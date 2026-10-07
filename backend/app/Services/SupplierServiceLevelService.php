@@ -609,6 +609,38 @@ class SupplierServiceLevelService
         $offset = ($page - 1) * $perPage;
         $pagedItems = array_slice($filtered, $offset, $perPage);
 
+        // Subtotals for current filtered items
+        $totalOrderedQty = array_sum(array_column($filtered, 'ordered_qty'));
+        $totalReceivedQty = array_sum(array_column($filtered, 'received_qty'));
+        $totalQtyDiff = array_sum(array_column($filtered, 'qty_diff'));
+        $totalRejectedQty = array_sum(array_column($filtered, 'rejected_qty'));
+
+        $totalShortQtyAmount = 0;
+        $totalRejectedAmount = 0;
+        $totalNetPriceDiffAmount = 0;
+        $totalImpactFiltered = 0;
+
+        foreach ($filtered as $item) {
+            $totalShortQtyAmount += ($item['qty_diff'] * $item['po_price']);
+            $totalRejectedAmount += ($item['rejected_qty'] * $item['po_price']);
+            $totalNetPriceDiffAmount += ($item['price_diff'] * $item['received_qty']);
+            $totalImpactFiltered += $item['impact_amount'];
+        }
+
+        // Global reconciliation summary for the report scope (Tab 1 & Tab 2 comparison)
+        $scopePoAmount = array_sum(array_column($report['reconciliations'], 'po_amount'));
+        $scopeGrAmount = array_sum(array_column($report['reconciliations'], 'gr_amount'));
+        $scopeNetDiff = $scopePoAmount - $scopeGrAmount;
+
+        $scopeShortQtyAmount = 0;
+        $scopeNetPriceDevAmount = 0;
+        $scopeRejectedAmount = 0;
+        foreach ($rawDiscrepancies as $d) {
+            $scopeShortQtyAmount += ($d['qty_diff'] * $d['po_price']);
+            $scopeNetPriceDevAmount += ($d['price_diff'] * $d['received_qty']);
+            $scopeRejectedAmount += ($d['rejected_qty'] * $d['po_price']);
+        }
+
         return [
             'items' => $pagedItems,
             'all_items' => $filtered,
@@ -619,6 +651,24 @@ class SupplierServiceLevelService
             'per_page' => $perPage,
             'from' => $totalItems > 0 ? $offset + 1 : 0,
             'to' => min($offset + $perPage, $totalItems),
+            'totals' => [
+                'ordered_qty' => $totalOrderedQty,
+                'received_qty' => $totalReceivedQty,
+                'qty_diff' => $totalQtyDiff,
+                'rejected_qty' => $totalRejectedQty,
+                'short_qty_amount' => $totalShortQtyAmount,
+                'rejected_amount' => $totalRejectedAmount,
+                'net_price_diff_amount' => $totalNetPriceDiffAmount,
+                'impact_amount' => $totalImpactFiltered,
+            ],
+            'reconciliation' => [
+                'po_amount' => $scopePoAmount,
+                'gr_amount' => $scopeGrAmount,
+                'net_diff' => $scopeNetDiff,
+                'short_qty_amount' => $scopeShortQtyAmount,
+                'net_price_dev_amount' => $scopeNetPriceDevAmount,
+                'rejected_amount' => $scopeRejectedAmount,
+            ],
         ];
     }
 

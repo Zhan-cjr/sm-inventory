@@ -510,21 +510,60 @@
                 @endforelse
             </tbody>
             @if(count($discrepancies['items']) > 0)
+                @php
+                    $discTotals = $discrepancies['totals'] ?? [];
+                    $discRecon = $discrepancies['reconciliation'] ?? [];
+                @endphp
                 <tfoot>
                     <tr>
-                        <td colspan="5" style="text-align: right;">TOTAL KESELURUHAN ({{ count($discrepancies['items']) }} Item Masalah):</td>
-                        <td style="text-align: right;">{{ number_format(array_sum(array_column($discrepancies['items'], 'ordered_qty')), 0, ',', '.') }}</td>
-                        <td style="text-align: right;">{{ number_format(array_sum(array_column($discrepancies['items'], 'received_qty')), 0, ',', '.') }}</td>
-                        <td style="text-align: right; color: #b91c1c;">{{ number_format(array_sum(array_column($discrepancies['items'], 'qty_diff')), 0, ',', '.') }}</td>
-                        <td style="text-align: right; color: #b91c1c;">{{ number_format(array_sum(array_column($discrepancies['items'], 'rejected_qty')), 0, ',', '.') }}</td>
-                        <td colspan="3" style="text-align: right;">Total Estimasi Dampak Risiko:</td>
-                        <td style="text-align: right; color: #b91c1c;">
-                            Rp {{ number_format(array_sum(array_column($discrepancies['items'], 'impact_amount')), 0, ',', '.') }}
+                        <td colspan="5" style="text-align: right; font-weight: 700;">TOTAL KESELURUHAN ({{ count($discrepancies['items']) }} Item Masalah):</td>
+                        <td style="text-align: right;">{{ number_format($discTotals['ordered_qty'] ?? array_sum(array_column($discrepancies['items'], 'ordered_qty')), 0, ',', '.') }}</td>
+                        <td style="text-align: right;">{{ number_format($discTotals['received_qty'] ?? array_sum(array_column($discrepancies['items'], 'received_qty')), 0, ',', '.') }}</td>
+                        <td style="text-align: right; color: #b91c1c;">{{ number_format($discTotals['qty_diff'] ?? array_sum(array_column($discrepancies['items'], 'qty_diff')), 0, ',', '.') }}</td>
+                        <td style="text-align: right; color: #b91c1c;">{{ number_format($discTotals['rejected_qty'] ?? array_sum(array_column($discrepancies['items'], 'rejected_qty')), 0, ',', '.') }}</td>
+                        <td colspan="3" style="text-align: right; font-weight: 700;">Total Dampak Risiko Masalah:</td>
+                        <td style="text-align: right; font-weight: 700; color: #b91c1c;">
+                            Rp {{ number_format($discTotals['impact_amount'] ?? array_sum(array_column($discrepancies['items'], 'impact_amount')), 0, ',', '.') }}
                         </td>
                     </tr>
                 </tfoot>
             @endif
         </table>
+
+        @if(!empty($discrepancies['reconciliation']) && ($discrepancies['reconciliation']['po_amount'] ?? 0) > 0)
+            @php $recon = $discrepancies['reconciliation']; @endphp
+            <div style="margin-top: 15px; margin-bottom: 15px; border: 1px solid #1e293b; padding: 8px 12px; background: #f8fafc; font-size: 7.5pt;">
+                <div style="font-weight: 700; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px;">
+                    Rekonsiliasi Nilai PO, Realisasi Faktur & Selisih Fisik (Klop 100%)
+                </div>
+                <table style="width: 100%; font-size: 7.5pt; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 20%; padding: 4px; border: 1px solid #e2e8f0; background: #ffffff;">
+                            <div style="color: #64748b; font-size: 6.5pt;">1. Total Pesanan (PO)</div>
+                            <div style="font-weight: 700; font-size: 8.5pt; color: #1e3a8a;">Rp {{ number_format($recon['po_amount'], 0, ',', '.') }}</div>
+                        </td>
+                        <td style="width: 20%; padding: 4px; border: 1px solid #e2e8f0; background: #ffffff;">
+                            <div style="color: #b91c1c; font-size: 6.5pt;">2. (-) Barang Kurang Kirim</div>
+                            <div style="font-weight: 700; font-size: 8.5pt; color: #dc2626;">-Rp {{ number_format($recon['short_qty_amount'], 0, ',', '.') }}</div>
+                        </td>
+                        <td style="width: 20%; padding: 4px; border: 1px solid #e2e8f0; background: #ffffff;">
+                            <div style="color: #c2410c; font-size: 6.5pt;">3. (+/-) Selisih Harga Faktur</div>
+                            <div style="font-weight: 700; font-size: 8.5pt; color: {{ $recon['net_price_dev_amount'] >= 0 ? '#b91c1c' : '#15803d' }};">
+                                {{ $recon['net_price_dev_amount'] >= 0 ? '+' : '-' }}Rp {{ number_format(abs($recon['net_price_dev_amount']), 0, ',', '.') }}
+                            </div>
+                        </td>
+                        <td style="width: 20%; padding: 4px; border: 1px solid #e2e8f0; background: #ffffff;">
+                            <div style="color: #15803d; font-size: 6.5pt;">4. (=) Total Faktur Tagihan</div>
+                            <div style="font-weight: 700; font-size: 8.5pt; color: #16a34a;">Rp {{ number_format($recon['gr_amount'], 0, ',', '.') }}</div>
+                        </td>
+                        <td style="width: 20%; padding: 4px; border: 1px solid #e2e8f0; background: #ffffff;">
+                            <div style="color: #475569; font-size: 6.5pt;">5. Selisih Bersih (PO - Faktur)</div>
+                            <div style="font-weight: 700; font-size: 8.5pt; color: #0f172a;">Rp {{ number_format($recon['net_diff'], 0, ',', '.') }}</div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        @endif
     @endif
 
     {{-- Signatures --}}

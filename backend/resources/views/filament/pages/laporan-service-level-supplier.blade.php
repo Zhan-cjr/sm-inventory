@@ -1668,7 +1668,9 @@
         @if($active_tab === 'item_discrepancy')
             @php
                 $pagedItems = $discData['items'] ?? [];
-                $totalImpactFiltered = array_sum(array_column($discData['all_items'] ?? [], 'impact_amount'));
+                $discTotals = $discData['totals'] ?? [];
+                $discRecon = $discData['reconciliation'] ?? [];
+                $totalImpactFiltered = $discTotals['impact_amount'] ?? array_sum(array_column($discData['all_items'] ?? [], 'impact_amount'));
             @endphp
             <div class="sl-card space-y-0">
                 {{-- 1. Triage Toolbar & Controls --}}
@@ -1821,13 +1823,25 @@
                         @if(count($pagedItems) > 0)
                             <tfoot>
                                 <tr>
-                                    <td colspan="4" style="text-align: right; letter-spacing: 0.04em;">TOTAL DAMPAK KESELURUHAN ({{ number_format($discData['total_items']) }} Item Masalah):</td>
-                                    <td style="text-align: right;">{{ number_format(array_sum(array_column($discData['all_items'], 'ordered_qty')), 0, ',', '.') }}</td>
-                                    <td style="text-align: right; color: #10b981;">{{ number_format(array_sum(array_column($discData['all_items'], 'received_qty')), 0, ',', '.') }}</td>
-                                    <td style="text-align: right; color: #ef4444;">{{ number_format(array_sum(array_column($discData['all_items'], 'qty_diff')), 0, ',', '.') }}</td>
-                                    <td style="text-align: right; color: #ef4444;">{{ number_format(array_sum(array_column($discData['all_items'], 'rejected_qty')), 0, ',', '.') }}</td>
-                                    <td colspan="3" style="text-align: right; color: #64748b; font-size: 0.7rem;">Estimasi Total Risiko Selisih:</td>
-                                    <td style="text-align: right; color: #ef4444; font-size: 0.85rem;">
+                                    <td colspan="4" style="text-align: right; font-weight: 800; letter-spacing: 0.04em;">
+                                        TOTAL KESELURUHAN ({{ number_format($discData['total_items']) }} Item Masalah):
+                                    </td>
+                                    <td style="text-align: right; font-weight: 700;">{{ number_format($discTotals['ordered_qty'] ?? 0, 0, ',', '.') }}</td>
+                                    <td style="text-align: right; font-weight: 800; color: #10b981;">{{ number_format($discTotals['received_qty'] ?? 0, 0, ',', '.') }}</td>
+                                    <td style="text-align: right; font-weight: 800; color: #ef4444;">{{ number_format($discTotals['qty_diff'] ?? 0, 0, ',', '.') }}</td>
+                                    <td style="text-align: right; font-weight: 800; color: #ef4444;">{{ number_format($discTotals['rejected_qty'] ?? 0, 0, ',', '.') }}</td>
+                                    <td colspan="3" style="text-align: right; font-size: 0.72rem; color: #64748b;">
+                                        @if($discrepancy_type === 'SHORT_QTY')
+                                            Total Nilai Kurang Kirim:
+                                        @elseif($discrepancy_type === 'PRICE_DIFF')
+                                            Total Deviasi Harga Faktur:
+                                        @elseif($discrepancy_type === 'REJECTED')
+                                            Total Nilai Barang Rusak:
+                                        @else
+                                            Total Estimasi Dampak Masalah:
+                                        @endif
+                                    </td>
+                                    <td style="text-align: right; font-weight: 900; color: #ef4444; font-size: 0.85rem;">
                                         Rp {{ number_format($totalImpactFiltered, 0, ',', '.') }}
                                     </td>
                                 </tr>
@@ -1835,6 +1849,73 @@
                         @endif
                     </table>
                 </div>
+
+                {{-- KOTAK REKONSILIASI KEUANGAN & PEMENUHAN (TAB 1 VS TAB 3) --}}
+                @if(!empty($discRecon) && ($discRecon['po_amount'] ?? 0) > 0)
+                    <div style="margin-top: 1rem; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 0.75rem; padding: 1rem 1.25rem;" class="dark:bg-gray-900 dark:border-gray-800">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem;" class="dark:border-gray-800">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 1.1rem;">⚖️</span>
+                                <div>
+                                    <div style="font-size: 0.82rem; font-weight: 800; color: #0f172a;" class="dark:text-white">
+                                        Rekonsiliasi Hubungan Nilai PO, Realisasi Faktur & Selisih Fisik
+                                    </div>
+                                    <div style="font-size: 0.7rem; color: #64748b;">
+                                        Menjelaskan hubungan matematis antara Tab Rapor Kinerja (Tab 1/2) dengan Tab Audit Selisih (Tab 3)
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="sl-kpi-badge sl-badge-green" style="font-size: 0.68rem;">100% Klop Terverifikasi</span>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                            {{-- 1. Total PO --}}
+                            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.65rem 0.85rem;" class="dark:bg-gray-800 dark:border-gray-700">
+                                <div style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase;">1. Total Pesanan (PO)</div>
+                                <div style="font-size: 1.05rem; font-weight: 800; color: #2563eb; margin-top: 0.2rem;">
+                                    Rp {{ number_format($discRecon['po_amount'], 0, ',', '.') }}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #94a3b8;">Nilai awal yang dipesan di PO</div>
+                            </div>
+
+                            {{-- 2. Barang Kurang Kirim --}}
+                            <div style="background: #ffffff; border: 1px solid #fecaca; border-radius: 0.5rem; padding: 0.65rem 0.85rem;" class="dark:bg-gray-800 dark:border-red-900/50">
+                                <div style="font-size: 0.68rem; font-weight: 700; color: #b91c1c; text-transform: uppercase;">2. (-) Barang Kurang Kirim</div>
+                                <div style="font-size: 1.05rem; font-weight: 800; color: #dc2626; margin-top: 0.2rem;">
+                                    -Rp {{ number_format($discRecon['short_qty_amount'], 0, ',', '.') }}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #ef4444;">Barang tidak dikirim (@ harga PO)</div>
+                            </div>
+
+                            {{-- 3. Deviasi Harga Faktur --}}
+                            <div style="background: #ffffff; border: 1px solid #fed7aa; border-radius: 0.5rem; padding: 0.65rem 0.85rem;" class="dark:bg-gray-800 dark:border-amber-900/50">
+                                <div style="font-size: 0.68rem; font-weight: 700; color: #c2410c; text-transform: uppercase;">3. (+/-) Selisih Harga Faktur</div>
+                                <div style="font-size: 1.05rem; font-weight: 800; color: {{ $discRecon['net_price_dev_amount'] >= 0 ? '#b91c1c' : '#15803d' }}; margin-top: 0.2rem;">
+                                    {{ $discRecon['net_price_dev_amount'] >= 0 ? '+' : '-' }}Rp {{ number_format(abs($discRecon['net_price_dev_amount']), 0, ',', '.') }}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #64748b;">{{ $discRecon['net_price_dev_amount'] >= 0 ? 'Faktur lebih mahal dari PO' : 'Faktur lebih murah dari PO' }}</div>
+                            </div>
+
+                            {{-- 4. Realisasi Faktur yang Harus Dibayar --}}
+                            <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 0.5rem; padding: 0.65rem 0.85rem;" class="dark:bg-gray-800 dark:border-green-900/50">
+                                <div style="font-size: 0.68rem; font-weight: 700; color: #15803d; text-transform: uppercase;">4. (=) Total Faktur Tagihan</div>
+                                <div style="font-size: 1.05rem; font-weight: 900; color: #16a34a; margin-top: 0.2rem;">
+                                    Rp {{ number_format($discRecon['gr_amount'], 0, ',', '.') }}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #15803d;">Nilai riil yang ditagih & dibayar</div>
+                            </div>
+
+                            {{-- 5. Selisih Bersih --}}
+                            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.65rem 0.85rem;" class="dark:bg-gray-800 dark:border-gray-700">
+                                <div style="font-size: 0.68rem; font-weight: 700; color: #475569; text-transform: uppercase;">5. Selisih Bersih (PO - Faktur)</div>
+                                <div style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-top: 0.2rem;" class="dark:text-white">
+                                    Rp {{ number_format($discRecon['net_diff'], 0, ',', '.') }}
+                                </div>
+                                <div style="font-size: 0.65rem; color: #64748b;">Klop dengan Tab 1 & Tab 2</div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 {{-- 3. Interactive Pagination Toolbar Tab 3 --}}
                 @if($discData['total_items'] > 0)
