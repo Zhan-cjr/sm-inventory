@@ -497,8 +497,29 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M1 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V2zM1 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V7zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V7zM1 12a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-2z"/></svg>
                     Pilih Kolom
                 </button>
-                <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border-radius: 0.5rem; padding: 0.5rem; width: 13rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
-                    @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'qty_ordered' => 'Qty PO', 'qty_received' => 'Qty Terima', 'unit_price' => 'Harga (DPP)', 'unit_price_tax' => 'Harga (+PPN)', 'harga_jual_1' => 'Harga Jual 1', 'margin_gol_1' => 'Margin 1', 'harga_jual_2' => 'Harga Jual 2', 'margin_gol_2' => 'Margin 2', 'harga_jual_3' => 'Harga Jual 3', 'margin_gol_3' => 'Margin 3', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
+                <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border-radius: 0.5rem; padding: 0.5rem; width: 14rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
+                    @php
+                        $availableCols = [
+                            'sku' => 'SKU',
+                            'barcode' => 'Barcode',
+                            'name' => 'Nama Produk',
+                            'qty_ordered' => 'Qty PO',
+                            'qty_received' => 'Qty Terima',
+                            'unit_price' => ($tax_type === 'include' ? 'Harga (+PPN)' : ($tax_type === 'exclude' ? 'Harga (DPP)' : 'Harga Satuan')),
+                            'unit_price_tax' => 'Harga (+PPN) Khusus',
+                            'unit_price_net_tax' => 'Harga Net (+PPN)',
+                            'harga_jual_1' => 'Harga Jual 1',
+                            'margin_gol_1' => 'Margin 1',
+                            'harga_jual_2' => 'Harga Jual 2',
+                            'margin_gol_2' => 'Margin 2',
+                            'harga_jual_3' => 'Harga Jual 3',
+                            'margin_gol_3' => 'Margin 3',
+                            'discount_1' => 'Diskon 1',
+                            'discount_2' => 'Diskon 2',
+                            'discount_3' => 'Diskon 3',
+                        ];
+                    @endphp
+                    @foreach($availableCols as $key => $label)
                         <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                             <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
                             <span class="text-xs text-gray-800 dark:text-gray-200">{{ $label }}</span>
@@ -520,8 +541,13 @@
                     @if(in_array('name', $visibleColumns)) <th class="pos-grid-th" style="min-width: 16rem; width: 25%;">Nama Produk</th> @endif
                     @if(in_array('qty_ordered', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Qty PO</th> @endif
                     @if(in_array('qty_received', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Qty Terima</th> @endif
-                    @if(in_array('unit_price', $visibleColumns)) <th class="pos-grid-th" style="width: 9.5rem; text-align: right;">Harga (DPP)</th> @endif
+                    @if(in_array('unit_price', $visibleColumns)) 
+                        <th class="pos-grid-th" style="width: 9.5rem; text-align: right;">
+                            {{ $tax_type === 'include' ? 'Harga (+PPN)' : ($tax_type === 'exclude' ? 'Harga (DPP)' : 'Harga Satuan') }}
+                        </th> 
+                    @endif
                     @if(in_array('unit_price_tax', $visibleColumns)) <th class="pos-grid-th" style="width: 9.5rem; text-align: right; background-color: #f0fdf4;" class="dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">Harga (+PPN)</th> @endif
+                    @if(in_array('unit_price_net_tax', $visibleColumns)) <th class="pos-grid-th" style="width: 9.5rem; text-align: right; background-color: #ecfdf5;" class="dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300" title="Harga modal bersih per unit setelah diskon (include PPN)">Harga Net (+PPN)</th> @endif
 
                     @if(in_array('harga_jual_1', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Jual 1</th> @endif
                     @if(in_array('margin_gol_1', $visibleColumns)) <th class="pos-grid-th" style="width: 4.25rem; text-align: right;">Margin 1 (%)</th> @endif
@@ -529,16 +555,16 @@
                     @if(in_array('margin_gol_2', $visibleColumns)) <th class="pos-grid-th" style="width: 4.25rem; text-align: right;">Margin 2 (%)</th> @endif
                     @if(in_array('harga_jual_3', $visibleColumns)) <th class="pos-grid-th" style="width: 9rem; text-align: right;">Harga Jual 3</th> @endif
                     @if(in_array('margin_gol_3', $visibleColumns)) <th class="pos-grid-th" style="width: 4.25rem; text-align: right;">Margin 3 (%)</th> @endif
-                    @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 3.5rem; text-align: right;">Dis1 (%)</th> @endif
-                    @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 3.5rem; text-align: right;">Dis2 (%)</th> @endif
-                    @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 3.5rem; text-align: right;">Dis3 (%)</th> @endif
-                    <th class="pos-grid-th" style="width: 9.5rem; text-align: right;">Total</th>
+                    @if(in_array('discount_1', $visibleColumns)) <th class="pos-grid-th" style="width: 6.25rem; text-align: right;">Dis1</th> @endif
+                    @if(in_array('discount_2', $visibleColumns)) <th class="pos-grid-th" style="width: 6.25rem; text-align: right;">Dis2</th> @endif
+                    @if(in_array('discount_3', $visibleColumns)) <th class="pos-grid-th" style="width: 6.25rem; text-align: right;">Dis3</th> @endif
+                    <th class="pos-grid-th" style="width: 9.5rem; text-align: right;">Total {{ $tax_type === 'include' ? '(+PPN)' : ($tax_type === 'exclude' ? '(DPP)' : '') }}</th>
                     <th class="pos-grid-th" style="width: 2.5rem; text-align: center;"></th>
                 </tr>
             </thead>
             <tbody @keydown="handleGridNav($event)">
                 @forelse($cart as $index => $item)
-                    <tr>
+                    <tr wire:key="cart-row-{{ $index }}-{{ $item['product_id'] }}">
                         <td class="pos-grid-td" style="text-align: center;">{{ $loop->iteration }}</td>
                         @if(in_array('sku', $visibleColumns)) <td class="pos-grid-td">{{ $item['sku'] }}</td> @endif
                         @if(in_array('barcode', $visibleColumns)) <td class="pos-grid-td">{{ $item['barcode'] }}</td> @endif
@@ -578,11 +604,19 @@
                         @endif
                         @if(in_array('unit_price', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <div x-data="{ raw: @entangle('cart.' . $index . '.unit_price'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.updateRow({{ $index }}, 'unit_price', this.raw); } }">
-                                <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="price-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
-                                       x-on:keydown.space.prevent="openCalc($event)"
-                                       title="Harga satuan sebelum PPN (DPP)">
-                            </div>
+                            @if($tax_type === 'include')
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.unit_price_tax'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.updateRow({{ $index }}, 'unit_price_tax', this.raw); } }">
+                                    <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="price-{{ $index }}" class="pos-input pos-grid-input font-semibold text-emerald-700 dark:text-emerald-400" style="text-align: right;" 
+                                           x-on:keydown.space.prevent="openCalc($event)"
+                                           title="Harga satuan include PPN (sesuai faktur fisik)">
+                                </div>
+                            @else
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.unit_price'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.updateRow({{ $index }}, 'unit_price', this.raw); } }">
+                                    <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" id="price-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
+                                           x-on:keydown.space.prevent="openCalc($event)"
+                                           title="{{ $tax_type === 'exclude' ? 'Harga satuan sebelum PPN (DPP)' : 'Harga satuan' }}">
+                                </div>
+                            @endif
                         </td>
                         @endif
 
@@ -596,10 +630,16 @@
                         </td>
                         @endif
 
+                        @if(in_array('unit_price_net_tax', $visibleColumns))
+                        <td class="pos-grid-td" style="padding: 0.25rem; text-align: right; background-color: #ecfdf5; font-weight: 600;" class="dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400" title="Harga modal bersih per unit setelah diskon (include PPN)">
+                            {{ number_format($item['unit_price_net_tax'] ?? 0, 2) }}
+                        </td>
+                        @endif
+
                         @if(in_array('harga_jual_1', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
                             @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
-                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_1'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_1'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.updateRow({{ $index }}, 'harga_jual_1', this.raw); } }">
                                     <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input pos-grid-input" style="text-align: right;" 
                                            x-on:keydown.space.prevent="openCalc($event)">
                                 </div>
@@ -613,7 +653,7 @@
                             @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
                                 <input type="number" step="any" class="pos-input pos-grid-input {{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
                                        wire:model.lazy="cart.{{ $index }}.margin_gol_1"
-                                       wire:change="recalculateRow({{ $index }})"
+                                       wire:change="updateRow({{ $index }}, 'margin_gol_1', $event.target.value)"
                                        x-on:keydown.space.prevent="openCalc($event)">
                             @else
                                 <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ $item['margin_gol_1'] < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_1'], 2) }}</div>
@@ -624,7 +664,7 @@
                         @if(in_array('harga_jual_2', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
                             @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
-                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_2'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_2'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.updateRow({{ $index }}, 'harga_jual_2', this.raw); } }">
                                     <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input pos-grid-input" style="text-align: right;" 
                                            x-on:keydown.space.prevent="openCalc($event)">
                                 </div>
@@ -638,7 +678,7 @@
                             @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
                                 <input type="number" step="any" class="pos-input pos-grid-input {{ ($item['margin_gol_2'] ?? 0) < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
                                        wire:model.lazy="cart.{{ $index }}.margin_gol_2"
-                                       wire:change="recalculateRow({{ $index }})"
+                                       wire:change="updateRow({{ $index }}, 'margin_gol_2', $event.target.value)"
                                        x-on:keydown.space.prevent="openCalc($event)">
                             @else
                                 <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ ($item['margin_gol_2'] ?? 0) < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_2'] ?? 0, 2) }}</div>
@@ -649,7 +689,7 @@
                         @if(in_array('harga_jual_3', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
                             @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
-                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_3'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.recalculateRow({{ $index }}); } }">
+                                <div x-data="{ raw: @entangle('cart.' . $index . '.harga_jual_3'), focused: false, get display() { if (this.focused) return this.raw; let rawStr = (this.raw || 0).toString(); let num = parseFloat(rawStr.replace(/,/g, '')); return isNaN(num) ? '' : num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }, set display(val) { this.raw = (val || '').toString().replace(/,/g, ''); $wire.updateRow({{ $index }}, 'harga_jual_3', this.raw); } }">
                                     <input type="text" x-model.lazy="display" @focus="focused = true; $nextTick(() => $el.select())" @blur="focused = false" class="pos-input pos-grid-input" style="text-align: right;" 
                                            x-on:keydown.space.prevent="openCalc($event)">
                                 </div>
@@ -663,37 +703,54 @@
                             @if(auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE'))
                                 <input type="number" step="any" class="pos-input pos-grid-input {{ ($item['margin_gol_3'] ?? 0) < 0 ? 'text-red-500' : 'text-green-600' }} font-medium" style="text-align: right; width: 100%;" 
                                        wire:model.lazy="cart.{{ $index }}.margin_gol_3"
-                                       wire:change="recalculateRow({{ $index }})"
+                                       wire:change="updateRow({{ $index }}, 'margin_gol_3', $event.target.value)"
                                        x-on:keydown.space.prevent="openCalc($event)">
                             @else
                                 <div style="text-align: right; padding: 0.375rem 0.5rem;" class="{{ ($item['margin_gol_3'] ?? 0) < 0 ? 'text-red-500' : 'text-green-600' }} font-medium">{{ number_format($item['margin_gol_3'] ?? 0, 2) }}</div>
                             @endif
                         </td>
                         @endif
-                        @if(in_array('discount_1', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" id="dis1-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
-                                   wire:model.lazy="cart.{{ $index }}.discount_1"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.space.prevent="openCalc($event)">
-                        </td>
-                        @endif
-                        @if(in_array('discount_2', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" id="dis2-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
-                                   wire:model.lazy="cart.{{ $index }}.discount_2"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.space.prevent="openCalc($event)">
-                        </td>
-                        @endif
-                        @if(in_array('discount_3', $visibleColumns))
-                        <td class="pos-grid-td" style="padding: 0.25rem;">
-                            <input onfocus="this.select()" type="number" step="any" id="dis3-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 
-                                   wire:model.lazy="cart.{{ $index }}.discount_3"
-                                   wire:change="recalculateRow({{ $index }})"
-                                   x-on:keydown.space.prevent="openCalc($event)">
-                        </td>
-                        @endif
+                        @foreach([1, 2, 3] as $tier)
+                            @if(in_array('discount_' . $tier, $visibleColumns))
+                            <td class="pos-grid-td" style="padding: 0.25rem;">
+                                <div style="display: flex; align-items: center; gap: 2px;"
+                                     x-data="{ 
+                                         raw: @entangle('cart.' . $index . '.discount_' . $tier),
+                                         type: @entangle('cart.' . $index . '.discount_' . $tier . '_type'),
+                                         focused: false,
+                                         get display() {
+                                             if (this.focused) return this.raw;
+                                             let val = parseFloat((this.raw || 0).toString().replace(/,/g, ''));
+                                             if (isNaN(val) || val === 0) return (this.focused ? '' : '0');
+                                             if (this.type === 'nominal') {
+                                                 return val.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+                                             }
+                                             return val.toString();
+                                         },
+                                         set display(val) {
+                                             let clean = (val || '').toString().replace(/,/g, '');
+                                             this.raw = clean;
+                                             $wire.updateRow({{ $index }}, 'discount_{{ $tier }}', clean);
+                                         }
+                                     }">
+                                    <input type="text" x-model.lazy="display"
+                                           @focus="focused = true; $nextTick(() => $el.select())"
+                                           @blur="focused = false"
+                                           id="dis{{ $tier }}-{{ $index }}" 
+                                           class="pos-input pos-grid-input" 
+                                           style="text-align: right; width: 100%; min-width: 44px;" 
+                                           x-on:keydown.space.prevent="openCalc($event)">
+                                    <button type="button" 
+                                            wire:click="toggleDiscountType({{ $index }}, {{ $tier }})" 
+                                            style="padding: 2px 4px; font-size: 0.7rem; font-weight: 700; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer; flex-shrink: 0;"
+                                            :class="type === 'nominal' ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300'"
+                                            title="Klik untuk ubah jenis diskon (% atau Rp)">
+                                        <span x-text="type === 'nominal' ? 'Rp' : '%'"></span>
+                                    </button>
+                                </div>
+                            </td>
+                            @endif
+                        @endforeach
                         <td class="pos-grid-td" style="text-align: right; font-weight: 600; color: #111827;" class="dark:text-gray-100">
                             @if($enable_edit_total)
                                 <input type="number" step="any" id="subtotal-input-{{ $index }}" 
@@ -744,11 +801,13 @@
         
         <!-- Totals -->
         <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; margin-left: auto;">
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
-                <label class="flex items-center gap-2 cursor-pointer whitespace-nowrap">
-                    <input type="checkbox" wire:model.live="include_tax" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Faktur Kena PPN ({{ (float)($taxRate ?? 11) }}%)</span>
-                </label>
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                <label style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #4b5563;" class="dark:text-gray-400">Model Pajak Faktur</label>
+                <select wire:model.live="tax_type" class="pos-input font-bold" style="padding: 0.25rem 0.5rem; font-size: 0.825rem; border-color: #3b82f6; min-width: 14rem;">
+                    <option value="include">Include PPN (Harga Sudah Termasuk PPN)</option>
+                    <option value="exclude">Exclude PPN (Harga Belum PPN / Tambah PPN)</option>
+                    <option value="non_tax">Non-PPN (Bebas PPN / Supplier Non-PKP)</option>
+                </select>
             </div>
 
             <div style="text-align: right; min-width: max-content;">
@@ -757,12 +816,21 @@
             </div>
 
             <div style="text-align: right; min-width: max-content;">
-                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Subtotal Gross</div>
+                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">
+                    {{ $tax_type === 'include' ? 'Subtotal (+PPN)' : ($tax_type === 'exclude' ? 'Subtotal DPP' : 'Subtotal') }}
+                </div>
                 <div style="font-weight: 600; font-size: 0.95rem; color: #374151;" class="dark:text-gray-200">Rp {{ number_format($subtotal, 2) }}</div>
             </div>
 
+            @if($totalItemDiscount > 0)
+                <div style="text-align: right; min-width: max-content; background: #eff6ff; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid #bfdbfe;" class="dark:bg-blue-950/30 dark:border-blue-900" title="Total potongan harga dari diskon baris barang">
+                    <div style="color: #2563eb; font-size: 0.65rem; text-transform: uppercase; font-weight: 700;" class="dark:text-blue-400">Total Diskon Item</div>
+                    <div style="font-weight: 700; font-size: 0.85rem; color: #1d4ed8;" class="dark:text-blue-300">- Rp {{ number_format($totalItemDiscount, 2) }}</div>
+                </div>
+            @endif
+
             <div style="text-align: right; min-width: max-content;">
-                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">Disc. Subtotal</div>
+                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400" title="Diskon tambahan nota/faktur (misal KAMIS PROMO MTI)">Diskon Faktur</div>
                 <div class="flex items-center justify-end gap-1">
                     <select wire:model.live="discount_subtotal_type" class="pos-input" style="width: 3.5rem; padding: 0.125rem 0.25rem;">
                         <option value="nominal">Rp</option>
@@ -772,13 +840,28 @@
                 </div>
             </div>
 
-            <div style="text-align: right; min-width: max-content;">
-                <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN ({{ (float)($taxRate ?? 11) }}%)</div>
-                <div class="flex items-center justify-end gap-1">
-                    <span style="font-size: 0.75rem; color: #6b7280;">Rp</span>
-                    <input onfocus="this.select()" type="number" wire:model.live="tax_amount" class="pos-input" style="width: 6rem; padding: 0.125rem 0.25rem; text-align: right; border-style: dashed; background: transparent;">
+            @if($tax_type === 'include')
+                <div style="text-align: right; min-width: max-content; background: #f8fafc; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px dashed #cbd5e1;" class="dark:bg-gray-800 dark:border-gray-700">
+                    <div style="color: #6b7280; font-size: 0.65rem; text-transform: uppercase; font-weight: 600;" class="dark:text-gray-400">DPP Netto</div>
+                    <div style="font-weight: 600; font-size: 0.85rem; color: #475569;" class="dark:text-gray-300">Rp {{ number_format($dpp_amount, 2) }}</div>
                 </div>
-            </div>
+                <div style="text-align: right; min-width: max-content; background: #f8fafc; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px dashed #cbd5e1;" class="dark:bg-gray-800 dark:border-gray-700">
+                    <div style="color: #6b7280; font-size: 0.65rem; text-transform: uppercase; font-weight: 600;" class="dark:text-gray-400">PPN ({{ (float)($taxRate ?? 11) }}%)</div>
+                    <div style="font-weight: 600; font-size: 0.85rem; color: #166534;" class="dark:text-emerald-400">Rp {{ number_format($tax_amount, 2) }}</div>
+                </div>
+            @elseif($tax_type === 'exclude')
+                <div style="text-align: right; min-width: max-content;">
+                    <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">DPP Netto</div>
+                    <div style="font-weight: 600; font-size: 0.95rem; color: #374151;" class="dark:text-gray-200">Rp {{ number_format($dpp_amount, 2) }}</div>
+                </div>
+                <div style="text-align: right; min-width: max-content;">
+                    <div style="color: #6b7280; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;" class="dark:text-gray-400">PPN ({{ (float)($taxRate ?? 11) }}%)</div>
+                    <div class="flex items-center justify-end gap-1">
+                        <span style="font-size: 0.75rem; color: #6b7280;">Rp</span>
+                        <input onfocus="this.select()" type="number" wire:model.live="tax_amount" class="pos-input" style="width: 6rem; padding: 0.125rem 0.25rem; text-align: right; border-style: dashed; background: transparent;">
+                    </div>
+                </div>
+            @endif
 
             <div style="text-align: right; min-width: max-content; background-color: rgba(37, 99, 235, 0.08); padding: 0.35rem 0.75rem; border-radius: 0.5rem; border: 1px solid rgba(37, 99, 235, 0.25);" class="dark:bg-blue-950/40 dark:border-blue-800/50">
                 <div style="color: #4b5563; font-size: 0.7rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;" class="dark:text-blue-300">Grand Total</div>

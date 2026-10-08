@@ -38,4 +38,6 @@ backend/test_redis.php
 frontend/test_ws.cjs
 
 DATABARANG/
-DATA IMPORT SARIWANGI/
+DATA IMPORT*/
+ai-service/*.py
+ai-service/*.xlsx

@@ -51,19 +51,32 @@
             </tr>
         </table>
 
+        @php
+            $taxRate = (float)(\App\Models\Organization::first()->tax_rate ?? 11);
+            $taxMultiplier = 1 + ($taxRate / 100);
+            $isInclude = ($doc->tax_type === 'include');
+            $subtotalItems = $doc->items->sum('subtotal');
+            $discountVal = (float)($doc->discount_subtotal ?? 0);
+            $dppNet = $doc->total_amount - ($doc->tax_amount ?? 0);
+        @endphp
+
         <table class="items-table">
             <thead>
                 <tr>
                     <th style="width: 25px;" class="text-center">No</th>
                     <th>Produk / Barang</th>
                     <th class="text-center" style="width: 40px;">Qty</th>
-                    <th class="text-right" style="width: 80px;">Harga</th>
-                    <th class="text-right" style="width: 120px;">Diskon(%)</th>
-                    <th class="text-right" style="width: 100px;">Subtotal</th>
+                    <th class="text-right" style="width: 90px;">Harga {{ $isInclude ? '(+PPN)' : '(DPP)' }}</th>
+                    <th class="text-right" style="width: 100px;">Diskon</th>
+                    <th class="text-right" style="width: 105px;">Subtotal {{ $isInclude ? '(+PPN)' : '(DPP)' }}</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($doc->items as $index => $item)
+                @php
+                    $rowPrice = $isInclude ? round($item->unit_price * $taxMultiplier, 2) : $item->unit_price;
+                    $rowSubtotal = $isInclude ? round($item->subtotal * $taxMultiplier, 2) : $item->subtotal;
+                @endphp
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>
@@ -71,37 +84,114 @@
                         <span style="color: #666; font-size: 0.85em;"> | Barcode: {{ $item->product ? $item->product->barcode : '-' }}</span>
                     </td>
                     <td class="text-center">{{ $item->quantity_received }}</td>
-                    <td class="text-right">Rp {{ number_format($item->unit_price ?? $item->unit_cost ?? 0, 0, ',', '.') }}</td>
+                    <td class="text-right">Rp {{ number_format($rowPrice, 0, ',', '.') }}</td>
                     <td class="text-right">
                         @php
                             $discs = [];
-                            if ((float)($item->discount_1 ?? 0) > 0) $discs[] = (float)$item->discount_1 . '%';
-                            if ((float)($item->discount_2 ?? 0) > 0) $discs[] = (float)$item->discount_2 . '%';
-                            if ((float)($item->discount_3 ?? 0) > 0) $discs[] = (float)$item->discount_3 . '%';
+                            foreach([1, 2, 3] as $tier) {
+                                $val = (float)($item->{"discount_{$tier}"} ?? 0);
+                                $type = $item->{"discount_{$tier}_type"} ?? 'percent';
+                                if ($val > 0) {
+                                    $discs[] = ($type === 'nominal') ? 'Rp ' . number_format($val, 0, ',', '.') : $val . '%';
+                                }
+                            }
                         @endphp
                         {{ count($discs) > 0 ? implode(' + ', $discs) : '0%' }}
                     </td>
-                    <td class="text-right">Rp {{ number_format($item->subtotal ?? 0, 0, ',', '.') }}</td>
+                    <td class="text-right">Rp {{ number_format($rowSubtotal, 0, ',', '.') }}</td>
                 </tr>
                 @endforeach
             </tbody>
         </table>
 
         <table class="summary-box">
-            @if($doc->tax_amount > 0)
-            <tr>
-                <td class="label">DPP (Dasar Pengenaan Pajak)</td>
-                <td class="value">Rp {{ number_format($doc->total_amount - $doc->tax_amount, 0, ',', '.') }}</td>
-            </tr>
-            <tr>
-                <td class="label">Pajak (PPN {{ (float)(\App\Models\Organization::first()->tax_rate ?? 11) }}%)</td>
-                <td class="value">Rp {{ number_format($doc->tax_amount, 0, ',', '.') }}</td>
-            </tr>
+            @if($isInclude)
+                {{-- 1. MODE INCLUDE PPN (seperti Amidis, Danone/Aqua) --}}
+                @php
+                    $subtotalGross = round($subtotalItems * $taxMultiplier, 0);
+                    $discGross = $discountVal > 0 ? ($doc->discount_subtotal_type === 'percent' ? round($subtotalGross * ($discountVal / 100), 0) : $discountVal) : 0;
+                @endphp
+                <tr>
+                    <td class="label">Subtotal Barang (+PPN)</td>
+                    <td class="value">Rp {{ number_format($subtotalGross, 0, ',', '.') }}</td>
+                </tr>
+                @if($discGross > 0)
+                <tr>
+                    <td class="label">
+                        Diskon Faktur
+                        @if($doc->discount_subtotal_type === 'percent')
+                            ({{ (float)$discountVal }}%)
+                        @endif
+                    </td>
+                    <td class="value" style="color: #b91c1c;">- Rp {{ number_format($discGross, 0, ',', '.') }}</td>
+                </tr>
+                @endif
+                <tr style="border-top: 1px dashed #ccc;">
+                    <td class="label">DPP (Dasar Pengenaan Pajak)</td>
+                    <td class="value">Rp {{ number_format($dppNet, 0, ',', '.') }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Pajak (PPN {{ $taxRate }}%)</td>
+                    <td class="value">Rp {{ number_format($doc->tax_amount, 0, ',', '.') }}</td>
+                </tr>
+                <tr style="border-top: 2px solid #333;">
+                    <td class="label" style="font-size: 11pt;">TOTAL FAKTUR</td>
+                    <td class="value" style="font-size: 11pt; font-weight: bold;">Rp {{ number_format($doc->total_amount, 0, ',', '.') }}</td>
+                </tr>
+            @elseif($doc->tax_type === 'exclude')
+                {{-- 2. MODE EXCLUDE PPN (seperti Unilever, Wings, Mayora) --}}
+                @php
+                    $discDpp = $discountVal > 0 ? ($doc->discount_subtotal_type === 'percent' ? round($subtotalItems * ($discountVal / 100), 0) : $discountVal) : 0;
+                @endphp
+                <tr>
+                    <td class="label">Subtotal Barang (DPP)</td>
+                    <td class="value">Rp {{ number_format($subtotalItems, 0, ',', '.') }}</td>
+                </tr>
+                @if($discDpp > 0)
+                <tr>
+                    <td class="label">
+                        Diskon Faktur
+                        @if($doc->discount_subtotal_type === 'percent')
+                            ({{ (float)$discountVal }}%)
+                        @endif
+                    </td>
+                    <td class="value" style="color: #b91c1c;">- Rp {{ number_format($discDpp, 0, ',', '.') }}</td>
+                </tr>
+                @endif
+                <tr style="border-top: 1px dashed #ccc;">
+                    <td class="label">DPP Netto</td>
+                    <td class="value">Rp {{ number_format($dppNet, 0, ',', '.') }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Pajak (PPN {{ $taxRate }}%)</td>
+                    <td class="value">Rp {{ number_format($doc->tax_amount, 0, ',', '.') }}</td>
+                </tr>
+                <tr style="border-top: 2px solid #333;">
+                    <td class="label" style="font-size: 11pt;">TOTAL FAKTUR</td>
+                    <td class="value" style="font-size: 11pt; font-weight: bold;">Rp {{ number_format($doc->total_amount, 0, ',', '.') }}</td>
+                </tr>
+            @else
+                {{-- 3. MODE NON-PPN --}}
+                <tr>
+                    <td class="label">Subtotal Barang</td>
+                    <td class="value">Rp {{ number_format($subtotalItems, 0, ',', '.') }}</td>
+                </tr>
+                @if($discountVal > 0)
+                <tr>
+                    <td class="label">
+                        Diskon Faktur
+                        @if($doc->discount_subtotal_type === 'percent')
+                            ({{ (float)$discountVal }}%)
+                        @endif
+                    </td>
+                    <td class="value" style="color: #b91c1c;">- Rp {{ number_format($discountVal, 0, ',', '.') }}</td>
+                </tr>
+                @endif
+                <tr style="border-top: 2px solid #333;">
+                    <td class="label" style="font-size: 11pt;">TOTAL</td>
+                    <td class="value" style="font-size: 11pt; font-weight: bold;">Rp {{ number_format($doc->total_amount, 0, ',', '.') }}</td>
+                </tr>
             @endif
-            <tr>
-                <td class="label" style="font-size: 12pt;">TOTAL</td>
-                <td class="value" style="font-size: 12pt; font-weight: bold;">Rp {{ number_format($doc->total_amount, 0, ',', '.') }}</td>
-            </tr>
         </table>
 
         <div style="clear: both; margin-top: 20px;">

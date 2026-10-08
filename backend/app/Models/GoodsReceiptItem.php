@@ -13,7 +13,11 @@ class GoodsReceiptItem extends Model
 
     protected $fillable = [
         'goods_receipt_id', 'product_id', 'quantity_ordered', 
-        'quantity_received', 'unit_price', 'discount_1', 'discount_2', 'discount_3', 'subtotal'
+        'quantity_received', 'unit_price', 
+        'discount_1', 'discount_1_type', 
+        'discount_2', 'discount_2_type', 
+        'discount_3', 'discount_3_type', 
+        'subtotal'
     ];
 
     protected $casts = [

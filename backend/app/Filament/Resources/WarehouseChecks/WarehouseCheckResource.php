@@ -237,7 +237,10 @@ HTML;
                         $isNewGr = false;
                         if ($existingDraftGr) {
                             $gr = $existingDraftGr;
-                            $gr->update(['include_tax' => $hasTaxableItems]);
+                            $gr->update([
+                                'include_tax' => $hasTaxableItems,
+                                'tax_type' => $hasTaxableItems ? 'include' : 'non_tax',
+                            ]);
                             // Hapus item draft lama untuk diisi ulang dengan data fisik terbaru
                             $gr->items()->delete();
                         } else {
@@ -254,6 +257,7 @@ HTML;
                                 'status' => 'DRAFT',
                                 'total_amount' => 0,
                                 'include_tax' => $hasTaxableItems,
+                                'tax_type' => $hasTaxableItems ? 'include' : 'non_tax',
                             ]);
                         }
 

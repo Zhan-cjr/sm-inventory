@@ -15,7 +15,7 @@ class GoodsReceipt extends Model
     protected $fillable = [
         'warehouse_check_id', 'purchase_order_id', 'supplier_id', 'supplier_division_id', 'branch_id', 
         'receipt_number', 'receipt_date', 'received_by', 'faktur_image',
-        'faktur_supplier', 'total_amount', 'include_tax', 'tax_amount', 'status', 'notes',
+        'faktur_supplier', 'total_amount', 'discount_subtotal', 'discount_subtotal_type', 'include_tax', 'tax_type', 'tax_amount', 'status', 'notes',
         'due_date', 'payment_status', 'paid_amount', 'payment_method'
     ];
 
@@ -23,6 +23,7 @@ class GoodsReceipt extends Model
         'receipt_date' => 'datetime',
         'due_date' => 'date',
         'total_amount' => 'decimal:2',
+        'discount_subtotal' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'include_tax' => 'boolean',

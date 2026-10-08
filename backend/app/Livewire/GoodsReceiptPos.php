@@ -35,10 +35,12 @@ class GoodsReceiptPos extends Component
     public $payment_method = 'tempo';
     public $purchase_order_id;
     public $include_tax = true;
+    public $tax_type = 'include'; // 'include', 'exclude', 'non_tax'
     public $tax_amount = 0;
+    public $dpp_amount = 0;
     public $cetak_nota = false;
 
-    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'unit_price_tax', 'harga_jual_1', 'margin_gol_1', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
+    public $visibleColumns = ['barcode', 'name', 'qty_ordered', 'qty_received', 'unit_price', 'harga_jual_1', 'margin_gol_1', 'discount_1', 'discount_2', 'discount_3', 'subtotal'];
 
     public $searchQuery = '';
     public $cart = [];
@@ -47,6 +49,7 @@ class GoodsReceiptPos extends Component
     public $totalQty = 0;
     public $totalLines = 0;
     public $subtotal = 0;
+    public $totalItemDiscount = 0;
     public $discount_subtotal = 0;
     public $discount_subtotal_type = 'nominal'; // 'percent' or 'nominal'
     public $grandTotal = 0;
@@ -80,8 +83,11 @@ class GoodsReceiptPos extends Component
             $this->supplier_division_id = $goodsReceipt->supplier_division_id;
             $this->payment_method = $goodsReceipt->payment_method ?? 'tempo';
             $this->purchase_order_id = $goodsReceipt->purchase_order_id;
-            $this->include_tax = $goodsReceipt->include_tax;
+            $this->tax_type = $goodsReceipt->tax_type ?? ($goodsReceipt->include_tax ? 'include' : 'non_tax');
+            $this->include_tax = ($this->tax_type !== 'non_tax');
             $this->tax_amount = $goodsReceipt->tax_amount;
+            $this->discount_subtotal = (float) ($goodsReceipt->discount_subtotal ?? 0);
+            $this->discount_subtotal_type = $goodsReceipt->discount_subtotal_type ?? 'nominal';
             $this->existing_faktur_image = is_array($goodsReceipt->faktur_image) ? $goodsReceipt->faktur_image : ($goodsReceipt->faktur_image ? [$goodsReceipt->faktur_image] : []);
             $this->faktur_image = [];
 
@@ -139,6 +145,7 @@ class GoodsReceiptPos extends Component
                     'qty_received' => $item->quantity_received,
                     'unit_price' => $unitPrice,
                     'unit_price_tax' => $unitPriceTax,
+                    'unit_price_net_tax' => $unitPriceTax,
                     'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($item->product->harga_jual_1 ?? 0),
                     'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($item->product->margin_gol_1 ?? 0),
                     'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($item->product->harga_jual_2 ?? 0),
@@ -146,11 +153,15 @@ class GoodsReceiptPos extends Component
                     'harga_jual_3' => ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($item->product->harga_jual_3 ?? 0),
                     'margin_gol_3' => ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($item->product->margin_gol_3 ?? 0),
                     'discount_1' => $item->discount_1,
+                    'discount_1_type' => $item->discount_1_type ?? 'percent',
                     'discount_2' => $item->discount_2,
+                    'discount_2_type' => $item->discount_2_type ?? 'percent',
                     'discount_3' => $item->discount_3,
+                    'discount_3_type' => $item->discount_3_type ?? 'percent',
                     'subtotal' => 0,
                 ];
                 $this->recalculateRow(count($this->cart) - 1, false);
+                $this->syncRowMargins(count($this->cart) - 1);
             }
         } else {
             $this->receipt_number = 'GR-' . date('YmdHis');
@@ -318,6 +329,7 @@ class GoodsReceiptPos extends Component
                             'qty_received' => (float) $qtyToDefault,
                             'unit_price' => $unitPrice,
                             'unit_price_tax' => $unitPriceTax,
+                            'unit_price_net_tax' => $unitPriceTax,
                             'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($checkItem->product->harga_jual_1 ?? 0),
                             'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($checkItem->product->margin_gol_1 ?? 0),
                             'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($checkItem->product->harga_jual_2 ?? 0),
@@ -325,11 +337,15 @@ class GoodsReceiptPos extends Component
                             'harga_jual_3' => ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($checkItem->product->harga_jual_3 ?? 0),
                             'margin_gol_3' => ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($checkItem->product->margin_gol_3 ?? 0),
                             'discount_1' => $disc1,
+                            'discount_1_type' => 'percent',
                             'discount_2' => $disc2,
+                            'discount_2_type' => 'percent',
                             'discount_3' => $disc3,
+                            'discount_3_type' => 'percent',
                             'subtotal' => 0,
                         ];
                         $this->recalculateRow(count($this->cart) - 1, false);
+                        $this->syncRowMargins(count($this->cart) - 1);
                     }
                 } else {
                     foreach ($po->items as $item) {
@@ -374,6 +390,7 @@ class GoodsReceiptPos extends Component
                             'qty_received' => (float) $qtyToDefault,
                             'unit_price' => $unitPrice,
                             'unit_price_tax' => $unitPriceTax,
+                            'unit_price_net_tax' => $unitPriceTax,
                             'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($item->product->harga_jual_1 ?? 0),
                             'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($item->product->margin_gol_1 ?? 0),
                             'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($item->product->harga_jual_2 ?? 0),
@@ -381,11 +398,15 @@ class GoodsReceiptPos extends Component
                             'harga_jual_3' => ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($item->product->harga_jual_3 ?? 0),
                             'margin_gol_3' => ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($item->product->margin_gol_3 ?? 0),
                             'discount_1' => (float) ($item->discount_1 ?? 0),
+                            'discount_1_type' => 'percent',
                             'discount_2' => (float) ($item->discount_2 ?? 0),
+                            'discount_2_type' => 'percent',
                             'discount_3' => (float) ($item->discount_3 ?? 0),
+                            'discount_3_type' => 'percent',
                             'subtotal' => 0,
                         ];
                         $this->recalculateRow(count($this->cart) - 1, false);
+                        $this->syncRowMargins(count($this->cart) - 1);
                     }
                 }
 
@@ -415,6 +436,7 @@ class GoodsReceiptPos extends Component
                 $this->cart[$index]['margin_gol_2'] = ($stock && $stock->margin_gol_2 > 0) ? $stock->margin_gol_2 : ($product?->margin_gol_2 ?? 0);
                 $this->cart[$index]['harga_jual_3'] = ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($product?->harga_jual_3 ?? 0);
                 $this->cart[$index]['margin_gol_3'] = ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($product?->margin_gol_3 ?? 0);
+                $this->syncRowMargins($index);
             }
         }
     }
@@ -634,6 +656,7 @@ class GoodsReceiptPos extends Component
                 'qty_received' => 1,
                 'unit_price' => $costPrice,
                 'unit_price_tax' => $costPriceTax,
+                'unit_price_net_tax' => $costPriceTax,
                 'harga_jual_1' => ($stock && $stock->harga_jual_1 > 0) ? $stock->harga_jual_1 : ($product->harga_jual_1 ?? 0),
                 'margin_gol_1' => ($stock && $stock->margin_gol_1 > 0) ? $stock->margin_gol_1 : ($product->margin_gol_1 ?? 0),
                 'harga_jual_2' => ($stock && $stock->harga_jual_2 > 0) ? $stock->harga_jual_2 : ($product->harga_jual_2 ?? 0),
@@ -641,17 +664,91 @@ class GoodsReceiptPos extends Component
                 'harga_jual_3' => ($stock && $stock->harga_jual_3 > 0) ? $stock->harga_jual_3 : ($product->harga_jual_3 ?? 0),
                 'margin_gol_3' => ($stock && $stock->margin_gol_3 > 0) ? $stock->margin_gol_3 : ($product->margin_gol_3 ?? 0),
                 'discount_1' => 0,
+                'discount_1_type' => 'percent',
                 'discount_2' => 0,
+                'discount_2_type' => 'percent',
                 'discount_3' => 0,
+                'discount_3_type' => 'percent',
                 'subtotal' => $costPrice
             ];
+            $this->syncRowMargins(count($this->cart) - 1);
         }
 
         $this->calculateTotals();
     }
 
+    public function getNetCostPriceTax(int $index): float
+    {
+        if (!isset($this->cart[$index])) {
+            return 0.0;
+        }
+
+        $item = $this->cart[$index];
+        $qty = (float) ($item['qty_received'] ?? 0);
+        $subtotal = (float) ($item['subtotal'] ?? 0);
+        $unitPrice = (float) ($item['unit_price'] ?? 0);
+        $netPrice = $qty > 0 ? ($subtotal / $qty) : $unitPrice;
+
+        $isTaxable = (bool) ($item['is_taxable'] ?? true);
+        $taxMultiplier = 1 + ($this->taxRate / 100);
+
+        $costNetTax = ($this->include_tax && $isTaxable) ? round($netPrice * $taxMultiplier, 2) : round($netPrice, 2);
+
+        if ($costNetTax <= 0) {
+            $costNetTax = (float) ($item['unit_price_tax'] ?? $item['unit_price'] ?? 0);
+        }
+
+        return $costNetTax;
+    }
+
+    public function syncRowMargins(int $index, ?string $changedField = null, $changedValue = null)
+    {
+        if (!isset($this->cart[$index])) {
+            return;
+        }
+
+        // Basis margin harga jual: Modal Netto (+PPN) setelah diskon faktur
+        $costBasis = $this->getNetCostPriceTax($index);
+        $this->cart[$index]['unit_price_net_tax'] = $costBasis;
+
+        if (in_array($changedField, ['margin_gol_1', 'margin_gol_2', 'margin_gol_3'])) {
+            $gol = substr($changedField, -1);
+            $margin = (float) $changedValue;
+            $this->cart[$index][$changedField] = $margin;
+            if ($costBasis > 0) {
+                $this->cart[$index]["harga_jual_{$gol}"] = round($costBasis * (1 + ($margin / 100)), 2);
+            }
+        } elseif (in_array($changedField, ['harga_jual_1', 'harga_jual_2', 'harga_jual_3'])) {
+            $gol = substr($changedField, -1);
+            $sellingPrice = (float) $changedValue;
+            $this->cart[$index][$changedField] = $sellingPrice;
+            if ($sellingPrice > 0 && $costBasis > 0) {
+                $this->cart[$index]["margin_gol_{$gol}"] = round((($sellingPrice - $costBasis) / $costBasis) * 100, 2);
+            } else {
+                $this->cart[$index]["margin_gol_{$gol}"] = 0;
+            }
+        } else {
+            // Sinkronisasi otomatis untuk semua golongan berdasarkan harga_jual yang ada terhadap Modal Netto (+PPN)
+            foreach ([1, 2, 3] as $i) {
+                $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
+                if ($sellingPrice > 0 && $costBasis > 0) {
+                    $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $costBasis) / $costBasis) * 100, 2);
+                } elseif ($sellingPrice <= 0 && ($this->cart[$index]["margin_gol_{$i}"] ?? 0) > 0 && $costBasis > 0) {
+                    $margin = (float) $this->cart[$index]["margin_gol_{$i}"];
+                    $this->cart[$index]["harga_jual_{$i}"] = round($costBasis * (1 + ($margin / 100)), 2);
+                } else {
+                    $this->cart[$index]["margin_gol_{$i}"] = 0;
+                }
+            }
+        }
+    }
+
     public function updateRow($index, $field, $value)
     {
+        if (!isset($this->cart[$index])) {
+            return;
+        }
+
         if ($field === 'qty_received' && (!empty($this->purchase_order_id) || (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)))) {
             if (!$this->hasPoBypassAuthorization()) {
                 Notification::make()->title('Qty terima disinkronkan dari Cek Gudang / PO dan tidak dapat diubah secara manual.')->warning()->send();
@@ -667,6 +764,8 @@ class GoodsReceiptPos extends Component
             $this->cart[$index]['unit_price_tax'] = $taxVal;
             $this->cart[$index]['unit_price'] = $isTaxable ? ($taxMultiplier > 0 ? round($taxVal / $taxMultiplier, 4) : $taxVal) : $taxVal;
             $this->recalculateRow($index, false);
+            $this->syncRowMargins($index);
+            $this->calculateTotals();
             return;
         }
 
@@ -678,6 +777,45 @@ class GoodsReceiptPos extends Component
             $this->cart[$index]['unit_price'] = $dppVal;
             $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($dppVal * $taxMultiplier, 2) : $dppVal;
             $this->recalculateRow($index, false);
+            $this->syncRowMargins($index);
+            $this->calculateTotals();
+            return;
+        }
+
+        if (in_array($field, ['discount_1', 'discount_2', 'discount_3'])) {
+            $cleaned = (float) str_replace(',', '', (string) $value);
+            $this->cart[$index][$field] = $cleaned;
+            $this->recalculateRow($index, false);
+            $this->syncRowMargins($index);
+            $this->calculateTotals();
+            return;
+        }
+
+        if ($field === 'subtotal') {
+            $qty = (float) ($this->cart[$index]['qty_received'] ?? 0);
+            $subtotal = (float) $value;
+            if ($qty > 0) {
+                $d1 = ((float) ($this->cart[$index]['discount_1'] ?? 0)) / 100;
+                $d2 = ((float) ($this->cart[$index]['discount_2'] ?? 0)) / 100;
+                $d3 = ((float) ($this->cart[$index]['discount_3'] ?? 0)) / 100;
+                $f1 = (1 - $d1) > 0 ? (1 - $d1) : 1;
+                $f2 = (1 - $d2) > 0 ? (1 - $d2) : 1;
+                $f3 = (1 - $d3) > 0 ? (1 - $d3) : 1;
+                $baseTotal = $subtotal / ($f1 * $f2 * $f3);
+                $this->cart[$index]['unit_price'] = round($baseTotal / $qty, 4);
+                $this->cart[$index]['subtotal'] = $subtotal;
+                
+                $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
+                $taxMultiplier = 1 + ($this->taxRate / 100);
+                $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($this->cart[$index]['unit_price'] * $taxMultiplier, 2) : $this->cart[$index]['unit_price'];
+                $this->syncRowMargins($index);
+            }
+            $this->calculateTotals();
+            return;
+        }
+
+        if (in_array($field, ['harga_jual_1', 'harga_jual_2', 'harga_jual_3', 'margin_gol_1', 'margin_gol_2', 'margin_gol_3'])) {
+            $this->syncRowMargins($index, $field, $value);
             return;
         }
 
@@ -716,148 +854,124 @@ class GoodsReceiptPos extends Component
         $name = (string) $name;
         $parts = explode('.', $name);
         if (count($parts) === 2) {
-            $index = $parts[0];
+            $index = (int) $parts[0];
             $field = $parts[1];
 
-            if ($field === 'qty_received' && (!empty($this->purchase_order_id) || (!empty($this->goodsReceipt) && !empty($this->goodsReceipt->warehouse_check_id)))) {
-                if (!$this->hasPoBypassAuthorization()) {
-                    Notification::make()->title('Qty terima disinkronkan dari Cek Gudang / PO dan tidak dapat diubah tanpa izin otorisasi Bypass Wajib PO.')->warning()->send();
-                    if ($this->goodsReceipt) {
-                        $origItem = $this->goodsReceipt->items()->where('product_id', $this->cart[$index]['product_id'])->first();
-                        $this->cart[$index]['qty_received'] = $origItem ? $origItem->quantity_received : ($this->cart[$index]['qty_ordered'] ?? 0);
-                    } else {
-                        $this->cart[$index]['qty_received'] = $this->cart[$index]['qty_ordered'] ?? 0;
-                    }
-                    $this->recalculateRow($index);
-                    return;
-                }
-            }
-            
-            if ($field === 'unit_price_tax') {
-                $taxVal = (float) $value;
-                $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
-                $taxMultiplier = 1 + ($this->taxRate / 100);
-                $this->cart[$index]['unit_price_tax'] = $taxVal;
-                $this->cart[$index]['unit_price'] = $isTaxable ? ($taxMultiplier > 0 ? round($taxVal / $taxMultiplier, 4) : $taxVal) : $taxVal;
-                $this->recalculateRow($index, false);
-            } elseif ($field === 'unit_price') {
-                $dppVal = (float) $value;
-                $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
-                $taxMultiplier = 1 + ($this->taxRate / 100);
-                $this->cart[$index]['unit_price'] = $dppVal;
-                $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($dppVal * $taxMultiplier, 2) : $dppVal;
-                $this->recalculateRow($index, false);
-            } elseif ($field === 'subtotal') {
-                $qty = (float) ($this->cart[$index]['qty_received'] ?? 0);
-                $subtotal = (float) $value;
-                if ($qty > 0) {
-                    $d1 = ((float) ($this->cart[$index]['discount_1'] ?? 0)) / 100;
-                    $d2 = ((float) ($this->cart[$index]['discount_2'] ?? 0)) / 100;
-                    $d3 = ((float) ($this->cart[$index]['discount_3'] ?? 0)) / 100;
-                    $f1 = (1 - $d1) > 0 ? (1 - $d1) : 1;
-                    $f2 = (1 - $d2) > 0 ? (1 - $d2) : 1;
-                    $f3 = (1 - $d3) > 0 ? (1 - $d3) : 1;
-                    $baseTotal = $subtotal / ($f1 * $f2 * $f3);
-                    $this->cart[$index]['unit_price'] = round($baseTotal / $qty, 4);
-                    $this->cart[$index]['subtotal'] = $subtotal;
-                    
-                    $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
-                    $taxMultiplier = 1 + ($this->taxRate / 100);
-                    $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($this->cart[$index]['unit_price'] * $taxMultiplier, 2) : $this->cart[$index]['unit_price'];
-                }
-            } else {
-                $this->recalculateRow($index);
-            }
-            
-            $item = $this->cart[$index];
-            $qty = (float) ($item['qty_received'] ?? 0);
-            $netPrice = $qty > 0 ? ((float)($item['subtotal'] ?? 0) / $qty) : (float) ($item['unit_price'] ?? 0);
-            
-            $isTaxable = $item['is_taxable'] ?? true;
-            $costPriceTax = ($this->include_tax && $isTaxable) ? round($netPrice * (1 + ($this->taxRate / 100)), 2) : $netPrice;
-
-            if (in_array($field, ['margin_gol_1', 'margin_gol_2', 'margin_gol_3'])) {
-                $gol = substr($field, -1);
-                $margin = (float) $value;
-                if ($costPriceTax > 0) {
-                    $this->cart[$index]["harga_jual_{$gol}"] = round($costPriceTax * (1 + ($margin / 100)), 2);
-                }
-            } elseif (in_array($field, ['harga_jual_1', 'harga_jual_2', 'harga_jual_3'])) {
-                $gol = substr($field, -1);
-                $sellingPrice = (float) $value;
-                if ($sellingPrice > 0 && $costPriceTax > 0) {
-                    $this->cart[$index]["margin_gol_{$gol}"] = round((($sellingPrice - $costPriceTax) / $costPriceTax) * 100, 2);
-                } else {
-                    $this->cart[$index]["margin_gol_{$gol}"] = 0;
-                }
-            } else {
-                foreach([1, 2, 3] as $i) {
-                    $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
-                    if ($sellingPrice > 0 && $costPriceTax > 0) {
-                        $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $costPriceTax) / $costPriceTax) * 100, 2);
-                    } else {
-                        $this->cart[$index]["margin_gol_{$i}"] = 0;
-                    }
-                }
-            }
-
-            $this->calculateTotals();
+            $this->updateRow($index, $field, $value);
         }
     }
 
     public function recalculateRow($index, $syncTaxPrice = true)
     {
+        if (!isset($this->cart[$index])) {
+            return;
+        }
+
         $item = $this->cart[$index];
         $qty = (float) ($item['qty_received'] ?? 0);
-        $price = (float) ($item['unit_price'] ?? 0);
+        $dppPrice = (float) ($item['unit_price'] ?? 0);
+        $taxPrice = (float) ($item['unit_price_tax'] ?? 0);
         $isTaxable = (bool) ($item['is_taxable'] ?? true);
         $taxMultiplier = 1 + ($this->taxRate / 100);
 
+        if ($this->tax_type === 'non_tax') {
+            $isTaxable = false;
+        }
+
         if ($syncTaxPrice) {
-            $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($price * $taxMultiplier, 2) : $price;
+            if ($this->tax_type === 'non_tax') {
+                $this->cart[$index]['unit_price_tax'] = $dppPrice;
+            } else {
+                $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($dppPrice * $taxMultiplier, 2) : $dppPrice;
+            }
         }
         
-        $baseTotal = $qty * $price;
-        
-        // Apply tiered discounts
-        $d1 = $baseTotal * (($item['discount_1'] ?? 0) / 100);
-        $t1 = $baseTotal - $d1;
-        
-        $d2 = $t1 * (($item['discount_2'] ?? 0) / 100);
-        $t2 = $t1 - $d2;
-        
-        $d3 = $t2 * (($item['discount_3'] ?? 0) / 100);
-        $subtotal = $t2 - $d3;
+        // Tentukan harga dasar baris sesuai Mode Pajak:
+        // Pada mode Include PPN: baris dihitung dari Harga (+PPN) agar subtotal baris sama persis dengan cetakan faktur
+        if ($this->tax_type === 'include' && $isTaxable) {
+            $rowPrice = (float) ($this->cart[$index]['unit_price_tax'] ?? $taxPrice);
+        } else {
+            $rowPrice = $dppPrice;
+        }
 
-        $this->cart[$index]['subtotal'] = round($subtotal, 2);
+        $baseTotal = $qty * $rowPrice;
+        $runningTotal = $baseTotal;
+
+        foreach ([1, 2, 3] as $tier) {
+            $val = (float) ($this->cart[$index]["discount_{$tier}"] ?? 0);
+            $type = $this->cart[$index]["discount_{$tier}_type"] ?? 'percent';
+
+            if ($val > 0) {
+                if ($type === 'nominal') {
+                    $runningTotal = max(0, $runningTotal - $val);
+                } else {
+                    $d = $runningTotal * ($val / 100);
+                    $runningTotal = max(0, $runningTotal - $d);
+                }
+            }
+        }
+
+        $this->cart[$index]['subtotal'] = round($runningTotal, 2);
+
+        // Update harga modal netto per unit (+PPN) untuk rujukan margin
+        if ($this->tax_type === 'include') {
+            $this->cart[$index]['unit_price_net_tax'] = $qty > 0 ? round($this->cart[$index]['subtotal'] / $qty, 2) : (float) ($this->cart[$index]['unit_price_tax'] ?? 0);
+        } elseif ($this->tax_type === 'exclude' && $isTaxable) {
+            $netDpp = $qty > 0 ? ($this->cart[$index]['subtotal'] / $qty) : $dppPrice;
+            $this->cart[$index]['unit_price_net_tax'] = round($netDpp * $taxMultiplier, 2);
+        } else {
+            $this->cart[$index]['unit_price_net_tax'] = $qty > 0 ? round($this->cart[$index]['subtotal'] / $qty, 2) : $dppPrice;
+        }
+
+        $this->syncRowMargins($index);
+        $this->calculateTotals();
+    }
+
+    public function toggleDiscountType($index, $tier = 1)
+    {
+        if (!isset($this->cart[$index])) {
+            return;
+        }
+        $tier = in_array((int)$tier, [1, 2, 3]) ? (int)$tier : 1;
+        $field = "discount_{$tier}_type";
+        $current = $this->cart[$index][$field] ?? 'percent';
+        $this->cart[$index][$field] = ($current === 'percent') ? 'nominal' : 'percent';
+        $this->recalculateRow($index, false);
+    }
+
+    public function updatedTaxType($value)
+    {
+        $this->include_tax = ($value !== 'non_tax');
+        foreach ($this->cart as $idx => $item) {
+            $this->recalculateRow($idx, false);
+            $this->syncRowMargins($idx);
+        }
         $this->calculateTotals();
     }
 
     public function updatedIncludeTax()
     {
-        // Recalculate all margins since the cost basis changed
-        foreach ($this->cart as $index => $item) {
-            $qty = (float) ($item['qty_received'] ?? 0);
-            $netPrice = $qty > 0 ? ((float)($item['subtotal'] ?? 0) / $qty) : (float) ($item['unit_price'] ?? 0);
-            
-            $isTaxable = $item['is_taxable'] ?? true;
-            $costPriceTax = ($this->include_tax && $isTaxable) ? round($netPrice * (1 + ($this->taxRate / 100)), 2) : $netPrice;
-            
-            foreach([1, 2, 3] as $i) {
-                $sellingPrice = (float) ($this->cart[$index]["harga_jual_{$i}"] ?? 0);
-                if ($sellingPrice > 0 && $costPriceTax > 0) {
-                    $this->cart[$index]["margin_gol_{$i}"] = round((($sellingPrice - $costPriceTax) / $costPriceTax) * 100, 2);
-                } else {
-                    $this->cart[$index]["margin_gol_{$i}"] = 0;
-                }
-            }
-        }
-        $this->calculateTotals();
+        $this->tax_type = $this->include_tax ? 'include' : 'non_tax';
+        $this->updatedTaxType($this->tax_type);
     }
 
     public function updatedTaxAmount()
     {
-        $this->grandTotal = $this->subtotal + (float) $this->tax_amount;
+        if ($this->tax_type === 'exclude') {
+            $this->grandTotal = $this->dpp_amount + (float) $this->tax_amount;
+        } else {
+            $this->grandTotal = $this->subtotal + (float) $this->tax_amount;
+        }
+    }
+
+    public function updatedDiscountSubtotal()
+    {
+        $this->calculateTotals();
+    }
+
+    public function updatedDiscountSubtotalType()
+    {
+        $this->calculateTotals();
     }
 
     public function calculateTotals()
@@ -866,37 +980,66 @@ class GoodsReceiptPos extends Component
         $this->totalQty = collect($this->cart)->sum('qty_received');
         $this->subtotal = collect($this->cart)->sum('subtotal');
 
-        // Calculate Subtotal Discount
-        $discountAmount = 0;
-        if ($this->discount_subtotal_type === 'percent') {
-            $discountAmount = $this->subtotal * ($this->discount_subtotal / 100);
-        } else {
-            $discountAmount = (float) $this->discount_subtotal;
+        $taxRate = (float) ($this->taxRate ?? 11);
+        $taxMultiplier = 1 + ($taxRate / 100);
+
+        // Hitung total penghematan diskon barang
+        $totalGross = 0;
+        foreach ($this->cart as $cItem) {
+            $cQty = (float) ($cItem['qty_received'] ?? 0);
+            $cPrice = ($this->tax_type === 'include' && ($cItem['is_taxable'] ?? true))
+                ? (float) ($cItem['unit_price_tax'] ?? 0)
+                : (float) ($cItem['unit_price'] ?? 0);
+            $totalGross += ($cQty * $cPrice);
         }
+        $this->totalItemDiscount = max(0, round($totalGross - $this->subtotal, 2));
 
-        $netTotal = $this->subtotal - $discountAmount;
-
-        if ($this->include_tax) {
-            $taxRate = $this->taxRate;
-            
-            $taxAmount = 0;
-            foreach ($this->cart as $item) {
-                $isTaxable = $item['is_taxable'] ?? true;
-                if ($isTaxable) {
-                    // Apply proportion of global discount to this item
-                    $itemProportion = $this->subtotal > 0 ? ($item['subtotal'] / $this->subtotal) : 0;
-                    $itemDiscount = $discountAmount * $itemProportion;
-                    $itemNet = $item['subtotal'] - $itemDiscount;
-                    
-                    $taxAmount += round($itemNet * ($taxRate / 100), 2);
-                }
+        if ($this->tax_type === 'include') {
+            // 1. MODE INCLUDE PPN (seperti Amidis, Danone/Aqua):
+            // $this->subtotal adalah Total Bruto INCLUDE PPN (misal Amidis: 1.034.940,00)
+            $discountAmount = 0;
+            if ($this->discount_subtotal_type === 'percent') {
+                $discountAmount = $this->subtotal * ($this->discount_subtotal / 100);
+            } else {
+                $discountAmount = (float) $this->discount_subtotal; // Nilai include PPN di faktur (misal 147.230,00)
             }
-            $this->tax_amount = $taxAmount;
+
+            $netTotal = $this->subtotal - $discountAmount; // misal 887.710,00
+            $this->grandTotal = round($netTotal, 2);
+
+            // Ekstraksi nilai DPP dan PPN mundur
+            $this->dpp_amount = round($this->grandTotal / $taxMultiplier, 2); // misal 799.738,74
+            $this->tax_amount = round($this->grandTotal - $this->dpp_amount, 2); // misal 87.971,26
+
+        } elseif ($this->tax_type === 'exclude') {
+            // 2. MODE EXCLUDE PPN (seperti Unilever, Wings, Mayora):
+            // $this->subtotal adalah Total DPP (sebelum pajak)
+            $discountAmount = 0;
+            if ($this->discount_subtotal_type === 'percent') {
+                $discountAmount = $this->subtotal * ($this->discount_subtotal / 100);
+            } else {
+                $discountAmount = (float) $this->discount_subtotal; // Diskon memotong DPP
+            }
+
+            $netDpp = $this->subtotal - $discountAmount;
+            $this->dpp_amount = round($netDpp, 2);
+            $this->tax_amount = round($netDpp * ($taxRate / 100), 2);
+            $this->grandTotal = round($netDpp + $this->tax_amount, 2);
+
         } else {
+            // 3. MODE NON-PPN (Bebas PPN / Supplier Non-PKP):
+            $discountAmount = 0;
+            if ($this->discount_subtotal_type === 'percent') {
+                $discountAmount = $this->subtotal * ($this->discount_subtotal / 100);
+            } else {
+                $discountAmount = (float) $this->discount_subtotal;
+            }
+
+            $netTotal = $this->subtotal - $discountAmount;
+            $this->grandTotal = round($netTotal, 2);
+            $this->dpp_amount = $this->grandTotal;
             $this->tax_amount = 0;
         }
-
-        $this->grandTotal = $netTotal + $this->tax_amount;
     }
 
     public function save()
@@ -914,6 +1057,10 @@ class GoodsReceiptPos extends Component
         if (empty($this->cart)) {
             Notification::make()->title('Keranjang kosong!')->danger()->send();
             return;
+        }
+
+        foreach ($this->cart as $idx => $item) {
+            $this->syncRowMargins($idx);
         }
 
         foreach ($this->cart as $item) {
@@ -976,7 +1123,10 @@ class GoodsReceiptPos extends Component
                 'faktur_supplier' => $this->faktur_supplier,
                 'faktur_image' => empty($imagePaths) ? null : $imagePaths,
                 'total_amount' => $this->grandTotal,
-                'include_tax' => $this->include_tax,
+                'discount_subtotal' => $this->discount_subtotal,
+                'discount_subtotal_type' => $this->discount_subtotal_type,
+                'include_tax' => ($this->tax_type !== 'non_tax'),
+                'tax_type' => $this->tax_type,
                 'tax_amount' => $this->tax_amount,
                 'status' => 'RECEIVED',
                 'payment_method' => $this->payment_method,
@@ -1004,22 +1154,50 @@ class GoodsReceiptPos extends Component
             $taxMultiplier = 1 + ($taxRate / 100);
 
             foreach ($this->cart as $item) {
+                $qty = (float) $item['qty_received'];
+                $itemSubtotal = (float) $item['subtotal'];
+
+                if ($this->tax_type === 'include') {
+                    $itemSubtotalDpp = round($itemSubtotal / $taxMultiplier, 2);
+                    $itemUnitPriceDpp = round(((float)$item['unit_price_tax']) / $taxMultiplier, 4);
+
+                    // Modal barang diambil dari harga netto baris faktur (+PPN)
+                    $costPriceTax = $qty > 0 ? round($itemSubtotal / $qty, 2) : (float) $item['unit_price_tax'];
+                    $netPrice = round($costPriceTax / $taxMultiplier, 4);
+                } elseif ($this->tax_type === 'exclude') {
+                    $itemSubtotalDpp = $itemSubtotal;
+                    $itemUnitPriceDpp = (float) $item['unit_price'];
+
+                    // Modal barang diambil dari harga netto baris DPP, lalu ditambah PPN 11%
+                    $netPrice = $qty > 0 ? round($itemSubtotal / $qty, 4) : (float) $item['unit_price'];
+                    $costPriceTax = round($netPrice * $taxMultiplier, 2);
+                } else {
+                    $itemSubtotalDpp = $itemSubtotal;
+                    $itemUnitPriceDpp = (float) $item['unit_price'];
+
+                    // Non PPN: murni harga netto baris
+                    $netPrice = $qty > 0 ? round($itemSubtotal / $qty, 2) : (float) $item['unit_price'];
+                    $costPriceTax = $netPrice;
+                }
+
                 GoodsReceiptItem::create([
                     'goods_receipt_id' => $gr->id,
                     'product_id' => $item['product_id'],
                     'quantity_ordered' => $item['qty_ordered'],
                     'quantity_received' => $item['qty_received'],
-                    'unit_price' => $item['unit_price'],
+                    'unit_price' => $itemUnitPriceDpp,
                     'discount_1' => $item['discount_1'] ?? 0,
+                    'discount_1_type' => $item['discount_1_type'] ?? 'percent',
                     'discount_2' => $item['discount_2'] ?? 0,
+                    'discount_2_type' => $item['discount_2_type'] ?? 'percent',
                     'discount_3' => $item['discount_3'] ?? 0,
-                    'subtotal' => $item['subtotal']
+                    'discount_3_type' => $item['discount_3_type'] ?? 'percent',
+                    'subtotal' => $itemSubtotalDpp
                 ]);
 
                 $product = Product::find($item['product_id']);
-                $netPrice = $item['qty_received'] > 0 ? ($item['subtotal'] / $item['qty_received']) : $item['unit_price'];
                 $isTaxable = (bool) ($item['is_taxable'] ?? ($product?->is_taxable ?? true));
-                $costPriceTax = ($this->include_tax && $isTaxable) ? round($netPrice * $taxMultiplier, 2) : $netPrice;
+                $costBasisMargin = $costPriceTax > 0 ? $costPriceTax : $netPrice;
 
                 // 1. Selalu update Produk Global (Master Data) agar harga global tetap up-to-date
                 if ($product) {
@@ -1034,10 +1212,10 @@ class GoodsReceiptPos extends Component
                         
                         foreach([1, 2, 3] as $i) {
                             $hj = (float) $updateData["harga_jual_{$i}"];
-                            if ($hj > 0 && $costPriceTax > 0) {
-                                $updateData["margin_gol_{$i}"] = round((($hj - $costPriceTax) / $costPriceTax) * 100, 2);
+                            if ($hj > 0 && $costBasisMargin > 0) {
+                                $updateData["margin_gol_{$i}"] = round((($hj - $costBasisMargin) / $costBasisMargin) * 100, 2);
                             } else {
-                                $updateData["margin_gol_{$i}"] = 0;
+                                $updateData["margin_gol_{$i}"] = (float) ($item["margin_gol_{$i}"] ?? 0);
                             }
                         }
                         $updateData['selling_price'] = $updateData['harga_jual_1'];
@@ -1060,10 +1238,10 @@ class GoodsReceiptPos extends Component
                             
                             foreach([1, 2, 3] as $i) {
                                 $hj = (float) $updateData["harga_jual_{$i}"];
-                                if ($hj > 0 && $costPriceTax > 0) {
-                                    $updateData["margin_gol_{$i}"] = round((($hj - $costPriceTax) / $costPriceTax) * 100, 2);
+                                if ($hj > 0 && $costBasisMargin > 0) {
+                                    $updateData["margin_gol_{$i}"] = round((($hj - $costBasisMargin) / $costBasisMargin) * 100, 2);
                                 } else {
-                                    $updateData["margin_gol_{$i}"] = 0;
+                                    $updateData["margin_gol_{$i}"] = (float) ($item["margin_gol_{$i}"] ?? 0);
                                 }
                             }
                             $updateData['selling_price'] = $updateData['harga_jual_1'];
