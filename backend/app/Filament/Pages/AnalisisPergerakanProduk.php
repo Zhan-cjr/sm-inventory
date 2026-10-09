@@ -36,12 +36,12 @@ class AnalisisPergerakanProduk extends Page
     // Filter States
     public ?string $start_date = null;
     public ?string $end_date = null;
-    public string $date_preset = '30_DAYS'; // TODAY, 7_DAYS, 30_DAYS, 90_DAYS, 365_DAYS, CUSTOM
+    public string $date_preset = '30_DAYS';
     public string $branch_id = 'ALL';
     public string $supplier_id = 'ALL';
     public string $category_id = 'ALL';
-    public string $quadrant = 'ALL'; // ALL, CRITICAL_FAST, OVERSTOCK_SLOW, DEAD_STOCK, OPTIMAL
-    public string $sort_by = 'doh_asc'; // doh_asc, doh_desc, revenue_desc, qty_desc, capital_desc, name_asc
+    public string $quadrant = 'ALL';
+    public string $sort_by = 'doh_asc';
     public string $search = '';
     public int $per_page = 15;
     public int $page = 1;
@@ -52,7 +52,6 @@ class AnalisisPergerakanProduk extends Page
         if ($user && $user->branch_id) {
             $this->branch_id = $user->branch_id;
         }
-
         $this->applyDatePreset('30_DAYS');
     }
 
@@ -82,85 +81,23 @@ class AnalisisPergerakanProduk extends Page
                 $this->start_date = Carbon::now()->subDays(364)->toDateString();
                 $this->end_date = $today;
                 break;
-            case 'CUSTOM':
-            default:
-                // Biarkan tanggal yang dipilih manual
-                break;
         }
-
         $this->page = 1;
     }
 
-    public function updatedStartDate(): void
-    {
-        $this->date_preset = 'CUSTOM';
-        $this->page = 1;
-    }
+    public function updatedStartDate(): void { $this->date_preset = 'CUSTOM'; $this->page = 1; }
+    public function updatedEndDate(): void { $this->date_preset = 'CUSTOM'; $this->page = 1; }
+    public function updatedBranchId(): void { $this->page = 1; }
+    public function updatedSupplierId(): void { $this->page = 1; }
+    public function updatedCategoryId(): void { $this->page = 1; }
+    public function updatedSortBy(): void { $this->page = 1; }
+    public function updatedPerPage(): void { $this->page = 1; }
+    public function updatedSearch(): void { $this->page = 1; }
 
-    public function updatedEndDate(): void
-    {
-        $this->date_preset = 'CUSTOM';
-        $this->page = 1;
-    }
-
-    public function updatedBranchId(): void
-    {
-        $this->page = 1;
-    }
-
-    public function updatedSupplierId(): void
-    {
-        $this->page = 1;
-    }
-
-    public function updatedCategoryId(): void
-    {
-        $this->page = 1;
-    }
-
-    public function updatedSortBy(): void
-    {
-        $this->page = 1;
-    }
-
-    public function updatedPerPage(): void
-    {
-        $this->page = 1;
-    }
-
-    public function updatedSearch(): void
-    {
-        $this->page = 1;
-    }
-
-    public function setQuadrant(string $quadrant): void
-    {
-        $this->quadrant = $quadrant;
-        $this->page = 1;
-    }
-
-    public function setSort(string $sort): void
-    {
-        $this->sort_by = $sort;
-        $this->page = 1;
-    }
-
-    public function setPage(int $page): void
-    {
-        $this->page = max(1, $page);
-    }
-
-    public function nextPage(): void
-    {
-        $this->page++;
-    }
-
-    public function prevPage(): void
-    {
-        if ($this->page > 1) {
-            $this->page--;
-        }
-    }
+    public function setQuadrant(string $quadrant): void { $this->quadrant = $quadrant; $this->page = 1; }
+    public function setPage(int $page): void { $this->page = max(1, $page); }
+    public function nextPage(): void { $this->page++; }
+    public function prevPage(): void { if ($this->page > 1) $this->page--; }
 
     public function resetFilters(): void
     {
@@ -178,7 +115,6 @@ class AnalisisPergerakanProduk extends Page
     public function getVelocityReportProperty(): array
     {
         $service = app(ProductVelocityAnalysisService::class);
-
         return $service->getVelocityReport([
             'start_date' => $this->start_date ?: Carbon::now()->subDays(29)->toDateString(),
             'end_date' => $this->end_date ?: Carbon::now()->toDateString(),
@@ -190,6 +126,64 @@ class AnalisisPergerakanProduk extends Page
             'search' => $this->search,
             'per_page' => $this->per_page,
             'page' => $this->page,
+        ]);
+    }
+
+    public function exportExcel()
+    {
+        $service = app(ProductVelocityAnalysisService::class);
+        $report = $service->getVelocityReport([
+            'start_date' => $this->start_date ?: Carbon::now()->subDays(29)->toDateString(),
+            'end_date' => $this->end_date ?: Carbon::now()->toDateString(),
+            'branch_id' => $this->branch_id,
+            'supplier_id' => $this->supplier_id,
+            'category_id' => $this->category_id,
+            'quadrant' => $this->quadrant,
+            'sort_by' => $this->sort_by,
+            'search' => $this->search,
+            'per_page' => 999999,
+            'page' => 1,
+        ]);
+
+        $items = $report['items'];
+        $daysCount = $report['days_count'];
+        $filename = 'analisis_pergerakan_produk_' . ($this->start_date ?: 'start') . '_sd_' . ($this->end_date ?: 'end') . '.csv';
+
+        return response()->streamDownload(function () use ($items, $daysCount) {
+            $handle = fopen('php://output', 'w');
+            fputs($handle, "\xEF\xBB\xBF"); // UTF-8 BOM for Microsoft Excel
+
+            fputcsv($handle, [
+                'No', 'SKU', 'Barcode Utama', 'Multi Barcode', 'Nama Produk',
+                'Kategori', 'Supplier', "Penjualan ({$daysCount} Hari)", 'ADS (Laju/Hari)',
+                'Total Omset (Rp)', 'Stok Fisik (Pcs)', 'Modal Tertahan (Rp)',
+                'DOH (Hari)', 'Status Kuadran', 'Rekomendasi Tindakan'
+            ]);
+
+            foreach ($items as $idx => $it) {
+                $multiBarcodeStr = !empty($it['additional_barcodes']) ? implode(', ', $it['additional_barcodes']) : '-';
+                fputcsv($handle, [
+                    $idx + 1,
+                    $it['sku'] ?? '-',
+                    $it['barcode'] ?? '-',
+                    $multiBarcodeStr,
+                    $it['product_name'] ?? '-',
+                    $it['category_name'] ?? '-',
+                    $it['supplier_name'] ?? '-',
+                    $it['qty_sold'] ?? 0,
+                    $it['ads'] ?? 0,
+                    $it['revenue'] ?? 0,
+                    $it['current_stock'] ?? 0,
+                    $it['capital_tied'] ?? 0,
+                    $it['doh_display'] ?? '-',
+                    $it['quadrant_label'] ?? '-',
+                    $it['recommended_action'] ?? '-'
+                ]);
+            }
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
 
