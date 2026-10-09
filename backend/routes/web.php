@@ -145,7 +145,8 @@ Route::get('/print/stock-card/{productId}/{branchId}', function ($productId, $br
     $branch = \App\Models\Branch::findOrFail($branchId);
     $logs = \App\Models\InventoryLog::where('product_id', $productId)
         ->where('branch_id', $branchId)
-        ->latest('id')
+        ->orderByDesc('created_at')
+        ->orderByDesc('id')
         ->get();
         
     return view('print.documents.stock-card-print', compact('product', 'branch', 'logs'));
