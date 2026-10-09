@@ -26,8 +26,8 @@ class ProductVelocityAnalysisService
         $page = max(1, (int)($filters['page'] ?? 1));
 
         $startCarbon = Carbon::parse($startDate)->startOfDay();
-        $endCarbon = Carbon::parse($endDate)->endOfDay();
-        $daysCount = max(1, $startCarbon->diffInDays($endCarbon) + 1);
+        $endCarbon = Carbon::parse($endDate)->startOfDay();
+        $daysCount = (int) max(1, round($startCarbon->diffInDays($endCarbon)) + 1);
 
         // 1. Agregasi Penjualan Riil
         $salesQuery = DB::table('transaction_items as ti')

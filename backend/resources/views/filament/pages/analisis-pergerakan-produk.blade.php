@@ -189,7 +189,7 @@
                             <th>SKU & Barcode</th>
                             <th>Nama Barang & Kategori</th>
                             <th>Supplier</th>
-                            <th style="text-align: right;">Laku ({{ $daysCount }} Hr)</th>
+                            <th style="text-align: right;">Laku ({{ (int) round($daysCount) }} Hr)</th>
                             <th style="text-align: right;">ADS (Laju/Hr)</th>
                             <th style="text-align: right;">Omset</th>
                             <th style="text-align: right;">Stok Fisik</th>
