@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\DB;
 class ProductVelocityAnalysisService
 {
     /**
-     * Hitung analisis pergerakan produk (Fast, Slow, Dead Stock & Optimal)
-     * Format ringkas, modular, dan di bawah 200 baris.
+     * Hitung analisis pergerakan produk (Fast, Slow, Dead Stock, Optimal, Empty)
+     * Format modular, performan tinggi, dan strictly < 250 baris.
      */
     public function getVelocityReport(array $filters): array
     {
@@ -29,7 +29,7 @@ class ProductVelocityAnalysisService
         $endCarbon = Carbon::parse($endDate)->endOfDay();
         $daysCount = max(1, $startCarbon->diffInDays($endCarbon) + 1);
 
-        // 1. Query Agregasi Penjualan (Memakai quantity * (unit_price - discount))
+        // 1. Agregasi Penjualan Riil
         $salesQuery = DB::table('transaction_items as ti')
             ->join('transactions as t', 't.id', '=', 'ti.transaction_id')
             ->whereBetween('t.transaction_date', [$startDate, $endDate])
@@ -57,7 +57,7 @@ class ProductVelocityAnalysisService
             ];
         }
 
-        // 2. Query Stok Produk Aktif
+        // 2. Query Stok Fisik & Relasi Master
         $stockQuery = Stock::query()
             ->with(['product.category', 'product.supplier', 'branch'])
             ->whereHas('product', function ($q) use ($supplierId, $categoryId) {
@@ -72,7 +72,7 @@ class ProductVelocityAnalysisService
 
         $stocks = $stockQuery->get();
 
-        // 3. Agregasi Produk & Multi-Barcode
+        // 3. Agregasi Master Produk & Multi-Barcode
         $aggregated = [];
         foreach ($stocks as $stock) {
             $product = $stock->product;
@@ -81,7 +81,8 @@ class ProductVelocityAnalysisService
 
             if (!isset($aggregated[$pid])) {
                 $salesData = $salesMap[$pid] ?? ['qty_sold' => 0, 'revenue' => 0];
-                $costPrice = (float) ($product->cost_price ?? $stock->cost_price ?? 0);
+                $costPrice = (float) ($stock->cost_price ?: $product->cost_price ?: 0);
+                $sellingPrice = (float) ($stock->selling_price ?: $product->selling_price ?: 0);
 
                 $additionalBarcodes = [];
                 if (!empty($product->metadata['additional_barcodes'])) {
@@ -99,7 +100,7 @@ class ProductVelocityAnalysisService
                     'category_name' => $product->category?->name ?? 'Tanpa Kategori',
                     'supplier_name' => $product->supplier?->name ?? 'Tanpa Supplier',
                     'cost_price' => $costPrice,
-                    'selling_price' => (float) ($product->selling_price ?? 0),
+                    'selling_price' => $sellingPrice,
                     'current_stock' => 0,
                     'qty_sold' => $salesData['qty_sold'],
                     'revenue' => $salesData['revenue'],
@@ -107,10 +108,10 @@ class ProductVelocityAnalysisService
                 ];
             }
 
-            $aggregated[$pid]['current_stock'] += (float) $stock->quantity;
+            $aggregated[$pid]['current_stock'] += (float) ($stock->quantity_on_hand ?? 0);
         }
 
-        // 4. Klasifikasi 4 Kuadran
+        // 4. Klasifikasi 4 Kuadran Manajerial
         $evaluated = [];
         $kpi = [
             'total_skus' => count($aggregated),
@@ -120,6 +121,7 @@ class ProductVelocityAnalysisService
             'overstock_slow' => ['count' => 0, 'capital_tied' => 0, 'total_stock' => 0],
             'dead_stock' => ['count' => 0, 'capital_tied' => 0, 'total_stock' => 0],
             'optimal' => ['count' => 0, 'capital_healthy' => 0, 'total_stock' => 0],
+            'empty_zero' => ['count' => 0, 'total_stock' => 0],
         ];
 
         foreach ($aggregated as $item) {
@@ -131,40 +133,51 @@ class ProductVelocityAnalysisService
             $kpi['total_revenue'] += $item['revenue'];
             $kpi['total_capital_tied'] += $capital;
 
-            $doh = $ads > 0 ? round($stock / $ads, 1) : ($stock > 0 ? 999999 : 0);
-
-            if ($stock > 0 && $sold <= 0.0001) {
-                $quad = 'DEAD_STOCK';
-                $label = 'Dead Stock (Macet)';
-                $badge = 'dark';
-                $action = 'Retur Supplier / Cuci Gudang';
-                $kpi['dead_stock']['count']++;
-                $kpi['dead_stock']['capital_tied'] += $capital;
-                $kpi['dead_stock']['total_stock'] += $stock;
-            } elseif ($doh <= 7) {
-                $quad = 'CRITICAL_FAST';
-                $label = 'Fast Moving Kritis';
-                $badge = 'danger';
-                $action = 'Segera Reorder PO';
-                $kpi['critical_fast']['count']++;
-                $kpi['critical_fast']['potential_revenue_risk'] += ($ads * 7 * $item['selling_price']);
-                $kpi['critical_fast']['total_stock'] += $stock;
-            } elseif ($doh >= 60) {
-                $quad = 'OVERSTOCK_SLOW';
-                $label = 'Slow Moving Overstock';
-                $badge = 'warning';
-                $action = 'Kunci Order / Promo Obral';
-                $kpi['overstock_slow']['count']++;
-                $kpi['overstock_slow']['capital_tied'] += $capital;
-                $kpi['overstock_slow']['total_stock'] += $stock;
+            if ($sold <= 0.0001) {
+                if ($stock > 0) {
+                    $quad = 'DEAD_STOCK';
+                    $label = 'Dead Stock (Macet)';
+                    $badge = 'dark';
+                    $action = 'Retur Supplier / Cuci Gudang';
+                    $doh = 999999;
+                    $kpi['dead_stock']['count']++;
+                    $kpi['dead_stock']['capital_tied'] += $capital;
+                    $kpi['dead_stock']['total_stock'] += $stock;
+                } else {
+                    $quad = 'EMPTY_ZERO';
+                    $label = 'Stok Kosong / Pasif';
+                    $badge = 'secondary';
+                    $action = 'Evaluasi Penghapusan / PO';
+                    $doh = 0;
+                    $kpi['empty_zero']['count']++;
+                }
             } else {
-                $quad = 'OPTIMAL';
-                $label = 'Optimal (Sehat)';
-                $badge = 'success';
-                $action = 'Pola Order Aman';
-                $kpi['optimal']['count']++;
-                $kpi['optimal']['capital_healthy'] += $capital;
-                $kpi['optimal']['total_stock'] += $stock;
+                $doh = $ads > 0 ? round($stock / $ads, 1) : 0;
+                if ($doh <= 7) {
+                    $quad = 'CRITICAL_FAST';
+                    $label = 'Fast Moving Kritis';
+                    $badge = 'danger';
+                    $action = 'Segera Reorder PO';
+                    $kpi['critical_fast']['count']++;
+                    $kpi['critical_fast']['potential_revenue_risk'] += ($ads * 7 * $item['selling_price']);
+                    $kpi['critical_fast']['total_stock'] += $stock;
+                } elseif ($doh >= 60) {
+                    $quad = 'OVERSTOCK_SLOW';
+                    $label = 'Slow Moving Overstock';
+                    $badge = 'warning';
+                    $action = 'Kunci Order / Promo Obral';
+                    $kpi['overstock_slow']['count']++;
+                    $kpi['overstock_slow']['capital_tied'] += $capital;
+                    $kpi['overstock_slow']['total_stock'] += $stock;
+                } else {
+                    $quad = 'OPTIMAL';
+                    $label = 'Optimal (Sehat)';
+                    $badge = 'success';
+                    $action = 'Pola Order Terjaga';
+                    $kpi['optimal']['count']++;
+                    $kpi['optimal']['capital_healthy'] += $capital;
+                    $kpi['optimal']['total_stock'] += $stock;
+                }
             }
 
             $item['doh'] = $doh;
