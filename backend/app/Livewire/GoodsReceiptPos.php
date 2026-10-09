@@ -686,13 +686,24 @@ class GoodsReceiptPos extends Component
         $item = $this->cart[$index];
         $qty = (float) ($item['qty_received'] ?? 0);
         $subtotal = (float) ($item['subtotal'] ?? 0);
-        $unitPrice = (float) ($item['unit_price'] ?? 0);
-        $netPrice = $qty > 0 ? ($subtotal / $qty) : $unitPrice;
-
         $isTaxable = (bool) ($item['is_taxable'] ?? true);
         $taxMultiplier = 1 + ($this->taxRate / 100);
 
-        $costNetTax = ($this->include_tax && $isTaxable) ? round($netPrice * $taxMultiplier, 2) : round($netPrice, 2);
+        if ($this->tax_type === 'non_tax') {
+            $isTaxable = false;
+        }
+
+        if ($this->tax_type === 'include') {
+            // Pada mode Include PPN: subtotal baris sudah include PPN, jadi modal netto (+PPN) per unit adalah subtotal / qty
+            $costNetTax = $qty > 0 ? round($subtotal / $qty, 2) : (float) ($item['unit_price_tax'] ?? 0);
+        } elseif ($this->tax_type === 'exclude' && $isTaxable) {
+            // Pada mode Exclude PPN: subtotal baris adalah DPP, jadi harus dikalikan faktor PPN
+            $netDpp = $qty > 0 ? ($subtotal / $qty) : (float) ($item['unit_price'] ?? 0);
+            $costNetTax = round($netDpp * $taxMultiplier, 2);
+        } else {
+            // Non PPN
+            $costNetTax = $qty > 0 ? round($subtotal / $qty, 2) : (float) ($item['unit_price'] ?? 0);
+        }
 
         if ($costNetTax <= 0) {
             $costNetTax = (float) ($item['unit_price_tax'] ?? $item['unit_price'] ?? 0);
@@ -795,19 +806,34 @@ class GoodsReceiptPos extends Component
             $qty = (float) ($this->cart[$index]['qty_received'] ?? 0);
             $subtotal = (float) $value;
             if ($qty > 0) {
-                $d1 = ((float) ($this->cart[$index]['discount_1'] ?? 0)) / 100;
-                $d2 = ((float) ($this->cart[$index]['discount_2'] ?? 0)) / 100;
-                $d3 = ((float) ($this->cart[$index]['discount_3'] ?? 0)) / 100;
-                $f1 = (1 - $d1) > 0 ? (1 - $d1) : 1;
-                $f2 = (1 - $d2) > 0 ? (1 - $d2) : 1;
-                $f3 = (1 - $d3) > 0 ? (1 - $d3) : 1;
-                $baseTotal = $subtotal / ($f1 * $f2 * $f3);
-                $this->cart[$index]['unit_price'] = round($baseTotal / $qty, 4);
-                $this->cart[$index]['subtotal'] = $subtotal;
-                
                 $isTaxable = (bool) ($this->cart[$index]['is_taxable'] ?? true);
+                if ($this->tax_type === 'non_tax') {
+                    $isTaxable = false;
+                }
                 $taxMultiplier = 1 + ($this->taxRate / 100);
-                $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($this->cart[$index]['unit_price'] * $taxMultiplier, 2) : $this->cart[$index]['unit_price'];
+
+                $runningFactor = 1.0;
+                foreach ([1, 2, 3] as $tier) {
+                    $d = (float) ($this->cart[$index]["discount_{$tier}"] ?? 0);
+                    $dtype = $this->cart[$index]["discount_{$tier}_type"] ?? 'percent';
+                    if ($d > 0 && $dtype === 'percent') {
+                        $runningFactor *= (1 - ($d / 100));
+                    }
+                }
+                $factor = $runningFactor > 0 ? $runningFactor : 1;
+                $baseTotal = $subtotal / $factor;
+                $calculatedRowPrice = round($baseTotal / $qty, 4);
+
+                $this->cart[$index]['subtotal'] = $subtotal;
+
+                if ($this->tax_type === 'include' && $isTaxable) {
+                    $this->cart[$index]['unit_price_tax'] = round($calculatedRowPrice, 2);
+                    $this->cart[$index]['unit_price'] = $taxMultiplier > 0 ? round($this->cart[$index]['unit_price_tax'] / $taxMultiplier, 4) : $this->cart[$index]['unit_price_tax'];
+                } else {
+                    $this->cart[$index]['unit_price'] = $calculatedRowPrice;
+                    $this->cart[$index]['unit_price_tax'] = $isTaxable ? round($calculatedRowPrice * $taxMultiplier, 2) : $calculatedRowPrice;
+                }
+
                 $this->syncRowMargins($index);
             }
             $this->calculateTotals();
