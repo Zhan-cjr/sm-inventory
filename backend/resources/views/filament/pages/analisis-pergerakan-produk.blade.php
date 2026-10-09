@@ -74,26 +74,31 @@
                     </select>
                 </div>
 
-                {{-- SEARCHABLE SUPPLIER COMBOBOX --}}
-                <div x-data="{
-                    open: false, search: '', selected: @entangle('supplier_id'),
-                    get selectedLabel() {
-                        if (!this.selected || this.selected === 'ALL') return 'Semua Supplier';
-                        let el = document.getElementById('sup-opt-' + this.selected);
-                        return el ? el.getAttribute('data-name') : 'Pilih Supplier';
-                    }
-                }" @click.outside="open = false" style="position: relative;">
+                {{-- SEARCHABLE SUPPLIER COMBOBOX WITH INSTANT LIVEWIRE TRIGGER --}}
+                <div x-data="{ open: false, search: '' }" @click.outside="open = false" style="position: relative;">
                     <label style="font-size: 0.6875rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 0.25rem;">Supplier (Ketik Cari):</label>
                     <div @click="open = !open" class="pv-input" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-                        <span x-text="selectedLabel" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;"></span>
-                        <span style="font-size: 0.625rem; color: #94a3b8;">▼</span>
+                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: {{ $supplier_id !== 'ALL' ? '#2563eb' : 'inherit' }};">
+                            {{ $this->selected_supplier_name }}
+                        </span>
+                        <span style="font-size: 0.625rem; color: #94a3b8; margin-left: 4px;">▼</span>
                     </div>
                     <div x-show="open" x-cloak class="pv-dropdown-menu">
-                        <div style="padding: 0.4rem; border-bottom: 1px solid #e2e8f0;"><input x-model="search" type="text" placeholder="Ketik nama supplier..." class="pv-input" style="padding: 0.3rem 0.5rem;" @click.stop autofocus /></div>
+                        <div style="padding: 0.4rem; border-bottom: 1px solid #e2e8f0;">
+                            <input x-model="search" type="text" placeholder="Ketik nama supplier..." class="pv-input" style="padding: 0.3rem 0.5rem;" @click.stop autofocus />
+                        </div>
                         <div style="overflow-y: auto; max-height: 180px;">
-                            <div @click="selected = 'ALL'; open = false; search = '';" class="pv-drop-item" style="font-weight: 800; color: #2563eb;">✨ Semua Supplier</div>
+                            <div wire:click="selectSupplier('ALL')" @click="open = false; search = '';" class="pv-drop-item" style="font-weight: 800; color: #2563eb; background: {{ $supplier_id === 'ALL' ? '#eff6ff' : 'transparent' }};">
+                                ✨ Semua Supplier
+                            </div>
                             @foreach($this->suppliers as $s)
-                                <div id="sup-opt-{{ $s->id }}" data-name="{{ $s->name }}" x-show="!search || '{{ strtolower(addslashes($s->name)) }}'.includes(search.toLowerCase())" @click="selected = '{{ $s->id }}'; open = false; search = '';" class="pv-drop-item">{{ $s->name }}</div>
+                                <div wire:click="selectSupplier('{{ $s->id }}')"
+                                     @click="open = false; search = '';"
+                                     x-show="!search || '{{ strtolower(addslashes($s->name)) }}'.includes(search.toLowerCase())"
+                                     class="pv-drop-item"
+                                     style="background: {{ $supplier_id === $s->id ? '#eff6ff' : 'transparent' }}; font-weight: {{ $supplier_id === $s->id ? '800' : 'normal' }};">
+                                    {{ $s->name }}
+                                </div>
                             @endforeach
                         </div>
                     </div>

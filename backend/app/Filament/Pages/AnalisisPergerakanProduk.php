@@ -94,6 +94,12 @@ class AnalisisPergerakanProduk extends Page
     public function updatedPerPage(): void { $this->page = 1; }
     public function updatedSearch(): void { $this->page = 1; }
 
+    public function selectSupplier(string $id): void
+    {
+        $this->supplier_id = $id;
+        $this->page = 1;
+    }
+
     public function setQuadrant(string $quadrant): void { $this->quadrant = $quadrant; $this->page = 1; }
     public function setPage(int $page): void { $this->page = max(1, $page); }
     public function nextPage(): void { $this->page++; }
@@ -110,6 +116,14 @@ class AnalisisPergerakanProduk extends Page
         $this->search = '';
         $this->per_page = 15;
         $this->applyDatePreset('30_DAYS');
+    }
+
+    public function getSelectedSupplierNameProperty(): string
+    {
+        if ($this->supplier_id === 'ALL' || empty($this->supplier_id)) {
+            return 'Semua Supplier';
+        }
+        return Supplier::where('id', $this->supplier_id)->value('name') ?? 'Semua Supplier';
     }
 
     public function getVelocityReportProperty(): array
@@ -151,7 +165,7 @@ class AnalisisPergerakanProduk extends Page
 
         return response()->streamDownload(function () use ($items, $daysCount) {
             $handle = fopen('php://output', 'w');
-            fputs($handle, "\xEF\xBB\xBF"); // UTF-8 BOM for Microsoft Excel
+            fputs($handle, "\xEF\xBB\xBF");
 
             fputcsv($handle, [
                 'No', 'SKU', 'Barcode Utama', 'Multi Barcode', 'Nama Produk',
