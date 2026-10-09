@@ -180,6 +180,7 @@ class ConsignmentBilling extends Page implements HasForms
 
             // Tagihan dihitung berdasarkan HPP dari Batch
             $amountOwed = 0;
+            $stock = \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->first();
             // Prioritas fallback jika transaksi tidak memiliki potongan batch FIFO: HPP dari Stok Cabang
             if ($stock && (float) $stock->cost_price > 0) {
                 $fallbackPrice = (float) (!$product->is_taxable 
