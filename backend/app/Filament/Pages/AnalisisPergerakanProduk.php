@@ -3,10 +3,9 @@
 namespace App\Filament\Pages;
 
 use App\Services\ProductVelocityAnalysisService;
-use App\Models\Branch;
-use App\Models\Supplier;
-use App\Models\Category;
+use App\Models\{Branch, Supplier, Category, Product, PurchaseOrder, PurchaseOrderItem, User};
 use Filament\Pages\Page;
+use Filament\Notifications\Notification;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -17,12 +16,8 @@ class AnalisisPergerakanProduk extends Page
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-        if (!$user) return false;
-        if (method_exists($user, 'hasRole') && ($user->hasRole('super_admin') || $user->hasRole('superadmin') || $user->hasRole('Admin'))) {
-            return true;
-        }
-        return $user->can('page_AnalisisPergerakanProduk');
+        $u = auth()->user();
+        return $u && (($u->hasRole('super_admin') || $u->hasRole('Admin')) || $u->can('page_AnalisisPergerakanProduk'));
     }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-bolt';
@@ -33,7 +28,6 @@ class AnalisisPergerakanProduk extends Page
 
     protected string $view = 'filament.pages.analisis-pergerakan-produk';
 
-    // Filter States
     public ?string $start_date = null;
     public ?string $end_date = null;
     public string $date_preset = '30_DAYS';
@@ -48,10 +42,8 @@ class AnalisisPergerakanProduk extends Page
 
     public function mount(): void
     {
-        $user = Auth::user();
-        if ($user && $user->branch_id) {
-            $this->branch_id = $user->branch_id;
-        }
+        $u = Auth::user();
+        if ($u && $u->branch_id) $this->branch_id = $u->branch_id;
         $this->applyDatePreset('30_DAYS');
     }
 
@@ -59,29 +51,15 @@ class AnalisisPergerakanProduk extends Page
     {
         $this->date_preset = $preset;
         $today = Carbon::now()->toDateString();
-
-        switch ($preset) {
-            case 'TODAY':
-                $this->start_date = $today;
-                $this->end_date = $today;
-                break;
-            case '7_DAYS':
-                $this->start_date = Carbon::now()->subDays(6)->toDateString();
-                $this->end_date = $today;
-                break;
-            case '30_DAYS':
-                $this->start_date = Carbon::now()->subDays(29)->toDateString();
-                $this->end_date = $today;
-                break;
-            case '90_DAYS':
-                $this->start_date = Carbon::now()->subDays(89)->toDateString();
-                $this->end_date = $today;
-                break;
-            case '365_DAYS':
-                $this->start_date = Carbon::now()->subDays(364)->toDateString();
-                $this->end_date = $today;
-                break;
-        }
+        $this->start_date = match ($preset) {
+            'TODAY' => $today,
+            '7_DAYS' => Carbon::now()->subDays(6)->toDateString(),
+            '30_DAYS' => Carbon::now()->subDays(29)->toDateString(),
+            '90_DAYS' => Carbon::now()->subDays(89)->toDateString(),
+            '365_DAYS' => Carbon::now()->subDays(364)->toDateString(),
+            default => $this->start_date,
+        };
+        $this->end_date = $today;
         $this->page = 1;
     }
 
@@ -94,21 +72,16 @@ class AnalisisPergerakanProduk extends Page
     public function updatedPerPage(): void { $this->page = 1; }
     public function updatedSearch(): void { $this->page = 1; }
 
-    public function selectSupplier(string $id): void
-    {
-        $this->supplier_id = $id;
-        $this->page = 1;
-    }
-
-    public function setQuadrant(string $quadrant): void { $this->quadrant = $quadrant; $this->page = 1; }
-    public function setPage(int $page): void { $this->page = max(1, $page); }
+    public function selectSupplier(string $id): void { $this->supplier_id = $id; $this->page = 1; }
+    public function setQuadrant(string $q): void { $this->quadrant = $q; $this->page = 1; }
+    public function setPage(int $p): void { $this->page = max(1, $p); }
     public function nextPage(): void { $this->page++; }
     public function prevPage(): void { if ($this->page > 1) $this->page--; }
 
     public function resetFilters(): void
     {
-        $user = Auth::user();
-        $this->branch_id = ($user && $user->branch_id) ? $user->branch_id : 'ALL';
+        $u = Auth::user();
+        $this->branch_id = ($u && $u->branch_id) ? $u->branch_id : 'ALL';
         $this->supplier_id = 'ALL';
         $this->category_id = 'ALL';
         $this->quadrant = 'ALL';
@@ -120,16 +93,13 @@ class AnalisisPergerakanProduk extends Page
 
     public function getSelectedSupplierNameProperty(): string
     {
-        if ($this->supplier_id === 'ALL' || empty($this->supplier_id)) {
-            return 'Semua Supplier';
-        }
+        if ($this->supplier_id === 'ALL' || empty($this->supplier_id)) return 'Semua Supplier';
         return Supplier::where('id', $this->supplier_id)->value('name') ?? 'Semua Supplier';
     }
 
     public function getVelocityReportProperty(): array
     {
-        $service = app(ProductVelocityAnalysisService::class);
-        return $service->getVelocityReport([
+        return app(ProductVelocityAnalysisService::class)->getVelocityReport([
             'start_date' => $this->start_date ?: Carbon::now()->subDays(29)->toDateString(),
             'end_date' => $this->end_date ?: Carbon::now()->toDateString(),
             'branch_id' => $this->branch_id,
@@ -143,10 +113,59 @@ class AnalisisPergerakanProduk extends Page
         ]);
     }
 
+    public function createDraftPoForProduct(string $productId)
+    {
+        $product = Product::with('supplier')->find($productId);
+        if (!$product || !$product->supplier_id) {
+            Notification::make()->title('Produk belum terhubung dengan Pemasok')->warning()->send();
+            return null;
+        }
+
+        $branchId = ($this->branch_id !== 'ALL' && !empty($this->branch_id))
+            ? $this->branch_id
+            : (auth()->user()?->branch_id ?? Branch::where('is_active', true)->value('id'));
+
+        $itemData = collect($this->velocity_report['items'])->firstWhere('product_id', $productId);
+        $ads = (float) ($itemData['ads'] ?? 0);
+        $stock = (float) ($itemData['current_stock'] ?? 0);
+        $cost = (float) ($itemData['cost_price'] ?: ($product->cost_price_tax ?: $product->cost_price ?: 0));
+        $qty = max(1, (int) ceil(($ads * 14) - $stock));
+        $sub = $qty * $cost;
+
+        $po = PurchaseOrder::create([
+            'organization_id' => $product->organization_id, 'branch_id' => $branchId,
+            'supplier_id' => $product->supplier_id, 'supplier_division_id' => $product->supplier_division_id,
+            'po_number' => $this->generateUniquePoNumber(), 'po_date' => now()->toDateString(),
+            'status' => 'DRAFT', 'total_amount' => $sub, 'created_by' => auth()->id() ?? User::first()?->id,
+        ]);
+
+        PurchaseOrderItem::create([
+            'purchase_order_id' => $po->id, 'product_id' => $product->id,
+            'quantity_suggested' => $qty, 'quantity_ordered' => $qty,
+            'unit_cost' => $cost, 'subtotal' => $sub,
+        ]);
+
+        Notification::make()
+            ->title("Draft {$po->po_number} Berhasil Dibuat")
+            ->body("{$product->name} (Qty: {$qty}) ke {$product->supplier?->name}")
+            ->success()
+            ->send();
+
+        return redirect()->to(route('filament.admin.resources.purchase-orders.edit', $po));
+    }
+
+    protected function generateUniquePoNumber(int $seq = 0): string
+    {
+        do {
+            $suffix = $seq > 0 ? sprintf('%02d', $seq) . '-' : '';
+            $num = 'PO-' . date('YmdHis') . '-' . $suffix . strtoupper(\Illuminate\Support\Str::random(4));
+        } while (PurchaseOrder::where('po_number', $num)->exists());
+        return $num;
+    }
+
     public function exportExcel()
     {
-        $service = app(ProductVelocityAnalysisService::class);
-        $report = $service->getVelocityReport([
+        $report = app(ProductVelocityAnalysisService::class)->getVelocityReport([
             'start_date' => $this->start_date ?: Carbon::now()->subDays(29)->toDateString(),
             'end_date' => $this->end_date ?: Carbon::now()->toDateString(),
             'branch_id' => $this->branch_id,
@@ -166,7 +185,6 @@ class AnalisisPergerakanProduk extends Page
         return response()->streamDownload(function () use ($items, $daysCount) {
             $handle = fopen('php://output', 'w');
             fputs($handle, "\xEF\xBB\xBF");
-
             fputcsv($handle, [
                 'No', 'SKU', 'Barcode Utama', 'Multi Barcode', 'Nama Produk',
                 'Kategori', 'Supplier', "Penjualan ({$daysCount} Hari)", 'ADS (Laju/Hari)',
@@ -175,44 +193,20 @@ class AnalisisPergerakanProduk extends Page
             ]);
 
             foreach ($items as $idx => $it) {
-                $multiBarcodeStr = !empty($it['additional_barcodes']) ? implode(', ', $it['additional_barcodes']) : '-';
+                $multi = !empty($it['additional_barcodes']) ? implode(', ', $it['additional_barcodes']) : '-';
                 fputcsv($handle, [
-                    $idx + 1,
-                    $it['sku'] ?? '-',
-                    $it['barcode'] ?? '-',
-                    $multiBarcodeStr,
-                    $it['product_name'] ?? '-',
-                    $it['category_name'] ?? '-',
-                    $it['supplier_name'] ?? '-',
-                    $it['qty_sold'] ?? 0,
-                    $it['ads'] ?? 0,
-                    $it['revenue'] ?? 0,
-                    $it['current_stock'] ?? 0,
-                    $it['capital_tied'] ?? 0,
-                    $it['doh_display'] ?? '-',
-                    $it['quadrant_label'] ?? '-',
-                    $it['recommended_action'] ?? '-'
+                    $idx + 1, $it['sku'] ?? '-', $it['barcode'] ?? '-', $multi,
+                    $it['product_name'] ?? '-', $it['category_name'] ?? '-', $it['supplier_name'] ?? '-',
+                    $it['qty_sold'] ?? 0, $it['ads'] ?? 0, $it['revenue'] ?? 0,
+                    $it['current_stock'] ?? 0, $it['capital_tied'] ?? 0, $it['doh_display'] ?? '-',
+                    $it['quadrant_label'] ?? '-', $it['recommended_action'] ?? '-'
                 ]);
             }
             fclose($handle);
-        }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    public function getBranchesProperty()
-    {
-        return Branch::where('is_active', true)->orderBy('name')->get();
-    }
-
-    public function getSuppliersProperty()
-    {
-        return Supplier::where('is_active', true)->orderBy('name')->get();
-    }
-
-    public function getCategoriesProperty()
-    {
-        return Category::orderBy('name')->get();
-    }
+    public function getBranchesProperty() { return Branch::where('is_active', true)->orderBy('name')->get(); }
+    public function getSuppliersProperty() { return Supplier::where('is_active', true)->orderBy('name')->get(); }
+    public function getCategoriesProperty() { return Category::orderBy('name')->get(); }
 }

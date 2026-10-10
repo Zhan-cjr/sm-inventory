@@ -35,6 +35,11 @@
         .pv-badge-secondary { background: #f3f4f6; color: #6b7280; border-color: #e5e7eb; }
         .dark .pv-badge-danger { background: #450a0a; color: #fca5a5; border-color: #7f1d1d; } .dark .pv-badge-warning { background: #451a03; color: #fcd34d; border-color: #78350f; }
         .dark .pv-badge-dark { background: #0f172a; color: #cbd5e1; border-color: #334155; } .dark .pv-badge-success { background: #022c22; color: #6ee7b7; border-color: #064e3b; }
+        .pv-btn-action-mini { background: #dc2626; color: #fff; font-size: 0.625rem; font-weight: 800; padding: 0.15rem 0.45rem; border-radius: 0.375rem; border: none; cursor: pointer; transition: background 0.15s; }
+        .pv-btn-action-mini:hover { background: #b91c1c; }
+        .pv-btn-action-bulk { background: #dc2626; color: #fff; font-size: 0.625rem; font-weight: 800; padding: 0.2rem 0.45rem; border-radius: 0.375rem; border: none; cursor: pointer; }
+        .pv-btn-action-bulk:hover { background: #b91c1c; }
+        .pv-btn-link-mini { color: #2563eb; font-size: 0.625rem; font-weight: 700; text-decoration: underline; }
     </style>
 
     @php
@@ -74,7 +79,7 @@
                     </select>
                 </div>
 
-                {{-- SEARCHABLE SUPPLIER COMBOBOX WITH INSTANT LIVEWIRE TRIGGER --}}
+                {{-- SEARCHABLE SUPPLIER COMBOBOX --}}
                 <div x-data="{ open: false, search: '' }" @click.outside="open = false" style="position: relative;">
                     <label style="font-size: 0.6875rem; font-weight: 700; color: #64748b; display: block; margin-bottom: 0.25rem;">Supplier (Ketik Cari):</label>
                     <div @click="open = !open" class="pv-input" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
@@ -120,7 +125,7 @@
                 <div style="font-size: 1.5rem; font-weight: 900; margin: 0.35rem 0;">{{ number_format($kpi['critical_fast']['count']) }} <span style="font-size: 0.75rem; font-weight: 500; color: #64748b;">SKU</span></div>
                 <div style="font-size: 0.75rem; color: #dc2626;">Risiko Omset: <b>Rp {{ number_format($kpi['critical_fast']['potential_revenue_risk']) }}</b></div>
                 <div style="font-size: 0.6875rem; color: #64748b; margin-top: 0.5rem; padding-top: 0.35rem; border-top: 1px solid #fecaca; display: flex; justify-content: space-between;">
-                    <span>Stok: {{ number_format($kpi['critical_fast']['total_stock']) }} pcs</span><span style="color: #dc2626; font-weight: 800;">Segera PO &rarr;</span>
+                    <span>Stok: {{ number_format($kpi['critical_fast']['total_stock']) }} pcs</span><span style="color: #dc2626; font-weight: 800;">Filter SKU &rarr;</span>
                 </div>
             </div>
 
@@ -228,7 +233,20 @@
                                 <td style="text-align: center;">
                                     <span class="pv-badge pv-badge-{{ $it['quadrant_badge'] }}">{{ $it['quadrant_label'] }}</span>
                                 </td>
-                                <td style="font-size: 0.6875rem; font-weight: 600; color: #475569;">{{ $it['recommended_action'] }}</td>
+                                <td style="font-size: 0.6875rem; font-weight: 600; color: #475569;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.35rem;">
+                                        <span>{{ $it['recommended_action'] }}</span>
+                                        @if($it['quadrant'] === 'CRITICAL_FAST')
+                                            <button wire:click="createDraftPoForProduct('{{ $it['product_id'] }}')" wire:loading.attr="disabled" type="button" class="pv-btn-action-mini" title="Buat Draft PO untuk produk ini">
+                                                + PO
+                                            </button>
+                                        @elseif($it['quadrant'] === 'DEAD_STOCK')
+                                            <a href="{{ route('filament.admin.pages.suggested-stock-transfers') }}" target="_blank" class="pv-btn-link-mini" title="Cek Saran Mutasi AI Antar Cabang">
+                                                Mutasi &rarr;
+                                            </a>
+                                        @endif
+                                    </div>
+                                </td>
                             </tr>
                         @empty
                             <tr><td colspan="12" style="text-align: center; padding: 2rem; color: #94a3b8;">Tidak ada data produk yang sesuai kriteria.</td></tr>
