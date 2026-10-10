@@ -42,7 +42,7 @@ class ProductAssemblyForm
                         ->dehydrated(),
 
                     Select::make('category_id')
-                        ->relationship('category', 'name')
+                        ->relationship('category', 'name', fn ($query) => $query->where('is_active', true)->orderBy('name'))
                         ->label('Kategori')
                         ->searchable()
                         ->preload(),

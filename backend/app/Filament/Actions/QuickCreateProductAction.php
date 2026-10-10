@@ -68,7 +68,7 @@ class QuickCreateProductAction
                         Grid::make(3)->schema([
                             Select::make('default_category_id')
                                 ->label('Kategori Default')
-                                ->options(Category::where('is_active', true)->pluck('name', 'id'))
+                                ->options(Category::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
                                 ->required()
                                 ->searchable()
                                 ->preload()
@@ -234,7 +234,7 @@ class QuickCreateProductAction
                                     Select::make('category_id')
                                         ->label('Kategori (Beda)')
                                         ->placeholder('Ikuti Header')
-                                        ->options(Category::where('is_active', true)->pluck('name', 'id'))
+                                        ->options(Category::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
                                         ->searchable(),
                                 ]),
                                 Grid::make(2)->schema([

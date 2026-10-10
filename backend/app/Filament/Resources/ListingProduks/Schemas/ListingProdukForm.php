@@ -183,7 +183,7 @@ class ListingProdukForm
                                 Select::make('category_id')
                                     ->label('Kategori')
                                     ->hiddenLabel()
-                                    ->relationship('category', 'name')
+                                    ->relationship('category', 'name', fn ($query) => $query->where('is_active', true)->orderBy('name'))
                                     ->searchable()
                                     ->preload()
                                     ->live()

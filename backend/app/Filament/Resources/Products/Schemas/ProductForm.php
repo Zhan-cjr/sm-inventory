@@ -159,7 +159,7 @@ class ProductForm
                             ->columnSpanFull()
                             ->disabled($isBranchUser),
                         Select::make('category_id')
-                            ->relationship('category', 'name')
+                            ->relationship('category', 'name', fn ($query) => $query->where('is_active', true)->orderBy('name'))
                             ->searchable()
                             ->preload()
                             ->live()

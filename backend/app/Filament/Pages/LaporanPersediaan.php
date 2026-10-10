@@ -91,7 +91,7 @@ class LaporanPersediaan extends Page implements HasTable
                     ->hidden(fn () => Auth::user()->branch_id !== null),
                 SelectFilter::make('category_id')
                     ->label('Kategori')
-                    ->relationship('product.category', 'name'),
+                    ->relationship('product.category', 'name', fn ($query) => $query->where('is_active', true)->orderBy('name')),
             ])
             ->headerActions([
                 \Filament\Actions\Action::make('cetak')
