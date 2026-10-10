@@ -17,7 +17,17 @@ class AnalisisPergerakanProduk extends Page
     public static function canAccess(): bool
     {
         $u = auth()->user();
-        return $u && (($u->hasRole('super_admin') || $u->hasRole('Admin')) || $u->can('page_AnalisisPergerakanProduk'));
+        if (! $u) {
+            return false;
+        }
+
+        if ($u->hasRole(['super_admin', 'super-admin', 'superadmin', 'Admin'])) {
+            return true;
+        }
+
+        return $u->can('View:AnalisisPergerakanProduk')
+            || $u->can('page_AnalisisPergerakanProduk')
+            || (static::getPagePermission() && $u->can(static::getPagePermission()));
     }
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-bolt';
