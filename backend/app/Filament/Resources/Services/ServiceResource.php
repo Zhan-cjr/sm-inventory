@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Services;
 use App\Filament\Resources\Services\Pages\ManageServices;
 use App\Models\Service;
 use BackedEnum;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -13,11 +14,14 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 
 class ServiceResource extends Resource
 {
@@ -95,9 +99,8 @@ class ServiceResource extends Resource
                     ->label('Deskripsi')
                     ->limit(40)
                     ->toggleable(isToggledHiddenByDefault: true),
-                IconColumn::make('is_active')
-                    ->label('Aktif')
-                    ->boolean(),
+                ToggleColumn::make('is_active')
+                    ->label('Aktif'),
                 TextColumn::make('created_at')
                     ->label('Dibuat')
                     ->dateTime()
@@ -105,7 +108,11 @@ class ServiceResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                TernaryFilter::make('is_active')
+                    ->label('Status Aktif')
+                    ->placeholder('Semua')
+                    ->trueLabel('Aktif')
+                    ->falseLabel('Nonaktif'),
             ])
             ->recordActions([
                 EditAction::make(),
@@ -113,6 +120,44 @@ class ServiceResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('deactivate')
+                        ->label('Nonaktifkan Terpilih')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('Nonaktifkan Jasa / Layanan')
+                        ->modalDescription('Apakah Anda yakin ingin menonaktifkan seluruh jasa/layanan yang dipilih?')
+                        ->modalSubmitActionLabel('Ya, Nonaktifkan')
+                        ->action(function (Collection $records): void {
+                            $count = $records->count();
+                            $records->each(fn (Service $record) => $record->update(['is_active' => false]));
+
+                            Notification::make()
+                                ->title('Berhasil Menonaktifkan')
+                                ->body("{$count} jasa/layanan berhasil dinonaktifkan.")
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                    BulkAction::make('activate')
+                        ->label('Aktifkan Terpilih')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Aktifkan Jasa / Layanan')
+                        ->modalDescription('Apakah Anda yakin ingin mengaktifkan seluruh jasa/layanan yang dipilih?')
+                        ->modalSubmitActionLabel('Ya, Aktifkan')
+                        ->action(function (Collection $records): void {
+                            $count = $records->count();
+                            $records->each(fn (Service $record) => $record->update(['is_active' => true]));
+
+                            Notification::make()
+                                ->title('Berhasil Mengaktifkan')
+                                ->body("{$count} jasa/layanan berhasil diaktifkan.")
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
                     DeleteBulkAction::make(),
                 ]),
             ]);
