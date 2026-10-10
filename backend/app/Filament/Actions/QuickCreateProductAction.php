@@ -71,15 +71,34 @@ class QuickCreateProductAction
                                 ->options(Category::where('is_active', true)->pluck('name', 'id'))
                                 ->required()
                                 ->searchable()
-                                ->preload(),
+                                ->preload()
+                                ->live()
+                                ->afterStateUpdated(fn (callable $set) => $set('default_sub_category', null)),
                             Select::make('default_sub_category')
                                 ->label('Sub Kategori Default')
-                                ->options(function () {
-                                    return Product::whereNotNull('sub_category')
+                                ->placeholder(fn (\Filament\Schemas\Components\Utilities\Get $get) => empty($get('default_category_id')) ? 'Pilih Kategori...' : 'Pilih Sub Kategori')
+                                ->options(function (\Filament\Schemas\Components\Utilities\Get $get) {
+                                    $categoryId = $get('default_category_id');
+
+                                    if (blank($categoryId)) {
+                                        $current = $get('default_sub_category');
+                                        return $current ? [$current => $current] : [];
+                                    }
+
+                                    $options = Product::where('category_id', $categoryId)
+                                        ->whereNotNull('sub_category')
                                         ->where('sub_category', '!=', '')
                                         ->distinct()
+                                        ->orderBy('sub_category')
                                         ->pluck('sub_category', 'sub_category')
                                         ->toArray();
+
+                                    $current = $get('default_sub_category');
+                                    if ($current && !isset($options[$current])) {
+                                        $options[$current] = $current;
+                                    }
+
+                                    return $options;
                                 })
                                 ->searchable()
                                 ->createOptionForm([

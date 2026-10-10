@@ -186,16 +186,27 @@ class ListingProdukForm
                                     ->relationship('category', 'name')
                                     ->searchable()
                                     ->preload()
+                                    ->live()
+                                    ->afterStateUpdated(fn (callable $set) => $set('sub_category', null))
                                     ->required(),
 
                                 Select::make('sub_category')
                                     ->label('Sub Kategori')
                                     ->hiddenLabel()
-                                    ->placeholder('Pilih / ketik')
+                                    ->placeholder(fn (\Filament\Schemas\Components\Utilities\Get $get) => empty($get('category_id')) ? 'Pilih Kategori...' : 'Pilih / ketik')
                                     ->options(function (\Filament\Schemas\Components\Utilities\Get $get) {
-                                        $options = Product::whereNotNull('sub_category')
+                                        $categoryId = $get('category_id');
+
+                                        if (blank($categoryId)) {
+                                            $current = $get('sub_category');
+                                            return $current ? [$current => $current] : [];
+                                        }
+
+                                        $options = Product::where('category_id', $categoryId)
+                                            ->whereNotNull('sub_category')
                                             ->where('sub_category', '!=', '')
                                             ->distinct()
+                                            ->orderBy('sub_category')
                                             ->pluck('sub_category', 'sub_category')
                                             ->toArray();
                                             

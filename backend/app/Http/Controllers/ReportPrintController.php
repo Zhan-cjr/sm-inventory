@@ -1464,6 +1464,17 @@ class ReportPrintController extends Controller
             $query->where('supplier_division_id', $divisionId);
         }
 
+        // Apply Category & Sub Category Filter
+        $categoryId = $filters['category']['category_id'] ?? $filters['category_id']['value'] ?? null;
+        if (!empty($categoryId)) {
+            $query->where('category_id', $categoryId);
+        }
+
+        $subCategory = $filters['category']['sub_category'] ?? $filters['sub_category']['value'] ?? null;
+        if (!empty($subCategory)) {
+            $query->where('sub_category', $subCategory);
+        }
+
         $user = \Illuminate\Support\Facades\Auth::user();
         $targetBranchId = null;
 

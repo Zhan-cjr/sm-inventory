@@ -162,6 +162,16 @@ class ProductsTable
                     ->placeholder('-')
                     ->sortable()
                     ->toggleable(),
+                TextColumn::make('category.name')
+                    ->label('Kategori')
+                    ->placeholder('-')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('sub_category')
+                    ->label('Sub Kategori')
+                    ->placeholder('-')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')
                     ->label('Status')
                     ->boolean(),
@@ -193,6 +203,62 @@ class ProductsTable
                 ]));
             })
             ->filters([
+                \Filament\Tables\Filters\Filter::make('category')
+                    ->form([
+                        \Filament\Forms\Components\Select::make('category_id')
+                            ->label('Kategori')
+                            ->placeholder('Semua Kategori')
+                            ->options(fn () => \App\Models\Category::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(fn (callable $set) => $set('sub_category', null)),
+                        \Filament\Forms\Components\Select::make('sub_category')
+                            ->label('Sub Kategori')
+                            ->placeholder(fn ($get) => empty($get('category_id')) ? 'Semua Sub Kategori' : 'Pilih Sub Kategori')
+                            ->options(function ($get) {
+                                $categoryId = $get('category_id');
+                                $query = \App\Models\Product::whereNotNull('sub_category')
+                                    ->where('sub_category', '!=', '');
+
+                                if (filled($categoryId)) {
+                                    $query->where('category_id', $categoryId);
+                                }
+
+                                return $query->distinct()
+                                    ->orderBy('sub_category')
+                                    ->pluck('sub_category', 'sub_category');
+                            })
+                            ->searchable()
+                            ->preload(),
+                    ])
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                        return $query
+                            ->when(
+                                $data['category_id'] ?? null,
+                                fn (\Illuminate\Database\Eloquent\Builder $query, $categoryId): \Illuminate\Database\Eloquent\Builder => $query->where('category_id', $categoryId)
+                            )
+                            ->when(
+                                $data['sub_category'] ?? null,
+                                fn (\Illuminate\Database\Eloquent\Builder $query, $subCategory): \Illuminate\Database\Eloquent\Builder => $query->where('sub_category', $subCategory)
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if (!empty($data['category_id'])) {
+                            $category = \App\Models\Category::find($data['category_id']);
+                            if ($category) {
+                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Kategori: ' . $category->name)
+                                    ->removeField('category_id');
+                            }
+                        }
+
+                        if (!empty($data['sub_category'])) {
+                            $indicators[] = \Filament\Tables\Filters\Indicator::make('Sub Kategori: ' . $data['sub_category'])
+                                ->removeField('sub_category');
+                        }
+                        return $indicators;
+                    }),
                 \Filament\Tables\Filters\Filter::make('supplier')
                     ->form([
                         \Filament\Forms\Components\Select::make('supplier_id')
