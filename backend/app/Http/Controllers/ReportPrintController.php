@@ -477,88 +477,201 @@ class ReportPrintController extends Controller
 
     private function printLaporanPersediaan($filters)
     {
-        // Laporan Persediaan uses Stock model as per LaporanPersediaan.php
-        $query = \App\Models\Stock::query()->with(['branch', 'product', 'product.category'])
-            ->addSelect([
-                'batch_valuation' => \App\Models\StockBatch::select(\Illuminate\Support\Facades\DB::raw('COALESCE(SUM(remaining_quantity * cost_price), 0)'))
-                    ->whereColumn('product_id', 'stocks.product_id')
-                    ->whereColumn('branch_id', 'stocks.branch_id')
-                    ->where('remaining_quantity', '>', 0)
-            ]);
-        $query = $this->applyDateFilters($query, $filters, 'created_at');
-        
-        if (auth()->user()->branch_id !== null) {
-            $query->where('branch_id', auth()->user()->branch_id);
-        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
-            $query->where('branch_id', $filters['branch_id']['value']);
+        $branchId = auth()->user()?->branch_id;
+        if (!$branchId && isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $branchId = $filters['branch_id']['value'];
         }
 
-        if ($searchQuery = request()->input('tableSearchQuery')) {
-            $query->where(function($q) use ($searchQuery) {
-                $q->whereHas('product', fn($pq) => $pq->where('sku', 'like', "%{$searchQuery}%")->orWhere('name', 'like', "%{$searchQuery}%")->orWhereHas('category', fn($cq) => $cq->where('name', 'like', "%{$searchQuery}%")));
+        $categoryId = $filters['category_id']['value'] ?? ($filters['category']['category_id'] ?? null);
+        $subCategory = $filters['sub_category']['value'] ?? ($filters['category']['sub_category'] ?? null);
+        $stockStatus = $filters['stock_status']['value'] ?? null;
+        $searchQuery = request()->input('tableSearchQuery');
+
+        $query = \Illuminate\Support\Facades\DB::table('stocks')
+            ->join('products', 'stocks.product_id', '=', 'products.id')
+            ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
+            ->leftJoin('branches', 'stocks.branch_id', '=', 'branches.id')
+            ->leftJoinSub(
+                \Illuminate\Support\Facades\DB::table('stock_batches')
+                    ->select('product_id', 'branch_id', \Illuminate\Support\Facades\DB::raw('SUM(remaining_quantity * cost_price) as batch_valuation'))
+                    ->where('remaining_quantity', '>', 0)
+                    ->groupBy('product_id', 'branch_id'),
+                'sb',
+                function ($join) {
+                    $join->on('sb.product_id', '=', 'stocks.product_id')
+                         ->on('sb.branch_id', '=', 'stocks.branch_id');
+                }
+            );
+
+        if ($branchId) {
+            $query->where('stocks.branch_id', $branchId);
+        }
+
+        if (!empty($categoryId)) {
+            $query->where('products.category_id', $categoryId);
+        }
+
+        if (!empty($subCategory)) {
+            $query->where('products.sub_category', $subCategory);
+        }
+
+        if ($stockStatus === 'available') {
+            $query->where('stocks.quantity_on_hand', '>', 0);
+        } elseif ($stockStatus === 'empty') {
+            $query->where('stocks.quantity_on_hand', '<=', 0);
+        }
+
+        if (!empty($searchQuery)) {
+            $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $searchQuery);
+            $query->where(function ($q) use ($escaped) {
+                $q->where('products.sku', 'like', "%{$escaped}%")
+                  ->orWhere('products.barcode', 'like', "%{$escaped}%")
+                  ->orWhere('products.name', 'like', "%{$escaped}%")
+                  ->orWhere('categories.name', 'like', "%{$escaped}%");
             });
         }
 
-        $stocks = $query->orderBy('created_at', 'desc')->get();
-        $period = $this->getPeriodString($filters);
+        // Apply Date Filters if any
+        $dateFilter = $filters['date_filter'] ?? $filters['created_at'] ?? null;
+        if (!empty($dateFilter['period']) || !empty($dateFilter['created_from']) || !empty($dateFilter['created_until'])) {
+            $query = $this->applyDateFilters($query, $filters, 'stocks.created_at');
+        }
 
+        $stocks = $query->select([
+            'branches.name as branch_name',
+            'products.sku',
+            'products.barcode',
+            'products.name as product_name',
+            'categories.name as category_name',
+            'stocks.quantity_on_hand',
+            'stocks.cost_price_tax as stock_cost_price_tax',
+            'products.cost_price_tax as prod_cost_price_tax',
+            'products.cost_price as prod_cost_price',
+            'sb.batch_valuation',
+        ])
+        ->orderBy('stocks.created_at', 'desc')
+        ->get();
+
+        $period = $this->getPeriodString($filters);
         $columns = ['Cabang', 'SKU', 'Barcode', 'Produk', 'Kategori', 'Sisa Stok', 'Harga Pokok (Rata-rata)', 'Valuasi Stok'];
+        $columnWidths = ['12%', '13%', '13%', '26%', '12%', '7%', '8%', '9%'];
+        $alignments = ['left', 'left', 'left', 'left', 'left', 'right', 'right', 'right'];
+
+        $totalQty = 0;
+        $totalValuation = 0;
         $rows = [];
+
         foreach ($stocks as $s) {
-            if ($s->quantity_on_hand > 0 && $s->batch_valuation > 0) {
-                $costPriceTax = $s->batch_valuation / $s->quantity_on_hand;
-                $valuation = $s->batch_valuation;
+            $qty = (float) $s->quantity_on_hand;
+            $batchVal = (float) ($s->batch_valuation ?? 0);
+
+            if ($qty > 0 && $batchVal > 0) {
+                $costPriceTax = $batchVal / $qty;
+                $valuation = $batchVal;
             } else {
-                $costPriceTax = $s->cost_price_tax > 0 ? $s->cost_price_tax : ($s->product->cost_price_tax ?? $s->product->cost_price ?? 0);
-                $valuation = $s->quantity_on_hand * $costPriceTax;
+                $costPriceTax = (float) ($s->stock_cost_price_tax > 0 
+                    ? $s->stock_cost_price_tax 
+                    : ($s->prod_cost_price_tax ?? $s->prod_cost_price ?? 0));
+                $valuation = $qty * $costPriceTax;
             }
-            
+
+            $totalQty += $qty;
+            $totalValuation += $valuation;
+
             $rows[] = [
-                $s->branch ? $s->branch->name : 'Pusat / Global',
-                $s->product ? $s->product->sku : '-',
-                $s->product ? $s->product->barcode : '-',
-                $s->product ? $s->product->name : '-',
-                ($s->product && $s->product->category) ? $s->product->category->name : '-',
-                $s->quantity_on_hand,
+                $s->branch_name ?? 'Pusat / Global',
+                $s->sku ?? '-',
+                $s->barcode ?? '-',
+                $s->product_name ?? '-',
+                $s->category_name ?? '-',
+                $qty,
                 number_format($costPriceTax, 0, ',', '.'),
                 number_format($valuation, 0, ',', '.')
             ];
         }
 
-        return view('print.reports.generic', ['title' => 'Laporan Persediaan', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+        if (!empty($rows)) {
+            $rows[] = [
+                '<strong>TOTAL</strong>',
+                '',
+                '',
+                '',
+                '',
+                '<strong>' . number_format($totalQty, 0, ',', '.') . '</strong>',
+                '',
+                '<strong>' . number_format($totalValuation, 0, ',', '.') . '</strong>'
+            ];
+        }
+
+        return view('print.reports.generic', [
+            'title' => 'Laporan Persediaan',
+            'period' => $period,
+            'columns' => $columns,
+            'columnWidths' => $columnWidths,
+            'alignments' => $alignments,
+            'rows' => $rows,
+            'summaryBox' => [
+                'Total Item Terdaftar' => number_format(count($stocks), 0, ',', '.') . ' Item',
+                'Total Kuantitas Fisik' => number_format($totalQty, 0, ',', '.'),
+                'Total Nilai Valuasi (HPP)' => 'Rp ' . number_format($totalValuation, 0, ',', '.'),
+            ],
+            'note' => 'Catatan: Nilai persediaan dihitung menggunakan metode FIFO (berdasarkan batch stok aktif).'
+        ]);
     }
 
     private function printRekapTotalStok($filters)
     {
-        $query = \App\Models\Stock::query()->with(['branch', 'product', 'product.category'])
-            ->addSelect([
-                'batch_valuation' => \App\Models\StockBatch::select(\Illuminate\Support\Facades\DB::raw('COALESCE(SUM(remaining_quantity * cost_price), 0)'))
-                    ->whereColumn('product_id', 'stocks.product_id')
-                    ->whereColumn('branch_id', 'stocks.branch_id')
-                    ->where('remaining_quantity', '>', 0)
-            ]);
-        // Apply branch filter if any
-        if (auth()->user()->branch_id !== null) {
-            $query->where('branch_id', auth()->user()->branch_id);
-        } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
-            $query->where('branch_id', $filters['branch_id']['value']);
-        }
-        
-        // Category filter
-        if (isset($filters['category_id']['value']) && !empty($filters['category_id']['value'])) {
-            $query->whereHas('product', function($q) use ($filters) {
-                $q->where('category_id', $filters['category_id']['value']);
-            });
+        $branchId = auth()->user()?->branch_id;
+        if (!$branchId && isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
+            $branchId = $filters['branch_id']['value'];
         }
 
-        $stocks = $query->get();
+        $categoryId = $filters['category_id']['value'] ?? ($filters['category']['category_id'] ?? null);
+        $subCategory = $filters['sub_category']['value'] ?? ($filters['category']['sub_category'] ?? null);
+
+        $query = \Illuminate\Support\Facades\DB::table('stocks')
+            ->join('products', 'stocks.product_id', '=', 'products.id')
+            ->leftJoin('categories', 'products.category_id', '=', 'categories.id')
+            ->leftJoinSub(
+                \Illuminate\Support\Facades\DB::table('stock_batches')
+                    ->select('product_id', 'branch_id', \Illuminate\Support\Facades\DB::raw('SUM(remaining_quantity * cost_price) as batch_valuation'))
+                    ->where('remaining_quantity', '>', 0)
+                    ->groupBy('product_id', 'branch_id'),
+                'sb',
+                function ($join) {
+                    $join->on('sb.product_id', '=', 'stocks.product_id')
+                         ->on('sb.branch_id', '=', 'stocks.branch_id');
+                }
+            );
+
+        if ($branchId) {
+            $query->where('stocks.branch_id', $branchId);
+        }
+
+        if (!empty($categoryId)) {
+            $query->where('products.category_id', $categoryId);
+        }
+
+        if (!empty($subCategory)) {
+            $query->where('products.sub_category', $subCategory);
+        }
+
+        $stocks = $query->select([
+            'categories.name as category_name',
+            'products.sub_category',
+            'stocks.quantity_on_hand',
+            'stocks.cost_price_tax as stock_cost_price_tax',
+            'products.cost_price_tax as prod_cost_price_tax',
+            'products.cost_price as prod_cost_price',
+            'sb.batch_valuation',
+        ])->get();
         
         $data = [];
         $totalValuation = 0;
         
         foreach ($stocks as $stock) {
-            $catName = $stock->product && $stock->product->category ? $stock->product->category->name : 'Uncategorized';
-            $subCatName = $stock->product && $stock->product->sub_category ? $stock->product->sub_category : 'General';
+            $catName = !empty($stock->category_name) ? $stock->category_name : 'Tanpa Kategori';
+            $subCatName = !empty($stock->sub_category) ? $stock->sub_category : 'General';
             $key = $catName . '|' . $subCatName;
             
             if (!isset($data[$key])) {
@@ -570,14 +683,19 @@ class ReportPrintController extends Controller
                 ];
             }
             
-            if ($stock->quantity_on_hand > 0 && $stock->batch_valuation > 0) {
-                $valuation = $stock->batch_valuation;
+            $qty = (float) $stock->quantity_on_hand;
+            $batchVal = (float) ($stock->batch_valuation ?? 0);
+
+            if ($qty > 0 && $batchVal > 0) {
+                $valuation = $batchVal;
             } else {
-                $costPriceTax = $stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->product->cost_price_tax ?? $stock->product->cost_price ?? 0);
-                $valuation = $stock->quantity_on_hand * $costPriceTax;
+                $costPriceTax = (float) ($stock->stock_cost_price_tax > 0 
+                    ? $stock->stock_cost_price_tax 
+                    : ($stock->prod_cost_price_tax ?? $stock->prod_cost_price ?? 0));
+                $valuation = $qty * $costPriceTax;
             }
             
-            $data[$key]['total_qty'] += $stock->quantity_on_hand;
+            $data[$key]['total_qty'] += $qty;
             $data[$key]['total_valuation'] += $valuation;
             $totalValuation += $valuation;
         }

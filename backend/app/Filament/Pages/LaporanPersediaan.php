@@ -92,6 +92,21 @@ class LaporanPersediaan extends Page implements HasTable
                 SelectFilter::make('category_id')
                     ->label('Kategori')
                     ->relationship('product.category', 'name', fn ($query) => $query->where('is_active', true)->orderBy('name')),
+                SelectFilter::make('stock_status')
+                    ->label('Status Stok')
+                    ->options([
+                        'available' => 'Hanya Stok Tersedia (> 0)',
+                        'empty' => 'Hanya Stok Kosong (<= 0)',
+                    ])
+                    ->query(function ($query, array $data) {
+                        if (($data['value'] ?? null) === 'available') {
+                            return $query->where('stocks.quantity_on_hand', '>', 0);
+                        }
+                        if (($data['value'] ?? null) === 'empty') {
+                            return $query->where('stocks.quantity_on_hand', '<=', 0);
+                        }
+                        return $query;
+                    }),
             ])
             ->headerActions([
                 \Filament\Actions\Action::make('cetak')

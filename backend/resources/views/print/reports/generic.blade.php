@@ -10,10 +10,14 @@
     <thead>
         <tr>
             @foreach($columns as $col)
+                @php
+                    $w = $columnWidths[$loop->index] ?? null;
+                    $align = $alignments[$loop->index] ?? null;
+                @endphp
                 @if(request('export') === 'xls')
                     <th bgcolor="#1e293b" style="width: 150px;"><font color="#ffffff"><b>{{ $col }}</b></font></th>
                 @else
-                    <th>{{ $col }}</th>
+                    <th @if($w) style="width: {{ $w }};" @endif class="{{ $align ? $align : '' }}">{{ $col }}</th>
                 @endif
             @endforeach
         </tr>
@@ -26,7 +30,10 @@
             @endphp
             <tr @if(request('export') === 'xls') bgcolor="{{ $bg }}" @endif>
                 @foreach($row as $cell)
-                    <td class="{{ is_numeric(str_replace(['.', ','], '', $cell)) && strpos($cell, ' ') === false && !preg_match('/^[A-Za-z]/', $cell) ? 'right' : '' }}" @if(request('export') === 'xls') style="mso-number-format:'\@';" @endif>{!! $cell !!}</td>
+                    @php
+                        $cellClass = $alignments[$loop->index] ?? (is_numeric(str_replace(['.', ','], '', $cell)) && strpos($cell, ' ') === false && !preg_match('/^[A-Za-z]/', $cell) ? 'right' : '');
+                    @endphp
+                    <td class="{{ $cellClass }}" @if(request('export') === 'xls') style="mso-number-format:'\@';" @endif>{!! $cell !!}</td>
                 @endforeach
             </tr>
         @endforeach

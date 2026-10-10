@@ -24,11 +24,15 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 11px;
+            table-layout: fixed;
+            word-wrap: break-word;
         }
         .report-table th, .report-table td {
             border: 1px dashed #333;
             padding: 4px 6px;
             text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         .report-table th.right, .report-table td.right {
             text-align: right;
@@ -37,19 +41,95 @@
             text-align: center;
         }
         .report-table th {
-            font-weight: normal;
+            font-weight: bold;
+            background-color: #f1f5f9;
         }
         .report-table .total-row td {
-            font-weight: normal;
+            font-weight: bold;
+            background-color: #e2e8f0;
+        }
+        .report-table thead {
+            display: table-header-group;
+        }
+        .report-table tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
         @media print {
             body {
                 padding: 0;
             }
+            .no-print {
+                display: none !important;
+            }
+        }
+        @media screen {
+            .no-print-bar {
+                position: sticky;
+                top: 0;
+                background: #0f172a;
+                color: #f8fafc;
+                padding: 10px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                z-index: 9999;
+                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+                margin: -20px -20px 20px -20px;
+                font-family: system-ui, -apple-system, sans-serif;
+            }
+            .btn-action {
+                border: none;
+                padding: 6px 14px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 600;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .btn-print {
+                background: #0284c7;
+                color: white;
+            }
+            .btn-print:hover {
+                background: #0369a1;
+            }
+            .btn-close {
+                background: #475569;
+                color: white;
+                margin-left: 8px;
+            }
+            .btn-close:hover {
+                background: #334155;
+            }
         }
     </style>
 </head>
-<body onload="window.print()">
+<body>
+    @if(request('export') !== 'xls')
+        <div class="no-print-bar no-print">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: bold; font-size: 13px;">Mode Cetak Laporan</span>
+                <span style="font-size: 11px; color: #94a3b8; background: #1e293b; padding: 2px 8px; border-radius: 4px;">Tekan tombol Cetak di bawah jika dialog print tertutup</span>
+            </div>
+            <div>
+                <button type="button" onclick="window.print()" class="btn-action btn-print">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Cetak / Simpan PDF
+                </button>
+                <button type="button" onclick="window.close()" class="btn-action btn-close">Tutup</button>
+            </div>
+        </div>
+        <script>
+            window.addEventListener('DOMContentLoaded', function() {
+                setTimeout(function() {
+                    window.print();
+                }, 300);
+            });
+        </script>
+    @endif
     @php
         $org = \App\Models\Organization::first();
         $org_name = $org ? strtoupper($org->name) : 'SM INVENTORY';
