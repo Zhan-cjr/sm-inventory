@@ -37,9 +37,12 @@ class ProductsTable
                 $branchId = static::resolveActiveBranchId($livewire);
 
                 if ($branchId) {
-                    $query->with(['stocks' => function ($q) use ($branchId) {
-                        $q->where('branch_id', $branchId)->with('racks');
-                    }]);
+                    $query->with([
+                        'stocks' => function ($q) use ($branchId) {
+                            $q->where('branch_id', $branchId);
+                        },
+                        'stocks.racks',
+                    ]);
                     $query->withSum(['stocks' => function ($q) use ($branchId) {
                         $q->where('branch_id', $branchId);
                     }], 'quantity_on_hand');
@@ -64,11 +67,21 @@ class ProductsTable
                         // 2. Jika bukan exact match, lakukan pencarian substring (LIKE %...%)
                         // Mendukung pencarian digit awal, tengah, maupun digit akhir barcode/SKU persis seperti di kasir
                         $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
-                        $query->where(function ($q) use ($escapedSearch) {
+                        $query->where(function ($q) use ($escapedSearch, $branchId) {
                             $q->where('products.barcode', 'like', "%{$escapedSearch}%")
                               ->orWhere('products.sku', 'like', "%{$escapedSearch}%")
                               ->orWhere('products.name', 'like', "%{$escapedSearch}%")
                               ->orWhere('products.metadata', 'like', "%{$escapedSearch}%");
+
+                            if ($branchId) {
+                                $q->orWhereHas('stocks', function ($sq) use ($escapedSearch, $branchId) {
+                                    $sq->where('branch_id', $branchId)
+                                       ->whereHas('racks', function ($rq) use ($escapedSearch) {
+                                           $rq->where('stock_opname_racks.rack_code', 'like', "%{$escapedSearch}%")
+                                              ->orWhere('stock_opname_racks.rack_name', 'like', "%{$escapedSearch}%");
+                                       });
+                                });
+                            }
                         })
                         ->orderByRaw("
                             CASE 
@@ -120,6 +133,23 @@ class ProductsTable
                     ->label('No Rak')
                     ->badge()
                     ->separator(',')
+                    ->getStateUsing(function ($record, \Filament\Tables\Contracts\HasTable $livewire) {
+                        $branchId = static::resolveActiveBranchId($livewire);
+                        if (! $branchId) {
+                            return [];
+                        }
+
+                        $stocks = $record->relationLoaded('stocks')
+                            ? $record->stocks->where('branch_id', $branchId)
+                            : $record->stocks()->where('branch_id', $branchId)->with('racks')->get();
+
+                        return $stocks
+                            ->flatMap(fn ($stock) => $stock->racks->pluck('rack_code'))
+                            ->filter()
+                            ->unique()
+                            ->values()
+                            ->all();
+                    })
                     ->searchable(query: fn (\Illuminate\Database\Eloquent\Builder $query) => $query)
                     ->visible(fn (\Filament\Tables\Contracts\HasTable $livewire) => static::resolveActiveBranchId($livewire) !== null)
                     ->toggleable(),
@@ -388,12 +418,13 @@ class ProductsTable
                                 ->minValue(1)
                                 ->required(),
                         ])
-                        ->action(function (\Illuminate\Support\Collection $records, array $data) {
+                        ->action(function (\Illuminate\Support\Collection $records, array $data, \Filament\Tables\Contracts\HasTable $livewire) {
                             $productIds = $records->pluck('id')->toArray();
-                            return redirect()->route('print.barcode.pricecard', [
+                            return redirect()->route('print.barcode.pricecard', array_filter([
                                 'product_ids' => $productIds,
                                 'copies' => $data['copies'],
-                            ]);
+                                'branch_id' => static::resolveActiveBranchId($livewire),
+                            ]));
                         })
                         ->deselectRecordsAfterCompletion(),
                     DeleteBulkAction::make()
