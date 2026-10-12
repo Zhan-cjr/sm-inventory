@@ -107,4 +107,45 @@ class StockOpnameItem extends Model
             }
         }
     }
+
+    protected ?float $memoizedDelta = null;
+
+    /**
+     * Menghitung mutasi eksternal (penjualan kasir, penerimaan, dll.)
+     * yang terjadi antara waktu sesi SO dimulai hingga sesi selesai / sekarang.
+     */
+    public function getDeltaDuringSessionAttribute(): float
+    {
+        if ($this->memoizedDelta !== null) {
+            return $this->memoizedDelta;
+        }
+
+        if (!$this->session || !$this->session->branch_id) {
+            return $this->memoizedDelta = 0.0;
+        }
+
+        $start = $this->session->created_at;
+        $end = $this->session->completed_at ?? now();
+
+        return $this->memoizedDelta = (float) \App\Models\InventoryLog::where('branch_id', $this->session->branch_id)
+            ->where('product_id', $this->product_id)
+            ->whereBetween('created_at', [$start, $end])
+            ->where(function ($q) {
+                $q->whereNull('reference_doc_type')
+                  ->orWhere('reference_doc_type', '!=', 'STOCK_OPNAME');
+            })
+            ->where(function ($q) {
+                $q->whereNull('reason_code')
+                  ->orWhere('reason_code', '!=', 'STOCK_OPNAME');
+            })
+            ->sum('quantity_change');
+    }
+
+    /**
+     * Stok sistem yang telah disesuaikan dengan mutasi transaksi selama sesi SO.
+     */
+    public function getAdjustedSystemQuantityAttribute(): float
+    {
+        return (float) $this->system_quantity + $this->delta_during_session;
+    }
 }

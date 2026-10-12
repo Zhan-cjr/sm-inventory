@@ -95,7 +95,25 @@ class StockOpnameSession extends Model
             ->flip()
             ->all();
 
-        return $itemsGrouped->map(function ($items) use ($existingProductIds) {
+        // Ambil seluruh mutasi eksternal (penjualan kasir, penerimaan, dll) selama sesi SO berlangsung
+        $start = $this->created_at;
+        $end = $this->completed_at ?? now();
+
+        $externalLogs = \App\Models\InventoryLog::where('branch_id', $branchId)
+            ->whereBetween('created_at', [$start, $end])
+            ->where(function ($q) {
+                $q->whereNull('reference_doc_type')
+                  ->orWhere('reference_doc_type', '!=', 'STOCK_OPNAME');
+            })
+            ->where(function ($q) {
+                $q->whereNull('reason_code')
+                  ->orWhere('reason_code', '!=', 'STOCK_OPNAME');
+            })
+            ->whereIn('product_id', $itemsGrouped->keys()->filter())
+            ->get()
+            ->groupBy('product_id');
+
+        return $itemsGrouped->map(function ($items, $pid) use ($existingProductIds, $externalLogs) {
             $product    = $items->first()->product;
             $totalC1    = (float) $items->whereNotNull('count1_quantity')->sum('count1_quantity');
             $totalC2    = (float) $items->whereNotNull('count2_quantity')->sum('count2_quantity');
@@ -103,8 +121,12 @@ class StockOpnameSession extends Model
             $systemQty  = (float) ($items->first()->system_quantity ?? 0);
             $hasFinal   = $items->where('status', 'FINAL_DONE')->count() > 0;
 
+            // Mutasi eksternal selama SO (misal penjualan: -1.0)
+            $deltaDuringSo = (float) ($externalLogs->get($pid)?->sum('quantity_change') ?? 0);
+            $adjustedSystemQty = $systemQty + $deltaDuringSo;
+
             $effectiveQty = $hasFinal ? $totalFinal : ($totalC2 ?: $totalC1);
-            $finalDisc    = $effectiveQty - $systemQty;
+            $finalDisc    = $effectiveQty - $adjustedSystemQty;
 
             // is_discrepancy: cek status DISCREPANCY (final check) ATAU ada selisih hitung vs sistem
             $hasDiscrepancyStatus = $items->where('status', 'DISCREPANCY')->count() > 0;
@@ -114,18 +136,20 @@ class StockOpnameSession extends Model
             $isNewToBranch = $productId ? !isset($existingProductIds[$productId]) : false;
 
             return [
-                'product_id'       => $productId,
-                'sku'              => $product?->sku,
-                'name'             => $product?->name,
-                'is_new_to_branch' => $isNewToBranch,
-                'effective_qty'    => $effectiveQty,
-                'system_qty'       => $systemQty,
-                'total_count1'     => $totalC1,
-                'total_count2'     => $totalC2,
-                'total_final'      => $totalFinal,
-                'final_disc'       => $finalDisc,
-                'is_discrepancy'   => $hasDiscrepancyStatus || $hasNumericDisc || $isNewToBranch,
-                'racks'            => $items->map(fn ($i) => [
+                'product_id'          => $productId,
+                'sku'                 => $product?->sku,
+                'name'                => $product?->name,
+                'is_new_to_branch'    => $isNewToBranch,
+                'effective_qty'       => $effectiveQty,
+                'system_qty'          => $systemQty,
+                'delta_during_so'     => $deltaDuringSo,
+                'adjusted_system_qty' => $adjustedSystemQty,
+                'total_count1'        => $totalC1,
+                'total_count2'        => $totalC2,
+                'total_final'         => $totalFinal,
+                'final_disc'          => $finalDisc,
+                'is_discrepancy'      => $hasDiscrepancyStatus || $hasNumericDisc || $isNewToBranch,
+                'racks'               => $items->map(fn ($i) => [
                     'rack_code'       => $i->rackSession?->rack?->rack_code,
                     'count1_quantity' => $i->count1_quantity,
                     'count2_quantity' => $i->count2_quantity,

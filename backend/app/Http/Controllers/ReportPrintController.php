@@ -1230,7 +1230,7 @@ class ReportPrintController extends Controller
         $items = $query->orderBy('created_at', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
-        $columns = ['No Sesi', 'Cabang', 'Rak', 'SKU', 'Barcode', 'Barang', 'Stok Sistem', 'Hitung 1', 'Hitung 2', 'Akhir', 'S.Plus', 'Nom.Plus', 'S.Minus', 'Nom.Minus'];
+        $columns = ['No Sesi', 'Cabang', 'Rak', 'SKU', 'Barcode', 'Barang', 'Stok Sistem', 'Mutasi SO', 'Hitung 1', 'Hitung 2', 'Akhir', 'S.Plus', 'Nom.Plus', 'S.Minus', 'Nom.Minus'];
         $rows = [];
         
         $grandTotalPlus = 0;
@@ -1251,13 +1251,16 @@ class ReportPrintController extends Controller
         }
         
         foreach ($items as $i) {
+            $delta = (float) $i->delta_during_session;
+            $adjustedSys = (float) $i->system_quantity + $delta;
+
             $selisih = 0;
             if ($i->final_quantity !== null) {
-                $selisih = $i->final_quantity - $i->system_quantity;
+                $selisih = $i->final_quantity - $adjustedSys;
             } elseif ($i->count2_quantity !== null) {
-                $selisih = $i->count2_quantity - $i->system_quantity;
+                $selisih = $i->count2_quantity - $adjustedSys;
             } elseif ($i->count1_quantity !== null) {
-                $selisih = $i->count1_quantity - $i->system_quantity;
+                $selisih = $i->count1_quantity - $adjustedSys;
             }
             
             $nominalPlus = 0;
@@ -1285,6 +1288,11 @@ class ReportPrintController extends Controller
             
             $grandTotalPlus += $nominalPlus;
             $grandTotalMinus += $nominalMinus;
+
+            $mutasiStr = '-';
+            if ($delta != 0) {
+                $mutasiStr = ($delta > 0 ? '+' : '') . $delta;
+            }
             
             $rows[] = [
                 $i->session ? $i->session->session_number : '-',
@@ -1294,6 +1302,7 @@ class ReportPrintController extends Controller
                 $i->product ? $i->product->barcode : '-',
                 $i->product ? $i->product->name : '-',
                 (float)$i->system_quantity,
+                $mutasiStr,
                 $i->count1_quantity !== null ? (float)$i->count1_quantity : '-',
                 $i->count2_quantity !== null ? (float)$i->count2_quantity : '-',
                 $i->final_quantity !== null ? (float)$i->final_quantity : '-',

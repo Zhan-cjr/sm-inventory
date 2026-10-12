@@ -575,6 +575,16 @@
                                 <span class="fc-pill-label">Sistem</span>
                                 <span>{{ $product['system_qty'] }}</span>
                             </div>
+                            @if(!empty($product['delta_during_so']) && $product['delta_during_so'] != 0)
+                                <div class="fc-pill" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a;">
+                                    <span class="fc-pill-label">Mutasi saat SO</span>
+                                    <span>{{ $product['delta_during_so'] > 0 ? '+' : '' }}{{ $product['delta_during_so'] }}</span>
+                                </div>
+                                <div class="fc-pill" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">
+                                    <span class="fc-pill-label">Disesuaikan</span>
+                                    <span>{{ $product['adjusted_system_qty'] }}</span>
+                                </div>
+                            @endif
                             <div class="fc-pill fc-pill-p1">
                                 <span class="fc-pill-label">Total P1</span>
                                 <span>{{ $product['total_count1'] }}</span>

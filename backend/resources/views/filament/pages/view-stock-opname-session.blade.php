@@ -1148,6 +1148,11 @@
                             </td>
                             <td class="num-cell text-gray-600 dark:text-gray-400">
                                 {{ number_format($summary['system_qty'], 0, ',', '.') }}
+                                @if(!empty($summary['delta_during_so']) && $summary['delta_during_so'] != 0)
+                                    <div class="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                                        Mutasi SO: {{ $summary['delta_during_so'] > 0 ? '+' : '' }}{{ number_format($summary['delta_during_so'], 0, ',', '.') }}
+                                    </div>
+                                @endif
                             </td>
                             <td class="num-cell text-gray-700 dark:text-gray-300">
                                 {{ number_format($summary['total_count1'], 0, ',', '.') }}

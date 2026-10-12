@@ -73,6 +73,19 @@ class FinalCheckStockOpname extends Page
             ->with(['product', 'rackSession.rack'])
             ->get();
 
+        $externalLogs = \App\Models\InventoryLog::where('branch_id', $this->record->branch_id)
+            ->whereBetween('created_at', [$this->record->created_at, $this->record->completed_at ?? now()])
+            ->where(function ($q) {
+                $q->whereNull('reference_doc_type')
+                  ->orWhere('reference_doc_type', '!=', 'STOCK_OPNAME');
+            })
+            ->where(function ($q) {
+                $q->whereNull('reason_code')
+                  ->orWhere('reason_code', '!=', 'STOCK_OPNAME');
+            })
+            ->get()
+            ->groupBy('product_id');
+
         $grouped = [];
         foreach ($items as $item) {
             $pid = $item->product_id;
@@ -81,15 +94,19 @@ class FinalCheckStockOpname extends Page
                     ->where('product_id', $pid)
                     ->get();
 
+                $delta = (float) ($externalLogs->get($pid)?->sum('quantity_change') ?? 0);
+
                 $grouped[$pid] = [
-                    'product_id'       => $pid,
-                    'product_name'     => $item->product?->name ?? 'Produk #' . $pid,
-                    'product_sku'      => $item->product?->sku ?? '-',
-                    'product_barcode'  => $item->product?->barcode ?? '-',
-                    'system_qty'       => (float) $item->system_quantity,
-                    'total_count1'     => (float) $allItems->sum('count1_quantity'),
-                    'total_count2'     => (float) $allItems->sum('count2_quantity'),
-                    'racks'            => [],
+                    'product_id'          => $pid,
+                    'product_name'        => $item->product?->name ?? 'Produk #' . $pid,
+                    'product_sku'         => $item->product?->sku ?? '-',
+                    'product_barcode'     => $item->product?->barcode ?? '-',
+                    'system_qty'          => (float) $item->system_quantity,
+                    'delta_during_so'     => $delta,
+                    'adjusted_system_qty' => (float) $item->system_quantity + $delta,
+                    'total_count1'        => (float) $allItems->sum('count1_quantity'),
+                    'total_count2'        => (float) $allItems->sum('count2_quantity'),
+                    'racks'               => [],
                 ];
             }
 

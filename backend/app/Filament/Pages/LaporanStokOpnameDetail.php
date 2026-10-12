@@ -55,8 +55,19 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                     ->searchable(),
                 TextColumn::make('system_quantity')
                     ->label('Stok Sistem')
+                    ->description(fn (StockOpnameItem $record) => $record->delta_during_session != 0 ? 'Disesuaikan: ' . (float)$record->adjusted_system_quantity : null)
                     ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->numeric(),
+                TextColumn::make('mutasi_so')
+                    ->label('Mutasi SO')
+                    ->state(function (StockOpnameItem $record) {
+                        $delta = (float) $record->delta_during_session;
+                        if ($delta == 0) return '-';
+                        return ($delta > 0 ? '+' : '') . $delta;
+                    })
+                    ->badge()
+                    ->color(fn ($state) => $state === '-' ? 'gray' : ($state[0] === '+' ? 'success' : 'warning'))
+                    ->tooltip('Mutasi penjualan/penerimaan kasir yang terjadi selama sesi SO berlangsung'),
                 TextColumn::make('count1_quantity')
                     ->label('Hitung 1')
                     ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
@@ -85,7 +96,7 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                 TextColumn::make('selisih_plus')
                     ->label('Selisih (+)')
                     ->state(function (StockOpnameItem $record) {
-                        $sys = (float)$record->system_quantity;
+                        $sys = (float)$record->adjusted_system_quantity;
                         $c1 = $record->count1_quantity !== null ? (float)$record->count1_quantity : null;
                         $c2 = $record->count2_quantity !== null ? (float)$record->count2_quantity : null;
                         $fin = $record->final_quantity !== null ? (float)$record->final_quantity : null;
@@ -101,7 +112,7 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                     ->label('Nominal (+)')
                     ->money('IDR', true)
                     ->state(function (StockOpnameItem $record) {
-                        $sys = (float)$record->system_quantity;
+                        $sys = (float)$record->adjusted_system_quantity;
                         $c1 = $record->count1_quantity !== null ? (float)$record->count1_quantity : null;
                         $c2 = $record->count2_quantity !== null ? (float)$record->count2_quantity : null;
                         $fin = $record->final_quantity !== null ? (float)$record->final_quantity : null;
@@ -128,7 +139,7 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                 TextColumn::make('selisih_minus')
                     ->label('Selisih (-)')
                     ->state(function (StockOpnameItem $record) {
-                        $sys = (float)$record->system_quantity;
+                        $sys = (float)$record->adjusted_system_quantity;
                         $c1 = $record->count1_quantity !== null ? (float)$record->count1_quantity : null;
                         $c2 = $record->count2_quantity !== null ? (float)$record->count2_quantity : null;
                         $fin = $record->final_quantity !== null ? (float)$record->final_quantity : null;
@@ -144,7 +155,7 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                     ->label('Nominal (-)')
                     ->money('IDR', true)
                     ->state(function (StockOpnameItem $record) {
-                        $sys = (float)$record->system_quantity;
+                        $sys = (float)$record->adjusted_system_quantity;
                         $c1 = $record->count1_quantity !== null ? (float)$record->count1_quantity : null;
                         $c2 = $record->count2_quantity !== null ? (float)$record->count2_quantity : null;
                         $fin = $record->final_quantity !== null ? (float)$record->final_quantity : null;
