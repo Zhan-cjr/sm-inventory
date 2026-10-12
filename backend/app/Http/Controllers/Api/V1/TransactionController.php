@@ -344,7 +344,7 @@ class TransactionController extends Controller
                                 'customer_name' => $customerName,
                                 'customer_wa_phone' => $customerWaPhone,
                                 'buyer_sku_code' => $product->ppob_sku,
-                                'price' => $res['data']['price'] ?? 0,
+                                'price' => ($res['data']['price'] ?? 0) > 0 ? $res['data']['price'] : ($product->cost_price ?? 0),
                                 'status' => $status,
                                 'rc' => $res['data']['rc'] ?? null,
                                 'sn' => $res['data']['sn'] ?? null,

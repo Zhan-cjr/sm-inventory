@@ -41,12 +41,18 @@ class AmaWebhookController extends Controller
                     $mappedStatus = $status;
                 }
 
-                $transaction->update([
+                $updateData = [
                     'status' => $mappedStatus,
                     'sn' => $sn,
                     'message' => $msg,
                     'raw_response' => json_encode($request->all())
-                ]);
+                ];
+
+                if ((float) $transaction->price <= 0 && $transaction->product?->cost_price) {
+                    $updateData['price'] = $transaction->product->cost_price;
+                }
+
+                $transaction->update($updateData);
 
                 $branchId = $transaction->transaction?->branch_id;
                 if ($branchId) {

@@ -59,7 +59,7 @@ class PpobTransactionResource extends Resource
 
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()->with(['transaction.items.product', 'ecommerceOrder.items.product', 'product']);
         
         $user = auth()->user();
         if ($user && $user->branch_id) {

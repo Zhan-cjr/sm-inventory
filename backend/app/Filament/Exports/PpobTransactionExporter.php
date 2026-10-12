@@ -25,16 +25,13 @@ class PpobTransactionExporter extends Exporter
             ExportColumn::make('provider')->label('Provider'),
             ExportColumn::make('price')
                 ->label('Harga Modal')
-                ->state(function (PpobTransaction $record) {
-                    return strtolower($record->status ?? '') === 'gagal' ? 0 : $record->price;
-                }),
+                ->state(fn (PpobTransaction $record) => $record->modal_price),
             ExportColumn::make('selling_price')
                 ->label('Harga Jual')
-                ->state(function (PpobTransaction $record) {
-                    $isFailed = strtolower($record->status ?? '') === 'gagal';
-                    if ($isFailed) return 0;
-                    return $record->transaction ? $record->transaction->final_amount : ($record->ecommerceOrder ? $record->ecommerceOrder->total_amount : 0);
-                }),
+                ->state(fn (PpobTransaction $record) => $record->selling_price),
+            ExportColumn::make('profit')
+                ->label('Laba')
+                ->state(fn (PpobTransaction $record) => $record->profit),
             ExportColumn::make('status')->label('Status'),
             ExportColumn::make('sn')->label('SN / Token'),
             ExportColumn::make('message')->label('Keterangan'),

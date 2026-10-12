@@ -173,7 +173,7 @@ class AmaService implements PpobProviderInterface
                 'rc' => $status,
                 'sn' => $gwRs['serialnumber'] ?? $gwRs['sn'] ?? '',
                 'message' => $gwRs['message'] ?? '',
-                'price' => $gwRs['price'] ?? 0,
+                'price' => (float) ($gwRs['price'] ?? $gwRs['harga'] ?? 0),
             ]
         ];
     }

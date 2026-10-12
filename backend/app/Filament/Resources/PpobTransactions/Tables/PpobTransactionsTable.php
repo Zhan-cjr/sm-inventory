@@ -47,9 +47,21 @@ class PpobTransactionsTable
                 TextColumn::make('price')
                     ->label('Harga Modal')
                     ->money('IDR', locale: 'id')
-                    ->state(function ($record) {
-                        return strtolower($record->status ?? '') === 'gagal' ? 0 : $record->price;
-                    })
+                    ->state(fn ($record) => $record->modal_price)
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->money('IDR', locale: 'id'))
+                    ->sortable(),
+                TextColumn::make('selling_price')
+                    ->label('Harga Jual')
+                    ->money('IDR', locale: 'id')
+                    ->state(fn ($record) => $record->selling_price)
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->money('IDR', locale: 'id'))
+                    ->sortable(),
+                TextColumn::make('profit')
+                    ->label('Laba')
+                    ->money('IDR', locale: 'id')
+                    ->state(fn ($record) => $record->profit)
+                    ->color('success')
+                    ->weight('bold')
                     ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->money('IDR', locale: 'id'))
                     ->sortable(),
                 TextColumn::make('status')

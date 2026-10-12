@@ -2465,7 +2465,12 @@ class ReportPrintController extends Controller
 
     private function printLaporanPpob($filters)
     {
-        $query = \App\Models\PpobTransaction::with(['transaction.branch'])->latest();
+        $query = \App\Models\PpobTransaction::with([
+            'transaction.branch', 
+            'transaction.items.product', 
+            'ecommerceOrder.items.product', 
+            'product'
+        ])->latest();
 
         $query = $this->applyDateFilters($query, $filters, 'created_at');
 
@@ -2507,15 +2512,9 @@ class ReportPrintController extends Controller
         $totalLaba = 0;
 
         foreach ($records as $r) {
-            $isFailed = strtolower($r->status ?? '') === 'gagal';
-            $hargaJual = 0;
-            
-            if (!$isFailed) {
-                $hargaJual = $r->transaction ? $r->transaction->final_amount : ($r->ecommerceOrder ? $r->ecommerceOrder->total_amount : 0);
-            }
-            
-            $laba = $isFailed ? 0 : ($hargaJual - $r->price);
-            $hargaModal = $isFailed ? 0 : $r->price;
+            $hargaJual = (float) $r->selling_price;
+            $hargaModal = (float) $r->modal_price;
+            $laba = (float) $r->profit;
             
             $totalHargaModal += $hargaModal;
             $totalHargaJual += $hargaJual;
