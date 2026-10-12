@@ -22,7 +22,7 @@ class GoodsReceiptItemObserver
         $stock->log_type = 'PURCHASE';
         $stock->reason_code = 'GR_ITEM_ADD';
         $stock->reference_doc_type = 'GOODS_RECEIPT';
-        $stock->reference_doc_id = $gr->id;
+        $stock->reference_doc_id = $gr->receipt_number ?: $gr->id;
         $stock->notes = 'Penerimaan Barang ' . $gr->receipt_number;
         
         $stock->increment('quantity_on_hand', $item->quantity_received);
@@ -65,7 +65,7 @@ class GoodsReceiptItemObserver
             $stock->log_type = 'PURCHASE_CANCEL';
             $stock->reason_code = 'GR_ITEM_REMOVE';
             $stock->reference_doc_type = 'GOODS_RECEIPT';
-            $stock->reference_doc_id = $gr->id;
+            $stock->reference_doc_id = $gr->receipt_number ?: $gr->id;
             $stock->notes = 'Hapus Item Penerimaan ' . $gr->receipt_number;
             
             $stock->decrement('quantity_on_hand', $item->quantity_received);

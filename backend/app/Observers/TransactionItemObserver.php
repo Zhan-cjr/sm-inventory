@@ -105,7 +105,8 @@ class TransactionItemObserver
         }
 
         // For regular items AND assembly component items, deduct stock normally.
-        $this->deductStock($item, $tx->branch_id, $item->product_id, $item->quantity, $tx->id);
+        $docNumber = $tx->receipt_number ?: ($tx->local_transaction_id ?: $tx->id);
+        $this->deductStock($item, $tx->branch_id, $item->product_id, $item->quantity, $docNumber);
     }
 
     public function deleting(TransactionItem $item): void
@@ -126,6 +127,7 @@ class TransactionItemObserver
         }
 
         // Restore stock for regular items and assembly components
-        $this->restoreStock($item, $tx->branch_id, $item->product_id, $item->quantity, $tx->id);
+        $docNumber = $tx->receipt_number ?: ($tx->local_transaction_id ?: $tx->id);
+        $this->restoreStock($item, $tx->branch_id, $item->product_id, $item->quantity, $docNumber);
     }
 }

@@ -82,7 +82,7 @@
             @forelse($logs as $log)
                 <tr>
                     <td>{{ $log->created_at->format('d/m/Y H:i') }}</td>
-                    <td style="font-family: monospace; font-size: 10px;">{{ $log->reference_doc_id ?? '-' }}</td>
+                    <td style="font-family: monospace; font-size: 11px; font-weight: 600;">{{ $log->display_doc_number }}</td>
                     <td>
                         <strong>{{ $log->log_type }}</strong><br>
                         <span style="font-size: 10px;">{{ $log->reason_code }} - {{ $log->notes }}</span>

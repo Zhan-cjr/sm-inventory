@@ -45,7 +45,7 @@ class StockTransferService
                 $stock->log_type = 'TRANSFER_OUT';
                 $stock->reason_code = 'STOCK_TRANSFER';
                 $stock->reference_doc_type = 'STOCK_TRANSFER';
-                $stock->reference_doc_id = $transfer->id;
+                $stock->reference_doc_id = $transfer->transfer_number ?: $transfer->id;
                 $stock->recorded_by = $userId;
                 $stock->notes = "Transfer out to Branch ID: {$transfer->to_branch_id}";
                 $stock->save();
@@ -91,7 +91,7 @@ class StockTransferService
                 $stock->log_type = 'TRANSFER_IN';
                 $stock->reason_code = 'STOCK_TRANSFER';
                 $stock->reference_doc_type = 'STOCK_TRANSFER';
-                $stock->reference_doc_id = $transfer->id;
+                $stock->reference_doc_id = $transfer->transfer_number ?: $transfer->id;
                 $stock->recorded_by = $userId;
                 $stock->notes = "Transfer in from Branch ID: {$transfer->from_branch_id}";
                 $stock->save();
@@ -136,7 +136,7 @@ class StockTransferService
                         $stock->log_type = 'TRANSFER_REJECTED';
                         $stock->reason_code = 'STOCK_TRANSFER';
                         $stock->reference_doc_type = 'STOCK_TRANSFER';
-                        $stock->reference_doc_id = $transfer->id;
+                        $stock->reference_doc_id = $transfer->transfer_number ?: $transfer->id;
                         $stock->recorded_by = $userId;
                         $stock->notes = "Transfer ditolak, stok dikembalikan";
                         $stock->save();

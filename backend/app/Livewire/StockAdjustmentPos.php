@@ -356,10 +356,36 @@ class StockAdjustmentPos extends Component
             'recorded_by' => auth()->user()->id, // Storing UUID
         ];
 
-        if ($this->stockAdjustment) {
-            $this->stockAdjustment->update($data);
-            $this->stockAdjustment->items()->delete();
+        $isEditing = !empty($this->stockAdjustment);
+
+        if ($isEditing) {
             $adj = $this->stockAdjustment;
+
+            // Revert stok dari item-item lama jika dokumen sebelumnya sudah diterapkan (COMPLETED / APPROVED)
+            if (in_array(strtoupper($adj->status ?? ''), ['COMPLETED', 'APPROVED'])) {
+                $oldItems = StockAdjustmentItem::where('stock_adjustment_id', $adj->id)->get();
+                foreach ($oldItems as $oldItem) {
+                    $oldStock = \App\Models\Stock::where('product_id', $oldItem->product_id)
+                        ->where('branch_id', $adj->branch_id)
+                        ->first();
+                    
+                    if ($oldStock) {
+                        $delta = (float) $oldItem->new_quantity - (float) $oldItem->previous_quantity;
+                        if ($delta != 0) {
+                            $oldStock->log_type = 'ADJUSTMENT';
+                            $oldStock->reason_code = 'EDIT_REVERT';
+                            $oldStock->reference_doc_type = 'STOCK_ADJUSTMENT';
+                            $oldStock->reference_doc_id = $adj->adjustment_number;
+                            $oldStock->notes = "Kembalikan Stok Semula (Edit {$adj->adjustment_number})";
+                            $oldStock->quantity_on_hand = (float) $oldStock->quantity_on_hand - $delta;
+                            $oldStock->save();
+                        }
+                    }
+                }
+            }
+
+            $adj->update($data);
+            $adj->items()->delete();
         } else {
             $adj = StockAdjustment::create($data);
         }
@@ -383,6 +409,15 @@ class StockAdjustmentPos extends Component
                 ], [
                     'quantity_on_hand' => 0
                 ]);
+
+                $logType = strtoupper($this->reason_type) === 'PLUS' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
+                $reasonName = $adj->adjustmentReason?->name ?? 'Koreksi Stok';
+
+                $stockRec->log_type = $logType;
+                $stockRec->reason_code = $reasonName;
+                $stockRec->reference_doc_type = 'STOCK_ADJUSTMENT';
+                $stockRec->reference_doc_id = $adj->adjustment_number;
+                $stockRec->notes = "Koreksi Stok: {$adj->adjustment_number}" . ($adj->notes ? " - {$adj->notes}" : '');
                 $stockRec->quantity_on_hand = $item['new_qty'];
                 $stockRec->save();
             }

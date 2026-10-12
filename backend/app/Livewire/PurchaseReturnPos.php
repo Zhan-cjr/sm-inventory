@@ -240,7 +240,7 @@ class PurchaseReturnPos extends Component
                         $stock->log_type = 'ADJUSTMENT';
                         $stock->reason_code = 'RETURN_EDIT_REVERT';
                         $stock->reference_doc_type = 'PURCHASE_RETURN';
-                        $stock->reference_doc_id = $pr->id;
+                        $stock->reference_doc_id = $pr->return_number ?: $pr->id;
                         $stock->notes = 'Revert sebelum Edit Retur ' . $pr->return_number;
                         
                         $stock->increment('quantity_on_hand', $oldItem->quantity);
@@ -314,7 +314,7 @@ class PurchaseReturnPos extends Component
                     $stock->log_type = 'RETURN';
                     $stock->reason_code = 'PURCHASE_RETURN';
                     $stock->reference_doc_type = 'PURCHASE_RETURN';
-                    $stock->reference_doc_id = $pr->id;
+                    $stock->reference_doc_id = $pr->return_number ?: $pr->id;
                     $stock->notes = 'Retur Pembelian ' . $pr->return_number;
                     
                     $stock->decrement('quantity_on_hand', $item['qty_returned']);

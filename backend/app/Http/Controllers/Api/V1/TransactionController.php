@@ -245,7 +245,7 @@ class TransactionController extends Controller
                                 $sourceStock->log_type = 'UNPACKING';
                                 $sourceStock->reason_code = 'AUTO_CONVERSION';
                                 $sourceStock->reference_doc_type = 'TRANSACTION';
-                                $sourceStock->reference_doc_id = $transaction->id;
+                                $sourceStock->reference_doc_id = $transaction->receipt_number ?: ($transaction->local_transaction_id ?: $transaction->id);
                                 $sourceStock->quantity_on_hand -= $sourceQtyToUnpack;
                                 $sourceStock->save();
 
@@ -260,7 +260,7 @@ class TransactionController extends Controller
                                 $stock->log_type = 'UNPACKING';
                                 $stock->reason_code = 'AUTO_CONVERSION';
                                 $stock->reference_doc_type = 'TRANSACTION';
-                                $stock->reference_doc_id = $transaction->id;
+                                $stock->reference_doc_id = $transaction->receipt_number ?: ($transaction->local_transaction_id ?: $transaction->id);
                                 $stock->quantity_on_hand += ($sourceQtyToUnpack * $conversion->conversion_qty);
                                 $stock->save();
                             }

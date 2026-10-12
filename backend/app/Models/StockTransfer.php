@@ -64,7 +64,7 @@ class StockTransfer extends Model
                     $stockOrigin->log_type = 'TRANSFER_DELETED_RESTORE';
                     $stockOrigin->reason_code = 'DELETE_TRANSFER';
                     $stockOrigin->reference_doc_type = 'STOCK_TRANSFER';
-                    $stockOrigin->reference_doc_id = $transfer->id;
+                    $stockOrigin->reference_doc_id = $transfer->transfer_number ?: $transfer->id;
                     $stockOrigin->recorded_by = $userId;
                     $stockOrigin->notes = "Restore stok karena transfer dihapus";
                     $stockOrigin->save();
@@ -82,7 +82,7 @@ class StockTransfer extends Model
                     $stockDest->log_type = 'TRANSFER_DELETED_REVERT';
                     $stockDest->reason_code = 'DELETE_TRANSFER';
                     $stockDest->reference_doc_type = 'STOCK_TRANSFER';
-                    $stockDest->reference_doc_id = $transfer->id;
+                    $stockDest->reference_doc_id = $transfer->transfer_number ?: $transfer->id;
                     $stockDest->recorded_by = $userId;
                     $stockDest->notes = "Revert stok karena transfer diterima dihapus";
                     $stockDest->save();

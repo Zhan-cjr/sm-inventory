@@ -184,7 +184,7 @@ class ViewStockOpnameSession extends ViewRecord
                 $stock->log_type           = $effectiveQty >= $before ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
                 $stock->reason_code        = 'STOCK_OPNAME';
                 $stock->reference_doc_type = 'STOCK_OPNAME';
-                $stock->reference_doc_id   = $session->id;
+                $stock->reference_doc_id   = $session->session_number ?: $session->id;
                 $stock->notes              = "Hasil Stok Opname {$session->session_number}";
                 $stock->recorded_by        = Auth::id();
 

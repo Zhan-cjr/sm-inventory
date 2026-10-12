@@ -26,8 +26,8 @@ class TransactionObserver
                     $stock->log_type = 'SALE_VOID';
                     $stock->reason_code = 'POS_VOID';
                     $stock->reference_doc_type = 'TRANSACTION';
-                    $stock->reference_doc_id = $transaction->id;
-                    $stock->notes = 'Void Penjualan ' . $transaction->local_transaction_id;
+                    $stock->reference_doc_id = $transaction->receipt_number ?: ($transaction->local_transaction_id ?: $transaction->id);
+                    $stock->notes = 'Void Penjualan ' . ($transaction->receipt_number ?: $transaction->local_transaction_id);
                     
                     $stock->increment('quantity_on_hand', $item->quantity);
                 }
