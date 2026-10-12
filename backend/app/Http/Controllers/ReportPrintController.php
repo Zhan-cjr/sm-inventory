@@ -59,7 +59,7 @@ class ReportPrintController extends Controller
     private function applyDateFilters($query, $filters, $dateColumn = 'transaction_date', $filterName = 'date_filter')
     {
         // Try new standardized format or fallback to legacy format
-        $filterData = $filters[$filterName] ?? $filters['transaction_date'] ?? null;
+        $filterData = $filters[$filterName] ?? $filters['transaction_date'] ?? $filters['created_at'] ?? null;
         if (!$filterData) return $query;
 
         $period = $filterData['period'] ?? null;
@@ -101,7 +101,7 @@ class ReportPrintController extends Controller
 
     private function getPeriodString($filters, $filterName = 'date_filter')
     {
-        $filterData = $filters[$filterName] ?? $filters['transaction_date'] ?? null;
+        $filterData = $filters[$filterName] ?? $filters['transaction_date'] ?? $filters['created_at'] ?? null;
         if (!$filterData) return 'Semua Waktu';
 
         $period = $filterData['period'] ?? null;
@@ -2499,11 +2499,21 @@ class ReportPrintController extends Controller
         }
 
         $records = $query->get();
-        $period = $this->getPeriodString($filters, 'transaction_date');
+        $period = $this->getPeriodString($filters, 'date_filter');
 
         $columns = [
             'Tanggal', 'No. Struk', 'Ref ID', 'No. Tujuan', 'Nama Customer', 
             'SKU Provider', 'Provider', 'Harga Modal', 'Harga Jual', 'Laba', 'Status', 'SN / Token', 'Keterangan'
+        ];
+
+        $columnWidths = [
+            '75px', '85px', '85px', '90px', '110px', 
+            '75px', '55px', '75px', '75px', '65px', '55px', '105px', '120px'
+        ];
+
+        $alignments = [
+            'left', 'left', 'left', 'left', 'left',
+            'left', 'center', 'right', 'right', 'right', 'center', 'left', 'left'
         ];
         
         $rows = [];
@@ -2520,6 +2530,30 @@ class ReportPrintController extends Controller
             $totalHargaJual += $hargaJual;
             $totalLaba += $laba;
 
+            // Format SN dipersingkat & ukuran font kecil
+            $snDisplay = '-';
+            if (!empty($r->sn)) {
+                $cleanSn = $r->sn;
+                if (str_contains($cleanSn, '/')) {
+                    $parts = explode('/', $cleanSn);
+                    $cleanSn = end($parts);
+                }
+                $cleanSn = \Illuminate\Support\Str::limit($cleanSn, 25);
+                $snDisplay = '<span style="font-size: 8px; line-height: 1.15; word-break: break-all; display: block;">' . e($cleanSn) . '</span>';
+            }
+
+            // Format Keterangan dipersingkat & ukuran font kecil
+            $msgDisplay = '-';
+            if (!empty($r->message)) {
+                $cleanMsg = $r->message;
+                if (str_starts_with($cleanMsg, 'SN=') && str_contains($cleanMsg, ';')) {
+                    $semiParts = explode(';', $cleanMsg);
+                    $cleanMsg = implode('; ', array_slice($semiParts, 1));
+                }
+                $cleanMsg = \Illuminate\Support\Str::limit($cleanMsg, 40);
+                $msgDisplay = '<span style="font-size: 8px; line-height: 1.15; word-break: break-word; display: block;">' . e($cleanMsg) . '</span>';
+            }
+
             $rows[] = [
                 $r->created_at ? $r->created_at->format('d M Y, H:i') : '-',
                 $r->transaction ? $r->transaction->receipt_number : '-',
@@ -2532,8 +2566,8 @@ class ReportPrintController extends Controller
                 number_format($hargaJual, 0, ',', '.'),
                 number_format($laba, 0, ',', '.'),
                 ucfirst($r->status ?? '-'),
-                $r->sn ?? '-',
-                $r->message ?? '-'
+                $snDisplay,
+                $msgDisplay
             ];
         }
 
@@ -2549,6 +2583,8 @@ class ReportPrintController extends Controller
             'title' => 'Laporan Transaksi PPOB',
             'period' => $period,
             'columns' => $columns,
+            'columnWidths' => $columnWidths,
+            'alignments' => $alignments,
             'rows' => $rows
         ]);
     }

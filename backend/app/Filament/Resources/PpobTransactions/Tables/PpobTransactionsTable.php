@@ -75,14 +75,19 @@ class PpobTransactionsTable
                     ->searchable(),
                 TextColumn::make('sn')
                     ->label('SN / Token')
+                    ->limit(25)
+                    ->tooltip(fn ($record) => $record->sn)
                     ->searchable(),
                 TextColumn::make('message')
                     ->label('Keterangan')
+                    ->limit(35)
+                    ->tooltip(fn ($record) => $record->message)
                     ->wrap()
                     ->searchable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
+                \App\Filament\Filters\DateFilterHelper::make('created_at'),
                 \Filament\Tables\Filters\SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('transaction.branch', 'name')
