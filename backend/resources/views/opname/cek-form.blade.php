@@ -302,6 +302,7 @@
                    placeholder="Ketik barcode manual..." autocomplete="off">
             <button class="manual-scan-btn" onclick="manualSearch()">Cari</button>
         </div>
+    </div>
 </div>
 
 <!-- Review Unscanned Modal -->
@@ -524,6 +525,17 @@
     let unscannedItems = [];
     
     document.getElementById('check-form').addEventListener('submit', function(e) {
+        const checkerNameInp = document.querySelector('input[name="checker_name"]');
+        if (!checkerNameInp || !checkerNameInp.value.trim()) {
+            alert('Harap masukkan Nama Anda pada bagian Identitas Pengecek terlebih dahulu!');
+            if (checkerNameInp) {
+                checkerNameInp.focus();
+                checkerNameInp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            e.preventDefault();
+            return;
+        }
+
         let hasEmptyScanned = false;
         let scannedItems = document.querySelectorAll('.product-item[data-scanned="true"]');
         let unscannedDomItems = document.querySelectorAll('.product-item[data-scanned="false"]');

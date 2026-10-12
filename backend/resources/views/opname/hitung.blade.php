@@ -525,6 +525,17 @@
     let unscannedItems = [];
     
     document.getElementById('count-form').addEventListener('submit', function(e) {
+        const counterNameInp = document.querySelector('input[name="counter_name"]');
+        if (!counterNameInp || !counterNameInp.value.trim()) {
+            alert('Harap masukkan Nama Anda pada bagian Identitas Penghitung terlebih dahulu!');
+            if (counterNameInp) {
+                counterNameInp.focus();
+                counterNameInp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            e.preventDefault();
+            return;
+        }
+
         let hasEmptyScanned = false;
         let scannedItems = document.querySelectorAll('.product-item[data-scanned="true"]');
         let unscannedDomItems = document.querySelectorAll('.product-item[data-scanned="false"]');
