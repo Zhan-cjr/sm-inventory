@@ -49,31 +49,20 @@ class PpobTransactionsTable
                     ->money('IDR', locale: 'id')
                     ->state(fn ($record) => $record->modal_price)
                     ->summarize(
-                        \Filament\Tables\Columns\Summarizers\Summarizer::make()
+                        \Filament\Tables\Columns\Summarizers\Sum::make()
                             ->money('IDR', locale: 'id')
-                            ->using(fn ($query) => $query->get()->sum(fn ($record) => $record->modal_price))
                     )
                     ->sortable(),
                 TextColumn::make('selling_price')
                     ->label('Harga Jual')
                     ->money('IDR', locale: 'id')
-                    ->state(fn ($record) => $record->selling_price)
-                    ->summarize(
-                        \Filament\Tables\Columns\Summarizers\Summarizer::make()
-                            ->money('IDR', locale: 'id')
-                            ->using(fn ($query) => $query->get()->sum(fn ($record) => $record->selling_price))
-                    ),
+                    ->state(fn ($record) => $record->selling_price),
                 TextColumn::make('profit')
                     ->label('Laba')
                     ->money('IDR', locale: 'id')
                     ->state(fn ($record) => $record->profit)
                     ->color('success')
-                    ->weight('bold')
-                    ->summarize(
-                        \Filament\Tables\Columns\Summarizers\Summarizer::make()
-                            ->money('IDR', locale: 'id')
-                            ->using(fn ($query) => $query->get()->sum(fn ($record) => $record->profit))
-                    ),
+                    ->weight('bold'),
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
