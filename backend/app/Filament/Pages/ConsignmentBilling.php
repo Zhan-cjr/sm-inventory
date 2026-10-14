@@ -263,7 +263,7 @@ class ConsignmentBilling extends Page implements HasForms
                 'tanggal_jatuh_tempo' => date('Y-m-d', strtotime('+7 days')),
                 'total_amount' => $this->totalTagihan,
                 'paid_amount' => 0,
-                'notes' => "Penagihan Konsinyasi Cut-Off " . $this->end_date,
+                'notes' => "Penagihan Konsinyasi Periode " . $this->start_date . " s/d " . $this->end_date,
                 'status' => 'UNPAID',
                 'created_by_id' => auth()->id(),
             ]);

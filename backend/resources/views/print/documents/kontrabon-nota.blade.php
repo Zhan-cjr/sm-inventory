@@ -35,7 +35,7 @@
             @if(isset($minDate) && isset($maxDate))
             <tr>
                 <td colspan="3"></td>
-                <td class="label" style="text-align: right;">Periode Cut-Off</td>
+                <td class="label" style="text-align: right;">Periode Penagihan</td>
                 <td class="separator">:</td>
                 <td>{{ $minDate }} s/d {{ $maxDate }}</td>
             </tr>
@@ -88,7 +88,12 @@
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td style="font-size: 8pt;">{{ $item['barcode'] }}</td>
-                    <td style="font-size: 8pt;"><strong>{{ $item['sku'] }}</strong><br>{{ $item['name'] }}</td>
+                    <td style="font-size: 8pt;">
+                        <strong>{{ $item['sku'] }}</strong><br>{{ $item['name'] }}
+                        @if(!empty($item['prior_unbilled_qty']) && $item['prior_unbilled_qty'] > 0)
+                            <br><span style="color: #b45309; font-size: 7.5pt; font-weight: 500;">(Termasuk {{ number_format($item['prior_unbilled_qty']) }} pcs unbilled s/d cut-off)</span>
+                        @endif
+                    </td>
                     <td class="text-right" style="font-size: 8pt;">Rp {{ number_format($item['cost_price'], 0, ',', '.') }}</td>
                     <td class="text-right" style="font-size: 8pt;">Rp {{ number_format($item['selling_price'], 0, ',', '.') }}</td>
                     <td class="text-center" style="font-size: 8pt;">{{ number_format($item['qty_jual']) }}</td>
@@ -102,6 +107,23 @@
                 @endforeach
             </tbody>
         </table>
+
+        @if(isset($unbilledPriorDetails) && count($unbilledPriorDetails['items']) > 0)
+        <div style="margin-top: 10px; margin-bottom: 12px; padding: 8px 12px; background-color: #fffbeb; border: 1px dashed #f59e0b; border-radius: 4px; font-size: 8pt; color: #92400e;">
+            <div style="font-weight: bold; margin-bottom: 3px;">
+                Catatan Saldo Tertinggal (Unbilled Sebelum Periode {{ $minDate }}):
+            </div>
+            <div>
+                Tagihan ini mencakup penjualan berstatus <em>unbilled</em> sebelum periode berjalan sebanyak <strong>{{ number_format($unbilledPriorDetails['total_qty']) }} pcs</strong> senilai <strong>Rp {{ number_format($unbilledPriorDetails['total_amount'], 0, ',', '.') }}</strong> dari transaksi:
+                <ul style="margin: 2px 0 3px 16px; padding: 0;">
+                    @foreach($unbilledPriorDetails['items'] as $prior)
+                        <li>Struk <strong>{{ $prior['receipt_number'] }}</strong> (Tgl {{ $prior['date'] }}) &bull; {{ $prior['product_name'] }} ({{ number_format($prior['qty']) }} pcs &times; Rp {{ number_format($prior['cost_price'], 0, ',', '.') }})</li>
+                    @endforeach
+                </ul>
+                Penjualan murni pada periode berjalan ({{ $minDate }} s/d {{ $maxDate }}) adalah <strong>{{ number_format($unbilledPriorDetails['current_qty']) }} pcs</strong> senilai <strong>Rp {{ number_format($unbilledPriorDetails['current_amount'], 0, ',', '.') }}</strong>.
+            </div>
+        </div>
+        @endif
         @endif
 
         @if($kontrabon->kontrabonDeductions->count() > 0)

@@ -2091,17 +2091,29 @@ class ReportPrintController extends Controller
         $organizationId = auth()->user()?->organization_id ?? \App\Models\Organization::first()?->id;
         $organization = \App\Models\Organization::find($organizationId);
         
-        $posItems = \App\Models\TransactionItem::with('product')
+        $posItems = \App\Models\TransactionItem::with(['product', 'transaction'])
             ->where('kontrabon_id', $kontrabon->id)
             ->get();
 
-        $ecomItems = \App\Models\EcommerceOrderItem::with('product')
+        $ecomItems = \App\Models\EcommerceOrderItem::with(['product', 'order'])
             ->where('kontrabon_id', $kontrabon->id)
             ->get();
 
         $allProductIds = $posItems->pluck('product_id')->merge($ecomItems->pluck('product_id'))->unique();
 
-        $selloutItems = $allProductIds->map(function ($productId) use ($posItems, $ecomItems, $kontrabon) {
+        // Deteksi periode awal & akhir filter dari catatan (notes) kontrabon
+        $filterStartDate = null;
+        $filterEndDate = null;
+        if (!empty($kontrabon->notes)) {
+            if (preg_match('/(?:Periode|Cut-Off)\s+([0-9]{4}-[0-9]{2}-[0-9]{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4})\s*(?:s\/d|sampai|-)\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4})/i', $kontrabon->notes, $matches)) {
+                $filterStartDate = \Carbon\Carbon::parse($matches[1])->format('Y-m-d');
+                $filterEndDate = \Carbon\Carbon::parse($matches[2])->format('Y-m-d');
+            } elseif (preg_match('/Cut-Off\s+([0-9]{4}-[0-9]{2}-[0-9]{2})/i', $kontrabon->notes, $matches)) {
+                $filterEndDate = \Carbon\Carbon::parse($matches[1])->format('Y-m-d');
+            }
+        }
+
+        $selloutItems = $allProductIds->map(function ($productId) use ($posItems, $ecomItems, $kontrabon, $filterStartDate) {
             $pItems = $posItems->where('product_id', $productId);
             $ecItems = $ecomItems->where('product_id', $productId);
             $firstProduct = $pItems->first()?->product ?? $ecItems->first()?->product;
@@ -2137,6 +2149,8 @@ class ReportPrintController extends Controller
             }
 
             $amountOwed = 0;
+            $priorUnbilledQty = 0;
+
             foreach ($pItems as $it) {
                 $batchCogs = (float) \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
                     ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
@@ -2148,6 +2162,10 @@ class ReportPrintController extends Controller
                 } else {
                     $deduction = $batchCogs > 0 ? $batchCogs : (abs($it->quantity) * $fallbackPrice);
                     $amountOwed -= $deduction;
+                }
+
+                if ($filterStartDate && $it->transaction?->transaction_date && $it->transaction->transaction_date < ($filterStartDate . ' 00:00:00')) {
+                    $priorUnbilledQty += (float) $it->quantity;
                 }
             }
 
@@ -2163,6 +2181,10 @@ class ReportPrintController extends Controller
                     $deduction = $batchCogs > 0 ? $batchCogs : (abs($it->quantity) * $fallbackPrice);
                     $amountOwed -= $deduction;
                 }
+
+                if ($filterStartDate && $it->order?->created_at && $it->order->created_at < ($filterStartDate . ' 00:00:00')) {
+                    $priorUnbilledQty += (float) $it->quantity;
+                }
             }
 
             $averageCostPrice = $qtyJualNet > 0 ? ($amountOwed / $qtyJualNet) : $fallbackPrice;
@@ -2175,6 +2197,7 @@ class ReportPrintController extends Controller
                 'qty_jual' => $qtyJual,
                 'qty_retur' => $qtyRetur,
                 'qty_jual_net' => $qtyJualNet,
+                'prior_unbilled_qty' => $priorUnbilledQty,
                 'cost_price' => $averageCostPrice,
                 'selling_price' => $sellingPrice,
                 'total_jual' => $totalJual,
@@ -2189,13 +2212,96 @@ class ReportPrintController extends Controller
             $q->where('kontrabon_id', $kontrabon->id);
         })->selectRaw('MIN(transaction_date) as min_date, MAX(transaction_date) as max_date')->first();
 
+        $minDate = $filterStartDate 
+            ? \Carbon\Carbon::parse($filterStartDate)->format('d-m-Y') 
+            : ($dates?->min_date ? \Carbon\Carbon::parse($dates->min_date)->format('d-m-Y') : null);
+
+        $maxDate = $filterEndDate 
+            ? \Carbon\Carbon::parse($filterEndDate)->format('d-m-Y') 
+            : ($dates?->max_date ? \Carbon\Carbon::parse($dates->max_date)->format('d-m-Y') : null);
+
+        // Kumpulkan rincian transaksi unbilled sebelum filterStartDate
+        $unbilledPriorDetails = null;
+        if ($filterStartDate) {
+            $priorItems = [];
+            $priorTotalQty = 0;
+            $priorTotalAmount = 0;
+
+            foreach ($posItems as $it) {
+                $tDate = $it->transaction?->transaction_date;
+                if ($tDate && $tDate < ($filterStartDate . ' 00:00:00')) {
+                    $batchCogs = (float) \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+                        ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+                        ->where('sbd.transaction_item_id', $it->id)
+                        ->sum(\Illuminate\Support\Facades\DB::raw('sbd.quantity * sb.cost_price'));
+
+                    $stock = \App\Models\Stock::where('product_id', $it->product_id)->where('branch_id', $kontrabon->branch_id)->first();
+                    $fallbackPrice = (float) ($stock && $stock->cost_price > 0 ? $stock->cost_price : ($it->product?->cost_price ?? 0));
+                    $itemCost = $batchCogs > 0 ? $batchCogs : ($it->quantity * $fallbackPrice);
+
+                    $priorItems[] = [
+                        'receipt_number' => $it->transaction?->receipt_number ?? '-',
+                        'date' => \Carbon\Carbon::parse($tDate)->format('d-m-Y H:i'),
+                        'product_name' => $it->product?->name ?? '-',
+                        'qty' => (float) $it->quantity,
+                        'cost_price' => $it->quantity > 0 ? ($itemCost / $it->quantity) : $fallbackPrice,
+                        'subtotal' => $itemCost,
+                    ];
+                    $priorTotalQty += (float) $it->quantity;
+                    $priorTotalAmount += $itemCost;
+                }
+            }
+
+            foreach ($ecomItems as $it) {
+                $tDate = $it->order?->created_at;
+                if ($tDate && $tDate < ($filterStartDate . ' 00:00:00')) {
+                    $batchCogs = (float) \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+                        ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+                        ->where('sbd.ecommerce_order_item_id', $it->id)
+                        ->sum(\Illuminate\Support\Facades\DB::raw('sbd.quantity * sb.cost_price'));
+
+                    $stock = \App\Models\Stock::where('product_id', $it->product_id)->where('branch_id', $kontrabon->branch_id)->first();
+                    $fallbackPrice = (float) ($stock && $stock->cost_price > 0 ? $stock->cost_price : ($it->product?->cost_price ?? 0));
+                    $itemCost = $batchCogs > 0 ? $batchCogs : ($it->quantity * $fallbackPrice);
+
+                    $priorItems[] = [
+                        'receipt_number' => $it->order?->order_number ?? '-',
+                        'date' => \Carbon\Carbon::parse($tDate)->format('d-m-Y H:i'),
+                        'product_name' => $it->product?->name ?? '-',
+                        'qty' => (float) $it->quantity,
+                        'cost_price' => $it->quantity > 0 ? ($itemCost / $it->quantity) : $fallbackPrice,
+                        'subtotal' => $itemCost,
+                    ];
+                    $priorTotalQty += (float) $it->quantity;
+                    $priorTotalAmount += $itemCost;
+                }
+            }
+
+            if (count($priorItems) > 0) {
+                $totalKontrabonQty = (float) $selloutItems->sum('qty_jual_net');
+                $totalKontrabonAmount = (float) $kontrabon->total_amount;
+
+                $currentQty = max(0, $totalKontrabonQty - $priorTotalQty);
+                $currentAmount = max(0, $totalKontrabonAmount - $priorTotalAmount);
+
+                $unbilledPriorDetails = [
+                    'items' => $priorItems,
+                    'total_qty' => $priorTotalQty,
+                    'total_amount' => $priorTotalAmount,
+                    'current_qty' => $currentQty,
+                    'current_amount' => $currentAmount,
+                ];
+            }
+        }
+
         return view('print.documents.kontrabon-nota', [
             'kontrabon' => $kontrabon,
             'organization' => $organization,
             'selloutItems' => $selloutItems,
             'title' => 'Nota Kontrabon',
-            'minDate' => $dates?->min_date ? \Carbon\Carbon::parse($dates->min_date)->format('d-m-Y') : null,
-            'maxDate' => $dates?->max_date ? \Carbon\Carbon::parse($dates->max_date)->format('d-m-Y') : null,
+            'minDate' => $minDate,
+            'maxDate' => $maxDate,
+            'unbilledPriorDetails' => $unbilledPriorDetails,
         ]);
     }
 
