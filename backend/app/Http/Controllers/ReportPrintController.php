@@ -2188,7 +2188,12 @@ class ReportPrintController extends Controller
             }
 
             $averageCostPrice = $qtyJualNet > 0 ? ($amountOwed / $qtyJualNet) : $fallbackPrice;
-            $sellingPrice = $qtyJual > 0 ? ($totalJual / $qtyJual) : (float)($firstProduct->price ?? 0);
+            $averageSellingPrice = $qtyJual > 0 ? ($totalJual / $qtyJual) : (float)($firstProduct->selling_price ?? 0);
+            $currentSellingPrice = (float)(($stock && $stock->selling_price > 0) ? $stock->selling_price : ($firstProduct->selling_price ?? 0));
+            if ($currentSellingPrice <= 0) {
+                $currentSellingPrice = $averageSellingPrice;
+            }
+            $hasPriceVariance = ($currentSellingPrice > 0 && abs($currentSellingPrice - $averageSellingPrice) >= 1);
 
             return [
                 'barcode' => $firstProduct->barcode ?? '-',
@@ -2199,7 +2204,9 @@ class ReportPrintController extends Controller
                 'qty_jual_net' => $qtyJualNet,
                 'prior_unbilled_qty' => $priorUnbilledQty,
                 'cost_price' => $averageCostPrice,
-                'selling_price' => $sellingPrice,
+                'selling_price' => $currentSellingPrice,
+                'average_selling_price' => $averageSellingPrice,
+                'has_price_variance' => $hasPriceVariance,
                 'total_jual' => $totalJual,
                 'total_beli_hpp' => $qtyJual * $averageCostPrice,
                 'total_retur_hpp' => $qtyRetur * $averageCostPrice,

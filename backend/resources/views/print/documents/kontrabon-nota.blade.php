@@ -95,7 +95,12 @@
                         @endif
                     </td>
                     <td class="text-right" style="font-size: 8pt;">Rp {{ number_format($item['cost_price'], 0, ',', '.') }}</td>
-                    <td class="text-right" style="font-size: 8pt;">Rp {{ number_format($item['selling_price'], 0, ',', '.') }}</td>
+                    <td class="text-right" style="font-size: 8pt;">
+                        Rp {{ number_format($item['selling_price'], 0, ',', '.') }}
+                        @if(!empty($item['has_price_variance']))
+                            <br><span style="color: #64748b; font-size: 7pt; font-weight: normal;">(Avg: Rp {{ number_format($item['average_selling_price'], 0, ',', '.') }})</span>
+                        @endif
+                    </td>
                     <td class="text-center" style="font-size: 8pt;">{{ number_format($item['qty_jual']) }}</td>
                     <td class="text-center" style="font-size: 8pt;">{{ number_format($item['qty_retur']) }}</td>
                     <td class="text-center" style="font-size: 8pt; font-weight: bold;">{{ number_format($item['qty_jual_net']) }}</td>
