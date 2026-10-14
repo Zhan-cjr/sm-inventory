@@ -134,9 +134,37 @@ class KontrabonResource extends Resource
                     ->label('Batalkan')
                     ->modalHeading('Batalkan Kontrabon')
                     ->action(function (Kontrabon $record) {
-                        $record->status = 'CANCELLED';
-                        $record->save();
-                        // Optional: release GR billing status
+                        \Illuminate\Support\Facades\DB::transaction(function () use ($record) {
+                            $record->status = 'CANCELLED';
+                            $record->save();
+
+                            // Lepaskan kaitan transaksi konsinyasi agar kembali unbilled
+                            \App\Models\TransactionItem::where('kontrabon_id', $record->id)
+                                ->update(['kontrabon_id' => null]);
+
+                            \App\Models\EcommerceOrderItem::where('kontrabon_id', $record->id)
+                                ->update(['kontrabon_id' => null]);
+
+                            // Revert potongan supplier jika ada
+                            foreach ($record->kontrabonDeductions as $kd) {
+                                if ($kd->supplier_deduction_id && $kd->amount_applied > 0) {
+                                    $dbDeduction = \App\Models\SupplierDeduction::find($kd->supplier_deduction_id);
+                                    if ($dbDeduction) {
+                                        $newClaimed = max(0, floatval($dbDeduction->claimed_amount) - floatval($kd->amount_applied));
+                                        $status = ($newClaimed <= 0.01) ? 'OPEN' : 'PARTIAL';
+                                        $dbDeduction->update([
+                                            'claimed_amount' => $newClaimed,
+                                            'status' => $status
+                                        ]);
+                                    }
+                                }
+                            }
+                        });
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Kontrabon Berhasil Dibatalkan')
+                            ->success()
+                            ->send();
                     })
                     ->hidden(fn (Kontrabon $record) => $record->status === 'CANCELLED' || $record->paid_amount > 0),
             ]);
