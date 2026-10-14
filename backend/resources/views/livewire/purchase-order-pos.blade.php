@@ -140,7 +140,7 @@
             <!-- Supplier Panel -->
             <div>
                 <div class="flex-between" style="margin-bottom: 0.5rem;">
-                    <div style="font-weight: 600; font-size: 1rem; color: #111827;" class="dark:text-gray-200">Detail Pemasok</div>
+                    <div style="font-weight: 600; font-size: 1rem; color: #111827;" class="dark:text-gray-200">Detail Supplier</div>
                     @if($supplier_id)
                     <div x-data="{ openSaran: false }" style="position: relative;">
                         <button @click="openSaran = !openSaran" 
@@ -175,7 +175,7 @@
                 </div>
                 <table style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
                     <tr>
-                        <td style="width: 30%;" class="pos-label">Pemasok</td>
+                        <td style="width: 30%;" class="pos-label">Supplier</td>
                         <td>
                             <div x-data="{ 
                                 open: false, 

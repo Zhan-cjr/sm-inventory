@@ -152,9 +152,9 @@
                     <tr>
                         <td colspan="7" style="text-align: center; padding: 3rem; color: #6b7280; font-style: italic;" class="dark:text-gray-400">
                             @if($supplier_id)
-                                Tidak ada faktur yang belum ditagihkan (dikontrabonkan) untuk pemasok ini.
+                                Tidak ada faktur yang belum ditagihkan (dikontrabonkan) untuk supplier ini.
                             @else
-                                Silakan pilih Pemasok terlebih dahulu untuk melihat daftar faktur.
+                                Silakan pilih Supplier terlebih dahulu untuk melihat daftar faktur.
                             @endif
                         </td>
                     </tr>
@@ -190,7 +190,7 @@
                 @empty
                     <tr>
                         <td colspan="4" style="text-align: center; padding: 2rem; color: #6b7280; font-style: italic;" class="dark:text-gray-400">
-                            Tidak ada saldo klaim, retur, atau potongan yang terbuka untuk pemasok ini.
+                            Tidak ada saldo klaim, retur, atau potongan yang terbuka untuk supplier ini.
                         </td>
                     </tr>
                 @endforelse

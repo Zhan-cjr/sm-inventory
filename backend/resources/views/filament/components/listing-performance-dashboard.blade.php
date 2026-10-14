@@ -8,7 +8,7 @@
     <!-- Header Ringkasan Perjanjian -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
         <div>
-            <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pemasok</div>
+            <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Supplier</div>
             <div class="text-base font-bold text-gray-900 dark:text-gray-100 mt-1">{{ $supplier?->name ?? '-' }}</div>
             <div class="text-xs text-gray-500 mt-0.5">
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $supplier?->is_consignment ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' }}">

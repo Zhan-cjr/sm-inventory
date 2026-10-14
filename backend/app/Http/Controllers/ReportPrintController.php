@@ -507,6 +507,11 @@ class ReportPrintController extends Controller
             $query->where('stocks.branch_id', $branchId);
         }
 
+        $query->where(function ($q) {
+            $q->where('products.product_type', '!=', 'digital')
+              ->orWhereNull('products.product_type');
+        });
+
         if (!empty($categoryId)) {
             $query->where('products.category_id', $categoryId);
         }
@@ -647,6 +652,11 @@ class ReportPrintController extends Controller
         if ($branchId) {
             $query->where('stocks.branch_id', $branchId);
         }
+
+        $query->where(function ($q) {
+            $q->where('products.product_type', '!=', 'digital')
+              ->orWhereNull('products.product_type');
+        });
 
         if (!empty($categoryId)) {
             $query->where('products.category_id', $categoryId);
@@ -2015,7 +2025,7 @@ class ReportPrintController extends Controller
         $records = $query->orderBy('tanggal_kontrabon', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
-        $columns = ['Tgl Kontrabon', 'No. Kontrabon', 'Pemasok', 'Cabang', 'Jatuh Tempo', 'Total Tagihan', 'Sudah Dibayar', 'Status'];
+        $columns = ['Tgl Kontrabon', 'No. Kontrabon', 'Supplier', 'Cabang', 'Jatuh Tempo', 'Total Tagihan', 'Sudah Dibayar', 'Status'];
         $rows = [];
         $t_tagihan = 0; $t_dibayar = 0;
         
@@ -2052,7 +2062,7 @@ class ReportPrintController extends Controller
         $records = $query->orderBy('payment_date', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
-        $columns = ['Tgl Bayar', 'No. Pembayaran', 'Pemasok', 'Cabang', 'Metode Bayar', 'Nominal Bayar', 'Status'];
+        $columns = ['Tgl Bayar', 'No. Pembayaran', 'Supplier', 'Cabang', 'Metode Bayar', 'Nominal Bayar', 'Status'];
         $rows = [];
         $t_bayar = 0;
         
@@ -2248,7 +2258,7 @@ class ReportPrintController extends Controller
         $records = $query->orderBy('created_at', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
-        $columns = ['Tanggal', 'Jenis', 'Pemasok', 'Cabang', 'Nominal', 'Terpakai', 'Status', 'Catatan'];
+        $columns = ['Tanggal', 'Jenis', 'Supplier', 'Cabang', 'Nominal', 'Terpakai', 'Status', 'Catatan'];
         $rows = [];
         $t_nominal = 0; $t_terpakai = 0;
         
@@ -2268,7 +2278,7 @@ class ReportPrintController extends Controller
         }
         $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>'.number_format($t_nominal, 0, ',', '.').'</strong>', '<strong>'.number_format($t_terpakai, 0, ',', '.').'</strong>', '', ''];
 
-        return view('print.reports.generic', ['title' => 'Daftar Klaim & Potongan Pemasok', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+        return view('print.reports.generic', ['title' => 'Daftar Klaim & Potongan Supplier', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
 
     private function printLaporanHpp(Request $request)

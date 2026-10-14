@@ -17,7 +17,7 @@ class SupplierImporter extends Importer
         return [
             \Filament\Forms\Components\Checkbox::make('overwrite')
                 ->label('Timpa data yang sudah ada')
-                ->helperText('Jika dicentang, data pemasok dengan kode yang sama akan diperbarui.'),
+                ->helperText('Jika dicentang, data supplier dengan kode yang sama akan diperbarui.'),
         ];
     }
     
@@ -81,13 +81,13 @@ class SupplierImporter extends Importer
                 }),
 
             ImportColumn::make('code')
-                ->label('Kode Pemasok')
+                ->label('Kode Supplier')
                 ->requiredMapping()
                 ->example('SUP-001')
                 ->rules(['required', 'string', 'max:50']),
 
             ImportColumn::make('name')
-                ->label('Nama Pemasok')
+                ->label('Nama Supplier')
                 ->requiredMapping()
                 ->example('PT Indofood')
                 ->rules(['required', 'string', 'max:255']),
@@ -183,7 +183,7 @@ class SupplierImporter extends Importer
 
     public static function getCompletedNotificationBody(Import $import): string
     {
-        $body = 'Import pemasok selesai. ' . number_format($import->successful_rows) . ' baris berhasil diimpor.';
+        $body = 'Import supplier selesai. ' . number_format($import->successful_rows) . ' baris berhasil diimpor.';
 
         if ($failedRowsCount = $import->getFailedRowsCount()) {
             $body .= ' ' . number_format($failedRowsCount) . ' baris gagal.';

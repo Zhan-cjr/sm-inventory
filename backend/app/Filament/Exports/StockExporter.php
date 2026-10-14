@@ -6,10 +6,16 @@ use App\Models\Stock;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
+use Illuminate\Database\Eloquent\Builder;
 
 class StockExporter extends Exporter
 {
     protected static ?string $model = Stock::class;
+
+    public static function modifyQuery(Builder $query): Builder
+    {
+        return $query->whereHas('product', fn ($q) => $q->where(fn ($sub) => $sub->where('product_type', '!=', 'digital')->orWhereNull('product_type')));
+    }
 
     public static function getColumns(): array
     {

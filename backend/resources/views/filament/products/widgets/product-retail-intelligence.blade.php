@@ -113,11 +113,11 @@
                             </span>
                             <div>
                                 <h4 style="font-size: 0.875rem; font-weight: 700; margin: 0; color: inherit;">Saran Tindakan Cerdas</h4>
-                                <p style="font-size: 0.75rem; margin: 0; color: #64748b;">Rekomendasi stok, mutasi & pesanan suplier</p>
+                                <p style="font-size: 0.75rem; margin: 0; color: #64748b;">Rekomendasi stok, mutasi & pesanan supplier</p>
                             </div>
                         </div>
                         <span style="font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 9999px; background: rgba(245, 158, 11, 0.1); color: #d97706;">
-                            Kesesuaian Suplier: {{ $otifScore }}%
+                            Kesesuaian Supplier: {{ $otifScore }}%
                         </span>
                     </div>
 

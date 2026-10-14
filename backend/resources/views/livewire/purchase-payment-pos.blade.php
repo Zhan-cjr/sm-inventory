@@ -169,9 +169,9 @@
                     <tr>
                         <td colspan="8" style="text-align: center; padding: 3rem; color: #6b7280; font-style: italic;" class="dark:text-gray-400">
                             @if($supplier_id)
-                                Hore! Tidak ada kontrabon yang belum lunas untuk pemasok ini.
+                                Hore! Tidak ada kontrabon yang belum lunas untuk supplier ini.
                             @else
-                                Silakan pilih Pemasok terlebih dahulu untuk melihat daftar kontrabon.
+                                Silakan pilih Supplier terlebih dahulu untuk melihat daftar kontrabon.
                             @endif
                         </td>
                     </tr>

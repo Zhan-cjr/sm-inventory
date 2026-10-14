@@ -66,7 +66,7 @@ class CreateStockOpnameSession extends CreateRecord
                 $itemsData = [];
                 $now = now();
                 foreach ($stocks as $stock) {
-                    if (!$stock->product || !$stock->product->is_active) continue;
+                    if (!$stock->product || !$stock->product->is_active || ($stock->product->product_type ?? 'physical') === 'digital') continue;
 
                     $itemsData[] = [
                         'id'              => Str::uuid()->toString(),
@@ -106,7 +106,7 @@ class CreateStockOpnameSession extends CreateRecord
                         ->get();
 
                     foreach ($stocks as $stock) {
-                        if (!$stock->product || !$stock->product->is_active) continue;
+                        if (!$stock->product || !$stock->product->is_active || ($stock->product->product_type ?? 'physical') === 'digital') continue;
 
                         StockOpnameItem::firstOrCreate(
                             [

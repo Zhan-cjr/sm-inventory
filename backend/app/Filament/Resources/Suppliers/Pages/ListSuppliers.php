@@ -25,7 +25,7 @@ class ListSuppliers extends ListRecords
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('success')
                 ->action(function () {
-                    $filename = 'Pemasok_' . now()->format('Y-m-d_His') . '.csv';
+                    $filename = 'Supplier_' . now()->format('Y-m-d_His') . '.csv';
 
                     return new StreamedResponse(function () {
                         $handle = fopen('php://output', 'w');
@@ -35,8 +35,8 @@ class ListSuppliers extends ListRecords
                         // Headers matching SupplierImporter columns for seamless round-trip
                         fputcsv($handle, [
                             'ID Organisasi',
-                            'Kode Pemasok',
-                            'Nama Pemasok',
+                            'Kode Supplier',
+                            'Nama Supplier',
                             'NPWP',
                             'Kontak Person',
                             'Telepon',

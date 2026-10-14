@@ -35,7 +35,7 @@ class ListingProduksTable
                     ->weight('bold'),
 
                 TextColumn::make('supplier.name')
-                    ->label('Pemasok')
+                    ->label('Supplier')
                     ->description(fn (ProductListing $record) => $record->supplier?->is_consignment ? 'Konsinyasi (Titip Jual)' : 'Beli Putus')
                     ->sortable()
                     ->searchable(),

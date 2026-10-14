@@ -72,7 +72,7 @@ class SuggestedOrders extends Page implements HasTable
                     ->sortable()
                     ->wrap(),
                 TextColumn::make('pemasok')
-                    ->label('Pemasok & Sub Divisi')
+                    ->label('Supplier & Sub Divisi')
                     ->state(function ($record) {
                         return $record->supplier?->name ?? $record->product?->supplier?->name ?? '-';
                     })
@@ -86,7 +86,7 @@ class SuggestedOrders extends Page implements HasTable
                             $parts[] = "Divisi: {$division}";
                         }
                         if (!empty($record->supplier_id)) {
-                            $parts[] = 'Pemasok Khusus Cabang';
+                            $parts[] = 'Supplier Khusus Cabang';
                         }
                         return !empty($parts) ? implode(' • ', $parts) : null;
                     })
@@ -164,15 +164,15 @@ class SuggestedOrders extends Page implements HasTable
                 \Filament\Tables\Filters\Filter::make('pemasok_filter')
                     ->form([
                         \Filament\Forms\Components\Select::make('supplier_id')
-                            ->label('Pemasok')
-                            ->placeholder('Semua Pemasok')
+                            ->label('Supplier')
+                            ->placeholder('Semua Supplier')
                             ->options(fn () => \App\Models\Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
                             ->searchable()
                             ->preload()
                             ->live()
                             ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null)),
                         \Filament\Forms\Components\Select::make('supplier_division_id')
-                            ->label('Sub Divisi Pemasok')
+                            ->label('Sub Divisi Supplier')
                             ->placeholder('Semua Sub Divisi')
                             ->options(function ($get) {
                                 $supplierId = $get('supplier_id');
@@ -212,7 +212,7 @@ class SuggestedOrders extends Page implements HasTable
                         if (!empty($data['supplier_id'])) {
                             $supplier = \App\Models\Supplier::find($data['supplier_id']);
                             if ($supplier) {
-                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Pemasok: ' . $supplier->name)
+                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Supplier: ' . $supplier->name)
                                     ->removeField('supplier_id');
                             }
                         }
@@ -328,7 +328,7 @@ class SuggestedOrders extends Page implements HasTable
                         }
 
                         \Filament\Notifications\Notification::make()
-                            ->title("{$createdPoCount} Draft Pesanan Pembelian berhasil dibuat berdasarkan Pemasok & Sub Divisi")
+                            ->title("{$createdPoCount} Draft Pesanan Pembelian berhasil dibuat berdasarkan Supplier & Sub Divisi")
                             ->success()
                             ->send();
 

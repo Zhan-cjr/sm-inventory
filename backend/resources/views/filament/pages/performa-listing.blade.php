@@ -558,7 +558,7 @@
                 >
                     @forelse($allListings as $item)
                         <option value="{{ $item->id }}" @selected($listing?->id === $item->id)>
-                            [{{ $item->listing_number }}] {{ $item->supplier?->name ?? 'Tanpa Pemasok' }} — {{ $item->status }} ({{ count($item->products) }} Produk, {{ count((array)$item->allowed_branch_ids) }} Cabang Pilot)
+                            [{{ $item->listing_number }}] {{ $item->supplier?->name ?? 'Tanpa Supplier' }} — {{ $item->status }} ({{ count($item->products) }} Produk, {{ count((array)$item->allowed_branch_ids) }} Cabang Pilot)
                         </option>
                     @empty
                         <option value="">Belum ada perjanjian listing</option>
@@ -640,7 +640,7 @@
                         </div>
 
                         <h2 class="pf-hero-title">
-                            {{ $listing->supplier?->name ?? 'Pemasok Tidak Diketahui' }}
+                            {{ $listing->supplier?->name ?? 'Supplier Tidak Diketahui' }}
                         </h2>
 
                         <div class="pf-hero-meta">
@@ -1173,11 +1173,11 @@
                                 <span class="pf-dl-dd" style="font-family: monospace;">{{ $listing->listing_number }}</span>
                             </div>
                             <div class="pf-dl-row">
-                                <span class="pf-dl-dt">Pemasok (Supplier)</span>
+                                <span class="pf-dl-dt">Supplier</span>
                                 <span class="pf-dl-dd">{{ $listing->supplier?->name ?? '-' }}</span>
                             </div>
                             <div class="pf-dl-row">
-                                <span class="pf-dl-dt">Divisi Pemasok</span>
+                                <span class="pf-dl-dt">Divisi Supplier</span>
                                 <span class="pf-dl-dd">{{ $listing->supplierDivision?->name ?? 'Semua Divisi' }}</span>
                             </div>
                             <div class="pf-dl-row">

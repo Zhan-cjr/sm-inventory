@@ -40,7 +40,7 @@ class PurchaseReturnForm
                             }
                         })
                     )
-                    ->label('Pemasok Utama')
+                    ->label('Supplier Utama')
                     ->searchable()
                     ->live()
                     ->afterStateUpdated(function ($set) { 
@@ -51,7 +51,7 @@ class PurchaseReturnForm
                     
                 Select::make('supplier_division_id')
                     ->label('Divisi / Sub-Supplier')
-                    ->placeholder('Pilih divisi pemasok (Opsional)')
+                    ->placeholder('Pilih divisi supplier (Opsional)')
                     ->options(function (Get $get) {
                         $supplierId = $get('supplier_id');
                         if (!$supplierId) {

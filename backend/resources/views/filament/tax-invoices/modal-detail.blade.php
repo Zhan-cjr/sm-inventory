@@ -150,7 +150,7 @@
             </span>
         </div>
         <div class="header-card">
-            <span class="header-card-label">Lawan Transaksi (Pemasok)</span>
+            <span class="header-card-label">Lawan Transaksi (Supplier)</span>
             <span class="header-card-value" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $record->nama_lawan }}">
                 {{ $record->nama_lawan ?: '-' }}
             </span>

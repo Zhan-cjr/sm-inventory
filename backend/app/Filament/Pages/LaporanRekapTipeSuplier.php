@@ -28,8 +28,8 @@ class LaporanRekapTipeSuplier extends Page implements HasTable
     use HasPageShield;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
-    protected static ?string $navigationLabel = 'Rekap Tipe Suplier';
-    protected static ?string $title = 'Laporan Rekap Transaksi Per Tipe Suplier';
+    protected static ?string $navigationLabel = 'Rekap Tipe Supplier';
+    protected static ?string $title = 'Laporan Rekap Transaksi Per Tipe Supplier';
     protected static string|\UnitEnum|null $navigationGroup = 'LAPORAN/ARSIP';
     protected static ?int $navigationSort = 16;
 

@@ -33,7 +33,7 @@ class PurchaseOrdersTable
                     ->searchable()
                     ->toggleable(),
                 TextColumn::make('supplier.name')
-                    ->label('Pemasok')
+                    ->label('Supplier')
                     ->searchable()
                     ->toggleable(),
                 TextColumn::make('po_number')

@@ -113,7 +113,7 @@ export const SuggestedOrdersFaqModal = ({ isOpen, onClose }) => {
               fontSize: '0.85rem'
             }}
           >
-            <strong>💡 Tips:</strong> Anda dapat mencentang beberapa produk dan klik &quot;Buat PO Terpilih&quot;. Sistem akan otomatis memecah draft PO sesuai Pemasok dan Sub Divisi masing-masing.
+            <strong>💡 Tips:</strong> Anda dapat mencentang beberapa produk dan klik &quot;Buat PO Terpilih&quot;. Sistem akan otomatis memecah draft PO sesuai Supplier dan Sub Divisi masing-masing.
           </div>
         </div>
 

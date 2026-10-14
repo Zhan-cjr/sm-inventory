@@ -218,7 +218,7 @@ class SuggestedStockTransfers extends Page implements HasTable
                     ->label('Cabang Pengirim (Donor/Surplus)')
                     ->options(fn () => Branch::where('is_active', true)->pluck('name', 'id')),
                 SelectFilter::make('supplier_id')
-                    ->label('Pemasok')
+                    ->label('Supplier')
                     ->options(fn () => Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
                     ->query(function (Builder $query, array $data) {
                         $supplierId = $data['value'] ?? null;

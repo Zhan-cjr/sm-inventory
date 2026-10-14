@@ -47,9 +47,11 @@ class ProductResource extends Resource
         $user = \Illuminate\Support\Facades\Auth::user();
 
         if ($user && $user->branch_id) {
-            // Batasi hanya produk yang terdaftar di cabang user
-            $query->whereHas('stocks', function ($q) use ($user) {
-                $q->where('branch_id', $user->branch_id);
+            // Batasi hanya produk yang terdaftar di cabang user ATAU produk digital (berlaku global untuk semua cabang)
+            $query->where(function ($q) use ($user) {
+                $q->whereHas('stocks', function ($sq) use ($user) {
+                    $sq->where('branch_id', $user->branch_id);
+                })->orWhere('product_type', 'digital');
             });
         }
 

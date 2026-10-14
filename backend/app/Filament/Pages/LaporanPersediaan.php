@@ -34,6 +34,7 @@ class LaporanPersediaan extends Page implements HasTable
         return $table
             ->query(
                 Stock::query()
+                    ->whereHas('product', fn ($q) => $q->where(fn ($sub) => $sub->where('product_type', '!=', 'digital')->orWhereNull('product_type')))
                     ->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id))
                     ->with(['branch', 'product', 'product.category'])
                     ->addSelect([
@@ -91,7 +92,10 @@ class LaporanPersediaan extends Page implements HasTable
                     ->hidden(fn () => Auth::user()->branch_id !== null),
                 SelectFilter::make('category_id')
                     ->label('Kategori')
-                    ->relationship('product.category', 'name', fn ($query) => $query->where('is_active', true)->orderBy('name')),
+                    ->relationship('product.category', 'name', fn ($query) => $query->where('is_active', true)
+                        ->whereHas('products', fn ($p) => $p->where(fn ($sub) => $sub->where('product_type', '!=', 'digital')->orWhereNull('product_type')))
+                        ->orderBy('name')
+                    ),
                 SelectFilter::make('stock_status')
                     ->label('Status Stok')
                     ->options([

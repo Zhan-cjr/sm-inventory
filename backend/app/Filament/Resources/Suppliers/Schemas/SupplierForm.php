@@ -35,11 +35,11 @@ class SupplierForm
                     })
                     ->unique(ignoreRecord: true),
                 TextInput::make('name')
-                    ->label('Nama Pemasok')
+                    ->label('Nama Supplier')
                     ->default(fn () => request()->query('name'))
                     ->required(),
                 TextInput::make('npwp')
-                    ->label('NPWP Pemasok')
+                    ->label('NPWP Supplier')
                     ->placeholder('Contoh: 01.300.553.3-092.000')
                     ->default(fn () => request()->query('npwp'))
                     ->maxLength(50),

@@ -29,7 +29,7 @@ class ProductForm
                 // 1. IDENTITAS & KLASIFIKASI DATA MASTER
                 // ========================================================
                 Section::make('Identitas & Klasifikasi Data Master')
-                    ->description('Kelola data pokok, barcode, kategori, dan suplier utama produk.')
+                    ->description('Kelola data pokok, barcode, kategori, dan supplier utama produk.')
                     ->schema([
                         FileUpload::make('image_path')
                             ->label('Foto Produk')
@@ -226,6 +226,7 @@ class ProductForm
                             ->helperText('Contoh: xld10 (Lihat daftar harga di Digiflazz atau AMA)')
                             ->disabled($isBranchUser),
                         Select::make('supplier_id')
+                            ->label('Supplier')
                             ->relationship(
                                 name: 'supplier', 
                                 titleAttribute: 'name', 
@@ -236,14 +237,15 @@ class ProductForm
                                     }
                                 })
                             )
+                            ->getOptionLabelFromRecordUsing(fn (\App\Models\Supplier $record) => $record->name . ($record->is_active ? '' : ' (Non-Aktif)'))
                             ->searchable()
                             ->preload()
                             ->live()
                             ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null))
                             ->disabled($isBranchUser),
                         Select::make('supplier_division_id')
-                            ->label('Sub Divisi Pemasok')
-                            ->placeholder('Tanpa Sub Divisi (Pemasok Global)')
+                            ->label('Sub Divisi Supplier')
+                            ->placeholder('Tanpa Sub Divisi (Supplier Global)')
                             ->options(function (callable $get) {
                                 $supplierId = $get('supplier_id');
                                 if (!$supplierId) {
@@ -286,14 +288,14 @@ class ProductForm
                             ->required()
                             ->numeric()
                             ->default(50)
-                            ->helperText('Saran jumlah pemesanan kembali ke pemasok')
+                            ->helperText('Saran jumlah pemesanan kembali ke supplier')
                             ->disabled($isBranchUser),
                         TextInput::make('lead_time_days')
-                            ->label('Lead Time Suplier (Hari)')
+                            ->label('Lead Time Supplier (Hari)')
                             ->required()
                             ->numeric()
                             ->default(5)
-                            ->helperText('Estimasi waktu suplier memproses dan mengirim barang')
+                            ->helperText('Estimasi waktu supplier memproses dan mengirim barang')
                             ->disabled($isBranchUser),
 
                         Placeholder::make('retail_intelligence_hub')

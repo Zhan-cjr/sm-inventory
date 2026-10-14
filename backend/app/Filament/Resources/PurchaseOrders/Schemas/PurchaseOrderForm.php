@@ -38,7 +38,7 @@ class PurchaseOrderForm
                             }
                         })
                     )
-                    ->label('Pemasok Utama')
+                    ->label('Supplier Utama')
                     ->required()
                     ->searchable()
                     ->preload()
@@ -55,7 +55,7 @@ class PurchaseOrderForm
                     }),
                 Select::make('supplier_division_id')
                     ->label('Divisi / Sub-Supplier')
-                    ->placeholder('Pilih divisi pemasok (Opsional)')
+                    ->placeholder('Pilih divisi supplier (Opsional)')
                     ->options(function (callable $get) {
                         $supplierId = $get('supplier_id');
                         if (!$supplierId) {

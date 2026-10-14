@@ -42,7 +42,7 @@ class QuickCreateProductAction
             })
             ->form([
                 Section::make('1. Header Default Batch')
-                    ->description('Pengaturan utama untuk kelompok barang yang akan ditambahkan (Pemasok, Cabang, Kategori & Tax Default)')
+                    ->description('Pengaturan utama untuk kelompok barang yang akan ditambahkan (Supplier, Cabang, Kategori & Tax Default)')
                     ->schema([
                         Grid::make(3)->schema([
                             Select::make('organization_id')
@@ -59,7 +59,7 @@ class QuickCreateProductAction
                                 ->searchable()
                                 ->helperText('Stok awal barang akan otomatis di-assign ke cabang ini.'),
                             Select::make('supplier_id')
-                                ->label('Pemasok (Supplier)')
+                                ->label('Supplier')
                                 ->options(Supplier::where('is_active', true)->pluck('name', 'id'))
                                 ->required()
                                 ->searchable()

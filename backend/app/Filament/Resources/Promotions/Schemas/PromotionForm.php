@@ -422,7 +422,7 @@ class PromotionForm
                 Section::make('Tanggungan Supplier (Promo Rafaksi / Klaim)')
                     ->schema([
                         Select::make('supplier_id')
-                            ->label('Pemasok / Supplier')
+                            ->label('Supplier')
                             ->relationship('supplier', 'name')
                             ->searchable()
                             ->preload()

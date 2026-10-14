@@ -17,7 +17,7 @@ class DivisionsRelationManager extends RelationManager
 {
     protected static string $relationship = 'divisions';
 
-    protected static ?string $title = 'Sub-Divisi Pemasok';
+    protected static ?string $title = 'Sub-Divisi Supplier';
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -75,7 +75,7 @@ class DivisionsRelationManager extends RelationManager
             ->headerActions([
                 CreateAction::make()
                     ->label('Tambah Sub-Divisi')
-                    ->modalHeading('Tambah Sub-Divisi Pemasok')
+                    ->modalHeading('Tambah Sub-Divisi Supplier')
                     ->modalWidth('lg'),
             ])
             ->recordActions([

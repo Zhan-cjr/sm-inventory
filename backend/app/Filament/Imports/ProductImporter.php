@@ -126,7 +126,7 @@ class ProductImporter extends Importer
 
             // Set null dulu agar tidak melanggar FK; UUID-nya diset di beforeSave()
             ImportColumn::make('supplier_id')
-                ->label('Pemasok (ID/Kode/Nama)')
+                ->label('Supplier (ID/Kode/Nama)')
                 ->example('PT Indofood')
                 ->fillRecordUsing(function (Product $record): void {
                     $record->supplier_id = null;

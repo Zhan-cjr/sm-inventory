@@ -42,7 +42,7 @@
         <strong>💡 Tips Operasional:</strong>
         <ul class="list-disc pl-5 mt-1 space-y-1">
             <li>Gunakan tombol <strong>"Segarkan Data AI"</strong> di pojok kanan atas kapan saja Anda ingin menghitung ulang data terbaru.</li>
-            <li>Anda dapat mencentang beberapa produk dan klik <strong>"Buat PO Terpilih"</strong>. Sistem akan otomatis memecah draft PO sesuai Pemasok dan Sub Divisi masing-masing.</li>
+            <li>Anda dapat mencentang beberapa produk dan klik <strong>"Buat PO Terpilih"</strong>. Sistem akan otomatis memecah draft PO sesuai Supplier dan Sub Divisi masing-masing.</li>
         </ul>
     </div>
 </div>

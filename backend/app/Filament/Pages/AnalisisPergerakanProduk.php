@@ -127,7 +127,7 @@ class AnalisisPergerakanProduk extends Page
     {
         $product = Product::with('supplier')->find($productId);
         if (!$product || !$product->supplier_id) {
-            Notification::make()->title('Produk belum terhubung dengan Pemasok')->warning()->send();
+            Notification::make()->title('Produk belum terhubung dengan Supplier')->warning()->send();
             return null;
         }
 

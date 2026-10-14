@@ -51,7 +51,7 @@ class SuppliersTable
             ])
             ->filters([
                 TernaryFilter::make('is_active')
-                    ->label('Status Pemasok')
+                    ->label('Status Supplier')
                     ->placeholder('Semua')
                     ->trueLabel('Aktif')
                     ->falseLabel('Non-Aktif')

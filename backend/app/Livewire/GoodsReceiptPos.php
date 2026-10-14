@@ -550,13 +550,13 @@ class GoodsReceiptPos extends Component
         }
 
         if (empty($this->supplier_id)) {
-            Notification::make()->title('Pilih Pemasok terlebih dahulu.')->warning()->send();
+            Notification::make()->title('Pilih Supplier terlebih dahulu.')->warning()->send();
             return;
         }
 
         if ($this->gr_requires_po && empty($this->purchase_order_id)) {
             if (!$this->hasPoBypassAuthorization()) {
-                Notification::make()->title('Penerimaan barang wajib dengan PO untuk Pemasok ini.')->warning()->send();
+                Notification::make()->title('Penerimaan barang wajib dengan PO untuk Supplier ini.')->warning()->send();
                 return;
             }
         }

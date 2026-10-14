@@ -41,7 +41,7 @@ class PurchasePaymentResource extends Resource
                             ->disabled(),
                         \Filament\Forms\Components\Select::make('supplier_id')
                             ->relationship('supplier', 'name')
-                            ->label('Pemasok')
+                            ->label('Supplier')
                             ->disabled(),
                         \Filament\Forms\Components\TextInput::make('payment_method')
                             ->label('Metode Bayar')
@@ -63,7 +63,7 @@ class PurchasePaymentResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('payment_number')->label('No. Pembayaran')->searchable(),
                 Tables\Columns\TextColumn::make('payment_date')->label('Tanggal')->date()->sortable(),
-                Tables\Columns\TextColumn::make('supplier.name')->label('Pemasok')->searchable(),
+                Tables\Columns\TextColumn::make('supplier.name')->label('Supplier')->searchable(),
                 Tables\Columns\TextColumn::make('total_amount')->label('Total Bayar')->money('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('status')->badge()->color('success'),
             ])

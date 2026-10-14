@@ -33,7 +33,7 @@ class GoodsReceiptsTable
                     ->placeholder('- Tanpa PO -')
                     ->searchable(),
                 TextColumn::make('supplier.name')
-                    ->label('Pemasok')
+                    ->label('Supplier')
                     ->searchable(),
                 TextColumn::make('branch.name')
                     ->label('Cabang')

@@ -21,8 +21,8 @@ class SupplierDeductionResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
     protected static \UnitEnum|string|null $navigationGroup = 'KEUANGAN';
     protected static ?string $navigationLabel = 'Klaim & Potongan';
-    protected static ?string $pluralModelLabel = 'Klaim & Potongan Pemasok';
-    protected static ?string $modelLabel = 'Potongan Pemasok';
+    protected static ?string $pluralModelLabel = 'Klaim & Potongan Supplier';
+    protected static ?string $modelLabel = 'Potongan Supplier';
     protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema

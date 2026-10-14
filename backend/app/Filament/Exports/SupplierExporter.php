@@ -22,9 +22,9 @@ class SupplierExporter extends Exporter
             ExportColumn::make('organization.code')
                 ->label('Kode Organisasi'),
             ExportColumn::make('code')
-                ->label('Kode Pemasok'),
+                ->label('Kode Supplier'),
             ExportColumn::make('name')
-                ->label('Nama Pemasok'),
+                ->label('Nama Supplier'),
             ExportColumn::make('npwp')
                 ->label('NPWP'),
             ExportColumn::make('contact_person')
@@ -54,7 +54,7 @@ class SupplierExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Ekspor data pemasok telah selesai. ' . Number::format($export->successful_rows) . ' baris berhasil diekspor.';
+        $body = 'Ekspor data supplier telah selesai. ' . Number::format($export->successful_rows) . ' baris berhasil diekspor.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
             $body .= ' ' . Number::format($failedRowsCount) . ' baris gagal diekspor.';

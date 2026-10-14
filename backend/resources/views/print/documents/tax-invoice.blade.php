@@ -170,13 +170,13 @@
 
     // Penjual (Seller)
     $namaPenjual = $isMasukan 
-        ? ($supplier?->name ?: ($doc->nama_lawan ?: 'PEMASOK')) 
+        ? ($supplier?->name ?: ($doc->nama_lawan ?: 'SUPPLIER')) 
         : ($doc->organization?->name ?? 'PERUSAHAAN');
     $npwpPenjual = $isMasukan 
         ? ($supplier?->npwp ?: ($doc->npwp_lawan ?: '-')) 
         : ($doc->organization?->code ?? '-');
     $alamatPenjual = $isMasukan 
-        ? ($supplier?->address ?: 'Alamat belum diatur pada Master Pemasok') 
+        ? ($supplier?->address ?: 'Alamat belum diatur pada Master Supplier') 
         : $alamatOrganisasi;
 
     // Pembeli (Buyer)

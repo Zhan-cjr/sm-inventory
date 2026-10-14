@@ -102,11 +102,11 @@ class TaxInvoiceForm
 
                                         Notification::make()
                                             ->title('e-Faktur Berhasil Dimuat')
-                                            ->body("Status: {$statusApproval}. Pemasok terhubung: {$supplier->name}")
+                                            ->body("Status: {$statusApproval}. Supplier terhubung: {$supplier->name}")
                                             ->success()
                                             ->send();
                                     } else {
-                                        $displayName = !empty($h['nama_penjual']) ? $h['nama_penjual'] : ('Pemasok NPWP ' . $h['npwp_penjual']);
+                                        $displayName = !empty($h['nama_penjual']) ? $h['nama_penjual'] : ('Supplier NPWP ' . $h['npwp_penjual']);
                                         $createSupplierUrl = SupplierResource::getUrl('create') . '?' . http_build_query([
                                             'name' => $displayName,
                                             'npwp' => $h['npwp_penjual'],
@@ -114,13 +114,13 @@ class TaxInvoiceForm
                                         ]);
 
                                         Notification::make()
-                                            ->title('Pemasok Belum Terdaftar')
-                                            ->body("Faktur valid dengan NPWP '{$h['npwp_penjual']}', namun pemasok belum ada di data master.")
+                                            ->title('Supplier Belum Terdaftar')
+                                            ->body("Faktur valid dengan NPWP '{$h['npwp_penjual']}', namun supplier belum ada di data master.")
                                             ->warning()
                                             ->persistent()
                                             ->actions([
                                                 \Filament\Notifications\Actions\Action::make('register_supplier')
-                                                    ->label('Daftarkan Pemasok')
+                                                    ->label('Daftarkan Supplier')
                                                     ->button()
                                                     ->color('primary')
                                                     ->url($createSupplierUrl)

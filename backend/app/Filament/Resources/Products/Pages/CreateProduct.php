@@ -26,8 +26,8 @@ class CreateProduct extends CreateRecord
     {
         $user = auth()->user();
         
-        // Jika pembuat produk adalah user cabang, otomatis daftarkan produk di cabangnya
-        if ($user && $user->branch_id) {
+        // Jika pembuat produk adalah user cabang dan tipe produk fisik, otomatis daftarkan produk di cabangnya
+        if ($user && $user->branch_id && ($this->record->product_type ?? 'physical') !== 'digital') {
             \App\Models\Stock::updateOrCreate(
                 [
                     'branch_id' => $user->branch_id,

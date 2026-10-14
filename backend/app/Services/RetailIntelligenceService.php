@@ -431,8 +431,8 @@ class RetailIntelligenceService
             $poQty = (int) $poLatest->quantity_ordered;
             $prescriptiveActions[] = [
                 "type" => "info",
-                "title" => "🚚 Barang Sedang Dalam Pengiriman Suplier",
-                "message" => "Pesanan #{$poNumber} sebanyak {$poQty} {$unit} sedang dalam proses kirim dari suplier. Anda tidak perlu membuat pesanan ganda.",
+                "title" => "🚚 Barang Sedang Dalam Pengiriman Supplier",
+                "message" => "Pesanan #{$poNumber} sebanyak {$poQty} {$unit} sedang dalam proses kirim dari supplier. Anda tidak perlu membuat pesanan ganda.",
                 "action_label" => "Lihat Surat Pesanan / Terima Barang",
                 "action_url" => route("filament.admin.resources.purchase-orders.edit", ["record" => $poLatest->purchase_order_id]),
             ];
@@ -450,7 +450,7 @@ class RetailIntelligenceService
             $prescriptiveActions[] = [
                 "type" => "danger",
                 "title" => "🚨 Stok Habis (Potensi Kehilangan Penjualan di {$branchLabel})",
-                "message" => "Barang ini aktif terjual (~{$dailyAvg} {$unit}/hari) namun stok fisik habis! Segera buat pesanan ke suplier agar toko tidak kehilangan omset.",
+                "message" => "Barang ini aktif terjual (~{$dailyAvg} {$unit}/hari) namun stok fisik habis! Segera buat pesanan ke supplier agar toko tidak kehilangan omset.",
                 "action_label" => "Buat Draft Pesanan Pembelian (PO)",
                 "action_url" => route("filament.admin.resources.purchase-orders.create") . "?supplier_id={$product->supplier_id}" . ($branchId ? "&branch_id={$branchId}" : ""),
             ];
@@ -459,7 +459,7 @@ class RetailIntelligenceService
             $prescriptiveActions[] = [
                 "type" => "warning",
                 "title" => "⚠️ Stok Menipis di {$branchLabel} (Waktunya Pesan Ulang)",
-                "message" => "Sisa stok ({$qoh} {$unit}) diperkirakan hanya cukup untuk ~{$doh} hari, sedangkan pengiriman suplier butuh waktu {$leadTime} hari. Disarankan segera memesan ulang.",
+                "message" => "Sisa stok ({$qoh} {$unit}) diperkirakan hanya cukup untuk ~{$doh} hari, sedangkan pengiriman supplier butuh waktu {$leadTime} hari. Disarankan segera memesan ulang.",
                 "action_label" => "Buat Draft Pesanan Pembelian (PO)",
                 "action_url" => route("filament.admin.resources.purchase-orders.create") . "?supplier_id={$product->supplier_id}" . ($branchId ? "&branch_id={$branchId}" : ""),
             ];
@@ -468,7 +468,7 @@ class RetailIntelligenceService
             $prescriptiveActions[] = [
                 "type" => "warning",
                 "title" => "⚠️ Barang Macet di {$branchLabel} (Modal Mengendap)",
-                "message" => "Ada {$qoh} {$unit} (Nilai modal: Rp " . number_format($invValue, 0, ",", ".") . ") belum terjual dalam 30 hari terakhir. Disarankan retur ke suplier atau buat promo tebus murah.",
+                "message" => "Ada {$qoh} {$unit} (Nilai modal: Rp " . number_format($invValue, 0, ",", ".") . ") belum terjual dalam 30 hari terakhir. Disarankan retur ke supplier atau buat promo tebus murah.",
                 "action_label" => null,
                 "action_url" => null,
             ];
@@ -477,7 +477,7 @@ class RetailIntelligenceService
             $prescriptiveActions[] = [
                 "type" => "success",
                 "title" => "🟢 Persediaan Stok {$branchLabel} Sangat Aman",
-                "message" => "Sisa stok ({$qoh} {$unit}) diperkirakan mencukupi untuk ~{$doh} hari ke depan. Belum diperlukan pemesanan ulang ke suplier.",
+                "message" => "Sisa stok ({$qoh} {$unit}) diperkirakan mencukupi untuk ~{$doh} hari ke depan. Belum diperlukan pemesanan ulang ke supplier.",
                 "action_label" => null,
                 "action_url" => null,
             ];

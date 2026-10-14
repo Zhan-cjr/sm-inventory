@@ -126,7 +126,14 @@ class ProductsTable
                     ->sortable(),
                 TextColumn::make('stocks_sum_quantity_on_hand')
                     ->label('Stok')
-                    ->formatStateUsing(fn ($state) => (float) $state)
+                    ->formatStateUsing(function ($state, \App\Models\Product $record) {
+                        if ($record->product_type === 'digital') {
+                            return 'Digital';
+                        }
+                        return (float) $state;
+                    })
+                    ->badge(fn (\App\Models\Product $record) => $record->product_type === 'digital')
+                    ->color(fn (\App\Models\Product $record) => $record->product_type === 'digital' ? 'info' : null)
                     ->sortable()
                     ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()),
                 TextColumn::make('stocks.racks.rack_code')
@@ -154,7 +161,7 @@ class ProductsTable
                     ->visible(fn (\Filament\Tables\Contracts\HasTable $livewire) => static::resolveActiveBranchId($livewire) !== null)
                     ->toggleable(),
                 TextColumn::make('supplier.name')
-                    ->label('Pemasok')
+                    ->label('Supplier')
                     ->sortable()
                     ->toggleable(),
                 TextColumn::make('supplierDivision.name')
@@ -262,15 +269,15 @@ class ProductsTable
                 \Filament\Tables\Filters\Filter::make('supplier')
                     ->form([
                         \Filament\Forms\Components\Select::make('supplier_id')
-                            ->label('Pemasok')
-                            ->placeholder('Semua Pemasok')
+                            ->label('Supplier')
+                            ->placeholder('Semua Supplier')
                             ->options(fn () => \App\Models\Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
                             ->searchable()
                             ->preload()
                             ->live()
                             ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null)),
                         \Filament\Forms\Components\Select::make('supplier_division_id')
-                            ->label('Sub Divisi Pemasok')
+                            ->label('Sub Divisi Supplier')
                             ->placeholder('Semua Sub Divisi')
                             ->options(function ($get) {
                                 $supplierId = $get('supplier_id');
@@ -300,7 +307,7 @@ class ProductsTable
                         if (!empty($data['supplier_id'])) {
                             $supplier = \App\Models\Supplier::find($data['supplier_id']);
                             if ($supplier) {
-                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Pemasok: ' . $supplier->name)
+                                $indicators[] = \Filament\Tables\Filters\Indicator::make('Supplier: ' . $supplier->name)
                                     ->removeField('supplier_id');
                             }
                         }

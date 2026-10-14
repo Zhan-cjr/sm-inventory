@@ -30,7 +30,7 @@ class ListingProdukForm
         return $schema
             ->components([
                 Section::make('Perjanjian Listing Produk')
-                    ->description('Data kesepakatan kerjasama listing produk baru dari pemasok')
+                    ->description('Data kesepakatan kerjasama listing produk baru dari supplier')
                     ->columns(3)
                     ->schema([
                         Hidden::make('organization_id')
@@ -44,7 +44,7 @@ class ListingProdukForm
                             ->helperText('Nomor unik perjanjian listing (otomatis)'),
 
                         Select::make('supplier_id')
-                            ->label('Pemasok (Supplier)')
+                            ->label('Supplier')
                             ->relationship('supplier', 'name', fn ($query) => $query->where('is_active', true))
                             ->required()
                             ->searchable()
@@ -53,7 +53,7 @@ class ListingProdukForm
                             ->afterStateUpdated(fn (callable $set) => $set('supplier_division_id', null)),
 
                         Select::make('supplier_division_id')
-                            ->label('Sub Divisi Pemasok (Opsional)')
+                            ->label('Sub Divisi Supplier (Opsional)')
                             ->placeholder('Tanpa Sub Divisi')
                             ->options(function (callable $get) {
                                 $supplierId = $get('supplier_id');
@@ -64,10 +64,10 @@ class ListingProdukForm
                             ->disabled(fn (callable $get) => blank($get('supplier_id'))),
 
                         Placeholder::make('supplier_type_info')
-                            ->label('Tipe Kerjasama Pemasok')
+                            ->label('Tipe Kerjasama Supplier')
                             ->content(function (callable $get) {
                                 $supplierId = $get('supplier_id');
-                                if (!$supplierId) return 'Pilih pemasok terlebih dahulu';
+                                if (!$supplierId) return 'Pilih supplier terlebih dahulu';
                                 $supplier = Supplier::find($supplierId);
                                 if (!$supplier) return '-';
                                 return $supplier->is_consignment 
@@ -83,8 +83,8 @@ class ListingProdukForm
                             ->live(),
 
                         Toggle::make('create_deduction_claim')
-                            ->label('Otomatis Potong Tagihan Kontrabon Pemasok')
-                            ->helperText('Jika aktif, total listing fee otomatis dicatat sebagai potongan terbuka pada pembayaran kontrabon pemasok ini.')
+                            ->label('Otomatis Potong Tagihan Kontrabon Supplier')
+                            ->helperText('Jika aktif, total listing fee otomatis dicatat sebagai potongan terbuka pada pembayaran kontrabon supplier ini.')
                             ->default(true)
                             ->visible(fn (callable $get) => ((float) str_replace(',', '.', str_replace('.', '', (string)$get('listing_fee')))) > 0)
                             ->dehydrated(false),
@@ -121,7 +121,7 @@ class ListingProdukForm
 
                         Textarea::make('notes')
                             ->label('Catatan Kesepakatan / Target Penjualan')
-                            ->placeholder('Contoh: Target penjualan minimal 2 pcs/toko/hari. Jika dalam 3 bulan tidak memenuhi target, sisa stok diretur 100% ke pemasok.')
+                            ->placeholder('Contoh: Target penjualan minimal 2 pcs/toko/hari. Jika dalam 3 bulan tidak memenuhi target, sisa stok diretur 100% ke supplier.')
                             ->columnSpanFull()
                             ->rows(2),
                     ]),

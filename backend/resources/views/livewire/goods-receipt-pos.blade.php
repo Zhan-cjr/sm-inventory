@@ -207,7 +207,7 @@
                     </tr>
                     <tr x-show="$wire.payment_method === 'tempo'">
                         <td class="pos-label">Jatuh Tempo</td>
-                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="due_date" placeholder="Otomatis dari Pemasok"></td>
+                        <td><input onfocus="this.select()" type="date" class="pos-input" wire:model="due_date" placeholder="Otomatis dari Supplier"></td>
                     </tr>
                     <tr>
                         <td class="pos-label">Pilih PO (Opsional)</td>
@@ -289,10 +289,10 @@
 
             <!-- Supplier Panel -->
             <div>
-                <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem;" class="text-gray-900 dark:text-gray-200">Detail Pemasok</div>
+                <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem;" class="text-gray-900 dark:text-gray-200">Detail Supplier</div>
                 <table style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
                     <tr>
-                        <td style="width: 30%;" class="pos-label">Pemasok</td>
+                        <td style="width: 30%;" class="pos-label">Supplier</td>
                         <td>
                             <div x-data="{ 
                                 open: false, 
@@ -433,14 +433,14 @@
                     $searchDisabledReason = 'Pilih Lokasi Cabang terlebih dahulu.';
                 } elseif (empty($supplier_id)) {
                     $isSearchDisabled = true;
-                    $searchDisabledReason = 'Pilih Pemasok terlebih dahulu.';
+                    $searchDisabledReason = 'Pilih Supplier terlebih dahulu.';
                 } else {
                     $currentUser = auth()->user() ?? \Filament\Facades\Filament::auth()->user();
                     $canBypassPo = $currentUser ? $currentUser->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED') : false;
                     if ($gr_requires_po && empty($purchase_order_id)) {
                         if (!$canBypassPo) {
                             $isSearchDisabled = true;
-                            $searchDisabledReason = 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';
+                            $searchDisabledReason = 'Penerimaan barang wajib dengan PO untuk Supplier ini.';
                         }
                     }
                 }

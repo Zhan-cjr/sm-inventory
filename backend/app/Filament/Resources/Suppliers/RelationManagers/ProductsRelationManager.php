@@ -78,7 +78,7 @@ class ProductsRelationManager extends RelationManager
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('scope')
-                    ->label('Lingkup Pemasok')
+                    ->label('Lingkup Supplier')
                     ->state(function ($record) use ($currentSupplierId, $userBranchId) {
                         if ($userBranchId) {
                             $branchStock = $record->stocks->firstWhere('branch_id', $userBranchId);
@@ -166,10 +166,10 @@ class ProductsRelationManager extends RelationManager
 
                         if (!$isBranchUser) {
                             $fields[] = Forms\Components\Radio::make('scope_type')
-                                ->label('Cakupan Pemasok')
+                                ->label('Cakupan Supplier')
                                 ->options([
-                                    'branch' => 'Pemasok Khusus Cabang Tertentu',
-                                    'global' => 'Pemasok Utama (Semua Cabang)',
+                                    'branch' => 'Supplier Khusus Cabang Tertentu',
+                                    'global' => 'Supplier Utama (Semua Cabang)',
                                 ])
                                 ->default(fn ($livewire) => !empty($livewire->tableFilters['branch_id']['value']) ? 'branch' : 'global')
                                 ->live();
@@ -184,7 +184,7 @@ class ProductsRelationManager extends RelationManager
                             $branchName = $user->branch?->name ?? 'Cabang Anda';
                             $fields[] = Forms\Components\Placeholder::make('info')
                                 ->label('Cakupan')
-                                ->content("Menambahkan barang sebagai Pemasok Khusus untuk {$branchName}");
+                                ->content("Menambahkan barang sebagai Supplier Khusus untuk {$branchName}");
 
                             $fields[] = Forms\Components\Hidden::make('scope_type')
                                 ->default('branch');
@@ -208,7 +208,7 @@ class ProductsRelationManager extends RelationManager
 
                         $fields[] = Forms\Components\Select::make('supplier_division_id')
                             ->label('Tetapkan Sub Divisi')
-                            ->placeholder('Tanpa Sub Divisi (Pemasok Global)')
+                            ->placeholder('Tanpa Sub Divisi (Supplier Global)')
                             ->options(function ($livewire) {
                                 $currentSupplierId = $livewire->getOwnerRecord()->id;
                                 return \App\Models\SupplierDivision::where('supplier_id', $currentSupplierId)
@@ -234,7 +234,7 @@ class ProductsRelationManager extends RelationManager
                                 );
                             }
                             \Filament\Notifications\Notification::make()
-                                ->title('Berhasil menetapkan barang ke pemasok khusus cabang')
+                                ->title('Berhasil menetapkan barang ke supplier khusus cabang')
                                 ->success()
                                 ->send();
                         } else {
@@ -244,7 +244,7 @@ class ProductsRelationManager extends RelationManager
                                     'supplier_division_id' => $data['supplier_division_id'] ?? null,
                                 ]);
                             \Filament\Notifications\Notification::make()
-                                ->title('Berhasil menambahkan barang sebagai pemasok utama')
+                                ->title('Berhasil menambahkan barang sebagai supplier utama')
                                 ->success()
                                 ->send();
                         }
@@ -252,7 +252,7 @@ class ProductsRelationManager extends RelationManager
             ])
             ->actions([
                 Action::make('pindah_pemasok')
-                    ->label('Pindah Pemasok / Sub Divisi')
+                    ->label('Pindah Supplier / Sub Divisi')
                     ->icon('heroicon-o-arrow-path-rounded-square')
                     ->color('warning')
                     ->fillForm(function ($record, $livewire) {
@@ -279,11 +279,11 @@ class ProductsRelationManager extends RelationManager
                             
                             $scopeOptions = [
                                 'branch' => 'Khusus Cabang Tertentu',
-                                'global' => 'Pemasok Utama (Semua Cabang)',
+                                'global' => 'Supplier Utama (Semua Cabang)',
                             ];
 
                             if ($hasOverrides) {
-                                $scopeOptions['revert_to_global'] = 'Kembalikan ke Pemasok Utama Produk (Hapus Override Cabang)';
+                                $scopeOptions['revert_to_global'] = 'Kembalikan ke Supplier Utama Produk (Hapus Override Cabang)';
                             }
 
                             $fields[] = Forms\Components\Radio::make('scope_type')
@@ -307,10 +307,10 @@ class ProductsRelationManager extends RelationManager
                             $isOverriddenInBranch = ($branchStock && $branchStock->supplier_id === $currentSupplierId);
 
                             $scopeOptions = [
-                                'branch' => "Pemasok Khusus {$branchName}",
+                                'branch' => "Supplier Khusus {$branchName}",
                             ];
                             if ($isOverriddenInBranch) {
-                                $scopeOptions['revert_to_global'] = 'Kembalikan ke Pemasok Utama Produk (Hapus Khusus Cabang)';
+                                $scopeOptions['revert_to_global'] = 'Kembalikan ke Supplier Utama Produk (Hapus Khusus Cabang)';
                             }
 
                             $fields[] = Forms\Components\Radio::make('scope_type')
@@ -325,7 +325,7 @@ class ProductsRelationManager extends RelationManager
                         }
 
                         $fields[] = Forms\Components\Select::make('new_supplier_id')
-                            ->label('Pilih Pemasok Tujuan')
+                            ->label('Pilih Supplier Tujuan')
                             ->options(function () use ($currentSupplierId) {
                                 return \App\Models\Supplier::where('is_active', true)
                                     ->where('id', '!=', $currentSupplierId)
@@ -339,7 +339,7 @@ class ProductsRelationManager extends RelationManager
 
                         $fields[] = Forms\Components\Select::make('new_supplier_division_id')
                             ->label('Pilih Sub Divisi Tujuan')
-                            ->placeholder('Tanpa Sub Divisi (Pemasok Global)')
+                            ->placeholder('Tanpa Sub Divisi (Supplier Global)')
                             ->options(function (callable $get) {
                                 $supplierId = $get('new_supplier_id');
                                 if (!$supplierId) return [];
@@ -364,7 +364,7 @@ class ProductsRelationManager extends RelationManager
                                 ]);
 
                             \Filament\Notifications\Notification::make()
-                                ->title('Berhasil mengembalikan barang mengikuti Pemasok Utama produk')
+                                ->title('Berhasil mengembalikan barang mengikuti Supplier Utama produk')
                                 ->success()
                                 ->send();
                             return;
@@ -381,7 +381,7 @@ class ProductsRelationManager extends RelationManager
                             );
 
                             \Filament\Notifications\Notification::make()
-                                ->title('Berhasil memindahkan pemasok khusus cabang')
+                                ->title('Berhasil memindahkan supplier khusus cabang')
                                 ->success()
                                 ->send();
                             return;
@@ -394,7 +394,7 @@ class ProductsRelationManager extends RelationManager
                         ]);
 
                         \Filament\Notifications\Notification::make()
-                            ->title('Berhasil memindahkan Pemasok Utama (Semua Cabang)')
+                            ->title('Berhasil memindahkan Supplier Utama (Semua Cabang)')
                             ->success()
                             ->send();
                     }),
@@ -402,7 +402,7 @@ class ProductsRelationManager extends RelationManager
             ->bulkActions([
                 BulkActionGroup::make([
                     BulkAction::make('pindah_pemasok_bulk')
-                        ->label('Pindah Pemasok / Sub Divisi (Terpilih)')
+                        ->label('Pindah Supplier / Sub Divisi (Terpilih)')
                         ->icon('heroicon-o-arrow-path-rounded-square')
                         ->color('warning')
                         ->fillForm(function ($livewire) {
@@ -425,8 +425,8 @@ class ProductsRelationManager extends RelationManager
                                     ->label('Cakupan Pemindahan')
                                     ->options([
                                         'branch' => 'Khusus Cabang Tertentu',
-                                        'global' => 'Pemasok Utama (Semua Cabang)',
-                                        'revert_to_global' => 'Kembalikan ke Pemasok Utama Produk (Hapus Override Cabang)',
+                                        'global' => 'Supplier Utama (Semua Cabang)',
+                                        'revert_to_global' => 'Kembalikan ke Supplier Utama Produk (Hapus Override Cabang)',
                                     ])
                                     ->default(fn ($livewire) => !empty($livewire->tableFilters['branch_id']['value']) ? 'branch' : 'global')
                                     ->live()
@@ -444,8 +444,8 @@ class ProductsRelationManager extends RelationManager
                                 $fields[] = Forms\Components\Radio::make('scope_type')
                                     ->label('Tindakan')
                                     ->options([
-                                        'branch' => "Pemasok Khusus {$branchName}",
-                                        'revert_to_global' => 'Kembalikan ke Pemasok Utama Produk (Hapus Khusus Cabang)',
+                                        'branch' => "Supplier Khusus {$branchName}",
+                                        'revert_to_global' => 'Kembalikan ke Supplier Utama Produk (Hapus Khusus Cabang)',
                                     ])
                                     ->default('branch')
                                     ->live()
@@ -456,7 +456,7 @@ class ProductsRelationManager extends RelationManager
                             }
 
                             $fields[] = Forms\Components\Select::make('new_supplier_id')
-                                ->label('Pilih Pemasok Tujuan')
+                                ->label('Pilih Supplier Tujuan')
                                 ->options(function () use ($currentSupplierId) {
                                     return \App\Models\Supplier::where('is_active', true)
                                         ->where('id', '!=', $currentSupplierId)
@@ -470,7 +470,7 @@ class ProductsRelationManager extends RelationManager
 
                             $fields[] = Forms\Components\Select::make('new_supplier_division_id')
                                 ->label('Pilih Sub Divisi Tujuan')
-                                ->placeholder('Tanpa Sub Divisi (Pemasok Global)')
+                                ->placeholder('Tanpa Sub Divisi (Supplier Global)')
                                 ->options(function (callable $get) {
                                     $supplierId = $get('new_supplier_id');
                                     if (!$supplierId) return [];
@@ -495,7 +495,7 @@ class ProductsRelationManager extends RelationManager
                                         ]);
                                 }
                                 \Filament\Notifications\Notification::make()
-                                    ->title('Berhasil mengembalikan barang terpilih ke Pemasok Utama')
+                                    ->title('Berhasil mengembalikan barang terpilih ke Supplier Utama')
                                     ->success()
                                     ->send();
                                 return;
@@ -512,7 +512,7 @@ class ProductsRelationManager extends RelationManager
                                     );
                                 }
                                 \Filament\Notifications\Notification::make()
-                                    ->title('Berhasil memindahkan pemasok khusus cabang untuk barang terpilih')
+                                    ->title('Berhasil memindahkan supplier khusus cabang untuk barang terpilih')
                                     ->success()
                                     ->send();
                                 return;
@@ -526,7 +526,7 @@ class ProductsRelationManager extends RelationManager
                                 ]);
                             }
                             \Filament\Notifications\Notification::make()
-                                ->title('Berhasil memindahkan Pemasok Utama untuk barang terpilih')
+                                ->title('Berhasil memindahkan Supplier Utama untuk barang terpilih')
                                 ->success()
                                 ->send();
                         }),

@@ -65,12 +65,12 @@ class ItemsRelationManager extends RelationManager
                     ->helperText(function (\Livewire\Component $livewire) {
                         $ownerRecord = $livewire->ownerRecord;
                         if (! $ownerRecord || empty($ownerRecord->supplier_id)) {
-                            return 'Pilih Pemasok terlebih dahulu di form utama.';
+                            return 'Pilih Supplier terlebih dahulu di form utama.';
                         }
                         if ($ownerRecord->supplier && $ownerRecord->supplier->gr_requires_po) {
                             if (empty($ownerRecord->purchase_order_id)) {
                                 if (!auth()->user()->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED')) {
-                                    return 'Penerimaan barang wajib dengan PO untuk Pemasok ini.';
+                                    return 'Penerimaan barang wajib dengan PO untuk Supplier ini.';
                                 }
                             }
                         }
@@ -159,8 +159,8 @@ class ItemsRelationManager extends RelationManager
                         if (! $ownerRecord || empty($ownerRecord->supplier_id)) {
                             \Filament\Notifications\Notification::make()
                                 ->warning()
-                                ->title('Pemasok Belum Dipilih')
-                                ->body('Harap lengkapi form Pemasok terlebih dahulu sebelum menambahkan barang.')
+                                ->title('Supplier Belum Dipilih')
+                                ->body('Harap lengkapi form Supplier terlebih dahulu sebelum menambahkan barang.')
                                 ->send();
                         } elseif ($ownerRecord->supplier && $ownerRecord->supplier->gr_requires_po) {
                             if (empty($ownerRecord->purchase_order_id)) {
@@ -168,7 +168,7 @@ class ItemsRelationManager extends RelationManager
                                     \Filament\Notifications\Notification::make()
                                         ->warning()
                                         ->title('Penerimaan barang wajib dengan PO')
-                                        ->body('Pemasok ini diatur wajib menggunakan Purchase Order.')
+                                        ->body('Supplier ini diatur wajib menggunakan Purchase Order.')
                                         ->send();
                                     $action->halt();
                                 }
