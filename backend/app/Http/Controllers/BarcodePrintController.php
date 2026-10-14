@@ -109,6 +109,8 @@ class BarcodePrintController extends Controller
                 }
             }
             
+            $this->attachVelocityCategories($products, $branchId);
+
             return view('print.barcodes.pricecard', [
                 'products' => $products, 
                 'from_session' => true,
@@ -137,6 +139,8 @@ class BarcodePrintController extends Controller
             }
         }
 
+        $this->attachVelocityCategories($products, $branchId);
+
         return view('print.barcodes.pricecard', [
             'products' => $products, 
             'from_session' => false,
@@ -144,5 +148,57 @@ class BarcodePrintController extends Controller
             'date_type' => $dateType,
             'custom_date' => $customDate
         ]);
+    }
+
+    /**
+     * Hitung kategori pergerakan produk (Fast, Medium, Slow, Dead) di cabang tersebut
+     * berdasarkan riwayat transaksi 90 hari terakhir (standar ritel modern).
+     */
+    protected function attachVelocityCategories($products, ?string $branchId): void
+    {
+        if ($products->isEmpty()) return;
+
+        $productIds = $products->pluck('id')->filter()->toArray();
+        $ninetyDaysAgo = \Carbon\Carbon::now()->subDays(90);
+
+        $salesMap = \Illuminate\Support\Facades\DB::table('transaction_items as ti')
+            ->join('transactions as t', 't.id', '=', 'ti.transaction_id')
+            ->whereIn('ti.product_id', $productIds)
+            ->when($branchId, fn($q) => $q->where('t.branch_id', $branchId))
+            ->where('t.transaction_date', '>=', $ninetyDaysAgo)
+            ->where(fn($q) => $q->where('t.is_voided', false)->orWhereNull('t.is_voided'))
+            ->groupBy('ti.product_id')
+            ->select('ti.product_id', \Illuminate\Support\Facades\DB::raw('SUM(ti.quantity) as total_qty'))
+            ->pluck('total_qty', 'ti.product_id')
+            ->toArray();
+
+        $stockDates = $branchId
+            ? \App\Models\Stock::whereIn('product_id', $productIds)
+                ->where('branch_id', $branchId)
+                ->pluck('created_at', 'product_id')
+                ->toArray()
+            : [];
+
+        $now = now();
+        foreach ($products as $p) {
+            $qty = (float) ($salesMap[$p->id] ?? 0);
+            $stockCreated = $stockDates[$p->id] ?? null;
+            $daysActive = $stockCreated ? max(1, min(90, (int) \Carbon\Carbon::parse($stockCreated)->diffInDays($now) + 1)) : 90;
+            $normalized90d = $daysActive < 90 ? ($qty / $daysActive) * 90 : $qty;
+
+            if ($normalized90d >= 90) {
+                $p->velocity_type = 'FAST';
+                $p->velocity_color = '#10b981'; // Emerald Green (Fast Moving)
+            } elseif ($normalized90d >= 15) {
+                $p->velocity_type = 'MEDIUM';
+                $p->velocity_color = '#0284c7'; // Sky Blue (Medium / Reguler)
+            } elseif ($normalized90d > 0) {
+                $p->velocity_type = 'SLOW';
+                $p->velocity_color = '#f59e0b'; // Amber / Orange (Slow Moving)
+            } else {
+                $p->velocity_type = 'DEAD';
+                $p->velocity_color = '#64748b'; // Slate Gray (Dead Stock / Pasif)
+            }
+        }
     }
 }

@@ -230,9 +230,12 @@
 
     <div class="container">
         @foreach($products as $product)
-            @php $itemCopies = $product->copies ?? 1; @endphp
+            @php 
+                $itemCopies = $product->copies ?? 1; 
+                $vColor = $product->velocity_color ?? '#dc2626';
+            @endphp
             @for($i = 0; $i < $itemCopies; $i++)
-                <div class="pricecard">
+                <div class="pricecard" style="border-left: 4.5px solid {{ $vColor }};">
                     <!-- Header -->
                     <div class="header">
                         <div class="logo-container">
@@ -248,7 +251,7 @@
                         </div>
                     </div>
                     
-                    <div class="separator"></div>
+                    <div class="separator" style="background: linear-gradient(90deg, {{ $vColor }} 0%, #dc2626 100%);"></div>
                     
                     <!-- Body -->
                     <div class="body-content">
@@ -283,10 +286,9 @@
                             <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
                             TGL CETAK <span style="margin: 0 1mm; font-weight: normal;">|</span> {{ $dateStr }}
                         </div>
-                        <div class="stripes">
-                            <div class="stripe stripe-red"></div>
-                            <div class="stripe stripe-grey"></div>
-                            <div class="stripe stripe-grey"></div>
+                        <div class="stripes" title="Kode Kategori Rak">
+                            <div class="stripe" style="background: {{ $vColor }}; width: 3mm;"></div>
+                            <div class="stripe" style="background: {{ $vColor }}; width: 2mm; opacity: 0.7;"></div>
                             <div class="stripe stripe-grey"></div>
                             <div class="stripe stripe-grey"></div>
                         </div>

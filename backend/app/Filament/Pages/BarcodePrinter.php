@@ -54,6 +54,7 @@ class BarcodePrinter extends Page implements HasForms
                     ->default($userBranchId)
                     ->hidden(fn () => $userBranchId !== null)
                     ->live()
+                    ->afterStateUpdated(fn ($state) => $this->refreshQueueBranchData($state))
                     ->required()
                     ->columnSpan(1),
 
@@ -76,20 +77,29 @@ class BarcodePrinter extends Page implements HasForms
                 Select::make('add_product_id')
                     ->label('🔎 Cari & Tambah Produk Ke Antrean (Ketik Nama / SKU / Barcode)')
                     ->searchable()
-                    ->placeholder('Ketik nama barang, SKU, atau scan barcode...')
+                    ->placeholder('Ketik nama barang fisik aktif, SKU, atau scan barcode...')
                     ->getSearchResultsUsing(function (string $search, $get) use ($userBranchId) {
                         $branchId = $userBranchId ?? $get('branch_id');
-                        return Product::where(function($q) use ($search) {
-                                $q->where('name', 'like', "%{$search}%")
-                                  ->orWhere('sku', 'like', "%{$search}%")
-                                  ->orWhere('barcode', 'like', "%{$search}%");
+                        return Product::query()
+                            ->where('products.is_active', true)
+                            ->where(fn($q) => $q->where('products.product_type', '!=', 'digital')->orWhereNull('products.product_type'))
+                            ->where(function($q) use ($search) {
+                                $q->where('products.name', 'like', "%{$search}%")
+                                  ->orWhere('products.sku', 'like', "%{$search}%")
+                                  ->orWhere('products.barcode', 'like', "%{$search}%");
                             })
                             ->when($branchId, function($q) use ($branchId) {
-                                $q->whereHas('stocks', fn($sq) => $sq->where('branch_id', $branchId));
+                                $q->whereHas('stocks', fn($sq) => $sq->where('branch_id', $branchId)->where('is_active', true));
                             })
+                            ->with(['stocks' => fn($sq) => $sq->when($branchId, fn($b) => $b->where('branch_id', $branchId))])
                             ->limit(30)
                             ->get()
-                            ->mapWithKeys(fn ($p) => [$p->id => "{$p->name} (SKU: {$p->sku} | Barcode: " . ($p->barcode ?? '-') . ")"])
+                            ->mapWithKeys(function ($p) use ($branchId) {
+                                $stock = $branchId ? $p->stocks->where('branch_id', $branchId)->first() : $p->stocks->first();
+                                $price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $p->selling_price;
+                                $stockQty = $stock ? (float)$stock->quantity_on_hand : 0;
+                                return [$p->id => "{$p->name} [Rp " . number_format($price, 0, ',', '.') . " | Stok: {$stockQty}] (Barcode: " . ($p->barcode ?? '-') . " / SKU: {$p->sku})"];
+                            })
                             ->toArray();
                     })
                     ->getOptionLabelUsing(fn ($value): ?string => Product::find($value)?->name)
@@ -104,6 +114,91 @@ class BarcodePrinter extends Page implements HasForms
             ])
             ->columns(3)
             ->statePath('data');
+    }
+
+    public static function getProductVelocityCategory(string $productId, ?string $branchId): array
+    {
+        $ninetyDaysAgo = \Carbon\Carbon::now()->subDays(90);
+
+        $qtySold = (float) \Illuminate\Support\Facades\DB::table('transaction_items as ti')
+            ->join('transactions as t', 't.id', '=', 'ti.transaction_id')
+            ->where('ti.product_id', $productId)
+            ->when($branchId, fn($q) => $q->where('t.branch_id', $branchId))
+            ->where('t.transaction_date', '>=', $ninetyDaysAgo)
+            ->where(fn($q) => $q->where('t.is_voided', false)->orWhereNull('t.is_voided'))
+            ->sum('ti.quantity');
+
+        // Cek umur produk di cabang untuk normalisasi cerdas produk baru (< 90 hari)
+        $stockCreated = $branchId ? \App\Models\Stock::where('product_id', $productId)->where('branch_id', $branchId)->value('created_at') : null;
+        $daysActive = $stockCreated ? max(1, min(90, (int) \Carbon\Carbon::parse($stockCreated)->diffInDays(now()) + 1)) : 90;
+        $normalized90d = $daysActive < 90 ? ($qtySold / $daysActive) * 90 : $qtySold;
+        $avgMonthly = round($normalized90d / 3, 1);
+
+        if ($normalized90d >= 90) {
+            return [
+                'type' => 'FAST',
+                'label' => 'Fast Moving',
+                'color' => '#10b981', // Emerald green
+                'badge_color' => 'success',
+                'qty_90d' => (int) $qtySold,
+                'avg_monthly' => $avgMonthly,
+                'desc' => "Sangat Laku di cabang ini (~{$avgMonthly} pcs/bln)",
+            ];
+        } elseif ($normalized90d >= 15) {
+            return [
+                'type' => 'MEDIUM',
+                'label' => 'Medium / Reguler',
+                'color' => '#0284c7', // Sky blue
+                'badge_color' => 'info',
+                'qty_90d' => (int) $qtySold,
+                'avg_monthly' => $avgMonthly,
+                'desc' => "Penjualan stabil di cabang ini (~{$avgMonthly} pcs/bln)",
+            ];
+        } elseif ($normalized90d > 0) {
+            return [
+                'type' => 'SLOW',
+                'label' => 'Slow Moving',
+                'color' => '#f59e0b', // Amber / Orange
+                'badge_color' => 'warning',
+                'qty_90d' => (int) $qtySold,
+                'avg_monthly' => $avgMonthly,
+                'desc' => "Kurang laku di cabang ini (~{$avgMonthly} pcs/bln)",
+            ];
+        } else {
+            return [
+                'type' => 'DEAD',
+                'label' => 'Dead Stock / Pasif',
+                'color' => '#64748b', // Slate gray
+                'badge_color' => 'gray',
+                'qty_90d' => 0,
+                'avg_monthly' => 0,
+                'desc' => 'Belum ada penjualan 90 hari di cabang ini',
+            ];
+        }
+    }
+
+    public function refreshQueueBranchData(?string $newBranchId): void
+    {
+        if (empty($this->data['print_items'])) return;
+
+        $items = $this->data['print_items'];
+        foreach ($items as &$item) {
+            $productId = $item['product_id'] ?? null;
+            if (!$productId) continue;
+
+            $stock = $newBranchId ? Stock::where('product_id', $productId)->where('branch_id', $newBranchId)->first() : null;
+            $product = Product::find($productId);
+            if ($product) {
+                $item['price'] = ($stock && $stock->selling_price > 0) ? (float)$stock->selling_price : (float)$product->selling_price;
+            }
+            $item['velocity'] = static::getProductVelocityCategory($productId, $newBranchId);
+        }
+        $this->data['print_items'] = $items;
+
+        \Filament\Notifications\Notification::make()
+            ->title('Data antrean cetak diperbarui sesuai cabang terpilih')
+            ->info()
+            ->send();
     }
 
     public function addProductToQueue($productId, $copies = 1): void
@@ -128,6 +223,7 @@ class BarcodePrinter extends Page implements HasForms
         } else {
             $stock = $branchId ? Stock::where('product_id', $product->id)->where('branch_id', $branchId)->first() : null;
             $price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $product->selling_price;
+            $velocity = static::getProductVelocityCategory($product->id, $branchId);
 
             $currentItems[] = [
                 'product_id' => $product->id,
@@ -136,6 +232,7 @@ class BarcodePrinter extends Page implements HasForms
                 'barcode' => $product->barcode ?? '-',
                 'price' => (float) $price,
                 'copies' => (int) $copies,
+                'velocity' => $velocity,
             ];
         }
 
@@ -234,8 +331,8 @@ class BarcodePrinter extends Page implements HasForms
                     if ($receipt) {
                         $countAdded = 0;
                         foreach ($receipt->items as $item) {
-                            if ($item->product) {
-                                $copies = $item->quantity_received > 0 ? $item->quantity_received : 1;
+                            if ($item->product && $item->product->is_active && $item->product->product_type !== 'digital') {
+                                $copies = $item->quantity_received > 0 ? (int)$item->quantity_received : 1;
                                 $this->addProductToQueue($item->product_id, $copies);
                                 $countAdded++;
                             }

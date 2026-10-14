@@ -4,6 +4,11 @@
         $totalItems = count($items);
         $totalCopies = collect($items)->sum(fn($i) => (int)($i['copies'] ?? 1));
         $estPricecardPages = ceil($totalCopies / 18);
+
+        $fastCount = collect($items)->filter(fn($i) => ($i['velocity']['type'] ?? '') === 'FAST')->count();
+        $medCount = collect($items)->filter(fn($i) => ($i['velocity']['type'] ?? '') === 'MEDIUM')->count();
+        $slowCount = collect($items)->filter(fn($i) => ($i['velocity']['type'] ?? '') === 'SLOW')->count();
+        $deadCount = collect($items)->filter(fn($i) => ($i['velocity']['type'] ?? '') === 'DEAD')->count();
     @endphp
 
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
@@ -12,10 +17,61 @@
         <x-filament::section
             icon="heroicon-o-magnifying-glass"
             header-heading="Pencarian & Pengaturan Cetak"
-            header-subheading="Pilih lokasi cabang, tipe tanggal, dan cari produk untuk dimasukkan ke antrean cetak."
+            header-subheading="Pilih lokasi cabang, tipe tanggal, dan cari produk fisik aktif untuk dimasukkan ke antrean cetak."
         >
             {{ $this->form }}
         </x-filament::section>
+
+        <!-- Section 1.5: Secret Shelf Category Color Guide -->
+        <div style="background: rgba(15, 23, 42, 0.03); dark:background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(128, 128, 128, 0.2); border-radius: 12px; padding: 1rem 1.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.1rem;">🏷️</span>
+                    <strong style="font-size: 0.92rem; letter-spacing: 0.2px;">Panduan Rahasia Kode Warna Rak pada Pricecard (Khusus Staf Toko)</strong>
+                </div>
+                <span style="font-size: 0.75rem; opacity: 0.7; font-style: italic;">
+                    *Dicetak berupa garis aksen kiri & strip warna tanpa teks keterangan agar rahasia bagi konsumen.
+                </span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+                <!-- Fast Moving -->
+                <div style="display: flex; align-items: center; gap: 10px; background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 8px 12px; border-radius: 6px;">
+                    <div style="font-size: 1.2rem;">🟢</div>
+                    <div>
+                        <div style="font-weight: 800; font-size: 0.82rem; color: #10b981;">Fast Moving (≥ 90 pcs / 90 hr)</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; line-height: 1.2;">~30 pcs/bln. Sangat laku, rak display wajib selalu terisi penuh.</div>
+                    </div>
+                </div>
+
+                <!-- Medium / Reguler -->
+                <div style="display: flex; align-items: center; gap: 10px; background: rgba(2, 132, 199, 0.08); border-left: 4px solid #0284c7; padding: 8px 12px; border-radius: 6px;">
+                    <div style="font-size: 1.2rem;">🔵</div>
+                    <div>
+                        <div style="font-weight: 800; font-size: 0.82rem; color: #0284c7;">Medium / Reguler (15 - 89 pcs)</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; line-height: 1.2;">5 - 29 pcs/bln. Penjualan stabil dan normal di cabang ini.</div>
+                    </div>
+                </div>
+
+                <!-- Slow Moving -->
+                <div style="display: flex; align-items: center; gap: 10px; background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; padding: 8px 12px; border-radius: 6px;">
+                    <div style="font-size: 1.2rem;">🟠</div>
+                    <div>
+                        <div style="font-weight: 800; font-size: 0.82rem; color: #f59e0b;">Slow Moving (1 - 14 pcs)</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; line-height: 1.2;">< 5 pcs/bln. Kurang laku, minimalkan jumlah tumpukan di rak.</div>
+                    </div>
+                </div>
+
+                <!-- Dead Stock -->
+                <div style="display: flex; align-items: center; gap: 10px; background: rgba(100, 116, 139, 0.08); border-left: 4px solid #64748b; padding: 8px 12px; border-radius: 6px;">
+                    <div style="font-size: 1.2rem;">⚪</div>
+                    <div>
+                        <div style="font-weight: 800; font-size: 0.82rem; color: #64748b;">Dead Stock / Pasif (0 pcs)</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; line-height: 1.2;">Macet total, belum ada penjualan selama 90 hari di cabang ini.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Section 2: Shopping Cart Queue Table -->
         <x-filament::section
@@ -28,6 +84,20 @@
                     <span style="background: rgba(16,185,129,0.15); color: #10b981; font-size: 0.75rem; font-weight: 800; padding: 4px 12px; border-radius: 99px;">
                         📦 {{ $totalItems }} Produk
                     </span>
+                    @if($totalItems > 0)
+                        <span style="background: rgba(16,185,129,0.1); color: #10b981; font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 99px;">
+                            🟢 {{ $fastCount }} Fast
+                        </span>
+                        <span style="background: rgba(2,132,199,0.1); color: #0284c7; font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 99px;">
+                            🔵 {{ $medCount }} Reguler
+                        </span>
+                        <span style="background: rgba(245,158,11,0.1); color: #f59e0b; font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 99px;">
+                            🟠 {{ $slowCount }} Slow
+                        </span>
+                        <span style="background: rgba(100,116,139,0.1); color: #64748b; font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 99px;">
+                            ⚪ {{ $deadCount }} Pasif
+                        </span>
+                    @endif
                     <span style="background: rgba(245,158,11,0.15); color: #f59e0b; font-size: 0.75rem; font-weight: 800; padding: 4px 12px; border-radius: 99px;">
                         📄 {{ $totalCopies }} Total Copies
                     </span>
@@ -44,13 +114,21 @@
                             <tr style="border-bottom: 2px solid rgba(128,128,128,0.2); font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7;">
                                 <th style="padding: 12px 8px; text-align: center; width: 40px;">#</th>
                                 <th style="padding: 12px;">Nama Produk & Kode</th>
+                                <th style="padding: 12px; text-align: center; width: 180px;">Kategori Rak (Cabang)</th>
                                 <th style="padding: 12px; text-align: right;">Harga Jual</th>
-                                <th style="padding: 12px; text-align: center; width: 220px;">Jumlah Cetak (Copies)</th>
-                                <th style="padding: 12px; text-align: center; width: 70px;">Aksi</th>
+                                <th style="padding: 12px; text-align: center; width: 200px;">Jumlah Cetak (Copies)</th>
+                                <th style="padding: 12px; text-align: center; width: 60px;">Aksi</th>
                             </tr>
                         </thead>
                         <tbody style="border-bottom: 1px solid rgba(128,128,128,0.2);">
                             @foreach($items as $index => $item)
+                                @php
+                                    $vel = $item['velocity'] ?? null;
+                                    $vColor = $vel['color'] ?? '#64748b';
+                                    $vLabel = $vel['label'] ?? 'Pasif / Dead';
+                                    $vQty = $vel['qty_90d'] ?? ($vel['qty_30d'] ?? 0);
+                                    $vAvg = $vel['avg_monthly'] ?? round($vQty / 3, 1);
+                                @endphp
                                 <tr style="border-bottom: 1px solid rgba(128,128,128,0.1);">
                                     <td style="padding: 14px 8px; text-align: center; font-weight: 800; opacity: 0.5;">
                                         {{ $index + 1 }}
@@ -67,6 +145,12 @@
                                                 Barcode: {{ $item['barcode'] ?? '-' }}
                                             </span>
                                         </div>
+                                    </td>
+                                    <td style="padding: 14px 12px; text-align: center;">
+                                        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 800; background: {{ $vColor }}22; color: {{ $vColor }}; border: 1px solid {{ $vColor }}44;" title="Total 90 Hari: {{ $vQty }} pcs (Rata-rata: ~{{ $vAvg }} pcs/bulan)">
+                                            <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ $vColor }};"></span>
+                                            {{ $vLabel }} (~{{ $vAvg }} pcs/bln)
+                                        </span>
                                     </td>
                                     <td style="padding: 14px 12px; text-align: right; font-weight: 900; font-size: 1.05rem; color: #10b981;">
                                         Rp {{ number_format((float)($item['price'] ?? 0), 0, ',', '.') }}
