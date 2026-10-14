@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -23,7 +24,9 @@ return new class extends Migration
                 ->toArray();
 
             if (!empty($stockIds)) {
-                DB::table('stock_rack')->whereIn('stock_id', $stockIds)->delete();
+                if (Schema::hasTable('stock_stock_opname_rack')) {
+                    DB::table('stock_stock_opname_rack')->whereIn('stock_id', $stockIds)->delete();
+                }
                 DB::table('stocks')->whereIn('id', $stockIds)->delete();
             }
         }
