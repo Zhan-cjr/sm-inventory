@@ -23,6 +23,12 @@ class Stock extends Model
 
     protected static function booted()
     {
+        static::creating(function ($stock) {
+            if ($stock->product_id) {
+                $stock->syncDefaultPricesFromProduct();
+            }
+        });
+
         static::saved(function ($stock) {
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             if ($stock->branch_id) {
@@ -187,5 +193,39 @@ class Stock extends Model
     public function setMarginGol3Attribute($value)
     {
         $this->attributes['margin_gol_3'] = static::parseIndonesianNumber($value);
+    }
+
+    /**
+     * Sinkronisasi harga dan margin default dari master produk jika belum diset atau kosong.
+     */
+    public function syncDefaultPricesFromProduct(?Product $product = null, bool $force = false): self
+    {
+        $product = $product ?? ($this->relationLoaded('product') ? $this->product : Product::find($this->product_id));
+        if (!$product) {
+            return $this;
+        }
+
+        if ($force || ($this->selling_price === null && (float) ($this->harga_jual_1 ?? 0) <= 0)) {
+            if ($this->cost_price === null || (float) $this->cost_price <= 0) {
+                $this->cost_price = $product->cost_price;
+            }
+            if ($this->cost_price_tax === null || (float) $this->cost_price_tax <= 0) {
+                $this->cost_price_tax = $product->cost_price_tax;
+            }
+            $this->selling_price = $product->selling_price ?? $product->harga_jual_1;
+            $this->harga_jual_1 = $product->harga_jual_1 ?? $product->selling_price;
+            $this->margin_gol_1 = $this->margin_gol_1 ?? $product->margin_gol_1;
+            $this->qty_min_gol_1 = $this->qty_min_gol_1 ?? $product->qty_min_gol_1 ?? 1;
+
+            $this->margin_gol_2 = $this->margin_gol_2 ?? $product->margin_gol_2;
+            $this->harga_jual_2 = $this->harga_jual_2 ?? $product->harga_jual_2;
+            $this->qty_min_gol_2 = $this->qty_min_gol_2 ?? $product->qty_min_gol_2;
+
+            $this->margin_gol_3 = $this->margin_gol_3 ?? $product->margin_gol_3;
+            $this->harga_jual_3 = $this->harga_jual_3 ?? $product->harga_jual_3;
+            $this->qty_min_gol_3 = $this->qty_min_gol_3 ?? $product->qty_min_gol_3;
+        }
+
+        return $this;
     }
 }

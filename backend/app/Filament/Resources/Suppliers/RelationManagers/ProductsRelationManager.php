@@ -224,14 +224,16 @@ class ProductsRelationManager extends RelationManager
 
                         if ($scopeType === 'branch') {
                             $branchId = $data['branch_id'] ?? auth()->user()->branch_id;
-                            foreach ($data['product_ids'] as $productId) {
-                                \App\Models\Stock::updateOrCreate(
-                                    ['branch_id' => $branchId, 'product_id' => $productId],
-                                    [
-                                        'supplier_id' => $supplierId,
-                                        'supplier_division_id' => $data['supplier_division_id'] ?? null,
-                                    ]
-                                );
+                            $products = \App\Models\Product::whereIn('id', $data['product_ids'])->get();
+                            foreach ($products as $prod) {
+                                $stock = \App\Models\Stock::firstOrNew([
+                                    'branch_id' => $branchId,
+                                    'product_id' => $prod->id,
+                                ]);
+                                $stock->supplier_id = $supplierId;
+                                $stock->supplier_division_id = $data['supplier_division_id'] ?? null;
+                                $stock->syncDefaultPricesFromProduct($prod);
+                                $stock->save();
                             }
                             \Filament\Notifications\Notification::make()
                                 ->title('Berhasil menetapkan barang ke supplier khusus cabang')
@@ -372,13 +374,14 @@ class ProductsRelationManager extends RelationManager
 
                         if ($scopeType === 'branch') {
                             // Update atau buat stok override untuk cabang target
-                            \App\Models\Stock::updateOrCreate(
-                                ['product_id' => $record->id, 'branch_id' => $targetBranchId],
-                                [
-                                    'supplier_id' => $data['new_supplier_id'],
-                                    'supplier_division_id' => $data['new_supplier_division_id'] ?? null,
-                                ]
-                            );
+                            $stock = \App\Models\Stock::firstOrNew([
+                                'product_id' => $record->id,
+                                'branch_id' => $targetBranchId,
+                            ]);
+                            $stock->supplier_id = $data['new_supplier_id'];
+                            $stock->supplier_division_id = $data['new_supplier_division_id'] ?? null;
+                            $stock->syncDefaultPricesFromProduct($record);
+                            $stock->save();
 
                             \Filament\Notifications\Notification::make()
                                 ->title('Berhasil memindahkan supplier khusus cabang')
@@ -503,13 +506,14 @@ class ProductsRelationManager extends RelationManager
 
                             if ($scopeType === 'branch') {
                                 foreach ($records as $record) {
-                                    \App\Models\Stock::updateOrCreate(
-                                        ['product_id' => $record->id, 'branch_id' => $targetBranchId],
-                                        [
-                                            'supplier_id' => $data['new_supplier_id'],
-                                            'supplier_division_id' => $data['new_supplier_division_id'] ?? null,
-                                        ]
-                                    );
+                                    $stock = \App\Models\Stock::firstOrNew([
+                                        'product_id' => $record->id,
+                                        'branch_id' => $targetBranchId,
+                                    ]);
+                                    $stock->supplier_id = $data['new_supplier_id'];
+                                    $stock->supplier_division_id = $data['new_supplier_division_id'] ?? null;
+                                    $stock->syncDefaultPricesFromProduct($record);
+                                    $stock->save();
                                 }
                                 \Filament\Notifications\Notification::make()
                                     ->title('Berhasil memindahkan supplier khusus cabang untuk barang terpilih')
