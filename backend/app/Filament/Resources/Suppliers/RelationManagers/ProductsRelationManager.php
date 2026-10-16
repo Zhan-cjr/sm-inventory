@@ -59,7 +59,15 @@ class ProductsRelationManager extends RelationManager
                     });
                 }
 
-                $query->with(['stocks.branch', 'supplierDivision']);
+                if ($userBranchId) {
+                    $query->with([
+                        'stocks' => fn ($q) => $q->where('branch_id', $userBranchId),
+                        'stocks.branch',
+                        'supplierDivision'
+                    ]);
+                } else {
+                    $query->with(['stocks.branch', 'supplierDivision']);
+                }
             })
             ->columns([
                 Tables\Columns\TextColumn::make('sku')
@@ -121,6 +129,15 @@ class ProductsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('cost_price')
                     ->label('Harga Beli')
                     ->money('IDR')
+                    ->state(function ($record) use ($userBranchId) {
+                        if ($userBranchId) {
+                            $branchStock = $record->stocks->firstWhere('branch_id', $userBranchId);
+                            if ($branchStock && (float) $branchStock->cost_price > 0) {
+                                return $branchStock->cost_price;
+                            }
+                        }
+                        return $record->cost_price;
+                    })
                     ->sortable(),
             ])
             ->filters([
