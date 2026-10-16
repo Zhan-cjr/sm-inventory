@@ -27,6 +27,11 @@ class ProductsRelationManager extends RelationManager
 
         return $table
             ->modifyQueryUsing(function (Builder $query) use ($currentSupplierId, $userBranchId) {
+                // Lepaskan filter default Eloquent relationship (where products.supplier_id = ?)
+                // agar produk yang dipasok khusus cabang ke supplier ini dapat ikut tampil.
+                $query->getQuery()->wheres = [];
+                $query->getQuery()->bindings['where'] = [];
+
                 if ($userBranchId) {
                     // User Cabang: Hanya tampilkan barang yang ada di cabangnya dan aktif dipasok oleh supplier ini
                     $query->whereHas('stocks', function ($sq) use ($userBranchId) {
