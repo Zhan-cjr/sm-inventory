@@ -9,7 +9,8 @@ export const OpenShiftModal = ({
   setStartingCash,
   formatThousandSeparator,
   onOpenShift,
-  closedShifts = []
+  closedShifts = [],
+  isProcessing = false
 }) => {
   if (!isOpen) return null;
 
@@ -38,7 +39,7 @@ export const OpenShiftModal = ({
             className="modern-barcode-input"
             style={{ width: '100%', padding: '0.75rem' }}
             value={selectedShiftName}
-            disabled={isAllShiftsClosed}
+            disabled={isAllShiftsClosed || isProcessing}
             onChange={(e) => setSelectedShiftName(e.target.value)}
           >
             <option value="Shift 1" disabled={isShift1Closed}>
@@ -57,7 +58,7 @@ export const OpenShiftModal = ({
             className="modern-barcode-input"
             style={{ width: '100%', fontSize: '1.5rem', textAlign: 'center', padding: '1rem' }}
             placeholder="0"
-            disabled={isAllShiftsClosed}
+            disabled={isAllShiftsClosed || isProcessing}
             value={startingCash ? formatThousandSeparator(startingCash) : ''}
             onChange={(e) => setStartingCash(e.target.value.replace(/[^0-9]/g, ''))}
           />
@@ -69,13 +70,13 @@ export const OpenShiftModal = ({
             width: '100%', 
             padding: '1rem', 
             fontSize: '1.1rem',
-            opacity: isAllShiftsClosed ? 0.5 : 1,
-            cursor: isAllShiftsClosed ? 'not-allowed' : 'pointer'
+            opacity: (isAllShiftsClosed || isProcessing) ? 0.5 : 1,
+            cursor: (isAllShiftsClosed || isProcessing) ? 'not-allowed' : 'pointer'
           }} 
           onClick={onOpenShift}
-          disabled={isAllShiftsClosed}
+          disabled={isAllShiftsClosed || isProcessing}
         >
-          {isAllShiftsClosed ? 'SEMUA SHIFT SELESAI' : 'BUKA SHIFT SEKARANG'}
+          {isProcessing ? 'MEMPROSES PEMBUKAAN SHIFT...' : (isAllShiftsClosed ? 'SEMUA SHIFT SELESAI' : 'BUKA SHIFT SEKARANG')}
         </button>
       </div>
     </div>

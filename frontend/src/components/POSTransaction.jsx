@@ -731,16 +731,30 @@ export const POSTransaction = ({
   }
 
   if (lockScreenInfo) {
+    const isCrossDay = lockScreenInfo.status === 'CROSS_DAY_SHIFT_EXPIRED';
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-dark)', color: 'var(--text-main)', padding: '1rem' }}>
-        <div className="fade-in" style={{ maxWidth: '600px', width: '100%', background: 'var(--bg-card)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '16px', padding: '2.5rem', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+        <div className="fade-in" style={{ maxWidth: '600px', width: '100%', background: 'var(--bg-card)', border: `1px solid ${isCrossDay ? 'rgba(234, 179, 8, 0.4)' : 'rgba(239, 68, 68, 0.3)'}`, borderRadius: '16px', padding: '2.5rem', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+          <div style={{ background: isCrossDay ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: isCrossDay ? '#eab308' : '#ef4444', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
             <Lock size={40} />
           </div>
-          <h2 style={{ color: '#ef4444', marginBottom: '1rem', letterSpacing: '0.05rem', fontSize: '1.5rem', fontWeight: 'bold' }}>❌ Akses Terkunci</h2>
+          <h2 style={{ color: isCrossDay ? '#eab308' : '#ef4444', marginBottom: '1rem', letterSpacing: '0.05rem', fontSize: '1.5rem', fontWeight: 'bold' }}>
+            {isCrossDay ? '⚠️ Shift Kemarin Belum Ditutup' : '❌ Akses Terkunci'}
+          </h2>
           <p style={{ color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '2rem', fontSize: '1.05rem' }}>
             {lockScreenInfo.message}
           </p>
+
+          {isCrossDay && (
+            <button
+              className="btn-primary"
+              style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', marginBottom: '1rem', background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+              onClick={() => setIsCloseShiftModalOpen(true)}
+            >
+              🔒 TUTUP SHIFT KEMARIN SEKARANG
+            </button>
+          )}
+
           <button
             className="btn-danger"
             style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
@@ -749,6 +763,42 @@ export const POSTransaction = ({
             <LogOut size={20} /> ➔ KELUAR & KEMBALI
           </button>
         </div>
+
+        {/* Modal Tutup Shift saat kasir memilih tutup shift kemarin */}
+        {isCrossDay && (isCloseShiftModalOpen || eodReportData) && (
+          <PosModalsContainer
+            isTerminalModalOpen={false}
+            allTerminals={allTerminals}
+            handleSelectTerminal={handleSelectTerminal}
+            isOpenShiftModalOpen={false}
+            selectedShiftName={selectedShiftName}
+            setSelectedShiftName={setSelectedShiftName}
+            startingCash={startingCash}
+            setStartingCash={setStartingCash}
+            handleOpenShift={handleOpenShift}
+            closedShiftsToday={closedShiftsToday}
+            isCloseShiftModalOpen={isCloseShiftModalOpen}
+            setIsCloseShiftModalOpen={setIsCloseShiftModalOpen}
+            activeShift={activeShift}
+            actualCash={actualCash}
+            setActualCash={setActualCash}
+            handleCloseShift={handleCloseShift}
+            isProcessing={isProcessing}
+            isCashMovementModalOpen={false}
+            setIsCashMovementModalOpen={setIsCashMovementModalOpen}
+            cashMovementType={cashMovementType}
+            setCashMovementType={setCashMovementType}
+            cashMovementAmount={cashMovementAmount}
+            setCashMovementAmount={setCashMovementAmount}
+            cashMovementDesc={cashMovementDesc}
+            setCashMovementDesc={setCashMovementDesc}
+            handleCashMovement={handleCashMovement}
+            eodReportData={eodReportData}
+            setEodReportData={setEodReportData}
+            onLogout={onLogout}
+            formatThousandSeparator={formatThousandSeparator}
+          />
+        )}
       </div>
     );
   }

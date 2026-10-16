@@ -253,6 +253,7 @@ export const PosModalsContainer = ({
           formatThousandSeparator={formatThousandSeparator}
           onOpenShift={handleOpenShift}
           closedShifts={closedShiftsToday}
+          isProcessing={isProcessing}
         />
       )}
 

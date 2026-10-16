@@ -9,6 +9,7 @@ use App\Models\CashMovement;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class ShiftController extends Controller
 {
@@ -56,6 +57,20 @@ class ShiftController extends Controller
 
         if ($userActive && $terminalActive) {
             if ($userActive->id === $terminalActive->id) {
+                // Check if shift is cross-day (started before today)
+                $shiftStartDate = Carbon::parse($userActive->start_time)->startOfDay();
+                $todayDate = Carbon::today();
+                
+                if ($shiftStartDate->lt($todayDate)) {
+                    $formattedDate = Carbon::parse($userActive->start_time)->translatedFormat('d F Y');
+                    return response()->json([
+                        'status' => 'CROSS_DAY_SHIFT_EXPIRED',
+                        'message' => "Peringatan: Shift aktif ({$userActive->shift_name}) dibuka pada tanggal {$formattedDate} dan belum ditutup! Demi integritas laporan keuangan, Anda wajib melakukan TUTUP SHIFT tanggal kemarin terlebih dahulu sebelum membuka shift hari ini.",
+                        'shift' => $userActive,
+                        'closed_shifts' => $closedShifts
+                    ]);
+                }
+
                 // Ideal case: user is on their correct terminal with their active shift
                 return response()->json([
                     'status' => 'OK',
@@ -112,9 +127,10 @@ class ShiftController extends Controller
         ]);
 
         $user = auth()->user();
+        $terminalId = $validated['terminal_id'];
         
         // Ensure cashier branch matches terminal branch
-        $terminal = \App\Models\Terminal::find($validated['terminal_id']);
+        $terminal = \App\Models\Terminal::find($terminalId);
         if (!$terminal) {
             return response()->json(['message' => 'Terminal tidak ditemukan.'], 404);
         }
@@ -124,75 +140,93 @@ class ShiftController extends Controller
             ], 403);
         }
 
-        // Rule 2: Check if the user already has an open shift anywhere
-        $userActive = Shift::where('user_id', $user->id)
-            ->where('status', 'OPEN')
-            ->first();
-            
-        if ($userActive) {
+        // ATOMIC LOCK: Mencegah race condition klik ganda (double-click) pada terminal atau user yang sama
+        $lockKey = "lock_open_shift_terminal_{$terminalId}";
+        $lock = Cache::lock($lockKey, 5);
+
+        if (!$lock->get()) {
             return response()->json([
-                'message' => "Gagal Buka Shift: Anda tidak bisa membuka shift baru ({$validated['shift_name']}) karena shift sebelumnya ({$userActive->shift_name}) belum ditutup (CLOSED). Harap tutup shift aktif Anda terlebih dahulu.",
-                'shift' => $userActive
-            ], 422);
+                'message' => 'Sistem sedang memproses pembukaan shift untuk kassa ini. Harap tunggu beberapa detik.'
+            ], 429);
         }
 
-        // Rule 2 (terminal-wide): Check if there is already an open shift for this terminal
-        $terminalActive = Shift::where('terminal_id', $validated['terminal_id'])
-            ->where('status', 'OPEN')
-            ->first();
-            
-        if ($terminalActive) {
-            return response()->json([
-                'message' => "Gagal Buka Shift: Terminal ini masih memiliki shift aktif ({$terminalActive->shift_name}) yang sedang berjalan oleh {$terminalActive->user->name}. Harap tutup shift sebelumnya terlebih dahulu sebelum membuka shift baru.",
-                'shift' => $terminalActive
-            ], 422);
+        try {
+            return DB::transaction(function () use ($validated, $user, $terminalId) {
+                // Rule 2: Check if the user already has an open shift anywhere (with row lock)
+                $userActive = Shift::where('user_id', $user->id)
+                    ->where('status', 'OPEN')
+                    ->lockForUpdate()
+                    ->first();
+                    
+                if ($userActive) {
+                    return response()->json([
+                        'message' => "Gagal Buka Shift: Anda tidak bisa membuka shift baru ({$validated['shift_name']}) karena shift sebelumnya ({$userActive->shift_name}) belum ditutup (CLOSED). Harap tutup shift aktif Anda terlebih dahulu.",
+                        'shift' => $userActive
+                    ], 422);
+                }
+
+                // Rule 2 (terminal-wide): Check if there is already an open shift for this terminal
+                $terminalActive = Shift::where('terminal_id', $terminalId)
+                    ->where('status', 'OPEN')
+                    ->lockForUpdate()
+                    ->first();
+                    
+                if ($terminalActive) {
+                    return response()->json([
+                        'message' => "Gagal Buka Shift: Terminal ini masih memiliki shift aktif ({$terminalActive->shift_name}) yang sedang berjalan oleh {$terminalActive->user->name}. Harap tutup shift sebelumnya terlebih dahulu sebelum membuka shift baru.",
+                        'shift' => $terminalActive
+                    ], 422);
+                }
+
+                $todayStart = Carbon::today();
+                $todayEnd = Carbon::tomorrow()->subSecond();
+
+                // Rule 1: Check if this shift name has already been closed on this terminal today (Option 1: Per Kassa)
+                $terminalClosedToday = Shift::where('terminal_id', $terminalId)
+                    ->where('shift_name', $validated['shift_name'])
+                    ->where('status', 'CLOSED')
+                    ->whereBetween('created_at', [$todayStart, $todayEnd])
+                    ->with('user')
+                    ->first();
+
+                if ($terminalClosedToday) {
+                    $closedByName = $terminalClosedToday->user ? $terminalClosedToday->user->name : 'kasir sebelumnya';
+                    return response()->json([
+                        'message' => "Gagal Buka Shift: {$validated['shift_name']} di kassa ini sudah ditutup hari ini (oleh {$closedByName}). Kassa ini tidak dapat membuka kembali shift yang sama hari ini demi integritas laporan keuangan."
+                    ], 422);
+                }
+
+                // Rule 1b: Also check if this cashier has already closed this shift name today elsewhere
+                $cashierClosedToday = Shift::where('user_id', $user->id)
+                    ->where('shift_name', $validated['shift_name'])
+                    ->where('status', 'CLOSED')
+                    ->whereBetween('created_at', [$todayStart, $todayEnd])
+                    ->first();
+
+                if ($cashierClosedToday) {
+                    return response()->json([
+                        'message' => "Gagal Buka Shift: Anda sudah menutup {$validated['shift_name']} hari ini. Sistem menolak pembukaan kembali shift yang sama pada hari yang sama demi integritas laporan keuangan."
+                    ], 422);
+                }
+
+                $shift = Shift::create([
+                    'user_id' => $user->id,
+                    'branch_id' => $user->branch_id,
+                    'terminal_id' => $terminalId,
+                    'shift_name' => $validated['shift_name'],
+                    'start_time' => now(),
+                    'starting_cash' => $validated['starting_cash'],
+                    'status' => 'OPEN'
+                ]);
+
+                return response()->json([
+                    'message' => 'Shift berhasil dibuka.',
+                    'shift' => $shift
+                ]);
+            });
+        } finally {
+            $lock->release();
         }
-
-        $todayStart = Carbon::today();
-        $todayEnd = Carbon::tomorrow()->subSecond();
-
-        // Rule 1: Check if this shift name has already been closed on this terminal today (Option 1: Per Kassa)
-        $terminalClosedToday = Shift::where('terminal_id', $validated['terminal_id'])
-            ->where('shift_name', $validated['shift_name'])
-            ->where('status', 'CLOSED')
-            ->whereBetween('created_at', [$todayStart, $todayEnd])
-            ->with('user')
-            ->first();
-
-        if ($terminalClosedToday) {
-            $closedByName = $terminalClosedToday->user ? $terminalClosedToday->user->name : 'kasir sebelumnya';
-            return response()->json([
-                'message' => "Gagal Buka Shift: {$validated['shift_name']} di kassa ini sudah ditutup hari ini (oleh {$closedByName}). Kassa ini tidak dapat membuka kembali shift yang sama hari ini demi integritas laporan keuangan."
-            ], 422);
-        }
-
-        // Rule 1b: Also check if this cashier has already closed this shift name today elsewhere
-        $cashierClosedToday = Shift::where('user_id', $user->id)
-            ->where('shift_name', $validated['shift_name'])
-            ->where('status', 'CLOSED')
-            ->whereBetween('created_at', [$todayStart, $todayEnd])
-            ->first();
-
-        if ($cashierClosedToday) {
-            return response()->json([
-                'message' => "Gagal Buka Shift: Anda sudah menutup {$validated['shift_name']} hari ini. Sistem menolak pembukaan kembali shift yang sama pada hari yang sama demi integritas laporan keuangan."
-            ], 422);
-        }
-
-        $shift = Shift::create([
-            'user_id' => $user->id,
-            'branch_id' => $user->branch_id,
-            'terminal_id' => $validated['terminal_id'],
-            'shift_name' => $validated['shift_name'],
-            'start_time' => now(),
-            'starting_cash' => $validated['starting_cash'],
-            'status' => 'OPEN'
-        ]);
-
-        return response()->json([
-            'message' => 'Shift berhasil dibuka.',
-            'shift' => $shift
-        ]);
     }
 
     public function cashMovement(Request $request)

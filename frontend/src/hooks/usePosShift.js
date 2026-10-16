@@ -63,6 +63,19 @@ export const usePosShift = ({
           setLockScreenInfo({ status: data.status, message: data.message });
           setActiveShift(null);
           localStorage.removeItem('pos_active_shift');
+        } else if (data.status === 'CROSS_DAY_SHIFT_EXPIRED') {
+          setActiveShift(data.shift);
+          safeSetItem('pos_active_shift', JSON.stringify(data.shift));
+          setLockScreenInfo({
+            status: 'CROSS_DAY_SHIFT_EXPIRED',
+            message: data.message,
+            shift: data.shift
+          });
+          setAlertMsg({
+            text: data.message,
+            type: 'error',
+            persist: true
+          });
         } else if (data.shift) {
           setActiveShift(data.shift);
           safeSetItem('pos_active_shift', JSON.stringify(data.shift));
@@ -84,6 +97,19 @@ export const usePosShift = ({
           try {
             const parsed = JSON.parse(cachedShift);
             if (parsed && parsed.terminal_id === terminalId) {
+              // Cek tanggal shift offline apakah lintas hari
+              const shiftDate = parsed.start_time ? new Date(parsed.start_time).toDateString() : null;
+              const todayDate = new Date().toDateString();
+              if (shiftDate && shiftDate !== todayDate) {
+                setActiveShift(parsed);
+                setLockScreenInfo({
+                  status: 'CROSS_DAY_SHIFT_EXPIRED',
+                  message: `Peringatan: Shift ${parsed.shift_name} (Offline) dibuka pada tanggal kemarin dan belum ditutup! Anda wajib menutup shift kemarin terlebih dahulu sebelum membuka shift hari ini.`,
+                  shift: parsed
+                });
+                return;
+              }
+
               setActiveShift(parsed);
               setAlertMsg({
                 text: `Melanjutkan ${parsed.shift_name} (Offline) yang belum ditutup. Harap tutup shift ini jika ingin membuka shift baru.`,
@@ -142,6 +168,8 @@ export const usePosShift = ({
   }, [activeShift, terminalInfo?.id, authToken, setAlertMsg, syncTransactions]);
 
   const handleOpenShift = () => {
+    if (isProcessing) return;
+
     if (!startingCash || isNaN(startingCash)) {
       setAlertMsg({ text: 'Modal awal harus diisi dengan angka.', type: 'error' });
       return;
@@ -177,6 +205,8 @@ export const usePosShift = ({
       setAlertMsg({ text: 'Tidak ada koneksi internet. Shift offline dibuka secara lokal.', type: 'info' });
       return;
     }
+
+    setIsProcessing(true);
 
     fetch('/api/v1/shifts/open', {
       method: 'POST',
@@ -242,6 +272,9 @@ export const usePosShift = ({
           window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
         }
         setAlertMsg({ text: 'Koneksi server terputus. Shift offline dibuka secara lokal.', type: 'info' });
+      })
+      .finally(() => {
+        setIsProcessing(false);
       });
   };
 
@@ -261,6 +294,7 @@ export const usePosShift = ({
     if (activeShift.is_offline || !navigator.onLine) {
       localStorage.removeItem('pos_active_shift');
       setActiveShift(null);
+      setLockScreenInfo(null);
       setIsCloseShiftModalOpen(false);
       setIsProcessing(false);
       setAlertMsg({ text: 'Shift offline berhasil ditutup (Lokal). Terima kasih!', type: 'success', persist: true });
@@ -288,6 +322,7 @@ export const usePosShift = ({
         if (data.shift) {
           localStorage.removeItem('pos_active_shift');
           setActiveShift(null);
+          setLockScreenInfo(null);
           setIsCloseShiftModalOpen(false);
           setAlertMsg({ text: 'Shift berhasil ditutup. Menyiapkan Laporan EOD...', type: 'success' });
           setEodReportData(data.shift);
@@ -299,6 +334,7 @@ export const usePosShift = ({
         console.error('Failed to close shift online, closing locally:', err);
         localStorage.removeItem('pos_active_shift');
         setActiveShift(null);
+        setLockScreenInfo(null);
         setIsCloseShiftModalOpen(false);
         setIsProcessing(false);
         setAlertMsg({ text: 'Koneksi terputus. Shift ditutup secara lokal. Terima kasih!', type: 'success', persist: true });
