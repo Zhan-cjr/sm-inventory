@@ -79,8 +79,12 @@ class AdminPanelProvider extends PanelProvider
                 fn (): string => '<link rel="stylesheet" href="/css/admin-custom.css?v=' . filemtime(public_path('css/admin-custom.css')) . '">' . view('filament.print-styles')->render(),
             )
             ->renderHook(
+                'panels::page.header.actions.after',
+                fn (): string => view('filament.components.page-help-button')->render(),
+            )
+            ->renderHook(
                 'panels::body.end',
-                fn (): string => \Illuminate\Support\Facades\Blade::render('@livewire("import-progress-bar")@auth @livewire("chat-ai-widget") @endauth'),
+                fn (): string => \Illuminate\Support\Facades\Blade::render('@livewire("import-progress-bar")@auth @livewire("chat-ai-widget") @livewire("user-guide-drawer") @endauth'),
             )
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\Filament\Clusters')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')

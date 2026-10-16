@@ -64,4 +64,18 @@
         </svg>
         <span style="white-space: nowrap;">Stok Transfer</span>
     </a>
+
+    <!-- 7. Petunjuk Penggunaan & SOP (F1) -->
+    <button type="button" 
+            onclick="Livewire.dispatch('open-user-guide', { menu: null, url: window.location.pathname })" 
+            title="Buku Panduan & Petunjuk Menu Ini (F1)"
+            style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; font-weight: 700; border-radius: 8px; text-decoration: none; transition: all 0.15s ease; border: 1px solid rgba(16, 185, 129, 0.4); cursor: pointer;"
+            class="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 shadow-sm">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span style="white-space: nowrap;">Petunjuk (F1)</span>
+    </button>
 </div>

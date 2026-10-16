@@ -7,8 +7,8 @@ export const CloseShiftModal = ({
   activeShift,
   actualCash,
   setActualCash,
-  formatThousandSeparator,
-  formatCurrency,
+  formatThousandSeparator = (val) => (val ? Number(val).toLocaleString('id-ID') : ''),
+  formatCurrency = (val) => 'Rp ' + Number(val || 0).toLocaleString('id-ID'),
   onCloseShift,
   isProcessing
 }) => {

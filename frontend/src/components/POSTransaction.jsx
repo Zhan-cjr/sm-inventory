@@ -779,7 +779,7 @@ export const POSTransaction = ({
             closedShiftsToday={closedShiftsToday}
             isCloseShiftModalOpen={isCloseShiftModalOpen}
             setIsCloseShiftModalOpen={setIsCloseShiftModalOpen}
-            activeShift={activeShift}
+            activeShift={activeShift || lockScreenInfo?.shift}
             actualCash={actualCash}
             setActualCash={setActualCash}
             handleCloseShift={handleCloseShift}
@@ -795,8 +795,10 @@ export const POSTransaction = ({
             handleCashMovement={handleCashMovement}
             eodReportData={eodReportData}
             setEodReportData={setEodReportData}
+            branchSettings={branchSettings}
             onLogout={onLogout}
             formatThousandSeparator={formatThousandSeparator}
+            formatCurrency={formatCurrency}
           />
         )}
       </div>
