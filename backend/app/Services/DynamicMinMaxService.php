@@ -166,25 +166,28 @@ class DynamicMinMaxService
                 $minCases = '';
                 $maxCases = '';
                 $safetyCases = '';
-                $bindings = [];
+                $minBindings = [];
+                $maxBindings = [];
+                $safetyBindings = [];
 
                 foreach ($chunk as $item) {
                     $ids[] = $item['id'];
+
                     $minCases .= "WHEN ? THEN ? ";
-                    $bindings[] = $item['id'];
-                    $bindings[] = $item['min_qty'];
+                    $minBindings[] = $item['id'];
+                    $minBindings[] = $item['min_qty'];
 
                     $maxCases .= "WHEN ? THEN ? ";
-                    $bindings[] = $item['id'];
-                    $bindings[] = $item['max_qty'];
+                    $maxBindings[] = $item['id'];
+                    $maxBindings[] = $item['max_qty'];
 
                     $safetyCases .= "WHEN ? THEN ? ";
-                    $bindings[] = $item['id'];
-                    $bindings[] = $item['safety_stock'];
+                    $safetyBindings[] = $item['id'];
+                    $safetyBindings[] = $item['safety_stock'];
                 }
 
                 $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
-                $bindings = array_merge($bindings, $ids);
+                $bindings = array_merge($minBindings, $maxBindings, $safetyBindings, $ids);
 
                 DB::update("
                     UPDATE stocks 
