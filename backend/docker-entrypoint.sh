@@ -29,8 +29,8 @@ fi
 
 # Ensure php uploads configuration
 cat << 'EOF' > /usr/local/etc/php/conf.d/uploads.ini
-upload_max_filesize = 50M
-post_max_size = 50M
+upload_max_filesize = 100M
+post_max_size = 100M
 memory_limit = 512M
 max_execution_time = 300
 EOF
