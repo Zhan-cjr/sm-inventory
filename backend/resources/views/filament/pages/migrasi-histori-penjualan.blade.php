@@ -192,13 +192,13 @@
                 Mendukung <strong>1 File Multi-Sheet</strong> (beda bulan beda sheet) maupun <strong>Multi-File Batch</strong> (banyak file bulanan ditarik sekaligus). Sistem otomatis membaca Barcode, Nama, Qty, dan Periode tanggal.
             </p>
 
-            <div x-data="{ isDragging: false, uploading: false, progress: 0 }"
+            <div x-data="{ isDragging: false, uploading: false, progress: 0, uploadError: null }"
                  x-on:dragover.prevent="isDragging = true"
                  x-on:dragleave.prevent="isDragging = false"
                  x-on:drop.prevent="isDragging = false; if ($event.dataTransfer.files.length) { $refs.fileInput.files = $event.dataTransfer.files; $refs.fileInput.dispatchEvent(new Event('change', { bubbles: true })); }"
-                 x-on:livewire-upload-start="uploading = true; progress = 0"
-                 x-on:livewire-upload-finish="uploading = false"
-                 x-on:livewire-upload-error="uploading = false"
+                 x-on:livewire-upload-start="uploading = true; progress = 0; uploadError = null"
+                 x-on:livewire-upload-finish="uploading = false; uploadError = null"
+                 x-on:livewire-upload-error="uploading = false; uploadError = 'Gagal mengunggah file. Pastikan ukuran file di bawah 100MB dan format .xls / .xlsx.'"
                  x-on:livewire-upload-progress="progress = $event.detail.progress"
                  class="mig-dropzone"
                  :style="isDragging ? 'border-color: #0284c7; background: #f0f9ff;' : ''"
@@ -234,6 +234,15 @@
                         <div style="background: linear-gradient(90deg, #0284c7, #38bdf8); height: 100%; transition: width 0.2s;" :style="'width: ' + progress + '%'"></div>
                     </div>
                 </div>
+
+                <!-- Pesan Error jika Upload Gagal -->
+                <div x-show="uploadError" x-text="uploadError" style="margin-top: 0.75rem; color: #dc2626; font-size: 0.85rem; font-weight: 600;"></div>
+                @error('files.*')
+                    <div style="margin-top: 0.5rem; color: #dc2626; font-size: 0.85rem; font-weight: 600;">{{ $message }}</div>
+                @enderror
+                @error('files')
+                    <div style="margin-top: 0.5rem; color: #dc2626; font-size: 0.85rem; font-weight: 600;">{{ $message }}</div>
+                @enderror
             </div>
 
             <!-- Uploaded files indicator -->
