@@ -68,6 +68,41 @@ class SuggestedOrderService
             ->pluck('total_qty', 'product_id')
             ->toArray();
 
+        // Fallback cerdas: Jika ada produk yang belum memiliki transaksi POS (misal cabang baru migrasi),
+        // gunakan rata-rata bulanan dari histori import 3 bulan terakhir
+        if ($branchId) {
+            $latestPeriods = DB::table('product_monthly_sales_histories')
+                ->where('branch_id', $branchId)
+                ->select('year', 'month')
+                ->distinct()
+                ->orderByDesc('year')
+                ->orderByDesc('month')
+                ->take(3)
+                ->get();
+
+            if ($latestPeriods->isNotEmpty()) {
+                $histSales = DB::table('product_monthly_sales_histories')
+                    ->where('branch_id', $branchId)
+                    ->where(function ($q) use ($latestPeriods) {
+                        foreach ($latestPeriods as $p) {
+                            $q->orWhere(function ($sq) use ($p) {
+                                $sq->where('year', $p->year)->where('month', $p->month);
+                            });
+                        }
+                    })
+                    ->groupBy('product_id')
+                    ->select('product_id', DB::raw('ROUND(AVG(quantity_sold), 1) as avg_monthly'))
+                    ->pluck('avg_monthly', 'product_id')
+                    ->toArray();
+
+                foreach ($histSales as $prodId => $avgQty) {
+                    if (!isset($sales[$prodId]) || (float)$sales[$prodId] <= 0) {
+                        $sales[$prodId] = (float)$avgQty;
+                    }
+                }
+            }
+        }
+
         $this->branchSales30DaysCache[$cacheKey] = $sales;
         return $sales;
     }
@@ -95,6 +130,40 @@ class SuggestedOrderService
             ->select('transaction_items.product_id', DB::raw('SUM(transaction_items.quantity) as total_qty'))
             ->pluck('total_qty', 'product_id')
             ->toArray();
+
+        // Fallback cerdas: Akumulasi penjualan 3 bulan terakhir dari histori import
+        if ($branchId) {
+            $latestPeriods = DB::table('product_monthly_sales_histories')
+                ->where('branch_id', $branchId)
+                ->select('year', 'month')
+                ->distinct()
+                ->orderByDesc('year')
+                ->orderByDesc('month')
+                ->take(3)
+                ->get();
+
+            if ($latestPeriods->isNotEmpty()) {
+                $histSales90 = DB::table('product_monthly_sales_histories')
+                    ->where('branch_id', $branchId)
+                    ->where(function ($q) use ($latestPeriods) {
+                        foreach ($latestPeriods as $p) {
+                            $q->orWhere(function ($sq) use ($p) {
+                                $sq->where('year', $p->year)->where('month', $p->month);
+                            });
+                        }
+                    })
+                    ->groupBy('product_id')
+                    ->select('product_id', DB::raw('SUM(quantity_sold) as sum_90d'))
+                    ->pluck('sum_90d', 'product_id')
+                    ->toArray();
+
+                foreach ($histSales90 as $prodId => $sumQty) {
+                    if (!isset($sales[$prodId]) || (float)$sales[$prodId] <= 0) {
+                        $sales[$prodId] = (float)$sumQty;
+                    }
+                }
+            }
+        }
 
         $this->branchSales90DaysCache[$cacheKey] = $sales;
         return $sales;

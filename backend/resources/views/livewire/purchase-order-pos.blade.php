@@ -448,7 +448,7 @@
                                             @if($item['stock'] <= 0 && $item['avg_bln'] <= 0)
                                                 Slow Moving (Sales 90 HR: {{ (int)($item['sales_90d'] ?? 0) }} pcs) — Disarankan Tinjau Ulang
                                             @else
-                                                Slow Moving (Sales 30 HR: {{ $item['avg_bln'] }} pcs) — Disarankan Tinjau Ulang
+                                                Slow Moving ({{ !empty($item['is_sales_from_history']) ? 'Histori' : 'Sales' }} 30 HR: {{ $item['avg_bln'] }} pcs) — Disarankan Tinjau Ulang
                                             @endif
                                         </span>
                                         <button type="button" 
@@ -466,7 +466,14 @@
                         @if(in_array('avg_bln', $visibleColumns)) 
                             <td class="pos-grid-td" style="text-align: right; color: #8b5cf6;">
                                 <div>{{ $item['avg_bln'] }}</div>
-                                @if(!empty($item['is_oos_with_history']))
+                                @if(!empty($item['is_sales_from_history']))
+                                    <div style="margin-top: 1px;">
+                                        <span style="display: inline-block; font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; background-color: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; white-space: nowrap;"
+                                              title="Rata-rata penjualan diambil dari histori import aplikasi lama">
+                                            Histori
+                                        </span>
+                                    </div>
+                                @elseif(!empty($item['is_oos_with_history']))
                                     <div style="margin-top: 2px;">
                                         <span style="display: inline-block; font-size: 0.62rem; font-weight: 700; padding: 1px 4px; border-radius: 4px; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; white-space: nowrap;"
                                               title="Pasokan sempat kosong. Total jual 90 hari: {{ (int)$item['sales_90d'] }} pcs (~{{ $item['avg_sales_active'] }} pcs/bln)">

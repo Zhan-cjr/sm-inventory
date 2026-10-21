@@ -14,6 +14,7 @@ use App\Models\StockAdjustmentItem;
 use App\Models\AdjustmentReason;
 use App\Models\GoodsReceiptItem;
 use App\Models\TransactionItem;
+use App\Models\ProductMonthlySalesHistory;
 use Filament\Notifications\Notification;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -762,6 +763,30 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 ->sum('quantity');
         }
 
+        // Fallback Cerdas: Jika transaksi POS kasir sistem baru kosong (misal cabang baru migrasi),
+        // gunakan data riwayat penjualan bulanan dari tabel ProductMonthlySalesHistory
+        $isSalesFromHistory = false;
+        if ($avgBln <= 0 && $branchId) {
+            $historyMonths = ProductMonthlySalesHistory::where('branch_id', $branchId)
+                ->where('product_id', $product->id)
+                ->orderByDesc('year')
+                ->orderByDesc('month')
+                ->take(3)
+                ->pluck('quantity_sold');
+
+            if ($historyMonths->isNotEmpty()) {
+                $histAvg = (float)$historyMonths->avg();
+                $histSum = (float)$historyMonths->sum();
+
+                if ($histAvg > 0) {
+                    $avgBln = round($histAvg, 1);
+                    $avgMinggu = round($avgBln / 4, 1);
+                    $sales90d = round($histSum, 1);
+                    $isSalesFromHistory = true;
+                }
+            }
+        }
+
         // Deteksi apakah stok habis karena retur:
         // Syarat Discontinue:
         // 1. Stok <= 0
@@ -828,6 +853,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             'sales_90d' => $sales90d,
             'is_oos_with_history' => $isOosWithHistory,
             'avg_sales_active' => $avgSalesActive,
+            'is_sales_from_history' => $isSalesFromHistory,
             'stock' => $stock ?? 0,
             'min_qty' => $minQty,
             'max_qty' => $maxQty,

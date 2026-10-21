@@ -26,3 +26,6 @@ Schedule::command('app:remind-pending-po')->dailyAt('08:00');
 
 // Menjalankan analisis pola belanja MBA otomatis setiap jam 2 dini hari
 Schedule::command('ai:train-mba')->dailyAt('02:00');
+
+// Menjalankan kalkulasi Min-Max dinamis dan safety stock otomatis setiap Senin jam 02:30 dini hari
+Schedule::command('inventory:recalculate-min-max')->weeklyOn(1, '02:30');
