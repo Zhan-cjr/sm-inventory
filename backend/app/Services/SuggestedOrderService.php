@@ -131,35 +131,46 @@ class SuggestedOrderService
             ->pluck('total_qty', 'product_id')
             ->toArray();
 
-        // Fallback cerdas: Akumulasi penjualan 3 bulan terakhir dari histori import
+        // Continuous Time-Series Stitching:
+        // Only pull pre-migration months from ProductMonthlySalesHistory if the 90-day window reaches back before earliest live transaction
         if ($branchId) {
-            $latestPeriods = DB::table('product_monthly_sales_histories')
+            $earliestTx = DB::table('transactions')
                 ->where('branch_id', $branchId)
-                ->select('year', 'month')
-                ->distinct()
-                ->orderByDesc('year')
-                ->orderByDesc('month')
-                ->take(3)
-                ->get();
+                ->where(function ($q) {
+                    $q->where('is_voided', 0)->orWhereNull('is_voided');
+                })
+                ->min('created_at');
+            $earliestLive = $earliestTx ? Carbon::parse($earliestTx) : null;
 
-            if ($latestPeriods->isNotEmpty()) {
-                $histSales90 = DB::table('product_monthly_sales_histories')
-                    ->where('branch_id', $branchId)
-                    ->where(function ($q) use ($latestPeriods) {
-                        foreach ($latestPeriods as $p) {
-                            $q->orWhere(function ($sq) use ($p) {
-                                $sq->where('year', $p->year)->where('month', $p->month);
-                            });
-                        }
-                    })
-                    ->groupBy('product_id')
-                    ->select('product_id', DB::raw('SUM(quantity_sold) as sum_90d'))
-                    ->pluck('sum_90d', 'product_id')
-                    ->toArray();
+            // If branch is NOT live yet, or has been live for less than 90 days:
+            if (!$earliestLive || $earliestLive->gt($ninetyDaysAgo)) {
+                $refDate = Carbon::now();
+                $preLiveCutoff = $earliestLive ? $earliestLive->copy()->startOfMonth() : $refDate;
 
-                foreach ($histSales90 as $prodId => $sumQty) {
-                    if (!isset($sales[$prodId]) || (float)$sales[$prodId] <= 0) {
-                        $sales[$prodId] = (float)$sumQty;
+                $preLivePeriods = [];
+                for ($i = 1; $i <= 3; $i++) {
+                    $dt = $refDate->copy()->subMonths($i);
+                    if ($dt->lt($preLiveCutoff)) {
+                        $preLivePeriods[] = ['year' => $dt->year, 'month' => $dt->month];
+                    }
+                }
+
+                if (!empty($preLivePeriods)) {
+                    $histQuery = DB::table('product_monthly_sales_histories')
+                        ->where('branch_id', $branchId)
+                        ->where(function ($q) use ($preLivePeriods) {
+                            foreach ($preLivePeriods as $p) {
+                                $q->orWhere(function ($sq) use ($p) {
+                                    $sq->where('year', $p['year'])->where('month', $p['month']);
+                                });
+                            }
+                        })
+                        ->groupBy('product_id')
+                        ->select('product_id', DB::raw('SUM(quantity_sold) as hist_qty'))
+                        ->pluck('hist_qty', 'product_id');
+
+                    foreach ($histQuery as $pId => $qty) {
+                        $sales[$pId] = ((float)($sales[$pId] ?? 0)) + (float)$qty;
                     }
                 }
             }
