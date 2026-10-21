@@ -16,6 +16,11 @@ class TelegramWebhookController extends Controller
             $update = $request->all();
 
             if (isset($update['callback_query'])) {
+                Log::info("Telegram webhook received callback_query", [
+                    'data' => $update['callback_query']['data'] ?? null,
+                    'user_id' => $update['callback_query']['from']['id'] ?? null,
+                    'chat_id' => $update['callback_query']['message']['chat']['id'] ?? null,
+                ]);
                 return $this->handleCallbackQuery($update['callback_query']);
             }
 
@@ -98,33 +103,14 @@ class TelegramWebhookController extends Controller
                     \Illuminate\Support\Facades\Cache::put($cacheKey, $chatHistory, now()->addMinutes(60));
                     
                     // Format response jika ada data tabel
-                    $data = $aiResponse->json('data');
-                    if (!empty($data) && is_array($data)) {
-                        $reply .= "\n\n📊 *Data Pendukung:*\n";
-                        foreach (array_slice($data, 0, 5) as $row) {
-                            $reply .= "• ";
-                            $rowItems = [];
-                            foreach ($row as $key => $val) {
-                                $rowItems[] = "{$val}";
-                            }
-                            $reply .= implode(" - ", $rowItems) . "\n";
-                        }
-                        if (count($data) > 5) {
-                            $reply .= "_(...dan " . (count($data) - 5) . " data lainnya)_";
-                        }
-                    }
-
+                    $this->sendMessage($botToken, $chatId, $reply);
                 } else {
-                    $reply = "❌ Maaf, AI Service sedang mengalami gangguan atau membalas dengan error.";
-                    Log::error("AI Service Error", ['response' => $aiResponse->body()]);
+                    $this->sendMessage($botToken, $chatId, "Maaf, asisten AI sedang mengalami kendala. Silakan coba sesaat lagi.");
                 }
             } catch (\Exception $e) {
-                $reply = "❌ Maaf, tidak dapat terhubung ke AI Service (Server Offline).";
-                Log::error("AI Service Connection Error", ['error' => $e->getMessage()]);
+                Log::error("Error communicating with AI service: " . $e->getMessage());
+                $this->sendMessage($botToken, $chatId, "Maaf, tidak dapat terhubung ke AI saat ini.");
             }
-
-            // 4. Kirim balasan ke Telegram
-            $this->sendMessage($botToken, $chatId, $reply);
 
             return response()->json(['status' => 'ok']);
 
@@ -138,11 +124,18 @@ class TelegramWebhookController extends Controller
     {
         if (!$token) return;
 
-        Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+        $response = Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
             'chat_id' => $chatId,
             'text' => $text,
             'parse_mode' => 'Markdown',
         ]);
+        if (!$response->successful()) {
+            Log::warning("Telegram sendMessage failed", [
+                'chat_id' => $chatId,
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+        }
     }
 
     private function sendChatAction($token, $chatId, $action)
@@ -163,7 +156,14 @@ class TelegramWebhookController extends Controller
             $payload['text'] = $text;
             $payload['show_alert'] = $showAlert;
         }
-        Http::post("https://api.telegram.org/bot{$token}/answerCallbackQuery", $payload);
+        $response = Http::post("https://api.telegram.org/bot{$token}/answerCallbackQuery", $payload);
+        if (!$response->successful()) {
+            Log::warning("Telegram answerCallbackQuery failed", [
+                'callback_query_id' => $callbackQueryId,
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+        }
     }
 
     private function editMessageText($token, $chatId, $messageId, $text, $replyMarkup = null)
@@ -179,7 +179,15 @@ class TelegramWebhookController extends Controller
         if ($replyMarkup) {
             $payload['reply_markup'] = $replyMarkup;
         }
-        Http::post("https://api.telegram.org/bot{$token}/editMessageText", $payload);
+        $response = Http::post("https://api.telegram.org/bot{$token}/editMessageText", $payload);
+        if (!$response->successful()) {
+            Log::error("Telegram editMessageText failed", [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+        }
     }
 
     private function handleCallbackQuery($callbackQuery)
@@ -197,11 +205,15 @@ class TelegramWebhookController extends Controller
         }
 
         if (!str_starts_with($data, 'action:') && !str_starts_with($data, 'pos_auth:')) {
+            $this->answerCallbackQuery($botToken, $callbackQueryId);
             return response()->json(['status' => 'ok']);
         }
 
         $parts = explode(':', $data);
-        if (count($parts) < 3) return response()->json(['status' => 'ok']);
+        if (count($parts) < 3) {
+            $this->answerCallbackQuery($botToken, $callbackQueryId);
+            return response()->json(['status' => 'ok']);
+        }
         
         $action = $parts[1];
         $id = $parts[2];
@@ -214,7 +226,8 @@ class TelegramWebhookController extends Controller
         
         if (!$approval || $approval->status !== 'pending') {
             $this->answerCallbackQuery($botToken, $callbackQueryId, "Permintaan persetujuan tidak ditemukan atau sudah diproses.", true);
-            $this->editMessageText($botToken, $chatId, $messageId, $callbackQuery['message']['text'] . "\n\n<i>Dokumen sudah diproses atau tidak ditemukan.</i>");
+            $baseText = htmlspecialchars($callbackQuery['message']['text'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $this->editMessageText($botToken, $chatId, $messageId, $baseText . "\n\n<i>Dokumen sudah diproses atau tidak ditemukan.</i>");
             return response()->json(['status' => 'ok']);
         }
 
@@ -271,7 +284,8 @@ class TelegramWebhookController extends Controller
                     return (float)$item->quantity_ordered > (float)$item->quantity_suggested;
                 });
 
-                $text = $callbackQuery['message']['text'] . "\n\n<b>🔍 Rincian Item (Over Order):</b>\n";
+                $baseText = htmlspecialchars($callbackQuery['message']['text'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $text = $baseText . "\n\n<b>🔍 Rincian Item (Over Order):</b>\n";
                 
                 if ($overItems->isEmpty()) {
                     $text .= "<i>Semua item (" . $model->items->count() . ") sesuai dengan saran order.</i>";
@@ -306,12 +320,13 @@ class TelegramWebhookController extends Controller
 
                         $promoInfo = '';
                         if (!empty($item->promo_note)) {
-                            $promoInfo = " 🏷️ <i>{$item->promo_note}</i>";
+                            $safePromo = htmlspecialchars($item->promo_note, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                            $promoInfo = " 🏷️ <i>{$safePromo}</i>";
                         } elseif ((float)$item->discount_1 > 0) {
                             $promoInfo = " 🏷️ <i>Disc. " . (float)$item->discount_1 . "%</i>";
                         }
 
-                        $prodName = htmlspecialchars($item->product->name ?? 'Unknown', ENT_QUOTES);
+                        $prodName = htmlspecialchars($item->product->name ?? 'Unknown', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                         $text .= "• <b>{$prodName}</b>\n";
                         $text .= "  Order: <b>" . (float)$item->quantity_ordered . "</b> (Saran: " . (float)$item->quantity_suggested . " | Stok: {$currentStock} | Jual: {$avgBln}/bln){$oosInfo}{$promoInfo}\n";
                         $count++;
@@ -328,7 +343,7 @@ class TelegramWebhookController extends Controller
                 ]);
 
                 $this->editMessageText($botToken, $chatId, $messageId, $text, $replyMarkup);
-                $this->answerCallbackQuery($botToken, $callbackQueryId);
+                $this->answerCallbackQuery($botToken, $callbackQueryId, "Menampilkan rincian over order");
                 return response()->json(['status' => 'ok']);
             }
             
@@ -342,28 +357,32 @@ class TelegramWebhookController extends Controller
             if ($action === 'reject') {
                 $notes = "Ditolak dari Telegram oleh {$approverName}";
                 $model->reject($approverId, $notes);
-                $statusText = "❌ <b>Ditolak</b> oleh {$approverName}";
+                $statusText = "❌ <b>Ditolak</b> oleh " . htmlspecialchars($approverName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             } else {
                 $model->approve($approverId, $notes);
-                $statusText = "✅ <b>Disetujui</b> oleh {$approverName}";
+                $statusText = "✅ <b>Disetujui</b> oleh " . htmlspecialchars($approverName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             }
 
-            $newText = $callbackQuery['message']['text'] . "\n\n" . $statusText;
+            $baseText = htmlspecialchars($callbackQuery['message']['text'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $newText = $baseText . "\n\n" . $statusText;
             $this->editMessageText($botToken, $chatId, $messageId, $newText); // No reply_markup means buttons are removed
             $this->answerCallbackQuery($botToken, $callbackQueryId, "Berhasil memproses dokumen!");
             return response()->json(['status' => 'ok']);
         }
 
+        $this->answerCallbackQuery($botToken, $callbackQueryId);
         return response()->json(['status' => 'ok']);
     }
 
     private function handlePosAuthCallback($callbackQuery, $callbackQueryId, $action, $authRequestId, $botToken, $chatId, $messageId, $telegramUserId, $telegramName)
     {
         $authRequest = \App\Models\AuthorizationRequest::with(['cashier'])->find($authRequestId);
+        $chatType = $callbackQuery['message']['chat']['type'] ?? 'private';
         
         if (!$authRequest || $authRequest->status !== 'PENDING') {
             $this->answerCallbackQuery($botToken, $callbackQueryId, "Permintaan otorisasi tidak ditemukan atau sudah diproses.", true);
-            $this->editMessageText($botToken, $chatId, $messageId, $callbackQuery['message']['text'] . "\n\n<i>Otorisasi sudah diproses atau tidak ditemukan.</i>");
+            $baseText = htmlspecialchars($callbackQuery['message']['text'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $this->editMessageText($botToken, $chatId, $messageId, $baseText . "\n\n<i>Otorisasi sudah diproses atau tidak ditemukan.</i>");
             return response()->json(['status' => 'ok']);
         }
 
@@ -376,6 +395,15 @@ class TelegramWebhookController extends Controller
             if ($user->branch_id === null || $user->branch_id === $authRequest->branch_id) {
                 $isAuthorized = true;
             }
+        } elseif (in_array($chatType, ['group', 'supergroup'])) {
+            // Check if group is an official registered organization group
+            $isKnownGroup = \App\Models\Organization::where('telegram_group_po_approval', (string) $chatId)
+                ->orWhere('telegram_group_stock_correction', (string) $chatId)
+                ->orWhere('telegram_group_warehouse_check', (string) $chatId)
+                ->exists();
+            if ($isKnownGroup) {
+                $isAuthorized = true;
+            }
         }
 
         if (!$isAuthorized) {
@@ -384,18 +412,20 @@ class TelegramWebhookController extends Controller
         }
 
         if ($action === 'review') {
-            $text = $callbackQuery['message']['text'] . "\n\n<b>🔍 Rincian Permintaan:</b>\n";
+            $baseText = htmlspecialchars($callbackQuery['message']['text'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $text = $baseText . "\n\n<b>🔍 Rincian Permintaan:</b>\n";
             
             if (!empty($authRequest->details)) {
                 foreach ($authRequest->details as $key => $val) {
                     // Prettify keys
-                    $prettyKey = ucwords(str_replace('_', ' ', $key));
+                    $prettyKey = htmlspecialchars(ucwords(str_replace('_', ' ', (string) $key)), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                     if (is_numeric($val)) {
                         if ($key === 'discount_amount' || $key === 'amount' || $key === 'total') {
                             $val = "Rp " . number_format($val, 0, ',', '.');
                         }
                     }
-                    $text .= "- {$prettyKey}: {$val}\n";
+                    $safeVal = htmlspecialchars((string) $val, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                    $text .= "- {$prettyKey}: {$safeVal}\n";
                 }
             } else {
                 $text .= "<i>Tidak ada rincian tambahan.</i>";
@@ -411,7 +441,7 @@ class TelegramWebhookController extends Controller
             ]);
 
             $this->editMessageText($botToken, $chatId, $messageId, $text, $replyMarkup);
-            $this->answerCallbackQuery($botToken, $callbackQueryId);
+            $this->answerCallbackQuery($botToken, $callbackQueryId, "Menampilkan rincian otorisasi");
             return response()->json(['status' => 'ok']);
         }
 
@@ -420,17 +450,20 @@ class TelegramWebhookController extends Controller
             
             $authRequest->update([
                 'status' => $status,
-                'supervisor_id' => $user->id
+                'supervisor_id' => $user?->id
             ]);
 
-            $statusText = $action === 'approve' ? "✅ <b>Disetujui</b> oleh {$user->name} (Telegram)" : "❌ <b>Ditolak</b> oleh {$user->name} (Telegram)";
-            $newText = $callbackQuery['message']['text'] . "\n\n" . $statusText;
+            $approverName = htmlspecialchars($user?->name ?? $telegramName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $statusText = $action === 'approve' ? "✅ <b>Disetujui</b> oleh {$approverName} (Telegram)" : "❌ <b>Ditolak</b> oleh {$approverName} (Telegram)";
+            $baseText = htmlspecialchars($callbackQuery['message']['text'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $newText = $baseText . "\n\n" . $statusText;
             
             $this->editMessageText($botToken, $chatId, $messageId, $newText);
             $this->answerCallbackQuery($botToken, $callbackQueryId, "Otorisasi berhasil diproses!");
             return response()->json(['status' => 'ok']);
         }
 
+        $this->answerCallbackQuery($botToken, $callbackQueryId);
         return response()->json(['status' => 'ok']);
     }
 }
