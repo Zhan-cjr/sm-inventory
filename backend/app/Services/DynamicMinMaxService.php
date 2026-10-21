@@ -110,6 +110,7 @@ class DynamicMinMaxService
 
         $updatedCount = 0;
         $itemsRecalculated = [];
+        $bulkUpdates = [];
 
         foreach ($stocks as $stock) {
             $pId = $stock->product_id;
@@ -130,13 +131,13 @@ class DynamicMinMaxService
             $oldMin = (int)$stock->min_qty;
             $oldMax = (int)$stock->max_qty;
 
-            // Apply updates without firing 5000+ individual model events / activity logs
-            Stock::withoutEvents(function () use ($stock, $calc) {
-                $stock->min_qty = $calc['min_qty'];
-                $stock->max_qty = $calc['max_qty'];
-                $stock->safety_stock = $calc['safety_stock'];
-                $stock->saveQuietly();
-            });
+            // Collect update payload for high-performance bulk update
+            $bulkUpdates[] = [
+                'id' => $stock->id,
+                'min_qty' => $calc['min_qty'],
+                'max_qty' => $calc['max_qty'],
+                'safety_stock' => $calc['safety_stock'],
+            ];
 
             $updatedCount++;
 
@@ -154,6 +155,46 @@ class DynamicMinMaxService
                     'old_max' => $oldMax,
                     'new_max' => $calc['max_qty'],
                 ];
+            }
+        }
+
+        // Ultra-fast bulk updates in chunks of 500 (replaces 5,000+ individual round-trip queries over remote MySQL network)
+        if (!empty($bulkUpdates)) {
+            $now = now()->toDateTimeString();
+            foreach (array_chunk($bulkUpdates, 500) as $chunk) {
+                $ids = [];
+                $minCases = '';
+                $maxCases = '';
+                $safetyCases = '';
+                $bindings = [];
+
+                foreach ($chunk as $item) {
+                    $ids[] = $item['id'];
+                    $minCases .= "WHEN ? THEN ? ";
+                    $bindings[] = $item['id'];
+                    $bindings[] = $item['min_qty'];
+
+                    $maxCases .= "WHEN ? THEN ? ";
+                    $bindings[] = $item['id'];
+                    $bindings[] = $item['max_qty'];
+
+                    $safetyCases .= "WHEN ? THEN ? ";
+                    $bindings[] = $item['id'];
+                    $bindings[] = $item['safety_stock'];
+                }
+
+                $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
+                $bindings = array_merge($bindings, $ids);
+
+                DB::update("
+                    UPDATE stocks 
+                    SET 
+                        min_qty = CASE id {$minCases} END,
+                        max_qty = CASE id {$maxCases} END,
+                        safety_stock = CASE id {$safetyCases} END,
+                        updated_at = '{$now}'
+                    WHERE id IN ({$idPlaceholders})
+                ", $bindings);
             }
         }
 

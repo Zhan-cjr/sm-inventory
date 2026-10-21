@@ -167,11 +167,13 @@ class SalesHistoryImportService
         array &$skuMap,
         string $branchId
     ): array {
-        $highestRow = $sheet->getHighestRow();
+        // Fast in-memory array reading (keyed by 1-based row and column letters 'A', 'B'...)
+        $sheetData = $sheet->toArray(null, false, false, true);
+        $highestRow = count($sheetData);
         $highestCol = $sheet->getHighestColumn();
 
         // 1. Detect Year & Month from sheet content (rows 1-7) or sheet name
-        [$year, $month] = $this->detectPeriod($sheet, $sheetName);
+        [$year, $month] = $this->detectPeriod($sheet, $sheetName, $sheetData);
 
         // 2. Find table header row
         $headerRowIndex = null;
@@ -185,7 +187,7 @@ class SalesHistoryImportService
         for ($row = 1; $row <= min(15, $highestRow); $row++) {
             $rowValues = [];
             for ($col = 'A'; $col <= 'Z'; $col++) {
-                $val = trim((string)$sheet->getCell($col . $row)->getValue());
+                $val = trim((string)($sheetData[$row][$col] ?? ''));
                 if (!empty($val)) {
                     $rowValues[$col] = strtolower($val);
                 }
@@ -244,10 +246,13 @@ class SalesHistoryImportService
         $productQtyAccumulator = [];
 
         for ($row = $headerRowIndex + 1; $row <= $highestRow; $row++) {
-            $skuVal = $colMap['sku'] ? trim((string)$sheet->getCell($colMap['sku'] . $row)->getValue()) : '';
-            $barcodeVal = $colMap['barcode'] ? trim((string)$sheet->getCell($colMap['barcode'] . $row)->getValue()) : '';
-            $nameVal = $colMap['name'] ? trim((string)$sheet->getCell($colMap['name'] . $row)->getValue()) : '';
-            $qtyRaw = $colMap['qty'] ? $sheet->getCell($colMap['qty'] . $row)->getValue() : null;
+            $rowRow = $sheetData[$row] ?? null;
+            if (!$rowRow) continue;
+
+            $skuVal = $colMap['sku'] ? trim((string)($rowRow[$colMap['sku']] ?? '')) : '';
+            $barcodeVal = $colMap['barcode'] ? trim((string)($rowRow[$colMap['barcode']] ?? '')) : '';
+            $nameVal = $colMap['name'] ? trim((string)($rowRow[$colMap['name']] ?? '')) : '';
+            $qtyRaw = $colMap['qty'] ? ($rowRow[$colMap['qty']] ?? null) : null;
 
             // Stop or skip if row is blank or a "Total" summary line
             if (empty($skuVal) && empty($barcodeVal)) {
@@ -313,12 +318,12 @@ class SalesHistoryImportService
     /**
      * Auto-detect Period (Year, Month) from sheet headers or sheet name.
      */
-    public function detectPeriod(Worksheet $sheet, string $sheetName): array
+    public function detectPeriod(Worksheet $sheet, string $sheetName, ?array $sheetData = null): array
     {
         // 1. Search header rows 1 to 7 for "Periode Laporan : 01-09-2026 - 30-09-2026"
         for ($row = 1; $row <= 7; $row++) {
             for ($col = 'A'; $col <= 'G'; $col++) {
-                $val = (string)$sheet->getCell($col . $row)->getValue();
+                $val = $sheetData ? (string)($sheetData[$row][$col] ?? '') : (string)$sheet->getCell($col . $row)->getValue();
                 if (empty($val)) continue;
 
                 // Match DD-MM-YYYY or DD/MM/YYYY
