@@ -28,18 +28,68 @@ trait HasPosDraft
         $reflection = new \ReflectionClass($this);
         $properties = $reflection->getProperties(\ReflectionProperty::IS_PUBLIC);
         
+        $ignoredProperties = [
+            'purchaseOrder', 'goodsReceipt', 'purchaseReturn', 'stockAdjustment',
+            'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image',
+            'scan_image', 'purchaseOrdersList', 'purchaseOrders',
+            // Promo modal states & file uploads
+            'promoFile', 'parsedPromoItems', 'excelSheets', 'excelColumns',
+            'showPromoModal', 'promoErrorMessage', 'promoText'
+        ];
+
         foreach ($properties as $prop) {
             // Only save properties declared in the specific component (not Livewire internals)
             if ($prop->class === static::class) {
                 $name = $prop->getName();
                 // Ignore model instances, large arrays, and file uploads
-                if (!in_array($name, ['purchaseOrder', 'goodsReceipt', 'purchaseReturn', 'stockAdjustment', 'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image', 'scan_image', 'purchaseOrdersList', 'purchaseOrders'])) {
-                    $draftData[$name] = $this->{$name};
+                if (in_array($name, $ignoredProperties)) {
+                    continue;
+                }
+
+                $val = $this->{$name};
+
+                // Exclude any file uploads or resources or objects that cannot be serialized
+                if ($this->isUnserializable($val)) {
+                    continue;
+                }
+
+                $draftData[$name] = $val;
+            }
+        }
+
+        try {
+            Cache::put('pos_draft_' . static::class . '_' . auth()->id(), $draftData, now()->addDays(3));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('POS saveDraft failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Check if a value cannot or should not be serialized
+     */
+    protected function isUnserializable($value): bool
+    {
+        if (is_resource($value)) {
+            return true;
+        }
+
+        if (is_object($value)) {
+            if ($value instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile
+                || $value instanceof \Symfony\Component\HttpFoundation\File\UploadedFile
+                || $value instanceof \Closure) {
+                return true;
+            }
+        }
+
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if ($this->isUnserializable($item)) {
+                    return true;
                 }
             }
         }
 
-        Cache::put('pos_draft_' . static::class . '_' . auth()->id(), $draftData, now()->addDays(3));
+        return false;
     }
 
     /**

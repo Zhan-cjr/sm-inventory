@@ -17,12 +17,14 @@ class SuggestedOrderService
     protected array $aiCache = [];
     protected array $stockCalculationCache = [];
     protected array $branchSales30DaysCache = [];
+    protected array $branchSales90DaysCache = [];
 
     public function clearCache(?string $branchId = null): void
     {
         $this->aiCache = [];
         $this->stockCalculationCache = [];
         $this->branchSales30DaysCache = [];
+        $this->branchSales90DaysCache = [];
 
         if ($branchId) {
             Cache::forget("suggested_orders_ai_{$branchId}");
@@ -67,6 +69,34 @@ class SuggestedOrderService
             ->toArray();
 
         $this->branchSales30DaysCache[$cacheKey] = $sales;
+        return $sales;
+    }
+
+    protected function getBranchSales90Days(?string $branchId = null): array
+    {
+        $cacheKey = $branchId ?: 'all';
+        if (isset($this->branchSales90DaysCache[$cacheKey])) {
+            return $this->branchSales90DaysCache[$cacheKey];
+        }
+
+        $ninetyDaysAgo = Carbon::now()->subDays(90);
+        $query = DB::table('transaction_items')
+            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            ->where('transactions.created_at', '>=', $ninetyDaysAgo)
+            ->where(function ($q) {
+                $q->where('transactions.is_voided', 0)->orWhereNull('transactions.is_voided');
+            });
+
+        if ($branchId) {
+            $query->where('transactions.branch_id', $branchId);
+        }
+
+        $sales = $query->groupBy('transaction_items.product_id')
+            ->select('transaction_items.product_id', DB::raw('SUM(transaction_items.quantity) as total_qty'))
+            ->pluck('total_qty', 'product_id')
+            ->toArray();
+
+        $this->branchSales90DaysCache[$cacheKey] = $sales;
         return $sales;
     }
 
@@ -195,6 +225,8 @@ class SuggestedOrderService
         
         $suggested_qty = 0;
         $status = 'OK';
+        $sales90Days = 0;
+        $isOosWithHistory = false;
         
         if ($current_qty < 0) {
             $suggested_qty = abs($current_qty) + $targetQty;
@@ -204,8 +236,19 @@ class SuggestedOrderService
                 $suggested_qty = $targetQty > 0 ? $targetQty : 1;
                 $status = 'CRITICAL';
             } else {
-                $suggested_qty = 0;
-                $status = 'OK';
+                // Fallback Cerdas: Pasokan Macet (OOS) - Hanya jika ada penjualan aktif signifikan di 90 hari (>= 10 pcs)
+                $branchSales90 = $this->getBranchSales90Days($stock->branch_id);
+                $sales90Days = (float)($branchSales90[$stock->product_id] ?? 0);
+                if ($sales90Days >= 10) {
+                    $isOosWithHistory = true;
+                    $activeAds = round($sales90Days / 90, 2);
+                    $targetQty = (float)ceil($activeAds * $targetDays);
+                    $suggested_qty = max(1, $targetQty);
+                    $status = 'CRITICAL';
+                } else {
+                    $suggested_qty = 0;
+                    $status = 'OK';
+                }
             }
         } else if ($current_qty <= $reorderPoint && $ads > 0) {
             $suggested_qty = max(0, $targetQty - $current_qty);
@@ -223,11 +266,13 @@ class SuggestedOrderService
             'name' => $stock->product->name ?? '-',
             'current_qty' => $current_qty,
             'ads' => $ads,
+            'sales_30d' => $sales30Days,
+            'sales_90d' => $sales90Days,
+            'is_oos_with_history' => $isOosWithHistory,
             'reorder_point' => $reorderPoint,
             'target_days' => $targetDays,
             'suggested_qty' => $suggested_qty,
             'status' => $status,
-            'lead_time' => $leadTime,
         ];
 
         $this->stockCalculationCache[$cacheKey] = $result;

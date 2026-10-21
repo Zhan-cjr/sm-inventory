@@ -17,4 +17,9 @@ class StockAdjustmentItem extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function stockAdjustment()
+    {
+        return $this->belongsTo(StockAdjustment::class);
+    }
 }

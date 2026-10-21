@@ -282,7 +282,38 @@ class TelegramWebhookController extends Controller
                             $text .= "<i>...dan " . ($overItems->count() - 15) . " item lainnya.</i>\n";
                             break;
                         }
-                        $text .= "- " . ($item->product->name ?? 'Unknown') . " | Qty: " . (float)$item->quantity_ordered . " (Saran: " . (float)$item->quantity_suggested . ")\n";
+
+                        $stock = \App\Models\Stock::where('product_id', $item->product_id)
+                            ->where('branch_id', $model->branch_id)
+                            ->first();
+                        $currentStock = $stock ? (float)$stock->quantity_on_hand : 0;
+
+                        $avgBln = (float)\App\Models\TransactionItem::where('product_id', $item->product_id)
+                            ->whereHas('transaction', fn($q) => $q->where('branch_id', $model->branch_id)->where('created_at', '>=', now()->subDays(30)))
+                            ->sum('quantity');
+
+                        $oosInfo = '';
+                        if ($avgBln <= 0 && $currentStock <= 0) {
+                            $s90 = (float)\App\Models\TransactionItem::where('product_id', $item->product_id)
+                                ->whereHas('transaction', fn($q) => $q->where('branch_id', $model->branch_id)->where('created_at', '>=', now()->subDays(90)))
+                                ->sum('quantity');
+                            if ($s90 >= 10) {
+                                $oosInfo = " ⚠️ <i>(Pasokan Macet, 90hr: " . (int)$s90 . " pcs)</i>";
+                            } elseif ($s90 > 0) {
+                                $oosInfo = " ⚠️ <i>(Slow Moving, 90hr: " . (int)$s90 . " pcs)</i>";
+                            }
+                        }
+
+                        $promoInfo = '';
+                        if (!empty($item->promo_note)) {
+                            $promoInfo = " 🏷️ <i>{$item->promo_note}</i>";
+                        } elseif ((float)$item->discount_1 > 0) {
+                            $promoInfo = " 🏷️ <i>Disc. " . (float)$item->discount_1 . "%</i>";
+                        }
+
+                        $prodName = htmlspecialchars($item->product->name ?? 'Unknown', ENT_QUOTES);
+                        $text .= "• <b>{$prodName}</b>\n";
+                        $text .= "  Order: <b>" . (float)$item->quantity_ordered . "</b> (Saran: " . (float)$item->quantity_suggested . " | Stok: {$currentStock} | Jual: {$avgBln}/bln){$oosInfo}{$promoInfo}\n";
                         $count++;
                     }
                 }

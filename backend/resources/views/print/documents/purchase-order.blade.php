@@ -60,6 +60,9 @@
                     <td>
                         {{ $item->product ? $item->product->name : '-' }}
                         <span style="color: #666; font-size: 0.85em;"> | Barcode: {{ $item->product ? $item->product->barcode : '-' }}</span>
+                        @if(!empty($item->promo_note))
+                            <br><span style="color: #166534; background-color: #dcfce7; padding: 1px 4px; font-size: 0.8em; font-weight: bold; border-radius: 3px; display: inline-block; margin-top: 2px;">🏷️ Promo: {{ $item->promo_note }}</span>
+                        @endif
                     </td>
                     <td class="text-center">{{ $item->quantity_ordered }}</td>
                     <td class="text-right">Rp {{ number_format($item->unit_cost ?? 0, 0, ',', '.') }}</td>

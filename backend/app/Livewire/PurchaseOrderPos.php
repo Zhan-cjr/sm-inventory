@@ -6,19 +6,29 @@ use Livewire\Component;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\Branch;
+use App\Models\Stock;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseReturnItem;
+use App\Models\StockAdjustmentItem;
+use App\Models\AdjustmentReason;
+use App\Models\GoodsReceiptItem;
+use App\Models\TransactionItem;
 use Filament\Notifications\Notification;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
+use Carbon\Carbon;
+use Livewire\WithFileUploads;
+use App\Services\PromoParserService;
 
 class PurchaseOrderPos extends Component implements HasActions, HasForms
 {
     use InteractsWithActions;
     use InteractsWithForms;
     use Traits\HasPosDraft;
+    use WithFileUploads;
 
     public $po_number;
     public $po_date;
@@ -32,7 +42,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     public $tax_amount = 0;
     public $cetak_nota = false;
 
-    public $visibleColumns = ['barcode', 'name', 'avg_bln', 'avg_minggu', 'stock', 'qty_saran', 'qty', 'unit_cost', 'discount_1', 'subtotal'];
+    public $visibleColumns = ['barcode', 'name', 'avg_bln', 'avg_minggu', 'stock', 'last_return', 'qty_saran', 'qty', 'unit_cost', 'discount_1', 'subtotal'];
 
     public $searchQuery = '';
     public $cart = [];
@@ -51,6 +61,23 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     public $searchResults = [];
 
     public $purchaseOrder;
+
+    // --- PROMO SUPPLIER IMPORT & PASTE ---
+    public $showPromoModal = false;
+    public $promoSource = 'excel'; // 'excel' or 'text'
+    public $promoFile;
+    public $promoText = '';
+    public $excelSheets = [];
+    public $selectedSheet = '';
+    public $excelColumns = [];
+    public $selectedBarcodeCol = 'A';
+    public $selectedPromoCol = 'D';
+    public $selectedNameCol = 'C';
+    public $startRow = 4;
+    public $parsedPromoItems = [];
+    public $promoFilterTab = 'all'; // 'all', 'need_order', 'cart_only'
+    public $updateExistingCartOnly = false;
+    public $promoErrorMessage = '';
 
     public function mount($purchaseOrder = null)
     {
@@ -72,35 +99,20 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             foreach ($items as $item) {
                 if (!$item->product) continue;
 
-                // Get stock
-                $stock = \App\Models\Stock::where('product_id', $item->product_id)
-                    ->where('branch_id', $this->branch_id)
-                    ->value('quantity_on_hand') ?? 0;
-
-                $stockModel = $item->product->stocks->where('branch_id', $this->branch_id)->first();
-
-                $avgBln = \App\Models\TransactionItem::where('product_id', $item->product_id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(30)))->sum('quantity');
-                $avgMinggu = \App\Models\TransactionItem::where('product_id', $item->product_id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(7)))->sum('quantity');
-
-                $this->cart[] = [
-                    'product_id' => $item->product_id,
-                    'sku' => $item->product->sku,
-                    'barcode' => $item->product->barcode,
-                    'name' => $item->product->name,
-                    'max_order' => 0,
-                    'avg_bln' => $avgBln,
-                    'avg_minggu' => $avgMinggu,
-                    'stock' => $stock,
-                    'min_qty' => $stockModel->min_qty ?? 0,
-                    'max_qty' => $stockModel->max_qty ?? 0,
-                    'qty_saran' => (float)($item->quantity_suggested ?? 0),
-                    'qty' => (float)$item->quantity_ordered,
-                    'unit_cost' => (float)$item->unit_cost,
-                    'discount_1' => (float)$item->discount_1,
-                    'discount_2' => (float)$item->discount_2,
-                    'discount_3' => (float)$item->discount_3,
-                    'subtotal' => (float)$item->subtotal
-                ];
+                $this->cart[] = $this->resolveCartItemData(
+                    $item->product,
+                    $this->branch_id,
+                    (float)$item->quantity_ordered,
+                    (float)($item->quantity_suggested ?? 0),
+                    (float)$item->unit_cost,
+                    [
+                        'discount_1' => (float)$item->discount_1,
+                        'discount_2' => (float)$item->discount_2,
+                        'discount_3' => (float)$item->discount_3,
+                    ],
+                    (float)$item->subtotal,
+                    $item->promo_note
+                );
             }
         } else {
             $this->po_number = 'PO-' . date('YmdHis');
@@ -279,40 +291,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             // Dispatch event to focus the row's Qty input
             $this->dispatch('item-added', index: $existingIndex);
         } else {
-            $finalCost = $product->cost_price_tax > 0 ? $product->cost_price_tax : ($product->cost_price ?? 0);
-            
-            $stock = null;
-            if ($this->branch_id) {
-                $stock = \App\Models\Stock::where('product_id', $product->id)
-                    ->where('branch_id', $this->branch_id)
-                    ->first();
-                
-                if ($stock && $stock->cost_price_tax > 0) {
-                    $finalCost = $stock->cost_price_tax;
-                } elseif ($stock && $stock->cost_price > 0) {
-                    $finalCost = $stock->cost_price;
-                }
-            }
-
-            $this->cart[] = [
-                'product_id' => $product->id,
-                'sku' => $product->sku,
-                'barcode' => $product->barcode,
-                'name' => $product->name,
-                'max_order' => 0,
-                'avg_bln' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(30)))->sum('quantity'),
-                'avg_minggu' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(7)))->sum('quantity'),
-                'stock' => $stock ? $stock->quantity_on_hand : 0,
-                'min_qty' => $stock ? $stock->min_qty : 0,
-                'max_qty' => $stock ? $stock->max_qty : 0,
-                'qty_saran' => 0,
-                'qty' => 1,
-                'unit_cost' => $finalCost,
-                'discount_1' => 0,
-                'discount_2' => 0,
-                'discount_3' => 0,
-                'subtotal' => $finalCost
-            ];
+            $this->cart[] = $this->resolveCartItemData($product, $this->branch_id, 1, 0);
         }
 
         $this->calculateTotals();
@@ -445,50 +424,24 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
     }
 
-    public function addItemWithQty($product, $qty, $stockRec = null, $qtySaran = 0)
+    public function addItemWithQty($product, $qty, $stockRec = null, $qtySaran = 0, $customDiscounts = null, $promoNote = null)
     {
         $existingIndex = collect($this->cart)->search(fn($item) => $item['product_id'] == $product->id);
 
         if ($existingIndex !== false) {
             $this->cart[$existingIndex]['qty_saran'] = $qtySaran;
             $this->cart[$existingIndex]['qty'] = $qty;
+            if ($customDiscounts) {
+                if (isset($customDiscounts['discount_1'])) $this->cart[$existingIndex]['discount_1'] = (float)$customDiscounts['discount_1'];
+                if (isset($customDiscounts['discount_2'])) $this->cart[$existingIndex]['discount_2'] = (float)$customDiscounts['discount_2'];
+                if (isset($customDiscounts['discount_3'])) $this->cart[$existingIndex]['discount_3'] = (float)$customDiscounts['discount_3'];
+            }
+            if ($promoNote !== null) {
+                $this->cart[$existingIndex]['promo_note'] = $promoNote;
+            }
             $this->recalculateRow($existingIndex);
         } else {
-            if (!$stockRec && $this->branch_id) {
-                $stockRec = \App\Models\Stock::where('product_id', $product->id)
-                    ->where('branch_id', $this->branch_id)
-                    ->first();
-            }
-
-            $finalCost = $product->cost_price_tax > 0 ? $product->cost_price_tax : ($product->cost_price ?? 0);
-            if ($stockRec) {
-                if ($stockRec->cost_price_tax > 0) {
-                    $finalCost = $stockRec->cost_price_tax;
-                } elseif ($stockRec->cost_price > 0) {
-                    $finalCost = $stockRec->cost_price;
-                }
-            }
-
-            $this->cart[] = [
-                'product_id' => $product->id,
-                'sku' => $product->sku,
-                'barcode' => $product->barcode,
-                'name' => $product->name,
-                'max_order' => 0,
-                'avg_bln' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(30)))->sum('quantity'),
-                'avg_minggu' => \App\Models\TransactionItem::where('product_id', $product->id)->whereHas('transaction', fn($q) => $q->where('branch_id', $this->branch_id)->where('created_at', '>=', now()->subDays(7)))->sum('quantity'),
-                'stock' => $stockRec->quantity_on_hand ?? 0,
-                'min_qty' => $stockRec->min_qty ?? 0,
-                'max_qty' => $stockRec->max_qty ?? 0,
-                'qty_saran' => $qtySaran,
-                'qty' => $qty,
-                'unit_cost' => $finalCost,
-                'discount_1' => 0,
-                'discount_2' => 0,
-                'discount_3' => 0,
-                'subtotal' => $finalCost * $qty
-            ];
-            
+            $this->cart[] = $this->resolveCartItemData($product, $this->branch_id, $qty, $qtySaran, null, $customDiscounts, null, $promoNote);
             $this->recalculateRow(count($this->cart) - 1);
         }
 
@@ -561,14 +514,24 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             }
 
             if ($organization->po_approval_max_qty_enabled) {
+                $overCount = 0;
                 foreach ($this->cart as $item) {
                     $qtySaran = $item['qty_saran'] ?? 0;
 
                     if ($item['qty'] > $qtySaran) {
                         $needsApproval = true;
-                        $approvalReason[] = "Kuantitas {$item['name']} ({$item['qty']}) melebihi saran order sistem ({$qtySaran}).";
-                        break;
+                        $overCount++;
+                        $promoText = !empty($item['promo_note']) ? " [Promo: {$item['promo_note']}]" : ((float)$item['discount_1'] > 0 ? " [Disc: {$item['discount_1']}%]" : "");
+                        $stockVal = $item['stock'] ?? 0;
+                        $avgSales = $item['avg_bln'] ?? 0;
+                        $oosText = !empty($item['is_oos_with_history']) ? " (Pasokan Macet, 90hr: " . (int)$item['sales_90d'] . " pcs)" : "";
+                        if ($overCount <= 5) {
+                            $approvalReason[] = "{$item['name']} (Order: {$item['qty']} | Saran: {$qtySaran} | Stok: {$stockVal} | Jual: {$avgSales}/bln{$oosText}){$promoText}";
+                        }
                     }
+                }
+                if ($overCount > 5) {
+                    $approvalReason[] = "...dan " . ($overCount - 5) . " item lainnya melebihi saran order.";
                 }
             }
         }
@@ -613,7 +576,8 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 'discount_1' => $item['discount_1'],
                 'discount_2' => $item['discount_2'],
                 'discount_3' => $item['discount_3'],
-                'subtotal' => $item['subtotal']
+                'subtotal' => $item['subtotal'],
+                'promo_note' => $item['promo_note'] ?? null,
             ]);
         }
 
@@ -634,6 +598,478 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
+    }
+
+    public function updatedBranchId($value)
+    {
+        if (!empty($this->cart)) {
+            foreach ($this->cart as $index => $item) {
+                $product = Product::find($item['product_id']);
+                if ($product) {
+                    $refreshed = $this->resolveCartItemData(
+                        $product, 
+                        $value, 
+                        $item['qty'], 
+                        $item['qty_saran'] ?? 0, 
+                        $item['unit_cost'], 
+                        [
+                            'discount_1' => $item['discount_1'] ?? 0,
+                            'discount_2' => $item['discount_2'] ?? 0,
+                            'discount_3' => $item['discount_3'] ?? 0,
+                        ],
+                        $item['subtotal']
+                    );
+                    $this->cart[$index] = $refreshed;
+                }
+            }
+        }
+    }
+
+    public function getProductReturnInfo($productId, $branchId)
+    {
+        $ninetyDaysAgo = Carbon::now()->subDays(90)->toDateString();
+
+        // 1. Ambil transaksi retur pembelian terakhir (PurchaseReturn)
+        $prItem = PurchaseReturnItem::where('product_id', $productId)
+            ->whereHas('purchaseReturn', function ($q) use ($branchId, $ninetyDaysAgo) {
+                if ($branchId) {
+                    $q->where('branch_id', $branchId);
+                }
+                $q->where('return_date', '>=', $ninetyDaysAgo)
+                  ->whereIn('status', ['COMPLETED', 'completed', 'APPROVED', 'approved']);
+            })
+            ->with('purchaseReturn')
+            ->latest('created_at')
+            ->first();
+
+        // 2. Ambil transaksi koreksi stok retur terakhir (StockAdjustment alasan retur)
+        $returReasonIds = AdjustmentReason::where('name', 'like', '%retur%')->pluck('id');
+        $adjItem = null;
+        if ($returReasonIds->isNotEmpty()) {
+            $adjItem = StockAdjustmentItem::where('product_id', $productId)
+                ->whereHas('stockAdjustment', function ($q) use ($branchId, $ninetyDaysAgo, $returReasonIds) {
+                    if ($branchId) {
+                        $q->where('branch_id', $branchId);
+                    }
+                    $q->whereIn('status', ['COMPLETED', 'completed', 'APPROVED', 'approved'])
+                      ->whereIn('adjustment_reason_id', $returReasonIds)
+                      ->where('adjustment_date', '>=', $ninetyDaysAgo);
+                })
+                ->with(['stockAdjustment.adjustmentReason'])
+                ->latest('created_at')
+                ->first();
+        }
+
+        // Tentukan mana yang paling baru antara Nota Retur Beli vs Koreksi Stok Retur
+        $lastReturn = null;
+        if ($prItem && $adjItem) {
+            $prDate = $prItem->purchaseReturn->return_date ?? $prItem->created_at;
+            $adjDate = $adjItem->stockAdjustment->adjustment_date ?? $adjItem->created_at;
+            if (Carbon::parse($prDate)->gte(Carbon::parse($adjDate))) {
+                $lastReturn = [
+                    'type' => 'retur_beli',
+                    'type_label' => 'Nota Retur Supplier',
+                    'qty' => (float)$prItem->quantity,
+                    'date' => Carbon::parse($prDate)->format('Y-m-d'),
+                    'doc_number' => $prItem->purchaseReturn->return_number ?? '-',
+                    'reason' => $prItem->reason ?? ($prItem->purchaseReturn->notes ?? '-'),
+                ];
+            } else {
+                $lastReturn = [
+                    'type' => 'koreksi_retur',
+                    'type_label' => 'Koreksi Stok Retur',
+                    'qty' => (float)abs($adjItem->adjustment_quantity),
+                    'date' => Carbon::parse($adjDate)->format('Y-m-d'),
+                    'doc_number' => $adjItem->stockAdjustment->adjustment_number ?? '-',
+                    'reason' => $adjItem->stockAdjustment->adjustmentReason->name ?? ($adjItem->reason_code ?? '-'),
+                ];
+            }
+        } elseif ($prItem) {
+            $prDate = $prItem->purchaseReturn->return_date ?? $prItem->created_at;
+            $lastReturn = [
+                'type' => 'retur_beli',
+                'type_label' => 'Nota Retur Supplier',
+                'qty' => (float)$prItem->quantity,
+                'date' => Carbon::parse($prDate)->format('Y-m-d'),
+                'doc_number' => $prItem->purchaseReturn->return_number ?? '-',
+                'reason' => $prItem->reason ?? ($prItem->purchaseReturn->notes ?? '-'),
+            ];
+        } elseif ($adjItem) {
+            $adjDate = $adjItem->stockAdjustment->adjustment_date ?? $adjItem->created_at;
+            $lastReturn = [
+                'type' => 'koreksi_retur',
+                'type_label' => 'Koreksi Stok Retur',
+                'qty' => (float)abs($adjItem->adjustment_quantity),
+                'date' => Carbon::parse($adjDate)->format('Y-m-d'),
+                'doc_number' => $adjItem->stockAdjustment->adjustment_number ?? '-',
+                'reason' => $adjItem->stockAdjustment->adjustmentReason->name ?? ($adjItem->reason_code ?? '-'),
+            ];
+        }
+
+        if ($lastReturn) {
+            $diffDays = Carbon::parse($lastReturn['date'])->diffInDays(now());
+            $lastReturn['days_ago'] = (int)$diffDays;
+            $lastReturn['date_formatted'] = Carbon::parse($lastReturn['date'])->format('d/m/Y');
+            $lastReturn['formatted'] = number_format($lastReturn['qty'], 0) . ' pcs (' . ($diffDays == 0 ? 'hari ini' : $diffDays . ' hr lalu') . ')';
+        }
+
+        return $lastReturn;
+    }
+
+    public function resolveCartItemData($product, $branchId, $qty = 1, $qtySaran = 0, $customCost = null, $customDiscounts = null, $customSubtotal = null, $promoNote = null)
+    {
+        $stock = null;
+        $stockModel = null;
+        if ($branchId) {
+            $stockModel = Stock::where('product_id', $product->id)
+                ->where('branch_id', $branchId)
+                ->first();
+            $stock = $stockModel ? (float)$stockModel->quantity_on_hand : 0;
+        }
+
+        if ($customCost !== null) {
+            $finalCost = (float)$customCost;
+        } else {
+            $finalCost = (float)($product->cost_price_tax > 0 ? $product->cost_price_tax : ($product->cost_price ?? 0));
+            if ($stockModel) {
+                if ($stockModel->cost_price_tax > 0) {
+                    $finalCost = (float)$stockModel->cost_price_tax;
+                } elseif ($stockModel->cost_price > 0) {
+                    $finalCost = (float)$stockModel->cost_price;
+                }
+            }
+        }
+
+        $avgBln = (float)TransactionItem::where('product_id', $product->id)
+            ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->where('created_at', '>=', now()->subDays(30)))
+            ->sum('quantity');
+
+        $avgMinggu = (float)TransactionItem::where('product_id', $product->id)
+            ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->where('created_at', '>=', now()->subDays(7)))
+            ->sum('quantity');
+
+        $minQty = (float)($stockModel->min_qty ?? 0);
+        $maxQty = (float)($stockModel->max_qty ?? 0);
+
+        // Ambil riwayat retur terakhir dalam 90 hari
+        $lastReturn = $this->getProductReturnInfo($product->id, $branchId);
+
+        // Ambil riwayat penjualan 90 hari jika penjualan 30 hari kosong
+        $sales90d = 0;
+        if ($avgBln <= 0) {
+            $sales90d = (float)TransactionItem::where('product_id', $product->id)
+                ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->where('created_at', '>=', now()->subDays(90)))
+                ->sum('quantity');
+        }
+
+        // Deteksi apakah stok habis karena retur:
+        // Syarat Discontinue:
+        // 1. Stok <= 0
+        // 2. Ada retur dalam 90 hari terakhir
+        // 3. Belum ada penerimaan barang baru sejak retur
+        // 4. Penjualan 30 hari = 0 DAN penjualan 90 hari < 10 pcs (barang lesu yang sisa stoknya diretur, bukan barang aktif yang kebetulan retur barang rusak)
+        $isEmptyDueToReturn = false;
+        if (($stock <= 0) && $lastReturn !== null && $avgBln <= 0 && $sales90d < 10) {
+            $hasNewReceipt = GoodsReceiptItem::where('product_id', $product->id)
+                ->whereHas('goodsReceipt', function ($q) use ($branchId, $lastReturn) {
+                    if ($branchId) {
+                        $q->where('branch_id', $branchId);
+                    }
+                    $q->where('receipt_date', '>', $lastReturn['date'])
+                      ->whereIn('status', ['COMPLETED', 'completed', 'APPROVED', 'approved', 'received']);
+                })
+                ->exists();
+            $isEmptyDueToReturn = !$hasNewReceipt;
+        }
+
+        // Deteksi Pasokan Macet (OOS): Stok <= 0 dan Sales 30 HR = 0, tetapi ada penjualan aktif signifikan di 90 hari terakhir (>= 10 pcs)
+        $isOosWithHistory = false;
+        $avgSalesActive = 0;
+        if (!$isEmptyDueToReturn && $avgBln <= 0 && $stock <= 0) {
+            if ($sales90d >= 10) {
+                $isOosWithHistory = true;
+                $avgSalesActive = round($sales90d / 3, 1);
+            }
+        }
+
+        // Deteksi Slow Moving Alert:
+        // 1. Sisa stok masih ada (> 0) namun penjualan 30 hari sangat rendah (<= 2 pcs)
+        // 2. ATAU Stok habis (<= 0) dan penjualan 90 hari sangat kecil (< 10 pcs / < 1 pcs per minggu)
+        $isSlowMovingAlert = false;
+        if (!$isEmptyDueToReturn && !$isOosWithHistory && ($qtySaran > 0 || ($minQty > 0 && $stock < $minQty))) {
+            if ($stock > 0 && $avgBln <= 2) {
+                $isSlowMovingAlert = true;
+            } elseif ($stock <= 0 && $avgBln <= 0 && $sales90d < 10) {
+                $isSlowMovingAlert = true;
+            }
+        }
+
+        $d1 = $customDiscounts['discount_1'] ?? 0;
+        $d2 = $customDiscounts['discount_2'] ?? 0;
+        $d3 = $customDiscounts['discount_3'] ?? 0;
+
+        $subtotal = $customSubtotal;
+        if ($subtotal === null) {
+            $baseTotal = $qty * $finalCost;
+            $t1 = $baseTotal - ($baseTotal * ($d1 / 100));
+            $t2 = $t1 - ($t1 * ($d2 / 100));
+            $t3 = $t2 - ($t2 * ($d3 / 100));
+            $subtotal = round($t3, 2);
+        }
+
+        return [
+            'product_id' => $product->id,
+            'sku' => $product->sku,
+            'barcode' => $product->barcode,
+            'name' => $product->name,
+            'max_order' => 0,
+            'avg_bln' => $avgBln,
+            'avg_minggu' => $avgMinggu,
+            'sales_90d' => $sales90d,
+            'is_oos_with_history' => $isOosWithHistory,
+            'avg_sales_active' => $avgSalesActive,
+            'stock' => $stock ?? 0,
+            'min_qty' => $minQty,
+            'max_qty' => $maxQty,
+            'qty_saran' => (float)$qtySaran,
+            'qty' => (float)$qty,
+            'unit_cost' => $finalCost,
+            'discount_1' => (float)$d1,
+            'discount_2' => (float)$d2,
+            'discount_3' => (float)$d3,
+            'subtotal' => (float)$subtotal,
+            'last_return' => $lastReturn,
+            'is_empty_due_to_return' => $isEmptyDueToReturn,
+            'is_slow_moving_alert' => $isSlowMovingAlert,
+            'promo_note' => $promoNote,
+        ];
+    }
+
+    public function discontinueBranchProduct($productId)
+    {
+        if (empty($this->branch_id)) {
+            Notification::make()->title('Pilih lokasi cabang terlebih dahulu!')->warning()->send();
+            return;
+        }
+
+        $stock = Stock::where('product_id', $productId)
+            ->where('branch_id', $this->branch_id)
+            ->first();
+
+        if ($stock) {
+            $stock->is_active = false;
+            $stock->save();
+
+            // Hapus produk dari keranjang PO saat ini
+            $existingIndex = collect($this->cart)->search(fn($item) => $item['product_id'] == $productId);
+            if ($existingIndex !== false) {
+                unset($this->cart[$existingIndex]);
+                $this->cart = array_values($this->cart);
+                $this->calculateTotals();
+            }
+
+            Notification::make()
+                ->title('Produk berhasil di-discontinue untuk cabang ini.')
+                ->success()
+                ->send();
+        } else {
+            Notification::make()->title('Data stok cabang tidak ditemukan!')->warning()->send();
+        }
+    }
+
+    public function openPromoModal()
+    {
+        if (empty($this->supplier_id)) {
+            Notification::make()->title('Pilih Supplier terlebih dahulu sebelum memuat promo!')->warning()->send();
+            return;
+        }
+
+        $this->showPromoModal = true;
+        $this->promoErrorMessage = '';
+    }
+
+    public function closePromoModal()
+    {
+        $this->showPromoModal = false;
+        $this->promoErrorMessage = '';
+    }
+
+    public function updatedPromoFile()
+    {
+        $this->promoErrorMessage = '';
+        if (!$this->promoFile) return;
+
+        try {
+            $service = app(PromoParserService::class);
+            $path = $this->promoFile->getRealPath();
+            $this->excelSheets = $service->getSheetNames($path);
+            $this->selectedSheet = $this->excelSheets[0] ?? '';
+            $this->detectHeadersForSelectedSheet();
+        } catch (\Throwable $e) {
+            $this->promoErrorMessage = 'Gagal membaca file Excel: ' . $e->getMessage();
+        }
+    }
+
+    public function updatedSelectedSheet()
+    {
+        $this->detectHeadersForSelectedSheet();
+    }
+
+    public function detectHeadersForSelectedSheet()
+    {
+        if (!$this->promoFile) return;
+
+        try {
+            $service = app(PromoParserService::class);
+            $path = $this->promoFile->getRealPath();
+            $detected = $service->detectHeaders($path, $this->selectedSheet);
+
+            $this->excelColumns = $detected['columns'] ?? [];
+            $this->selectedBarcodeCol = $detected['barcode_col'] ?? 'A';
+            $this->selectedPromoCol = $detected['promo_col'] ?? 'D';
+            $this->selectedNameCol = $detected['name_col'] ?? 'C';
+            $this->startRow = ($detected['header_row'] ?? 1) + 1;
+        } catch (\Throwable $e) {
+            $this->promoErrorMessage = 'Gagal mendeteksi header sheet: ' . $e->getMessage();
+        }
+    }
+
+    public function processPromoData()
+    {
+        $this->promoErrorMessage = '';
+        $service = app(PromoParserService::class);
+
+        try {
+            $parsedRaw = [];
+            if ($this->promoSource === 'excel') {
+                if (!$this->promoFile) {
+                    $this->promoErrorMessage = 'Silakan pilih/upload file Excel terlebih dahulu.';
+                    return;
+                }
+                $path = $this->promoFile->getRealPath();
+                $parsedRaw = $service->parseExcel(
+                    $path,
+                    $this->selectedSheet,
+                    $this->selectedBarcodeCol,
+                    $this->selectedPromoCol,
+                    $this->selectedNameCol,
+                    (int)$this->startRow
+                );
+            } else {
+                if (empty(trim($this->promoText))) {
+                    $this->promoErrorMessage = 'Silakan tempel (paste) teks WhatsApp terlebih dahulu.';
+                    return;
+                }
+                $parsedRaw = $service->parseWhatsAppText($this->promoText);
+            }
+
+            if (empty($parsedRaw)) {
+                $this->promoErrorMessage = 'Tidak ada data barcode dan promo yang berhasil dibaca. Pastikan format kolom/teks sesuai.';
+                return;
+            }
+
+            // Hubungkan dengan data inventaris toko
+            $this->parsedPromoItems = $service->matchWithInventory($parsedRaw, $this->branch_id, $this->cart);
+
+            $matchedCount = collect($this->parsedPromoItems)->where('is_matched', true)->count();
+            Notification::make()
+                ->title("Berhasil membaca " . count($this->parsedPromoItems) . " promo ({$matchedCount} cocok dengan master barang).")
+                ->success()
+                ->send();
+
+        } catch (\Throwable $e) {
+            $this->promoErrorMessage = 'Terjadi kesalahan saat memproses promo: ' . $e->getMessage();
+        }
+    }
+
+    public function togglePromoItemSelection($index)
+    {
+        if (isset($this->parsedPromoItems[$index])) {
+            $this->parsedPromoItems[$index]['selected'] = !$this->parsedPromoItems[$index]['selected'];
+        }
+    }
+
+    public function setAllPromoSelection($state)
+    {
+        foreach ($this->parsedPromoItems as &$item) {
+            if ($item['is_matched']) {
+                $item['selected'] = $state;
+            }
+        }
+    }
+
+    public function selectOnlyNeedOrderPromo()
+    {
+        foreach ($this->parsedPromoItems as &$item) {
+            if ($item['is_matched']) {
+                $item['selected'] = ($item['recommendation'] === 'need_order' || $item['in_cart']);
+            }
+        }
+    }
+
+    public function applyPromoToCart()
+    {
+        if (empty($this->parsedPromoItems)) return;
+
+        $updatedCartCount = 0;
+        $addedCartCount = 0;
+
+        foreach ($this->parsedPromoItems as $promoItem) {
+            if (!$promoItem['is_matched'] || empty($promoItem['selected'])) {
+                continue;
+            }
+
+            // Cari jika sudah ada di keranjang
+            $cartIndex = collect($this->cart)->search(fn($ci) => $ci['product_id'] == $promoItem['product_id']);
+
+            if ($cartIndex !== false) {
+                // Perbarui diskon & promo note
+                if ((float)$promoItem['disc_percent'] > 0) {
+                    $this->cart[$cartIndex]['discount_1'] = (float)$promoItem['disc_percent'];
+                }
+                if (!empty($promoItem['promo_note'])) {
+                    $this->cart[$cartIndex]['promo_note'] = $promoItem['promo_note'];
+                }
+                $this->recalculateRow($cartIndex);
+                $updatedCartCount++;
+            } elseif (!$this->updateExistingCartOnly) {
+                // Tambahkan barang baru ke keranjang
+                $product = Product::find($promoItem['product_id']);
+                if ($product) {
+                    $qtyToOrder = $promoItem['qty_saran'] > 0 ? (float)$promoItem['qty_saran'] : 0;
+                    $discounts = [];
+                    if ((float)$promoItem['disc_percent'] > 0) {
+                        $discounts['discount_1'] = (float)$promoItem['disc_percent'];
+                    }
+
+                    $this->cart[] = $this->resolveCartItemData(
+                        $product,
+                        $this->branch_id,
+                        $qtyToOrder,
+                        (float)$promoItem['qty_saran'],
+                        null,
+                        $discounts,
+                        null,
+                        $promoItem['promo_note']
+                    );
+                    $this->recalculateRow(count($this->cart) - 1);
+                    $addedCartCount++;
+                }
+            }
+        }
+
+        $this->calculateTotals();
+        $this->showPromoModal = false;
+
+        $msg = [];
+        if ($updatedCartCount > 0) $msg[] = "{$updatedCartCount} diskon keranjang diperbarui";
+        if ($addedCartCount > 0) $msg[] = "{$addedCartCount} barang promo ditambahkan";
+
+        if (empty($msg)) {
+            Notification::make()->title('Tidak ada item yang diterapkan ke keranjang.')->info()->send();
+        } else {
+            Notification::make()->title(implode(', ', $msg) . '.')->success()->send();
+        }
     }
 
     public function render()

@@ -106,10 +106,22 @@ class GoodsReceiptPos extends Component
                 $this->include_tax = true;
             }
 
+            $poId = $goodsReceipt->purchase_order_id;
+            if (!$poId && $goodsReceipt->warehouse_check_id) {
+                $poId = \App\Models\WarehouseCheck::find($goodsReceipt->warehouse_check_id)?->purchase_order_id;
+            }
+
             foreach ($goodsReceipt->items as $item) {
                 $stock = null;
                 if ($this->branch_id) {
                     $stock = Stock::where('product_id', $item->product_id)->where('branch_id', $this->branch_id)->first();
+                }
+
+                $poItem = null;
+                if ($poId) {
+                    $poItem = \App\Models\PurchaseOrderItem::where('purchase_order_id', $poId)
+                        ->where('product_id', $item->product_id)
+                        ->first();
                 }
 
                 $isTaxable = (bool) ($item->product?->is_taxable ?? true);
@@ -159,6 +171,7 @@ class GoodsReceiptPos extends Component
                     'discount_3' => $item->discount_3,
                     'discount_3_type' => $item->discount_3_type ?? 'percent',
                     'subtotal' => 0,
+                    'promo_note' => $poItem ? ($poItem->promo_note ?? null) : null,
                 ];
                 $this->recalculateRow(count($this->cart) - 1, false);
                 $this->syncRowMargins(count($this->cart) - 1);
@@ -343,6 +356,7 @@ class GoodsReceiptPos extends Component
                             'discount_3' => $disc3,
                             'discount_3_type' => 'percent',
                             'subtotal' => 0,
+                            'promo_note' => $poItem ? ($poItem->promo_note ?? null) : null,
                         ];
                         $this->recalculateRow(count($this->cart) - 1, false);
                         $this->syncRowMargins(count($this->cart) - 1);
@@ -404,6 +418,7 @@ class GoodsReceiptPos extends Component
                             'discount_3' => (float) ($item->discount_3 ?? 0),
                             'discount_3_type' => 'percent',
                             'subtotal' => 0,
+                            'promo_note' => $item->promo_note ?? null,
                         ];
                         $this->recalculateRow(count($this->cart) - 1, false);
                         $this->syncRowMargins(count($this->cart) - 1);

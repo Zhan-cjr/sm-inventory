@@ -141,37 +141,49 @@
             <div>
                 <div class="flex-between" style="margin-bottom: 0.5rem;">
                     <div style="font-weight: 600; font-size: 1rem; color: #111827;" class="dark:text-gray-200">Detail Supplier</div>
-                    @if($supplier_id)
-                    <div x-data="{ openSaran: false }" style="position: relative;">
-                        <button @click="openSaran = !openSaran" 
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        {{-- Tombol Promo Supplier --}}
+                        <button type="button" 
+                                wire:click="openPromoModal" 
                                 class="pos-input" 
-                                style="display: flex; align-items: center; gap: 0.5rem; background: #3b82f6; color: white; border: none; cursor: pointer; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-weight: 600;">
+                                style="display: flex; align-items: center; gap: 0.4rem; background: #059669; color: white; border: none; cursor: pointer; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-weight: 600;"
+                                title="Upload Excel atau Paste Teks WA Promo Supplier">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 1A1.5 1.5 0 0 0 1 2.5v11A1.5 1.5 0 0 0 2.5 15h6.086a1.5 1.5 0 0 0 1.06-.44l4.915-4.914A1.5 1.5 0 0 0 15 8.586V2.5A1.5 1.5 0 0 0 13.5 1h-11zM2 2.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 .5.5V8H9.5A1.5 1.5 0 0 0 8 9.5V14H2.5a.5.5 0 0 1-.5-.5v-11zm7 11.293V9.5a.5.5 0 0 1 .5-.5h4.293L9 13.793z"/></svg>
+                            Promo Supplier
+                        </button>
+
+                        @if($supplier_id)
+                        <div x-data="{ openSaran: false }" style="position: relative;">
+                            <button @click="openSaran = !openSaran" 
+                                    class="pos-input" 
+                                    style="display: flex; align-items: center; gap: 0.5rem; background: #3b82f6; color: white; border: none; cursor: pointer; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-weight: 600;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3.5a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 8 4z"/></svg>
+                                Saran Order
+                                <span wire:loading wire:target="applySaranOrder" class="animate-spin">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                </span>
+                            </button>
+                            <div x-show="openSaran" @click.away="openSaran = false" 
+                                 style="position: absolute; right: 0; top: 100%; z-index: 50; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 16rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" 
+                                 class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
+                                <button wire:click="applySaranOrder('minmax')" @click="openSaran = false" class="w-full text-left p-2 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition-colors group">
+                                    <div class="font-bold text-gray-800 dark:text-gray-200 group-hover:text-blue-700">Metode Min/Max</div>
+                                    <div class="text-[10px] text-gray-500">Order jika stok < min (Qty = max - stok)</div>
+                                </button>
+                                <div style="height: 1px; background: #f3f4f6; margin: 0.25rem 0;" class="dark:bg-gray-700"></div>
+                                <button wire:click="applySaranOrder('sales')" @click="openSaran = false" class="w-full text-left p-2 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition-colors group">
+                                    <div class="font-bold text-gray-800 dark:text-gray-200 group-hover:text-blue-700">Trend Penjualan (14 Hari)</div>
+                                    <div class="text-[10px] text-gray-500">Berdasarkan rata harian 30 hari terakhir</div>
+                                </button>
+                            </div>
+                        </div>
+                        @else
+                        <button class="pos-input" style="display: flex; align-items: center; gap: 0.5rem; background: #9ca3af; color: white; border: none; cursor: not-allowed; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-weight: 600;" disabled>
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3.5a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 8 4z"/></svg>
                             Saran Order
-                            <span wire:loading wire:target="applySaranOrder" class="animate-spin">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            </span>
                         </button>
-                        <div x-show="openSaran" @click.away="openSaran = false" 
-                             style="position: absolute; right: 0; top: 100%; z-index: 50; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 16rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" 
-                             class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
-                            <button wire:click="applySaranOrder('minmax')" @click="openSaran = false" class="w-full text-left p-2 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition-colors group">
-                                <div class="font-bold text-gray-800 dark:text-gray-200 group-hover:text-blue-700">Metode Min/Max</div>
-                                <div class="text-[10px] text-gray-500">Order jika stok < min (Qty = max - stok)</div>
-                            </button>
-                            <div style="height: 1px; background: #f3f4f6; margin: 0.25rem 0;" class="dark:bg-gray-700"></div>
-                            <button wire:click="applySaranOrder('sales')" @click="openSaran = false" class="w-full text-left p-2 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition-colors group">
-                                <div class="font-bold text-gray-800 dark:text-gray-200 group-hover:text-blue-700">Trend Penjualan (14 Hari)</div>
-                                <div class="text-[10px] text-gray-500">Berdasarkan rata harian 30 hari terakhir</div>
-                            </button>
-                        </div>
+                        @endif
                     </div>
-                    @else
-                    <button class="pos-input" style="display: flex; align-items: center; gap: 0.5rem; background: #9ca3af; color: white; border: none; cursor: not-allowed; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-weight: 600;" disabled>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3.5a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 8 4z"/></svg>
-                        Saran Order
-                    </button>
-                    @endif
                 </div>
                 <table style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
                     <tr>
@@ -343,7 +355,7 @@
                 Pilih Kolom
             </button>
             <div x-show="open" @click.away="open = false" style="position: absolute; right: 0; top: 100%; z-index: 50; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 12rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
-                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'avg_bln' => 'Sales 30 HR', 'avg_minggu' => 'Sales 7 HR', 'stock' => 'Stok', 'min_qty' => 'Min Qty', 'max_qty' => 'Max Qty', 'qty_saran' => 'Qty Saran', 'qty' => 'Qty Pesan', 'unit_cost' => 'Harga Satuan', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
+                @foreach(['sku' => 'SKU', 'barcode' => 'Barcode', 'name' => 'Nama Produk', 'avg_bln' => 'Sales 30 HR', 'avg_minggu' => 'Sales 7 HR', 'stock' => 'Stok', 'last_return' => 'Retur Terakhir', 'min_qty' => 'Min Qty', 'max_qty' => 'Max Qty', 'qty_saran' => 'Qty Saran', 'qty' => 'Qty Pesan', 'unit_cost' => 'Harga Satuan', 'discount_1' => 'Dis1', 'discount_2' => 'Dis2', 'discount_3' => 'Dis3'] as $key => $label)
                     <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer rounded">
                         <input type="checkbox" wire:model.live="visibleColumns" value="{{ $key }}" class="rounded text-blue-600">
                         <span class="text-xs">{{ $label }}</span>
@@ -365,6 +377,7 @@
                     @if(in_array('avg_bln', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Sales 30 HR</th> @endif
                     @if(in_array('avg_minggu', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right;">Sales 7 HR</th> @endif
                     @if(in_array('stock', $visibleColumns)) <th class="pos-grid-th" style="width: 4.5rem; text-align: right;">Stok</th> @endif
+                    @if(in_array('last_return', $visibleColumns)) <th class="pos-grid-th" style="width: 8rem; text-align: right;" title="Transaksi Retur Pembelian & Koreksi Retur (90 Hari Terakhir)">Retur Terakhir</th> @endif
                     @if(in_array('min_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Min</th> @endif
                     @if(in_array('max_qty', $visibleColumns)) <th class="pos-grid-th" style="width: 4rem; text-align: right;">Max</th> @endif
                     @if(in_array('qty_saran', $visibleColumns)) <th class="pos-grid-th" style="width: 5rem; text-align: right; background-color: #e0f2fe; color: #0369a1;">Qty Saran</th> @endif
@@ -388,11 +401,96 @@
                                 <div style="white-space: normal; word-break: break-word; line-height: 1.35;">
                                     {{ $item['name'] }}
                                 </div>
+
+                                {{-- Promo Supplier Badge --}}
+                                @if(!empty($item['promo_note']))
+                                    <div style="margin-top: 0.25rem;">
+                                        <span style="display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 0.375rem; background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0;"
+                                              title="Promo On-Faktur dari Supplier">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M2 2a1 1 0 0 1 1-1h4.586a1 1 0 0 1 .707.293l7 7a1 1 0 0 1 0 1.414l-4.586 4.586a1 1 0 0 1-1.414 0l-7-7A1 1 0 0 1 2 6.586V2zm3.5 4a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>
+                                            Promo: {{ $item['promo_note'] }}
+                                        </span>
+                                    </div>
+                                @endif
+                                
+                                {{-- Smart Badge 1: Habis via Retur --}}
+                                @if(!empty($item['is_empty_due_to_return']))
+                                    <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 0.375rem; background-color: #ffe4e6; color: #9f1239; border: 1px solid #fecdd3;"
+                                              title="Stok kosong karena diretur {{ $item['last_return']['qty'] ?? 0 }} pcs ({{ $item['last_return']['days_ago'] ?? 0 }} hari lalu), belum ada barang masuk lagi, dan penjualan 90 hari sangat kecil ({{ (int)($item['sales_90d'] ?? 0) }} pcs). Disarankan discontinue.">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+                                            Habis via Retur ({{ $item['last_return']['days_ago'] ?? 0 }} hr lalu) — Disarankan Discontinue
+                                        </span>
+                                        <button type="button" 
+                                                wire:click="discontinueBranchProduct('{{ $item['product_id'] }}')"
+                                                wire:confirm="Yakin ingin mendiscontinue produk ini khusus di cabang ini? Produk akan dinonaktifkan di cabang ini dan tidak muncul lagi di saran order."
+                                                style="cursor: pointer; font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 0.25rem; background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; transition: background 0.15s;"
+                                                onmouseover="this.style.backgroundColor='#dc2626'; this.style.color='#ffffff';"
+                                                onmouseout="this.style.backgroundColor='#fee2e2'; this.style.color='#b91c1c';"
+                                                title="Klik untuk menonaktifkan produk ini khusus di cabang ini">
+                                            Discontinue Cabang
+                                        </button>
+                                    </div>
+                                @elseif(!empty($item['is_oos_with_history']))
+                                    {{-- Smart Badge 3: Pasokan Sempat Kosong / OOS with history --}}
+                                    <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 0.375rem; background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;"
+                                              title="Stok kosong karena pasokan macet. Penjualan 30 hari = 0, namun riwayat penjualan 90 hari tercatat {{ (int)$item['sales_90d'] }} pcs (rata-rata ~{{ $item['avg_sales_active'] }} pcs/bln saat aktif). Aman untuk diorder.">
+                                            📦 Pasokan Sempat Kosong (Riwayat 90 HR: {{ (int)$item['sales_90d'] }} pcs)
+                                        </span>
+                                    </div>
+                                @elseif(!empty($item['is_slow_moving_alert']))
+                                    {{-- Smart Badge 2: Slow Moving / Penjualan Lesu --}}
+                                    <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 0.375rem; background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a;"
+                                              title="Produk slow-moving: Penjualan 30 hari hanya {{ $item['avg_bln'] }} pcs sementara sisa stok masih {{ $item['stock'] }} pcs. Disarankan tidak order untuk menjaga arus kas.">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>
+                                            @if($item['stock'] <= 0 && $item['avg_bln'] <= 0)
+                                                Slow Moving (Sales 90 HR: {{ (int)($item['sales_90d'] ?? 0) }} pcs) — Disarankan Tinjau Ulang
+                                            @else
+                                                Slow Moving (Sales 30 HR: {{ $item['avg_bln'] }} pcs) — Disarankan Tinjau Ulang
+                                            @endif
+                                        </span>
+                                        <button type="button" 
+                                                wire:click="updateRow({{ $index }}, 'qty', 0)"
+                                                style="cursor: pointer; font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 0.25rem; background-color: #fffbeb; color: #b45309; border: 1px solid #fcd34d; transition: background 0.15s;"
+                                                onmouseover="this.style.backgroundColor='#d97706'; this.style.color='#ffffff';"
+                                                onmouseout="this.style.backgroundColor='#fffbeb'; this.style.color='#b45309';"
+                                                title="Klik untuk mengubah Qty Pesan menjadi 0">
+                                            Set Qty 0
+                                        </button>
+                                    </div>
+                                @endif
                             </td> 
                         @endif
-                        @if(in_array('avg_bln', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #8b5cf6;">{{ $item['avg_bln'] }}</td> @endif
+                        @if(in_array('avg_bln', $visibleColumns)) 
+                            <td class="pos-grid-td" style="text-align: right; color: #8b5cf6;">
+                                <div>{{ $item['avg_bln'] }}</div>
+                                @if(!empty($item['is_oos_with_history']))
+                                    <div style="margin-top: 2px;">
+                                        <span style="display: inline-block; font-size: 0.62rem; font-weight: 700; padding: 1px 4px; border-radius: 4px; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; white-space: nowrap;"
+                                              title="Pasokan sempat kosong. Total jual 90 hari: {{ (int)$item['sales_90d'] }} pcs (~{{ $item['avg_sales_active'] }} pcs/bln)">
+                                            90hr: {{ (int)$item['sales_90d'] }}
+                                        </span>
+                                    </div>
+                                @endif
+                            </td> 
+                        @endif
                         @if(in_array('avg_minggu', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #a855f7;">{{ $item['avg_minggu'] }}</td> @endif
                         @if(in_array('stock', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #6b7280;">{{ $item['stock'] }}</td> @endif
+                        @if(in_array('last_return', $visibleColumns))
+                            <td class="pos-grid-td" style="text-align: right;">
+                                @if(!empty($item['last_return']))
+                                    <div title="No Dok: {{ $item['last_return']['doc_number'] }}&#10;Tipe: {{ $item['last_return']['type_label'] }}&#10;Tgl: {{ $item['last_return']['date_formatted'] }}&#10;Alasan: {{ $item['last_return']['reason'] }}"
+                                         style="cursor: help; line-height: 1.2;">
+                                        <span style="font-weight: 700; color: #e11d48;">{{ number_format($item['last_return']['qty'], 0) }} pcs</span>
+                                        <div style="font-size: 0.7rem; color: #6b7280;">({{ $item['last_return']['days_ago'] == 0 ? 'hari ini' : $item['last_return']['days_ago'] . ' hr lalu' }})</div>
+                                    </div>
+                                @else
+                                    <span style="color: #9ca3af;">-</span>
+                                @endif
+                            </td>
+                        @endif
                         @if(in_array('min_qty', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #ef4444;">{{ $item['min_qty'] }}</td> @endif
                         @if(in_array('max_qty', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #10b981;">{{ $item['max_qty'] }}</td> @endif
                         @if(in_array('qty_saran', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; font-weight: bold; color: #0284c7; background-color: #f0f9ff;">{{ $item['qty_saran'] }}</td> @endif
@@ -542,6 +640,274 @@
                 <button wire:click="removeZeroQtyItems" type="button" class="pos-btn-danger">
                     Hapus Semua
                 </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- MODAL IMPORT PROMO SUPPLIER --}}
+    @if($showPromoModal)
+    <div class="pos-modal-overlay" style="z-index: 9999999;">
+        <div class="pos-modal-card" style="max-width: 64rem; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            {{-- Modal Header --}}
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.75rem;" class="dark:border-gray-700">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="background-color: #d1fae5; color: #059669; padding: 0.5rem; border-radius: 0.5rem;" class="dark:bg-emerald-950 dark:text-emerald-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M2.5 1A1.5 1.5 0 0 0 1 2.5v11A1.5 1.5 0 0 0 2.5 15h6.086a1.5 1.5 0 0 0 1.06-.44l4.915-4.914A1.5 1.5 0 0 0 15 8.586V2.5A1.5 1.5 0 0 0 13.5 1h-11zM2 2.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 .5.5V8H9.5A1.5 1.5 0 0 0 8 9.5V14H2.5a.5.5 0 0 1-.5-.5v-11zm7 11.293V9.5a.5.5 0 0 1 .5-.5h4.293L9 13.793z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="pos-modal-title" style="font-size: 1.15rem;">Muat Promo On-Faktur Supplier</h3>
+                        <p style="font-size: 0.8rem; color: #6b7280; margin: 0;">Upload file Excel (.xlsx/.xls) atau tempel chat WhatsApp promo dari supplier.</p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closePromoModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" style="cursor: pointer; background: transparent; border: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            {{-- Modal Body (Scrollable) --}}
+            <div style="flex: 1 1 auto; overflow-y: auto; padding: 0.75rem 0; display: flex; flex-direction: column; gap: 1rem;">
+                {{-- Source Selector Tabs --}}
+                <div style="display: flex; gap: 0.5rem; border-bottom: 2px solid #e5e7eb;" class="dark:border-gray-700">
+                    <button type="button" 
+                            wire:click="$set('promoSource', 'excel')"
+                            style="padding: 0.5rem 1rem; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid {{ $promoSource === 'excel' ? '#059669' : 'transparent' }}; color: {{ $promoSource === 'excel' ? '#059669' : '#6b7280' }}; margin-bottom: -2px; cursor: pointer; background: transparent; border-top: none; border-left: none; border-right: none;">
+                        📊 File Excel Promo
+                    </button>
+                    <button type="button" 
+                            wire:click="$set('promoSource', 'text')"
+                            style="padding: 0.5rem 1rem; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid {{ $promoSource === 'text' ? '#059669' : 'transparent' }}; color: {{ $promoSource === 'text' ? '#059669' : '#6b7280' }}; margin-bottom: -2px; cursor: pointer; background: transparent; border-top: none; border-left: none; border-right: none;">
+                        💬 Teks Chat WhatsApp
+                    </button>
+                </div>
+
+                {{-- Tab 1: Upload Excel --}}
+                @if($promoSource === 'excel')
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem; background: #f9fafb; padding: 1rem; border-radius: 0.5rem; border: 1px dashed #d1d5db;" class="dark:bg-gray-800 dark:border-gray-700">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                            <div>
+                                <label style="font-weight: 600; font-size: 0.85rem; color: #374151;" class="dark:text-gray-200">Pilih File Excel:</label>
+                                <input type="file" wire:model="promoFile" accept=".xlsx,.xls,.csv" class="pos-input" style="margin-top: 0.25rem;">
+                            </div>
+                            <div wire:loading wire:target="promoFile" style="font-size: 0.8rem; color: #059669; font-weight: 600;">
+                                ⏳ Membaca struktur file Excel...
+                            </div>
+                        </div>
+
+                        {{-- Options if Sheet/Columns detected --}}
+                        @if(count($excelSheets) > 0)
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;" class="dark:border-gray-700">
+                                <div>
+                                    <label class="pos-label" style="font-size: 0.75rem;">Sheet Excel:</label>
+                                    <select wire:model.live="selectedSheet" class="pos-input" style="font-size: 0.8rem;">
+                                        @foreach($excelSheets as $sh)
+                                            <option value="{{ $sh }}">{{ $sh }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="pos-label" style="font-size: 0.75rem;">Kolom Barcode:</label>
+                                    <select wire:model="selectedBarcodeCol" class="pos-input" style="font-size: 0.8rem;">
+                                        @foreach($excelColumns as $colLetter => $colName)
+                                            <option value="{{ $colLetter }}">Kolom {{ $colLetter }} ({{ $colName }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="pos-label" style="font-size: 0.75rem;">Kolom Promo / Diskon:</label>
+                                    <select wire:model="selectedPromoCol" class="pos-input" style="font-size: 0.8rem;">
+                                        @foreach($excelColumns as $colLetter => $colName)
+                                            <option value="{{ $colLetter }}">Kolom {{ $colLetter }} ({{ $colName }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="pos-label" style="font-size: 0.75rem;">Mulai Baris:</label>
+                                    <input type="number" min="1" wire:model="startRow" class="pos-input" style="font-size: 0.8rem;">
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                @else
+                {{-- Tab 2: WhatsApp Text --}}
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <label style="font-weight: 600; font-size: 0.85rem; color: #374151;" class="dark:text-gray-200">
+                            Tempel (Paste) Salinan Chat WhatsApp Sales:
+                        </label>
+                        <textarea wire:model="promoText" 
+                                  rows="6" 
+                                  class="pos-input" 
+                                  style="font-family: monospace; font-size: 0.8rem; resize: vertical;"
+                                  placeholder="Contoh format chat WA:&#10;- 8998866608923 SOKLIN SOFTENER TWILIGHT Disc. 10%&#10;- 8998866803892 SOKLIN ALL IN1 SCT Pot. Rp 2.500/Box&#10;- 8998866632553 Sedaap Kecap Pch 550Gr Disc. 7,3%"></textarea>
+                    </div>
+                @endif
+
+                {{-- Action Button: Parse / Analyze --}}
+                <div style="display: flex; justify-content: flex-end;">
+                    <button type="button" 
+                            wire:click="processPromoData" 
+                            class="pos-input" 
+                            style="background-color: #2563eb; color: white; border: none; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 1rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+                        <span>Baca & Cocokkan dengan Master Barang</span>
+                        <span wire:loading wire:target="processPromoData" class="animate-spin">⏳</span>
+                    </button>
+                </div>
+
+                {{-- Error Alert --}}
+                @if(!empty($promoErrorMessage))
+                    <div style="padding: 0.75rem 1rem; background-color: #fee2e2; color: #b91c1c; border-radius: 0.375rem; border: 1px solid #fca5a5; font-size: 0.85rem;">
+                        ⚠️ {{ $promoErrorMessage }}
+                    </div>
+                @endif
+
+                {{-- Parsed Preview Results --}}
+                @if(count($parsedPromoItems) > 0)
+                    @php
+                        $matchedCount = collect($parsedPromoItems)->where('is_matched', true)->count();
+                        $needOrderCount = collect($parsedPromoItems)->where('recommendation', 'need_order')->count();
+                        $inCartCount = collect($parsedPromoItems)->where('in_cart', true)->count();
+                        $slowCount = collect($parsedPromoItems)->where('recommendation', 'slow_moving')->count();
+                        $selectedCount = collect($parsedPromoItems)->where('selected', true)->count();
+                    @endphp
+
+                    <div style="border-top: 1px solid #e5e7eb; padding-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;" class="dark:border-gray-700">
+                        {{-- Summary Cards --}}
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem;">
+                            <div style="padding: 0.5rem; background-color: #f3f4f6; border-radius: 0.375rem; text-align: center;" class="dark:bg-gray-800">
+                                <div style="font-size: 0.7rem; color: #6b7280;">Total Promo Dibaca</div>
+                                <div style="font-size: 1.15rem; font-weight: 700; color: #111827;" class="dark:text-gray-100">{{ count($parsedPromoItems) }}</div>
+                            </div>
+                            <div style="padding: 0.5rem; background-color: #ecfdf5; border-radius: 0.375rem; text-align: center; border: 1px solid #a7f3d0;" class="dark:bg-emerald-950 dark:border-emerald-800">
+                                <div style="font-size: 0.7rem; color: #047857;">Cocok di Master</div>
+                                <div style="font-size: 1.15rem; font-weight: 700; color: #065f46;" class="dark:text-emerald-300">{{ $matchedCount }}</div>
+                            </div>
+                            <div style="padding: 0.5rem; background-color: #eff6ff; border-radius: 0.375rem; text-align: center; border: 1px solid #bfdbfe;" class="dark:bg-blue-950 dark:border-blue-800">
+                                <div style="font-size: 0.7rem; color: #1d4ed8;">🟢 Butuh Order (Saran > 0)</div>
+                                <div style="font-size: 1.15rem; font-weight: 700; color: #1e40af;" class="dark:text-blue-300">{{ $needOrderCount }}</div>
+                            </div>
+                            <div style="padding: 0.5rem; background-color: #fef3c7; border-radius: 0.375rem; text-align: center; border: 1px solid #fde68a;" class="dark:bg-amber-950 dark:border-amber-800">
+                                <div style="font-size: 0.7rem; color: #b45309;">Di Keranjang Saat Ini</div>
+                                <div style="font-size: 1.15rem; font-weight: 700; color: #92400e;" class="dark:text-amber-300">{{ $inCartCount }}</div>
+                            </div>
+                        </div>
+
+                        {{-- Action Controls & Filters --}}
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                            <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                                <button type="button" wire:click="selectOnlyNeedOrderPromo" class="pos-input" style="font-size: 0.75rem; background-color: #dbeafe; color: #1e40af; border-color: #bfdbfe; font-weight: 600; cursor: pointer; padding: 0.2rem 0.5rem;">
+                                    🟢 Pilih yang Butuh Order Saja
+                                </button>
+                                <button type="button" wire:click="setAllPromoSelection(true)" class="pos-input" style="font-size: 0.75rem; font-weight: 500; cursor: pointer; padding: 0.2rem 0.5rem;">
+                                    Pilih Semua
+                                </button>
+                                <button type="button" wire:click="setAllPromoSelection(false)" class="pos-input" style="font-size: 0.75rem; font-weight: 500; cursor: pointer; padding: 0.2rem 0.5rem;">
+                                    Kosongkan
+                                </button>
+                            </div>
+
+                            <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; cursor: pointer; color: #374151;" class="dark:text-gray-300">
+                                <input type="checkbox" wire:model="updateExistingCartOnly" class="rounded text-emerald-600">
+                                <span>Hanya perbarui diskon barang yang <b>sudah ada di keranjang</b></span>
+                            </label>
+                        </div>
+
+                        {{-- Table of Parsed Promo Items --}}
+                        <div style="max-height: 280px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 0.375rem;" class="dark:border-gray-700">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+                                <thead style="position: sticky; top: 0; background-color: #f3f4f6; z-index: 5;" class="dark:bg-gray-800">
+                                    <tr>
+                                        <th style="padding: 0.4rem; text-align: center; width: 2.5rem;">Pilih</th>
+                                        <th style="padding: 0.4rem; text-align: left;">Barcode</th>
+                                        <th style="padding: 0.4rem; text-align: left;">Nama Produk (Database)</th>
+                                        <th style="padding: 0.4rem; text-align: left;">Promo Terbaca</th>
+                                        <th style="padding: 0.4rem; text-align: right;">Stok</th>
+                                        <th style="padding: 0.4rem; text-align: right;">Jual/Bln</th>
+                                        <th style="padding: 0.4rem; text-align: right;">Qty Saran</th>
+                                        <th style="padding: 0.4rem; text-align: center;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($parsedPromoItems as $idx => $pItem)
+                                    <tr style="border-bottom: 1px solid #f3f4f6;" class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:border-gray-700">
+                                        <td style="padding: 0.4rem; text-align: center;">
+                                            @if($pItem['is_matched'])
+                                                <input type="checkbox" 
+                                                       wire:click="togglePromoItemSelection({{ $idx }})" 
+                                                       {{ $pItem['selected'] ? 'checked' : '' }} 
+                                                       class="rounded text-emerald-600 cursor-pointer">
+                                            @else
+                                                <span style="color: #9ca3af;">-</span>
+                                            @endif
+                                        </td>
+                                        <td style="padding: 0.4rem; font-family: monospace;">{{ $pItem['barcode'] }}</td>
+                                        <td style="padding: 0.4rem; font-weight: 600;">
+                                            @if($pItem['is_matched'])
+                                                {{ $pItem['product_name'] }}
+                                                @if($pItem['in_cart'])
+                                                    <span style="font-size: 0.65rem; color: #2563eb; background: #dbeafe; padding: 1px 4px; border-radius: 3px; margin-left: 4px;">Di Keranjang</span>
+                                                @endif
+                                            @else
+                                                <span style="color: #ef4444; font-style: italic;">Tidak ditemukan: {{ $pItem['file_name'] }}</span>
+                                            @endif
+                                        </td>
+                                        <td style="padding: 0.4rem;">
+                                            <span style="font-weight: 700; color: #047857; background: #ecfdf5; padding: 1px 6px; border-radius: 4px; border: 1px solid #a7f3d0;">
+                                                {{ $pItem['promo_raw'] }}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 0.4rem; text-align: right; color: #4b5563;" class="dark:text-gray-300">
+                                            {{ $pItem['is_matched'] ? number_format($pItem['current_stock'], 0) : '-' }}
+                                        </td>
+                                        <td style="padding: 0.4rem; text-align: right; color: #8b5cf6;">
+                                            {{ $pItem['is_matched'] ? number_format($pItem['avg_bln'], 0) : '-' }}
+                                        </td>
+                                        <td style="padding: 0.4rem; text-align: right; font-weight: 700; color: {{ $pItem['qty_saran'] > 0 ? '#0284c7' : '#9ca3af' }};">
+                                            {{ $pItem['is_matched'] ? number_format($pItem['qty_saran'], 0) : '-' }}
+                                        </td>
+                                        <td style="padding: 0.4rem; text-align: center;">
+                                            @if(!$pItem['is_matched'])
+                                                <span style="font-size: 0.65rem; color: #dc2626; background: #fee2e2; padding: 1px 5px; border-radius: 3px;">Belum Terdaftar</span>
+                                            @elseif($pItem['recommendation'] === 'need_order')
+                                                <span style="font-size: 0.65rem; color: #15803d; background: #dcfce7; padding: 1px 5px; border-radius: 3px; font-weight: 700;">🟢 Butuh Order</span>
+                                            @elseif($pItem['recommendation'] === 'slow_moving')
+                                                <span style="font-size: 0.65rem; color: #b91c1c; background: #fee2e2; padding: 1px 5px; border-radius: 3px;">🔴 Slow Moving</span>
+                                            @else
+                                                <span style="font-size: 0.65rem; color: #b45309; background: #fef3c7; padding: 1px 5px; border-radius: 3px;">Stok Aman</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            {{-- Modal Footer --}}
+            <div class="pos-modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.85rem; color: #4b5563;" class="dark:text-gray-300">
+                    @if(count($parsedPromoItems) > 0)
+                        Terpilih: <b>{{ collect($parsedPromoItems)->where('selected', true)->count() }}</b> item promo
+                    @endif
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" wire:click="closePromoModal" class="pos-btn-cancel">
+                        Tutup
+                    </button>
+                    @if(count($parsedPromoItems) > 0)
+                    <button type="button" 
+                            wire:click="applyPromoToCart" 
+                            class="pos-btn-danger" 
+                            style="background-color: #059669; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.75.75 0 0 1 1.028 1.09l-6.5 7.5a.75.75 0 0 1-1.08.02L2.736 8.53a.75.75 0 0 1 1.028-1.09L7.25 10.45l5.486-6.48z"/></svg>
+                        <span>Terapkan ke Keranjang PO</span>
+                    </button>
+                    @endif
+                </div>
             </div>
         </div>
     </div>

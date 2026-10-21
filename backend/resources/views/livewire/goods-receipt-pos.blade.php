@@ -581,6 +581,14 @@
                                          @else
                                              <span style="display: inline-block; font-size: 0.65rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; letter-spacing: 0.02em;" title="Produk Non-PPN (Bebas Pajak)">NonPPN</span>
                                          @endif
+                                         @if(!empty($item['promo_note']))
+                                             <div style="margin-top: 0.25rem;">
+                                                 <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background-color: #fef08a; color: #854d0e; border: 1px solid #fde047;"
+                                                       title="Periksa Faktur Supplier: Ada catatan promo pada PO ini">
+                                                     ⚠️ Promo PO: {{ $item['promo_note'] }}
+                                                 </span>
+                                             </div>
+                                         @endif
                                      </div>
                                  </div>
                             </td> 
