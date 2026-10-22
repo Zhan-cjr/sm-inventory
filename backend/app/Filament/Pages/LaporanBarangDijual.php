@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\AllSalesItem;
+use App\Models\Supplier;
 use Filament\Pages\Page;
 use Filament\Tables\Table;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -216,9 +217,14 @@ class LaporanBarangDijual extends Page implements HasTable
                     ->hidden(fn () => Auth::user()->branch_id !== null),
                 SelectFilter::make('supplier_id')
                     ->label('Supplier')
-                    ->relationship('product.supplier', 'name')
+                    ->options(fn () => Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->query(function (Builder $query, array $data) {
+                        if (!empty($data['value'])) {
+                            $query->whereHas('product', fn ($q) => $q->where('supplier_id', $data['value']));
+                        }
+                    }),
                 SelectFilter::make('source')
                     ->label('Sumber')
                     ->options([

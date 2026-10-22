@@ -1101,15 +1101,20 @@ class ReportPrintController extends Controller
     {
         $query = \App\Models\GoodsReceiptItem::query()->whereHas('goodsReceipt', function($q) use ($filters) {
             $q = $this->applyDateFilters($q, $filters, 'receipt_date', 'receipt_date');
-            if (isset($filters['supplier_id']['value']) && !empty($filters['supplier_id']['value'])) {
-                $q->where('supplier_id', $filters['supplier_id']['value']);
-            }
             if (auth()->user()->branch_id !== null) {
                 $q->where('branch_id', auth()->user()->branch_id);
             } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
                 $q->where('branch_id', $filters['branch_id']['value']);
             }
-        })->with(['product', 'goodsReceipt', 'goodsReceipt.supplier', 'goodsReceipt.purchaseOrder']);
+        })->with(['product', 'product.supplier', 'goodsReceipt', 'goodsReceipt.supplier', 'goodsReceipt.purchaseOrder']);
+
+        if (isset($filters['supplier_id']['value']) && !empty($filters['supplier_id']['value'])) {
+            $suppId = $filters['supplier_id']['value'];
+            $query->where(function($q) use ($suppId) {
+                $q->whereHas('goodsReceipt', fn($gq) => $gq->where('supplier_id', $suppId))
+                  ->orWhereHas('product', fn($pq) => $pq->where('supplier_id', $suppId));
+            });
+        }
 
         if ($searchQuery = request()->input('tableSearchQuery')) {
             $query->where(function($q) use ($searchQuery) {

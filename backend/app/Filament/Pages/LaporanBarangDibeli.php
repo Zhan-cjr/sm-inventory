@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\GoodsReceiptItem;
+use App\Models\Supplier;
 use Filament\Pages\Page;
 use Filament\Tables\Table;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -181,7 +182,17 @@ class LaporanBarangDibeli extends Page implements HasTable
                     ->hidden(fn () => Auth::user()->branch_id !== null),
                 SelectFilter::make('supplier_id')
                     ->label('Supplier')
-                    ->relationship('goodsReceipt.supplier', 'name'),
+                    ->options(fn () => Supplier::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                    ->searchable()
+                    ->preload()
+                    ->query(function (Builder $query, array $data) {
+                        if (!empty($data['value'])) {
+                            $query->where(function (Builder $q) use ($data) {
+                                $q->whereHas('goodsReceipt', fn ($gr) => $gr->where('supplier_id', $data['value']))
+                                  ->orWhereHas('product', fn ($pr) => $pr->where('supplier_id', $data['value']));
+                            });
+                        }
+                    }),
             ])
             ->headerActions([
                 \Filament\Actions\Action::make('cetak')
