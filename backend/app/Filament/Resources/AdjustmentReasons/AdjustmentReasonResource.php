@@ -11,10 +11,13 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class AdjustmentReasonResource extends Resource
@@ -46,6 +49,10 @@ class AdjustmentReasonResource extends Resource
                         'MINUS' => 'Koreksi Minus (-)',
                     ])
                     ->required(),
+                Toggle::make('is_active')
+                    ->label('Status Aktif')
+                    ->default(true)
+                    ->required(),
             ]);
     }
 
@@ -66,13 +73,20 @@ class AdjustmentReasonResource extends Resource
                         'MINUS' => 'danger',
                         default => 'gray',
                     }),
+                ToggleColumn::make('is_active')
+                    ->label('Status Aktif')
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                TernaryFilter::make('is_active')
+                    ->label('Status Aktif')
+                    ->placeholder('Semua')
+                    ->trueLabel('Aktif')
+                    ->falseLabel('Nonaktif'),
             ])
             ->recordActions([
                 EditAction::make(),

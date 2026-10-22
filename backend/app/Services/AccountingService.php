@@ -458,15 +458,26 @@ class AccountingService
             'journalable_type' => \App\Models\PurchaseReturn::class,
         ]);
 
-        // Kalkulasi PPN berdasarkan Goods Receipt referensi
+        // Kalkulasi PPN berdasarkan Goods Receipt referensi (header atau per-item)
         $taxAmount = 0;
+        $taxRate = (float) (\App\Models\Organization::find($organizationId)->tax_rate ?? 11);
+        $taxMultiplier = 1 + ($taxRate / 100);
+
         $gr = $return->goodsReceipt;
         if ($gr && $gr->include_tax) {
-            $taxRate = \App\Models\Organization::find($organizationId)->tax_rate ?? \App\Models\Organization::first()->id1;
-            $taxMultiplier = 1 + ($taxRate / 100);
-            
             $dpp = round($return->total_amount / $taxMultiplier, 2);
             $taxAmount = $return->total_amount - $dpp;
+        } else {
+            $return->loadMissing(['items.goodsReceipt', 'items.product']);
+            foreach ($return->items as $item) {
+                $isTaxable = (bool) ($item->product?->is_taxable ?? true);
+                $grIncludesTax = $item->goodsReceipt ? (bool) $item->goodsReceipt->include_tax : false;
+                
+                if ($isTaxable && $grIncludesTax) {
+                    $itemDpp = round($item->subtotal / $taxMultiplier, 2);
+                    $taxAmount += ($item->subtotal - $itemDpp);
+                }
+            }
         }
 
         $inventoryAmount = $return->total_amount - $taxAmount;

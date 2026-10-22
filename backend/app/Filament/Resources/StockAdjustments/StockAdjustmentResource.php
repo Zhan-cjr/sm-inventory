@@ -75,7 +75,7 @@ class StockAdjustmentResource extends Resource
                             ->dehydrated(),
                         Select::make('adjustment_reason_id')
                             ->label('Alasan / Sifat Transaksi')
-                            ->relationship('adjustmentReason', 'name')
+                            ->relationship('adjustmentReason', 'name', modifyQueryUsing: fn ($query, $record) => $query->where('is_active', true)->when($record?->adjustment_reason_id, fn($q, $id) => $q->orWhere('id', $id)))
                             ->required()
                             ->searchable()
                             ->preload()

@@ -75,7 +75,7 @@ class StockAdjustmentPos extends Component
             // Load draft if not editing existing adjustment
             $this->loadDraft();
             
-            $firstReason = AdjustmentReason::first();
+            $firstReason = AdjustmentReason::where('is_active', true)->first();
             if ($firstReason) {
                 $this->adjustment_reason_id = $firstReason->id;
                 $this->reason_type = $firstReason->type;
@@ -452,7 +452,9 @@ class StockAdjustmentPos extends Component
     {
         return view('livewire.stock-adjustment-pos', [
             'branches' => Branch::all(),
-            'reasons' => AdjustmentReason::all(),
+            'reasons' => AdjustmentReason::where('is_active', true)
+                ->when($this->adjustment_reason_id, fn($q, $id) => $q->orWhere('id', $id))
+                ->get(),
         ]);
     }
 }

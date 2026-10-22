@@ -12,6 +12,8 @@ class PurchaseReturnItem extends Model
     protected $fillable = [
         'purchase_return_id',
         'product_id',
+        'goods_receipt_id',
+        'stock_batch_id',
         'quantity',
         'unit_price',
         'subtotal',
@@ -26,5 +28,15 @@ class PurchaseReturnItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function goodsReceipt()
+    {
+        return $this->belongsTo(GoodsReceipt::class);
+    }
+
+    public function stockBatch()
+    {
+        return $this->belongsTo(StockBatch::class);
     }
 }

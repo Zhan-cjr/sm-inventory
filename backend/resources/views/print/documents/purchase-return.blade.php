@@ -16,6 +16,28 @@
             <h1>Retur Pembelian (Purchase Return)</h1>
         </div>
 
+        @php
+            $itemGrList = $doc->items->map(function($i) use ($doc) {
+                $effectiveGr = $i->goodsReceipt ?: $doc->goodsReceipt;
+                return $effectiveGr ? $effectiveGr->receipt_number : ($i->goods_receipt_id ?: 'NON-GR');
+            })->unique()->values();
+
+            if ($itemGrList->count() === 1 && $itemGrList[0] !== 'NON-GR') {
+                $headerGrLabel = $itemGrList[0];
+            } elseif ($itemGrList->count() > 1) {
+                $headerGrLabel = 'Multi-GR (Terlampir per Item)';
+            } elseif ($itemGrList->count() === 1 && $itemGrList[0] === 'NON-GR') {
+                $headerGrLabel = 'NON-GR / SALDO AWAL';
+            } else {
+                $headerGrLabel = $doc->goodsReceipt ? $doc->goodsReceipt->receipt_number : '-';
+            }
+
+            $totalPcs = $doc->items->sum('quantity');
+            $formattedTotalPcs = (float) $totalPcs == (int) $totalPcs 
+                ? number_format($totalPcs, 0, ',', '.') 
+                : number_format($totalPcs, 2, ',', '.');
+        @endphp
+
         <table class="info-table">
             <tr>
                 <td class="label">No. Retur</td>
@@ -31,7 +53,7 @@
                 <td>{{ $doc->supplier ? $doc->supplier->name : '-' }}</td>
                 <td class="label" style="text-align: right;">Referensi GR</td>
                 <td class="separator">:</td>
-                <td>{{ $doc->goodsReceipt ? $doc->goodsReceipt->receipt_number : '-' }}</td>
+                <td><strong>{{ $headerGrLabel }}</strong></td>
             </tr>
             <tr>
                 <td class="label">Pembuat</td>
@@ -45,24 +67,39 @@
                 <tr>
                     <th style="width: 25px;" class="text-center">No</th>
                     <th>Produk / Barang</th>
-                    <th class="text-center" style="width: 40px;">Qty Retur</th>
-                    <th class="text-right" style="width: 80px;">Harga Beli</th>
-                    <th class="text-right" style="width: 100px;">Subtotal</th>
+                    <th style="width: 170px;">Ref. No GR</th>
+                    <th class="text-center" style="width: 65px;">Qty Retur</th>
+                    <th class="text-right" style="width: 90px;">Harga Beli</th>
+                    <th class="text-right" style="width: 110px;">Subtotal</th>
                     <th style="width: 120px;">Alasan</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($doc->items as $index => $item)
+                @php
+                    $effectiveGr = $item->goodsReceipt ?: $doc->goodsReceipt;
+                    $grText = $effectiveGr ? $effectiveGr->receipt_number : ($item->goods_receipt_id ?: 'NON-GR / SALDO AWAL');
+                    $grDateText = $effectiveGr && $effectiveGr->receipt_date ? \Carbon\Carbon::parse($effectiveGr->receipt_date)->format('d/m/Y') : null;
+                    $qtyFormatted = (float) $item->quantity == (int) $item->quantity 
+                        ? number_format($item->quantity, 0, ',', '.') 
+                        : number_format($item->quantity, 2, ',', '.');
+                @endphp
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>
-                        {{ $item->product ? $item->product->name : '-' }}
-                        <span style="color: #666; font-size: 0.85em;"> | Barcode: {{ $item->product ? $item->product->barcode : '-' }}</span>
+                        <div style="font-weight: 600;">{{ $item->product ? $item->product->name : '-' }}</div>
+                        <div style="color: #666; font-size: 0.85em;">Barcode: {{ $item->product ? $item->product->barcode : '-' }}</div>
                     </td>
-                    <td class="text-center">{{ $item->quantity }}</td>
+                    <td style="font-size: 0.9em;">
+                        <strong>{{ $grText }}</strong>
+                        @if($grDateText)
+                            <div style="color: #666; font-size: 0.85em;">Tgl: {{ $grDateText }}</div>
+                        @endif
+                    </td>
+                    <td class="text-center" style="font-weight: 600;">{{ $qtyFormatted }}</td>
                     <td class="text-right">Rp {{ number_format($item->unit_price ?? 0, 0, ',', '.') }}</td>
-                    <td class="text-right">Rp {{ number_format($item->subtotal ?? 0, 0, ',', '.') }}</td>
-                    <td>{{ $item->reason ?: '-' }}</td>
+                    <td class="text-right" style="font-weight: 600;">Rp {{ number_format($item->subtotal ?? 0, 0, ',', '.') }}</td>
+                    <td style="font-size: 0.85em;">{{ $item->reason ?: '-' }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -70,8 +107,12 @@
 
         <table class="summary-box">
             <tr>
-                <td class="label" style="font-size: 12pt;">TOTAL NILAI RETUR</td>
-                <td class="value" style="font-size: 12pt; font-weight: bold; color: #dc2626;">Rp {{ number_format($doc->total_amount, 0, ',', '.') }}</td>
+                <td class="label" style="font-size: 10pt; color: #555;">TOTAL BARANG / PCS</td>
+                <td class="value" style="font-size: 10pt; font-weight: 600; text-align: right;">{{ count($doc->items) }} Baris / {{ $formattedTotalPcs }} Pcs</td>
+            </tr>
+            <tr>
+                <td class="label" style="font-size: 12pt; font-weight: bold;">TOTAL NILAI RETUR</td>
+                <td class="value" style="font-size: 12pt; font-weight: bold; color: #dc2626; text-align: right;">Rp {{ number_format($doc->total_amount, 0, ',', '.') }}</td>
             </tr>
         </table>
 
