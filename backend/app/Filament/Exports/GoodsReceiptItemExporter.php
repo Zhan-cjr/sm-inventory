@@ -16,11 +16,13 @@ class GoodsReceiptItemExporter extends Exporter
         return [
             ExportColumn::make('goodsReceipt.receipt_date')->label('Tanggal'),
             ExportColumn::make('goodsReceipt.receipt_number')->label('No Penerimaan'),
+            ExportColumn::make('goodsReceipt.purchaseOrder.po_number')->label('No PO'),
             ExportColumn::make('goodsReceipt.supplier.name')->label('Supplier'),
             ExportColumn::make('product.sku')->label('SKU'),
             ExportColumn::make('product.barcode')->label('Barcode'),
             ExportColumn::make('product.name')->label('Barang'),
-            ExportColumn::make('quantity_received')->label('Qty'),
+            ExportColumn::make('quantity_ordered')->label('Qty PO'),
+            ExportColumn::make('quantity_received')->label('Qty Diterima'),
             ExportColumn::make('unit_price')->label('Harga'),
             ExportColumn::make('subtotal')->label('Subtotal'),
         ];

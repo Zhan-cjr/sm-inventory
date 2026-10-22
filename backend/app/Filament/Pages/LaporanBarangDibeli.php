@@ -18,10 +18,15 @@ use Illuminate\Support\Facades\Auth;
 
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
+use Livewire\Attributes\Url;
+
 class LaporanBarangDibeli extends Page implements HasTable
 {
     use InteractsWithTable;
     use HasPageShield;
+
+    #[Url(as: 'tab')]
+    public string $activeTab = 'detail';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-cart';
     protected static ?string $navigationLabel = 'Laporan Barang Dibeli';
@@ -31,15 +36,93 @@ class LaporanBarangDibeli extends Page implements HasTable
 
     protected string $view = 'filament.pages.report-page';
 
+    public function getReportTabs(): array
+    {
+        return [
+            'detail' => [
+                'label' => 'Detail Per Transaksi',
+                'icon' => 'heroicon-o-list-bullet',
+            ],
+            'rekap' => [
+                'label' => 'Rekap Per Barang',
+                'icon' => 'heroicon-o-squares-2x2',
+            ],
+        ];
+    }
+
+    public function updatedActiveTab(): void
+    {
+        $this->resetPage();
+    }
+
+    public function getTableRecordKey(\Illuminate\Database\Eloquent\Model|array $record): string
+    {
+        if (is_array($record)) {
+            return (string) ($record['id'] ?? $record['product_id'] ?? uniqid());
+        }
+
+        return (string) ($record->getKey() ?? $record->id ?? $record->product_id ?? uniqid());
+    }
+
     public function table(Table $table): Table
     {
+        $isRekap = $this->activeTab === 'rekap';
+
         return $table
+            ->defaultKeySort(false)
+            ->defaultSort($isRekap ? 'quantity_received' : 'goodsReceipt.receipt_date', 'desc')
             ->query(
                 GoodsReceiptItem::query()
+                    ->whereNotNull('goods_receipt_items.product_id')
+                    ->when($isRekap, function ($q) {
+                        $q->selectRaw("
+                            goods_receipt_items.product_id as id,
+                            goods_receipt_items.product_id,
+                            SUM(goods_receipt_items.quantity_ordered) as quantity_ordered,
+                            SUM(goods_receipt_items.quantity_received) as quantity_received,
+                            SUM(goods_receipt_items.subtotal) as subtotal
+                        ")
+                        ->groupBy('goods_receipt_items.product_id');
+                    })
                     ->when(Auth::user()->branch_id !== null, fn ($q) => $q->whereHas('goodsReceipt', fn ($gr) => $gr->where('branch_id', Auth::user()->branch_id)))
-                    ->with(['goodsReceipt', 'goodsReceipt.branch', 'goodsReceipt.supplier', 'product'])
+                    ->with(['goodsReceipt', 'goodsReceipt.branch', 'goodsReceipt.supplier', 'goodsReceipt.purchaseOrder', 'product', 'product.supplier'])
             )
-            ->columns([
+            ->columns($isRekap ? [
+                TextColumn::make('product.sku')
+                    ->label('SKU')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('product.barcode')
+                    ->label('Barcode')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('product.name')
+                    ->label('Nama Barang')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('product.supplier.name')
+                    ->label('Supplier')
+                    ->searchable(),
+                TextColumn::make('quantity_ordered')
+                    ->label('Total Qty PO')
+                    ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
+                    ->sortable(),
+                TextColumn::make('quantity_received')
+                    ->label('Total Qty Diterima')
+                    ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
+                    ->sortable(),
+                TextColumn::make('avg_price')
+                    ->label('Harga Rata-Rata')
+                    ->money('IDR', true)
+                    ->state(fn ($record) => $record->quantity_received > 0 ? ($record->subtotal / $record->quantity_received) : ($record->product?->cost_price ?? 0)),
+                TextColumn::make('subtotal')
+                    ->label('Total Pembelian (Net)')
+                    ->money('IDR', true)
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->money('IDR', true))
+                    ->sortable(),
+            ] : [
                 TextColumn::make('goodsReceipt.receipt_date')
                     ->label('Tanggal Terima')
                     ->dateTime('d M Y')
@@ -47,6 +130,11 @@ class LaporanBarangDibeli extends Page implements HasTable
                 TextColumn::make('goodsReceipt.receipt_number')
                     ->label('No Penerimaan')
                     ->searchable(),
+                TextColumn::make('goodsReceipt.purchaseOrder.po_number')
+                    ->label('No PO')
+                    ->placeholder('-')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('goodsReceipt.supplier.name')
                     ->label('Supplier')
                     ->searchable(),
@@ -62,6 +150,11 @@ class LaporanBarangDibeli extends Page implements HasTable
                 TextColumn::make('product.name')
                     ->label('Nama Barang')
                     ->searchable(),
+                TextColumn::make('quantity_ordered')
+                    ->label('Qty PO')
+                    ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
+                    ->sortable(),
                 TextColumn::make('quantity_received')
                     ->label('Qty Diterima')
                     ->numeric()
@@ -97,6 +190,7 @@ class LaporanBarangDibeli extends Page implements HasTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-barang-dibeli',
+                        'tab' => $this->activeTab,
                         'tableFilters' => $livewire->tableFilters,
                         'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
@@ -111,6 +205,7 @@ class LaporanBarangDibeli extends Page implements HasTable
                         ->icon('heroicon-o-document-text')
                         ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                             'type' => 'laporan-barang-dibeli',
+                            'tab' => $this->activeTab,
                             'export' => 'xls',
                             'tableFilters' => $livewire->tableFilters,
                             'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,

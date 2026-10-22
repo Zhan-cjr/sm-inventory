@@ -929,6 +929,40 @@ class ReportPrintController extends Controller
         $items = $query->get();
         $period = $this->getPeriodString($filters);
 
+        if (request('tab') === 'detail') {
+            $columns = ['Tanggal', 'No Transaksi', 'Sumber', 'Cabang', 'SKU', 'Barcode', 'Produk', 'Qty Jual', 'Qty Retur', 'Harga Jual', 'Total'];
+            $rows = [];
+            $t_jual = 0; $t_retur = 0; $t_subtotal = 0;
+            foreach($items as $i) {
+                $qty_jual = $i->quantity > 0 ? (float)$i->quantity : 0;
+                $qty_retur = $i->quantity < 0 ? abs((float)$i->quantity) : 0;
+                $t_jual += $qty_jual;
+                $t_retur += $qty_retur;
+                $t_subtotal += (float)$i->subtotal;
+                $rows[] = [
+                    $i->transaction_date ? \Carbon\Carbon::parse($i->transaction_date)->format('d-m-Y H:i') : '-',
+                    $i->transaction_number,
+                    $i->source,
+                    $i->branch ? $i->branch->name : '-',
+                    $i->product ? $i->product->sku : '-',
+                    $i->product ? $i->product->barcode : '-',
+                    $i->product ? $i->product->name : '-',
+                    $qty_jual,
+                    $qty_retur,
+                    number_format($i->unit_price, 0, ',', '.'),
+                    number_format($i->subtotal, 0, ',', '.')
+                ];
+            }
+            $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '', '', '<strong>'.$t_jual.'</strong>', '<strong>'.$t_retur.'</strong>', '', '<strong>'.number_format($t_subtotal, 0, ',', '.').'</strong>'];
+
+            return view('print.reports.generic', [
+                'title' => 'Laporan Barang Dijual (Detail Transaksi)', 
+                'period' => $period, 
+                'columns' => $columns, 
+                'rows' => $rows
+            ]);
+        }
+
         $columns = ['SKU', 'Barcode', 'Produk', 'Qty Jual', 'Qty Retur', 'Harga Beli', 'Harga Jual', 'Total Beli', 'Total Jual'];
         $rows = [];
         
@@ -1075,7 +1109,7 @@ class ReportPrintController extends Controller
             } elseif (isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
                 $q->where('branch_id', $filters['branch_id']['value']);
             }
-        })->with(['product', 'goodsReceipt', 'goodsReceipt.supplier']);
+        })->with(['product', 'goodsReceipt', 'goodsReceipt.supplier', 'goodsReceipt.purchaseOrder']);
 
         if ($searchQuery = request()->input('tableSearchQuery')) {
             $query->where(function($q) use ($searchQuery) {
@@ -1087,27 +1121,78 @@ class ReportPrintController extends Controller
         $items = $query->get();
         $period = $this->getPeriodString($filters, 'receipt_date');
 
-        $columns = ['Tanggal', 'Supplier', 'SKU', 'Barcode', 'Produk', 'Qty', 'Harga Beli', 'Total'];
+        if (request('tab') === 'rekap') {
+            $grouped = [];
+            foreach($items as $i) {
+                $pid = $i->product_id;
+                if (!isset($grouped[$pid])) {
+                    $grouped[$pid] = [
+                        'sku' => $i->product ? $i->product->sku : '-',
+                        'barcode' => $i->product ? $i->product->barcode : '-',
+                        'name' => $i->product ? $i->product->name : '-',
+                        'supplier' => ($i->goodsReceipt && $i->goodsReceipt->supplier) ? $i->goodsReceipt->supplier->name : ($i->product?->supplier?->name ?? '-'),
+                        'qty_po' => 0,
+                        'qty_received' => 0,
+                        'subtotal' => 0,
+                    ];
+                }
+                $grouped[$pid]['qty_po'] += (int) ($i->quantity_ordered ?? 0);
+                $grouped[$pid]['qty_received'] += (int) ($i->quantity_received ?? 0);
+                $grouped[$pid]['subtotal'] += (float) ($i->subtotal ?? 0);
+            }
+
+            usort($grouped, fn($a, $b) => strcmp($a['name'], $b['name']));
+
+            $columns = ['SKU', 'Barcode', 'Produk', 'Supplier', 'Qty PO', 'Qty Terima', 'Harga Rata-Rata', 'Total Pembelian'];
+            $rows = [];
+            $t_po = 0; $t_qty = 0; $t_subtotal = 0;
+            foreach($grouped as $g) {
+                $t_po += $g['qty_po'];
+                $t_qty += $g['qty_received'];
+                $t_subtotal += $g['subtotal'];
+                $avg_price = $g['qty_received'] > 0 ? ($g['subtotal'] / $g['qty_received']) : 0;
+                $rows[] = [
+                    $g['sku'],
+                    $g['barcode'],
+                    $g['name'],
+                    $g['supplier'],
+                    $g['qty_po'],
+                    $g['qty_received'],
+                    number_format($avg_price, 0, ',', '.'),
+                    number_format($g['subtotal'], 0, ',', '.')
+                ];
+            }
+            $rows[] = ['<strong>TOTAL</strong>', '', '', '', '<strong>'.$t_po.'</strong>', '<strong>'.$t_qty.'</strong>', '', '<strong>'.number_format($t_subtotal, 0, ',', '.').'</strong>'];
+
+            return view('print.reports.generic', ['title' => 'Laporan Barang Dibeli (Rekap Per Barang)', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+        }
+
+        $columns = ['Tanggal', 'No Penerimaan', 'No PO', 'Supplier', 'SKU', 'Barcode', 'Produk', 'Qty PO', 'Qty Terima', 'Harga Beli', 'Total'];
         $rows = [];
-        $t_qty = 0; $t_total = 0;
+        $t_po = 0; $t_qty = 0; $t_total = 0;
         foreach($items as $i) {
-            $qty = $i->quantity_received ?? 0;
+            $qty_po = (int) ($i->quantity_ordered ?? 0);
+            $qty = (int) ($i->quantity_received ?? 0);
+            $t_po += $qty_po;
             $t_qty += $qty;
             $t_total += $i->subtotal;
             $rows[] = [
                 $i->goodsReceipt ? \Carbon\Carbon::parse($i->goodsReceipt->receipt_date)->format('d-m-Y') : '-',
+                $i->goodsReceipt ? $i->goodsReceipt->receipt_number : '-',
+                ($i->goodsReceipt && $i->goodsReceipt->purchaseOrder) ? $i->goodsReceipt->purchaseOrder->po_number : '-',
                 ($i->goodsReceipt && $i->goodsReceipt->supplier) ? $i->goodsReceipt->supplier->name : '-',
                 $i->product ? $i->product->sku : '-',
                 $i->product ? $i->product->barcode : '-',
                 $i->product ? $i->product->name : '-',
+                $qty_po,
                 $qty,
                 number_format($i->unit_price, 0, ',', '.'),
                 number_format($i->subtotal, 0, ',', '.')
             ];
         }
-        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '<strong>'.$t_qty.'</strong>', '', '<strong>'.number_format($t_total, 0, ',', '.').'</strong>'];
+        $rows[] = ['<strong>TOTAL</strong>', '', '', '', '', '', '', '<strong>'.$t_po.'</strong>', '<strong>'.$t_qty.'</strong>', '', '<strong>'.number_format($t_total, 0, ',', '.').'</strong>'];
 
-        return view('print.reports.generic', ['title' => 'Laporan Barang Dibeli', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
+        return view('print.reports.generic', ['title' => 'Laporan Barang Dibeli (Detail Transaksi)', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }
 
     private function printLaporanStokOpnameRingkas($filters)

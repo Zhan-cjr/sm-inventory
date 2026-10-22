@@ -19,10 +19,15 @@ use Illuminate\Support\Facades\Auth;
 
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 
+use Livewire\Attributes\Url;
+
 class LaporanBarangDijual extends Page implements HasTable
 {
     use InteractsWithTable;
     use HasPageShield;
+
+    #[Url(as: 'tab')]
+    public string $activeTab = 'detail';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-bag';
     protected static ?string $navigationLabel = 'Laporan Barang Dijual';
@@ -32,17 +37,105 @@ class LaporanBarangDijual extends Page implements HasTable
 
     protected string $view = 'filament.pages.report-page';
 
+    public function getReportTabs(): array
+    {
+        return [
+            'detail' => [
+                'label' => 'Detail Per Transaksi',
+                'icon' => 'heroicon-o-list-bullet',
+            ],
+            'rekap' => [
+                'label' => 'Rekap Per Barang',
+                'icon' => 'heroicon-o-squares-2x2',
+            ],
+        ];
+    }
+
+    public function updatedActiveTab(): void
+    {
+        $this->resetPage();
+    }
+
+    public function getTableRecordKey(\Illuminate\Database\Eloquent\Model|array $record): string
+    {
+        if (is_array($record)) {
+            return (string) ($record['id'] ?? $record['product_id'] ?? uniqid());
+        }
+
+        return (string) ($record->getKey() ?? $record->id ?? $record->product_id ?? uniqid());
+    }
+
     public function table(Table $table): Table
     {
+        $isRekap = $this->activeTab === 'rekap';
+
         return $table
+            ->defaultKeySort(false)
+            ->defaultSort($isRekap ? 'qty_terjual' : 'transaction_date', 'desc')
             ->query(
                 AllSalesItem::query()
+                    ->whereNotNull('all_sales_items.product_id')
+                    ->when($isRekap, function ($q) {
+                        $q->selectRaw("
+                            all_sales_items.product_id as id,
+                            all_sales_items.product_id,
+                            SUM(CASE WHEN all_sales_items.quantity > 0 THEN all_sales_items.quantity ELSE 0 END) as qty_terjual,
+                            SUM(CASE WHEN all_sales_items.quantity < 0 THEN ABS(all_sales_items.quantity) ELSE 0 END) as qty_retur,
+                            SUM(all_sales_items.quantity) as qty_net,
+                            SUM(all_sales_items.total_cogs) as total_cogs,
+                            SUM(all_sales_items.subtotal) as subtotal
+                        ")
+                        ->groupBy('all_sales_items.product_id');
+                    })
                     ->when(Auth::user()->branch_id !== null, function (Builder $query) {
                         $query->where('branch_id', Auth::user()->branch_id);
                     })
-                    ->with(['branch', 'product'])
+                    ->with(['branch', 'product', 'product.supplier'])
             )
-            ->columns([
+            ->columns($isRekap ? [
+                TextColumn::make('product.sku')
+                    ->label('SKU')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('product.barcode')
+                    ->label('Barcode')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('product.name')
+                    ->label('Nama Barang')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('product.supplier.name')
+                    ->label('Supplier')
+                    ->searchable(),
+                TextColumn::make('qty_terjual')
+                    ->label('Total Terjual')
+                    ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
+                    ->sortable(),
+                TextColumn::make('qty_retur')
+                    ->label('Total Retur')
+                    ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
+                    ->sortable(),
+                TextColumn::make('qty_net')
+                    ->label('Total Qty Bersih')
+                    ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
+                    ->sortable(),
+                TextColumn::make('product.cost_price')
+                    ->label('Harga Pokok (HPP)')
+                    ->money('IDR', true)
+                    ->state(fn ($record) => $record->product?->cost_price_tax > 0 ? $record->product?->cost_price_tax : ($record->product?->cost_price ?? 0)),
+                TextColumn::make('product.selling_price')
+                    ->label('Harga Jual')
+                    ->money('IDR', true),
+                TextColumn::make('subtotal')
+                    ->label('Total Penjualan (Net)')
+                    ->money('IDR', true)
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->money('IDR', true))
+                    ->sortable(),
+            ] : [
                 TextColumn::make('source')
                     ->label('Sumber')
                     ->badge()
@@ -140,6 +233,7 @@ class LaporanBarangDijual extends Page implements HasTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-barang-dijual',
+                        'tab' => $this->activeTab,
                         'tableFilters' => $livewire->tableFilters,
                         'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
@@ -154,6 +248,7 @@ class LaporanBarangDijual extends Page implements HasTable
                         ->icon('heroicon-o-document-text')
                         ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                             'type' => 'laporan-barang-dijual',
+                            'tab' => $this->activeTab,
                             'export' => 'xls',
                             'tableFilters' => $livewire->tableFilters,
                             'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
