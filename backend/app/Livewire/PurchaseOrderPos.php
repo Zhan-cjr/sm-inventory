@@ -794,16 +794,20 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                     ->where('year', $histMonth->year)
                     ->where('month', $histMonth->month)
                     ->sum('quantity_sold');
-                if ($histSales > 0) {
-                    $isSalesFromHistory = true;
-                }
             }
 
             $liveDays = max(1, $earliestLive->diffInDays($refDate));
-            if ($liveDays >= 14) {
+            if ($liveSales > 0) {
+                // Penjualan kasir live dinormalisasi ke bulanan
                 $avgBln = round(($liveSales / $liveDays) * 30, 1);
+                $isSalesFromHistory = false;
+            } elseif ($histSales > 0) {
+                // Di masa awal migrasi produk belum terjual di kasir baru, gunakan histori bulan sebelumnya
+                $avgBln = round($histSales, 1);
+                $isSalesFromHistory = true;
             } else {
-                $avgBln = $histSales > 0 ? round($histSales, 1) : round(($liveSales / $liveDays) * 30, 1);
+                $avgBln = 0.0;
+                $isSalesFromHistory = false;
             }
             $avgMinggu = round($avgBln / 4, 1);
         } else {
@@ -893,14 +897,17 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         // Deteksi Slow Moving Alert:
-        // 1. Sisa stok masih ada (> 0) namun penjualan 30 hari sangat rendah (<= 2 pcs)
-        // 2. ATAU Stok habis (<= 0) dan penjualan 90 hari sangat kecil (< 10 pcs / < 1 pcs per minggu)
+        // Produk HANYA dikategorikan Slow Moving jika penjualan 90 harinya terbukti sangat rendah (< 10 pcs / < 1 pcs per minggu):
+        // 1. Sisa stok masih ada (> 0) namun penjualan 30 hari sangat rendah (<= 2 pcs) DAN 90 hari < 10 pcs
+        // 2. ATAU Stok habis (<= 0) dan penjualan 90 hari < 10 pcs
         $isSlowMovingAlert = false;
         if (!$isEmptyDueToReturn && !$isOosWithHistory && ($qtySaran > 0 || ($minQty > 0 && $stock < $minQty))) {
-            if ($stock > 0 && $avgBln <= 2) {
-                $isSlowMovingAlert = true;
-            } elseif ($stock <= 0 && $avgBln <= 0 && $sales90d < 10) {
-                $isSlowMovingAlert = true;
+            if ($sales90d < 10) {
+                if ($stock > 0 && $avgBln <= 2) {
+                    $isSlowMovingAlert = true;
+                } elseif ($stock <= 0 && $avgBln <= 0) {
+                    $isSlowMovingAlert = true;
+                }
             }
         }
 
