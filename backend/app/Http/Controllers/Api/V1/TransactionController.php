@@ -295,6 +295,19 @@ class TransactionController extends Controller
                     if ($product && $product->product_type === 'digital' && !empty($product->ppob_sku)) {
                         $customerNo = $item['customer_no'] ?? null;
                         if ($customerNo) {
+                            // Smart Cooldown Guard: Cegah transaksi ganda jika nomor & SKU sama masih 'Pending' dalam 5 menit terakhir
+                            $recentPendingPpob = \App\Models\PpobTransaction::where('customer_no', $customerNo)
+                                ->where('buyer_sku_code', $product->ppob_sku)
+                                ->where('status', 'Pending')
+                                ->where('created_at', '>=', now()->subMinutes(5))
+                                ->latest()
+                                ->first();
+
+                            if ($recentPendingPpob) {
+                                $pendingRef = $recentPendingPpob->ref_id;
+                                throw new \Exception("Nomor {$customerNo} sedang dalam proses pengisian {$product->name} (No Ref: {$pendingRef}). Mohon tunggu status selesai dan silahkan cek di pos kasir anda di menu PPOB(F12)");
+                            }
+
                             $refId = $transaction->receipt_number;
                             $existingPpobCount = \App\Models\PpobTransaction::where('transaction_id', $transaction->id)->count();
                             if ($existingPpobCount > 0) {
