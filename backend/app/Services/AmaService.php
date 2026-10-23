@@ -27,7 +27,8 @@ class AmaService implements PpobProviderInterface
                     CURLOPT_SSL_CIPHER_LIST => 'DEFAULT@SECLEVEL=0',
                     CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_0,
                 ],
-                'timeout' => 15,
+                'connect_timeout' => 10,
+                'timeout' => 25,
             ]);
     }
 
@@ -112,14 +113,14 @@ class AmaService implements PpobProviderInterface
             $res = $response->json();
             return $this->mapResponseToStandard($res);
         } catch (\Exception $e) {
-            Log::error('AMA Topup Error: ' . $e->getMessage());
+            Log::error("AMA Topup Error for refId {$refId}: " . $e->getMessage());
             if (str_contains($e->getMessage(), 'timed out') || str_contains($e->getMessage(), 'timeout')) {
                 return [
                     'data' => [
                         'status' => 'Pending',
                         'rc' => '68',
                         'sn' => '',
-                        'message' => 'Transaksi pending (timeout > 60s), menunggu callback',
+                        'message' => 'Transaksi pending (timeout provider), menunggu callback',
                         'price' => 0,
                     ]
                 ];
@@ -130,23 +131,18 @@ class AmaService implements PpobProviderInterface
 
     public function checkStatus(string $skuCode, string $customerNo, string $refId)
     {
-        // For AMA, using 'INQ' method or status inquiry
-        $payload = $this->buildRequestPayload('INQ', $skuCode, $customerNo, $refId, []);
-        $payloadJson = json_encode($payload);
-        $sign = $this->generateSign($payloadJson);
-
-        try {
-            $response = $this->getHttpClient()->withHeaders([
-                'Content-Type' => 'application/json',
-                'X-API-KEY' => $sign
-            ])->withBody($payloadJson, 'application/json')->post($this->getTransactionUrl());
-            
-            $res = $response->json();
-            return $this->mapResponseToStandard($res);
-        } catch (\Exception $e) {
-            Log::error('AMA CheckStatus Error: ' . $e->getMessage());
-            return ['data' => ['status' => 'Pending', 'message' => 'Check status failed: ' . $e->getMessage()]];
-        }
+        // Berdasarkan dokumentasi H2H AMA (v1.3.3), AMA tidak menyediakan endpoint Pull Check Status untuk produk Topup/Prabayar.
+        // Mengirim method 'INQ' pada produk topup akan memicu error '65 PRODUCT CLOSE' dari server AMA.
+        // Status transaksi pending akan diperbarui secara otomatis ketika Webhook Callback diterima dari server AMA.
+        return [
+            'data' => [
+                'status' => 'Pending',
+                'rc' => '68',
+                'sn' => '',
+                'message' => 'Transaksi sedang diproses oleh AMA. Menunggu konfirmasi webhook atau cek Web Report AMA.',
+                'price' => 0,
+            ]
+        ];
     }
 
     private function mapResponseToStandard($res)

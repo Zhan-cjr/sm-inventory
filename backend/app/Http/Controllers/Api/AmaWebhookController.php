@@ -29,11 +29,11 @@ class AmaWebhookController extends Controller
             
             if ($transaction) {
                 // Map AMA status to our standard status
-                // '00' = Success, '04' = Failed, '68' = Pending
+                // '00' or '0' = Success, '04' = Failed, '68' = Pending
                 $mappedStatus = 'Pending';
-                if ($status === '00' || strtolower($status) === 'success') {
+                if ($status === '00' || $status === '0' || strtolower($status) === 'success' || strtolower($status) === 'sukses') {
                     $mappedStatus = 'Sukses';
-                } elseif (in_array($status, ['03', '04', '05', '06', '63', '65', '67', '99']) || strtolower($status) === 'failed') {
+                } elseif (in_array($status, ['03', '04', '05', '06', '63', '65', '67', '99']) || strtolower($status) === 'failed' || strtolower($status) === 'gagal') {
                     $mappedStatus = 'Gagal';
                 } elseif ($status === '68' || strtolower($status) === 'pending') {
                     $mappedStatus = 'Pending';
