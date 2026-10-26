@@ -114,9 +114,16 @@ class SuggestedOrders extends Page implements HasTable
                     ->sortable()
                     ->weight('bold'),
                 TextColumn::make('ads')
-                    ->label('ADS (Sales/Hari)')
+                    ->label('ADS (WMA/Hari)')
                     ->numeric(decimalPlaces: 2)
-                    ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['ads']),
+                    ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['ads'])
+                    ->description(function ($record) {
+                        $calc = app(SuggestedOrderService::class)->calculateForStock($record);
+                        if (!empty($calc['wma_monthly'])) {
+                            return "WMA: " . round($calc['wma_monthly']) . "/bln";
+                        }
+                        return null;
+                    }),
                 TextColumn::make('reorder_point')
                     ->label('Titik Pesan (ROP)')
                     ->numeric(decimalPlaces: 0)
@@ -129,7 +136,18 @@ class SuggestedOrders extends Page implements HasTable
                     ->weight('bold')
                     ->color('primary')
                     ->numeric(decimalPlaces: 0)
-                    ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['suggested_qty']),
+                    ->state(fn ($record) => app(SuggestedOrderService::class)->calculateForStock($record)['suggested_qty'])
+                    ->description(function ($record) {
+                        $calc = app(SuggestedOrderService::class)->calculateForStock($record);
+                        $parts = [];
+                        if (!empty($calc['carton_suggested_text']) && $calc['suggested_qty'] > 0) {
+                            $parts[] = "📦 " . $calc['carton_suggested_text'];
+                        }
+                        if (!empty($calc['on_order_qty']) && $calc['on_order_qty'] > 0) {
+                            $parts[] = "🚚 PO Jalan: " . (int)$calc['on_order_qty'] . " pcs";
+                        }
+                        return !empty($parts) ? implode(' • ', $parts) : null;
+                    }),
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()

@@ -156,31 +156,80 @@
                         <div x-data="{ openSaran: false }" style="position: relative;">
                             <button @click="openSaran = !openSaran" 
                                     class="pos-input" 
-                                    style="display: flex; align-items: center; gap: 0.5rem; background: #3b82f6; color: white; border: none; cursor: pointer; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-weight: 600;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3.5a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 8 4z"/></svg>
-                                Saran Order
-                                <span wire:loading wire:target="applySaranOrder" class="animate-spin">
+                                    style="display: flex; align-items: center; gap: 0.45rem; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; cursor: pointer; padding: 0.35rem 0.85rem; border-radius: 0.45rem; font-weight: 600; font-size: 0.82rem; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.25); transition: all 0.15s ease;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                <span>Saran Order</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="transition: transform 0.2s;" :style="openSaran ? 'transform: rotate(180deg)' : ''"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+                                <span wire:loading wire:target="applySaranOrder" class="animate-spin" style="margin-left: 0.2rem;">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                                 </span>
                             </button>
                             <div x-show="openSaran" @click.away="openSaran = false" 
-                                 style="position: absolute; right: 0; top: 100%; z-index: 50; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; width: 16rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);" 
-                                 class="pos-dropdown-bg border border-gray-200 dark:border-gray-700">
-                                <button wire:click="applySaranOrder('minmax')" @click="openSaran = false" class="w-full text-left p-2 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition-colors group">
-                                    <div class="font-bold text-gray-800 dark:text-gray-200 group-hover:text-blue-700">Metode Min/Max</div>
-                                    <div class="text-[10px] text-gray-500">Order jika stok < min (Qty = max - stok)</div>
-                                </button>
-                                <div style="height: 1px; background: #f3f4f6; margin: 0.25rem 0;" class="dark:bg-gray-700"></div>
-                                <button wire:click="applySaranOrder('sales')" @click="openSaran = false" class="w-full text-left p-2 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition-colors group">
-                                    <div class="font-bold text-gray-800 dark:text-gray-200 group-hover:text-blue-700">Trend Penjualan (14 Hari)</div>
-                                    <div class="text-[10px] text-gray-500">Berdasarkan rata harian 30 hari terakhir</div>
-                                </button>
+                                 x-transition:enter="transition ease-out duration-150"
+                                 x-transition:enter-start="opacity-0 transform scale-95"
+                                 x-transition:enter-end="opacity-100 transform scale-100"
+                                 x-transition:leave="transition ease-in duration-100"
+                                 x-transition:leave-start="opacity-100 transform scale-100"
+                                 x-transition:leave-end="opacity-0 transform scale-95"
+                                 style="position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; border-radius: 0.65rem; width: 19.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1); overflow: hidden;" 
+                                 class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                
+                                <div style="padding: 0.65rem 0.85rem; background-color: #f8fafc;" class="dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700">
+                                    <div style="font-size: 0.68rem; font-weight: 700; color: #64748b; letter-spacing: 0.05em; text-transform: uppercase;">
+                                        Pilih Metode Saran Restock
+                                    </div>
+                                    <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 1px;">
+                                        Otomatis mengisi keranjang sesuai parameter cabang
+                                    </div>
+                                </div>
+
+                                <div style="padding: 0.45rem;">
+                                    {{-- Opsi 1: Min-Max --}}
+                                    <button wire:click="applySaranOrder('minmax')" @click="openSaran = false" 
+                                            class="w-full text-left p-2.5 rounded-lg transition-all group hover:bg-blue-50 dark:hover:bg-gray-700/80">
+                                        <div style="display: flex; align-items: flex-start; gap: 0.65rem;">
+                                            <div style="padding: 0.4rem; border-radius: 0.45rem; background-color: #eff6ff; color: #2563eb; flex-shrink: 0;" class="group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                                            </div>
+                                            <div style="flex-grow: 1;">
+                                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                                    <span style="font-weight: 700; font-size: 0.82rem; color: #1e293b;" class="dark:text-gray-100 group-hover:text-blue-700">Batas Stok Min/Max</span>
+                                                    <span style="font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 9999px; background-color: #dbeafe; color: #1e40af;">Rutin Cabang</span>
+                                                </div>
+                                                <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px; line-height: 1.3;">
+                                                    Order saat stok &lt; min. Mengisi kembali hingga plafon max cabang.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <div style="height: 1px; background: #f1f5f9; margin: 0.35rem 0.4rem;" class="dark:bg-gray-700"></div>
+
+                                    {{-- Opsi 2: Trend Penjualan WMA Cerdas --}}
+                                    <button wire:click="applySaranOrder('sales')" @click="openSaran = false" 
+                                            class="w-full text-left p-2.5 rounded-lg transition-all group hover:bg-emerald-50 dark:hover:bg-gray-700/80">
+                                        <div style="display: flex; align-items: flex-start; gap: 0.65rem;">
+                                            <div style="padding: 0.4rem; border-radius: 0.45rem; background-color: #ecfdf5; color: #059669; flex-shrink: 0;" class="group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                            </div>
+                                            <div style="flex-grow: 1;">
+                                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                                    <span style="font-weight: 700; font-size: 0.82rem; color: #1e293b;" class="dark:text-gray-100 group-hover:text-emerald-700">Trend Penjualan Cerdas</span>
+                                                    <span style="font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 9999px; background-color: #d1fae5; color: #065f46;">WMA + PO Jalan</span>
+                                                </div>
+                                                <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px; line-height: 1.3;">
+                                                    Analisa bobot 3 bulan + lead time dikurangi kuantitas PO yang masih di jalan.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         @else
-                        <button class="pos-input" style="display: flex; align-items: center; gap: 0.5rem; background: #9ca3af; color: white; border: none; cursor: not-allowed; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-weight: 600;" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3.5a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 8 4z"/></svg>
-                            Saran Order
+                        <button class="pos-input" style="display: flex; align-items: center; gap: 0.45rem; background: #cbd5e1; color: #64748b; border: none; cursor: not-allowed; padding: 0.35rem 0.85rem; border-radius: 0.45rem; font-weight: 600; font-size: 0.82rem;" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            <span>Saran Order</span>
                         </button>
                         @endif
                     </div>
@@ -500,7 +549,30 @@
                         @endif
                         @if(in_array('min_qty', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #ef4444;">{{ $item['min_qty'] }}</td> @endif
                         @if(in_array('max_qty', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #10b981;">{{ $item['max_qty'] }}</td> @endif
-                        @if(in_array('qty_saran', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; font-weight: bold; color: #0284c7; background-color: #f0f9ff;">{{ $item['qty_saran'] }}</td> @endif
+                        @if(in_array('qty_saran', $visibleColumns)) 
+                            <td class="pos-grid-td" style="text-align: right; font-weight: bold; color: #0284c7; background-color: #f0f9ff; vertical-align: top;">
+                                <div>{{ $item['qty_saran'] }}</div>
+                                @if(!empty($item['carton_text']) && (float)($item['qty_saran'] ?? 0) > 0)
+                                    <div style="margin-top: 2px;">
+                                        <button type="button" 
+                                                wire:click="applyCartonRounding({{ $index }})"
+                                                class="hover:opacity-80 active:scale-95 transition-all"
+                                                style="cursor: pointer; display: inline-flex; align-items: center; gap: 2px; font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; white-space: nowrap;"
+                                                title="Klik untuk membulatkan Qty Pesan ke kelipatan dus (isi {{ $item['carton_size'] ?? '-' }} pcs/dus)">
+                                            <span>📦</span> <span>{{ $item['carton_text'] }}</span>
+                                        </button>
+                                    </div>
+                                @endif
+                                @if(!empty($item['on_order_qty']) && (float)$item['on_order_qty'] > 0)
+                                    <div style="margin-top: 2px;">
+                                        <span style="display: inline-block; font-size: 0.58rem; font-weight: 600; padding: 1px 4px; border-radius: 4px; background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; white-space: nowrap;"
+                                              title="Ada PO aktif yang sedang berjalan/belum diterima: {{ (int)$item['on_order_qty'] }} pcs">
+                                            🚚 PO Jalan: {{ (int)$item['on_order_qty'] }}
+                                        </span>
+                                    </div>
+                                @endif
+                            </td> 
+                        @endif
                         @if(in_array('qty', $visibleColumns))
                         <td class="pos-grid-td" style="padding: 0.25rem;">
                             <input onfocus="this.select()" type="number" id="qty-{{ $index }}" class="pos-input pos-grid-input" style="text-align: right;" 

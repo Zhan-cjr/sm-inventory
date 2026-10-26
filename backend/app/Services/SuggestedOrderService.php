@@ -18,6 +18,8 @@ class SuggestedOrderService
     protected array $stockCalculationCache = [];
     protected array $branchSales30DaysCache = [];
     protected array $branchSales90DaysCache = [];
+    protected array $branchOnOrderCache = [];
+    protected array $branchWmaSalesCache = [];
 
     public function clearCache(?string $branchId = null): void
     {
@@ -25,6 +27,8 @@ class SuggestedOrderService
         $this->stockCalculationCache = [];
         $this->branchSales30DaysCache = [];
         $this->branchSales90DaysCache = [];
+        $this->branchOnOrderCache = [];
+        $this->branchWmaSalesCache = [];
 
         if ($branchId) {
             Cache::forget("suggested_orders_ai_{$branchId}");
@@ -180,40 +184,208 @@ class SuggestedOrderService
         return $sales;
     }
 
-    protected function fetchFromAI(?string $branchId = null): array
+    /**
+     * Ekstrak isi kemasan karton/dus dari metadata atau teks nama produk (misal: /24, /12, P10/25, ISI 40).
+     */
+    public static function extractCartonQuantity($product): ?int
     {
-        $cacheBranchKey = $branchId ?: 'all';
-        if (isset($this->aiCache[$cacheBranchKey])) {
-            return $this->aiCache[$cacheBranchKey];
+        if (!$product) return null;
+
+        // 1. Cek metadata eksplisit
+        $meta = is_array($product->metadata) ? $product->metadata : (json_decode($product->metadata ?? '[]', true) ?? []);
+        if (!empty($meta['carton_quantity']) && (int)$meta['carton_quantity'] > 1) {
+            return (int)$meta['carton_quantity'];
+        }
+        if (!empty($meta['pcs_per_carton']) && (int)$meta['pcs_per_carton'] > 1) {
+            return (int)$meta['pcs_per_carton'];
         }
 
-        $cachedData = Cache::remember("suggested_orders_ai_{$cacheBranchKey}", now()->addMinutes(30), function () use ($branchId) {
-            $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
+        // 2. Deteksi dari nama produk
+        $name = $product->name ?? '';
 
-            try {
-                $params = [];
-                if ($branchId) {
-                    $params['branch_id'] = $branchId;
-                }
-                $response = Http::timeout(10)->get($aiUrl . '/api/v1/ai/restock-suggestions', $params);
-
-                if ($response->successful()) {
-                    $data = $response->json()['data'] ?? [];
-                    $indexed = [];
-                    foreach ($data as $item) {
-                        $indexed[$item['product_id']] = $item;
-                    }
-                    return $indexed;
-                }
-            } catch (\Exception $e) {
-                Log::warning('AI Restock Service unavailable (' . $aiUrl . '): ' . $e->getMessage() . '. Falling back to database ADS calculation.');
+        // Pola A: Angka dalam kurung/siku di dekat akhir nama: misal (24), [40], (12)*, (30)
+        // Hindari kode produk 4 digit seperti (5078) atau (2184)
+        if (preg_match('/[\(\[]\s*(\d{1,3})\s*[\)\]]\s*\*?\s*(?:\(\d+\))?\s*$/i', $name, $m)) {
+            $val = (int)$m[1];
+            if ($val >= 2 && $val <= 250) {
+                return $val;
             }
+        }
 
-            return [];
-        });
+        // Pola B: Slash atau asterisk di dekat akhir nama: misal /24, /12, /6, /72, P10/25, *24
+        // Jika ada beberapa slash (misal 900/380/12), ambil slash TERAKHIR yang merupakan kemasan dus
+        if (preg_match_all('/(?:\/|\*)\s*(\d{1,3})\s*(?:PCS)?\s*(?:\(\d+\)|\*|\s*$)/i', $name, $allM)) {
+            $last = end($allM[1]);
+            $val = (int)$last;
+            if ($val >= 2 && $val <= 250) {
+                return $val;
+            }
+        }
 
-        $this->aiCache[$cacheBranchKey] = $cachedData;
-        return $cachedData;
+        // Pola C: Keyword eksplisit: ISI 24, @24, X 24
+        if (preg_match('/\b(?:isi|x|@)\s*(\d{1,3})\s*(?:pcs)?\b/i', $name, $m)) {
+            $val = (int)$m[1];
+            if ($val >= 2 && $val <= 250) {
+                return $val;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Hitung total kuantitas barang yang sedang dipesan (PO On-Order / Dalam Perjalanan / Belum Diterima).
+     */
+    public function getBranchOnOrderQuantities(?string $branchId = null): array
+    {
+        $cacheKey = $branchId ?: 'all';
+        if (isset($this->branchOnOrderCache[$cacheKey])) {
+            return $this->branchOnOrderCache[$cacheKey];
+        }
+
+        $query = DB::table('purchase_order_items')
+            ->join('purchase_orders', 'purchase_order_items.purchase_order_id', '=', 'purchase_orders.id')
+            ->whereIn('purchase_orders.status', ['approved', 'pending_approval']);
+
+        if ($branchId) {
+            $query->where('purchase_orders.branch_id', $branchId);
+        }
+
+        $onOrder = $query->groupBy('purchase_order_items.product_id')
+            ->select(
+                'purchase_order_items.product_id',
+                DB::raw('SUM(GREATEST(0, purchase_order_items.quantity_ordered - COALESCE(purchase_order_items.quantity_received, 0))) as total_on_order')
+            )
+            ->pluck('total_on_order', 'product_id')
+            ->map(fn($v) => (float)$v)
+            ->toArray();
+
+        $this->branchOnOrderCache[$cacheKey] = $onOrder;
+        return $onOrder;
+    }
+
+    /**
+     * Hitung Weighted Moving Average (WMA 3 Bulan) sesuai Sheet 2 Forecast_PO.xlsx:
+     * P1 (30 hari terakhir): Bobot 3 (50%)
+     * P2 (31-60 hari lalu):  Bobot 2 (33.3%)
+     * P3 (61-90 hari lalu):  Bobot 1 (16.7%)
+     * WMA Monthly = (3*P1 + 2*P2 + 1*P3) / 6
+     * ADS = WMA Monthly / 30
+     */
+    public function getBranchWmaSales(?string $branchId = null): array
+    {
+        $cacheKey = $branchId ?: 'all';
+        if (isset($this->branchWmaSalesCache[$cacheKey])) {
+            return $this->branchWmaSalesCache[$cacheKey];
+        }
+
+        $now = Carbon::now();
+        $thirtyDaysAgo = $now->copy()->subDays(30);
+        $sixtyDaysAgo = $now->copy()->subDays(60);
+        $ninetyDaysAgo = $now->copy()->subDays(90);
+
+        // Ambil transaksi live POS 3 periode
+        $queryBase = DB::table('transaction_items')
+            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            ->where(function ($q) {
+                $q->where('transactions.is_voided', 0)->orWhereNull('transactions.is_voided');
+            });
+        if ($branchId) {
+            $queryBase->where('transactions.branch_id', $branchId);
+        }
+
+        $p1Sales = (clone $queryBase)
+            ->whereBetween('transactions.created_at', [$thirtyDaysAgo, $now])
+            ->groupBy('transaction_items.product_id')
+            ->select('transaction_items.product_id', DB::raw('SUM(transaction_items.quantity) as qty'))
+            ->pluck('qty', 'product_id')
+            ->toArray();
+
+        $p2Sales = (clone $queryBase)
+            ->whereBetween('transactions.created_at', [$sixtyDaysAgo, $thirtyDaysAgo])
+            ->groupBy('transaction_items.product_id')
+            ->select('transaction_items.product_id', DB::raw('SUM(transaction_items.quantity) as qty'))
+            ->pluck('qty', 'product_id')
+            ->toArray();
+
+        $p3Sales = (clone $queryBase)
+            ->whereBetween('transactions.created_at', [$ninetyDaysAgo, $sixtyDaysAgo])
+            ->groupBy('transaction_items.product_id')
+            ->select('transaction_items.product_id', DB::raw('SUM(transaction_items.quantity) as qty'))
+            ->pluck('qty', 'product_id')
+            ->toArray();
+
+        // Sambung histori Excel sebelum migrasi jika cabang aktif < 90 hari
+        if ($branchId) {
+            $earliestTx = DB::table('transactions')
+                ->where('branch_id', $branchId)
+                ->where(function ($q) {
+                    $q->where('is_voided', 0)->orWhereNull('is_voided');
+                })
+                ->min('created_at');
+            $earliestLive = $earliestTx ? Carbon::parse($earliestTx) : null;
+
+            if (!$earliestLive || $earliestLive->gt($ninetyDaysAgo)) {
+                $preLiveCutoff = $earliestLive ? $earliestLive->copy()->startOfMonth() : $now;
+
+                for ($m = 1; $m <= 3; $m++) {
+                    $dt = $now->copy()->subMonths($m);
+                    if ($dt->lt($preLiveCutoff)) {
+                        $hist = DB::table('product_monthly_sales_histories')
+                            ->where('branch_id', $branchId)
+                            ->where('year', $dt->year)
+                            ->where('month', $dt->month)
+                            ->groupBy('product_id')
+                            ->select('product_id', DB::raw('SUM(quantity_sold) as qty'))
+                            ->pluck('qty', 'product_id');
+
+                        foreach ($hist as $pId => $qty) {
+                            if ($m == 1 && empty($p1Sales[$pId])) {
+                                $p1Sales[$pId] = (float)$qty;
+                            } elseif ($m == 2 && empty($p2Sales[$pId])) {
+                                $p2Sales[$pId] = (float)$qty;
+                            } elseif ($m == 3 && empty($p3Sales[$pId])) {
+                                $p3Sales[$pId] = (float)$qty;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $allProductIds = array_unique(array_merge(
+            array_keys($p1Sales),
+            array_keys($p2Sales),
+            array_keys($p3Sales)
+        ));
+
+        $wmaResult = [];
+        foreach ($allProductIds as $pId) {
+            $v1 = (float)($p1Sales[$pId] ?? 0);
+            $v2 = (float)($p2Sales[$pId] ?? 0);
+            $v3 = (float)($p3Sales[$pId] ?? 0);
+
+            // Rumus Sheet 2: WMA 3 Periode dengan Bobot 3, 2, 1
+            $wmaMonthly = round(((3 * $v1) + (2 * $v2) + (1 * $v3)) / 6, 2);
+            $ads = round($wmaMonthly / 30, 2);
+
+            $wmaResult[$pId] = [
+                'p1' => $v1,
+                'p2' => $v2,
+                'p3' => $v3,
+                'total_90d' => round($v1 + $v2 + $v3, 1),
+                'wma_monthly' => $wmaMonthly,
+                'ads' => $ads,
+            ];
+        }
+
+        $this->branchWmaSalesCache[$cacheKey] = $wmaResult;
+        return $wmaResult;
+    }
+
+    protected function fetchFromAI(?string $branchId = null): array
+    {
+        return [];
     }
 
     public function calculateForBranch(string $branchId, array $filters = []): array
@@ -269,96 +441,87 @@ class SuggestedOrderService
         $effectiveSupplierId = $stock->supplier_id ?: ($stock->product->supplier_id ?? null);
         $effectiveDivisionId = $stock->supplier_id ? $stock->supplier_division_id : ($stock->product->supplier_division_id ?? null);
 
-        $aiData = $this->fetchFromAI($stock->branch_id);
-        
-        if (isset($aiData[$stock->product_id])) {
-            $aiItem = $aiData[$stock->product_id];
-            $result = [
-                'product_id' => $stock->product_id,
-                'supplier_id' => $effectiveSupplierId,
-                'supplier_division_id' => $effectiveDivisionId,
-                'sku' => $stock->product->sku ?? '-',
-                'name' => $stock->product->name ?? '-',
-                'current_qty' => (float)$aiItem['current_qty'],
-                'ads' => (float)$aiItem['ads'],
-                'reorder_point' => (float)$aiItem['reorder_point'],
-                'target_days' => (int)($aiItem['target_days'] ?? 30),
-                'suggested_qty' => (float)$aiItem['suggested_qty'],
-                'status' => $aiItem['status'],
-                'lead_time' => (int)($aiItem['lead_time'] ?? 7),
-            ];
-            $this->stockCalculationCache[$cacheKey] = $result;
-            return $result;
-        }
+        // Ambil kuantitas PO yang sedang berjalan (On-Order) dan estimasi isi karton
+        $onOrderMap = $this->getBranchOnOrderQuantities($stock->branch_id);
+        $onOrderQty = (float)($onOrderMap[$stock->product_id] ?? 0);
+        $cartonSize = self::extractCartonQuantity($stock->product);
 
-        // Fallback: Smart Database Calculation for ADS & Reorder Point (Bulk Optimized)
+        // Smart Calculation: WMA 3 Bulan (Sesuai Sheet 2 Weight Moving Average di Forecast_PO.xlsx)
         $current_qty = (float)$stock->quantity_on_hand;
-        $branchSales = $this->getBranchSales30Days($stock->branch_id);
-        $sales30Days = (float)($branchSales[$stock->product_id] ?? 0);
+        $wmaSales = $this->getBranchWmaSales($stock->branch_id);
+        $prodWma = $wmaSales[$stock->product_id] ?? null;
 
-        $ads = round($sales30Days / 30, 2);
-        $leadTime = (int)($stock->product->lead_time_days ?? 7);
-        $targetDays = (int)($stock->desired_inventory_days ?? 30);
-        $safetyStock = (float)ceil($ads * 3);
+        $ads = $prodWma ? (float)$prodWma['ads'] : 0.0;
+        $sales30Days = $prodWma ? (float)$prodWma['p1'] : 0.0;
+        $sales90Days = $prodWma ? (float)$prodWma['total_90d'] : 0.0;
+        $wmaMonthly = $prodWma ? (float)$prodWma['wma_monthly'] : 0.0;
+
+        $leadTime = (int)($stock->lead_time > 0 ? $stock->lead_time : ($stock->product->lead_time_days ?? 3));
+        $targetDays = (int)($stock->desired_inventory_days > 0 ? $stock->desired_inventory_days : 14);
+
+        $safetyStock = (float)ceil($ads * max(2, $leadTime));
         $reorderPoint = (float)max(0, ceil(($ads * $leadTime) + $safetyStock));
-        $targetQty = (float)ceil($ads * $targetDays);
-        
+        $targetQty = (float)round($ads * $targetDays);
+
         $suggested_qty = 0;
         $status = 'OK';
-        $sales90Days = 0;
         $isOosWithHistory = false;
-        
-        if ($current_qty < 0) {
-            $suggested_qty = abs($current_qty) + $targetQty;
-            $status = 'CRITICAL';
-        } else if ($current_qty == 0) {
-            if ($ads > 0) {
-                $suggested_qty = $targetQty > 0 ? $targetQty : 1;
-                $status = 'CRITICAL';
-            } else {
-                // Fallback Cerdas: Pasokan Macet (OOS) - Hanya jika ada penjualan aktif signifikan di 90 hari (>= 10 pcs)
-                $branchSales90 = $this->getBranchSales90Days($stock->branch_id);
-                $sales90Days = (float)($branchSales90[$stock->product_id] ?? 0);
-                if ($sales90Days >= 10) {
-                    $isOosWithHistory = true;
-                    $activeAds = round($sales90Days / 90, 2);
-                    $targetQty = (float)ceil($activeAds * $targetDays);
-                    $suggested_qty = max(1, $targetQty);
-                    $status = 'CRITICAL';
-                } else {
-                    $suggested_qty = 0;
-                    $status = 'OK';
-                }
-            }
-        } else if ($current_qty <= $reorderPoint && $ads > 0) {
-            $suggested_qty = max(0, $targetQty - $current_qty);
-            $status = $suggested_qty > 0 ? 'REORDER' : 'OK';
-        } else if ($ads == 0) {
-            // Ketika 30 hari penjualan = 0, tetapi stok menipis/kritis (di bawah min_qty, safety_stock, atau reorder_point)
-            $isCritical = ($stock->min_qty > 0 && $current_qty <= (float)$stock->min_qty) 
-                || ($current_qty <= $reorderPoint)
-                || ($stock->safety_stock > 0 && $current_qty <= (float)$stock->safety_stock);
-                
-            if ($isCritical) {
-                $branchSales90 = $this->getBranchSales90Days($stock->branch_id);
-                $sales90Days = (float)($branchSales90[$stock->product_id] ?? 0);
-                if ($sales90Days >= 10) {
-                    $isOosWithHistory = true;
-                    $activeAds = round($sales90Days / 90, 2);
-                    $targetQty = (float)ceil($activeAds * $targetDays);
-                    $suggested_qty = max(0, $targetQty - $current_qty);
-                    $status = $suggested_qty > 0 ? 'REORDER' : 'OK';
-                } else {
-                    $suggested_qty = 0;
-                    $status = 'OK';
-                }
+
+        // 1. FILTER KETAT: Jika produk TIDAK ADA PENJUALAN dalam 90 hari terakhir (WMA = 0 / 90d = 0),
+        //    maka pada mode WMA saran order = 0 (Dead Stock tidak disarankan reorder).
+        if ($sales90Days <= 0 && $ads <= 0) {
+            $suggested_qty = 0;
+            $status = 'OK';
+        }
+        // 2. FILTER SLOW MOVING: Jika 30 hari terakhir TIDAK ADA PENJUALAN (sales30Days = 0),
+        //    produk HANYA boleh disarankan order jika riwayat 90 hari aktif signifikan (>= 10 pcs, Pasokan Macet/OOS).
+        //    Jika sales 90 hari < 10 pcs (slow moving / penjualan lesu), saran order = 0.
+        elseif ($sales30Days <= 0 && $sales90Days < 10) {
+            $suggested_qty = 0;
+            $status = 'OK';
+        }
+        // 3. JIKA STOK MINUS (Koreksi Selisih Kasir)
+        elseif ($current_qty < 0) {
+            $grossNeed = abs($current_qty) + max(1, $targetQty);
+            $suggested_qty = max(0, $grossNeed - $onOrderQty);
+            $status = $suggested_qty > 0 ? 'CRITICAL' : 'OK';
+        }
+        // 4. JIKA STOK 0 (HABIS)
+        elseif ($current_qty == 0) {
+            if ($sales30Days > 0 && $ads > 0) {
+                // Ada penjualan aktif di 30 hari terakhir
+                $grossNeed = max(1, $targetQty);
+                $suggested_qty = max(0, $grossNeed - $onOrderQty);
+                $status = $suggested_qty > 0 ? 'CRITICAL' : 'OK';
+            } elseif ($sales90Days >= 10) {
+                // Pasokan Macet (OOS): 30 hari 0 karena barang kosong, tapi 90 hari terbukti aktif
+                $isOosWithHistory = true;
+                $activeAds = round($sales90Days / 90, 2);
+                $targetOos = (float)max(1, round($activeAds * $targetDays));
+                $suggested_qty = max(0, $targetOos - $onOrderQty);
+                $status = $suggested_qty > 0 ? 'CRITICAL' : 'OK';
             } else {
                 $suggested_qty = 0;
                 $status = 'OK';
             }
-        } else {
+        }
+        // 5. JIKA STOK MASIH ADA TETAPI DI BAWAH REORDER POINT
+        elseif ($current_qty <= $reorderPoint && $ads > 0 && $sales30Days > 0) {
+            $grossNeed = max(0, $targetQty - $current_qty);
+            $suggested_qty = max(0, $grossNeed - $onOrderQty);
+            $status = $suggested_qty > 0 ? 'REORDER' : 'OK';
+        }
+        // 6. STOK CUKUP
+        else {
             $suggested_qty = 0;
             $status = 'OK';
+        }
+
+        // Format Saran Kemasan Dus / Karton
+        $cartonSuggestedText = null;
+        if ($suggested_qty > 0 && $cartonSize && $cartonSize > 1) {
+            $dusCount = (int)ceil($suggested_qty / $cartonSize);
+            $cartonSuggestedText = "{$dusCount} Dus (" . ($dusCount * $cartonSize) . " pcs)";
         }
 
         $result = [
@@ -368,7 +531,11 @@ class SuggestedOrderService
             'sku' => $stock->product->sku ?? '-',
             'name' => $stock->product->name ?? '-',
             'current_qty' => $current_qty,
+            'on_order_qty' => $onOrderQty,
+            'carton_size' => $cartonSize,
+            'carton_suggested_text' => $cartonSuggestedText,
             'ads' => $ads,
+            'wma_monthly' => $wmaMonthly,
             'sales_30d' => $sales30Days,
             'sales_90d' => $sales90Days,
             'is_oos_with_history' => $isOosWithHistory,

@@ -435,10 +435,30 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         if ($addedCount > 0) {
-            $methodName = $method === 'sales' ? 'Analisa Penjualan 30 Hari & AI' : 'Batas Stok Min-Max';
+            $methodName = $method === 'sales' ? 'Trend Penjualan Cerdas (WMA 3 Bulan & On-Order)' : 'Batas Stok Min-Max';
             Notification::make()->title("{$addedCount} barang berhasil ditambahkan berdasarkan {$methodName}.")->success()->send();
         } else {
             Notification::make()->title("Tidak ada barang yang perlu diorder untuk supplier ini.")->info()->send();
+        }
+    }
+
+    public function applyCartonRounding($index)
+    {
+        if (!isset($this->cart[$index])) return;
+
+        $item = $this->cart[$index];
+        $qtySaran = (float)($item['qty_saran'] ?? 0);
+        $cartonSize = (int)($item['carton_size'] ?? 0);
+
+        if ($qtySaran > 0 && $cartonSize > 1) {
+            $targetQty = (int)ceil($qtySaran / $cartonSize) * $cartonSize;
+            $this->cart[$index]['qty'] = $targetQty;
+            $this->recalculateRow($index);
+
+            Notification::make()
+                ->title("Qty diubah menjadi {$targetQty} pcs (Pembulatan kelipatan dus)")
+                ->info()
+                ->send();
         }
     }
 
@@ -543,8 +563,22 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                         $stockVal = $item['stock'] ?? 0;
                         $avgSales = $item['avg_bln'] ?? 0;
                         $oosText = !empty($item['is_oos_with_history']) ? " (Pasokan Macet, 90hr: " . (int)$item['sales_90d'] . " pcs)" : "";
+
+                        // Keterangan transparan jika order ini merupakan pembulatan kemasan dus resmi
+                        $cartonNote = "";
+                        $cartonSize = (int)($item['carton_size'] ?? 0);
+                        if ($cartonSize > 1 && $qtySaran > 0) {
+                            $targetDus = ceil($qtySaran / $cartonSize) * $cartonSize;
+                            if ((float)$item['qty'] == (float)$targetDus) {
+                                $dusCount = (int)($targetDus / $cartonSize);
+                                $cartonNote = " [Pembulatan {$dusCount} Dus @{$cartonSize}]";
+                            } elseif ((float)$item['qty'] > $qtySaran) {
+                                $cartonNote = " [Kemasan Dus: {$cartonSize} pcs]";
+                            }
+                        }
+
                         if ($overCount <= 5) {
-                            $approvalReason[] = "{$item['name']} (Order: {$item['qty']} | Saran: {$qtySaran} | Stok: {$stockVal} | Jual: {$avgSales}/bln{$oosText}){$promoText}";
+                            $approvalReason[] = "{$item['name']} (Order: {$item['qty']} | Saran: {$qtySaran}{$cartonNote} | Stok: {$stockVal} | Jual: {$avgSales}/bln{$oosText}){$promoText}";
                         }
                     }
                 }
@@ -922,6 +956,15 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             $subtotal = round($t3, 2);
         }
 
+        $onOrderMap = $branchId ? app(\App\Services\SuggestedOrderService::class)->getBranchOnOrderQuantities($branchId) : [];
+        $onOrderQty = (float)($onOrderMap[$product->id] ?? 0);
+        $cartonSize = \App\Services\SuggestedOrderService::extractCartonQuantity($product);
+        $cartonText = null;
+        if ((float)$qtySaran > 0 && $cartonSize && $cartonSize > 1) {
+            $dusCount = (int)ceil((float)$qtySaran / $cartonSize);
+            $cartonText = "{$dusCount} Dus (" . ($dusCount * $cartonSize) . " pcs)";
+        }
+
         return [
             'product_id' => $product->id,
             'sku' => $product->sku,
@@ -938,6 +981,9 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             'min_qty' => $minQty,
             'max_qty' => $maxQty,
             'qty_saran' => (float)$qtySaran,
+            'on_order_qty' => $onOrderQty,
+            'carton_size' => $cartonSize,
+            'carton_text' => $cartonText,
             'qty' => (float)$qty,
             'unit_cost' => $finalCost,
             'discount_1' => (float)$d1,
