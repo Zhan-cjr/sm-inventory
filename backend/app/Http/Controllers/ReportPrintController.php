@@ -478,13 +478,14 @@ class ReportPrintController extends Controller
     private function printLaporanPersediaan($filters)
     {
         $branchId = auth()->user()?->branch_id;
-        if (!$branchId && isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
-            $branchId = $filters['branch_id']['value'];
+        if (!$branchId) {
+            $branchId = data_get($filters, 'branch_id.value', data_get($filters, 'branch_id', request('branch_id')));
         }
 
-        $categoryId = $filters['category_id']['value'] ?? ($filters['category']['category_id'] ?? null);
-        $subCategory = $filters['sub_category']['value'] ?? ($filters['category']['sub_category'] ?? null);
-        $stockStatus = $filters['stock_status']['value'] ?? null;
+        $categoryId = data_get($filters, 'category_id.value', data_get($filters, 'category_id', data_get($filters, 'category.category_id')));
+        $subCategory = data_get($filters, 'sub_category.value', data_get($filters, 'sub_category', data_get($filters, 'category.sub_category')));
+        $supplierId = data_get($filters, 'supplier_id.value', data_get($filters, 'supplier_id', request('supplier_id')));
+        $stockStatus = data_get($filters, 'stock_status.value', data_get($filters, 'stock_status', request('stock_status')));
         $searchQuery = request()->input('tableSearchQuery');
 
         $query = \Illuminate\Support\Facades\DB::table('stocks')
@@ -512,6 +513,10 @@ class ReportPrintController extends Controller
               ->orWhereNull('products.product_type');
         });
 
+        if (!empty($supplierId)) {
+            $query->where('products.supplier_id', $supplierId);
+        }
+
         if (!empty($categoryId)) {
             $query->where('products.category_id', $categoryId);
         }
@@ -521,9 +526,11 @@ class ReportPrintController extends Controller
         }
 
         if ($stockStatus === 'available') {
-            $query->where('stocks.quantity_on_hand', '>', 0);
+            $query->whereRaw('GREATEST(0, stocks.quantity_on_hand - COALESCE(stocks.quantity_damaged, 0)) > 0');
+        } elseif ($stockStatus === 'has_bs') {
+            $query->where('stocks.quantity_damaged', '>', 0);
         } elseif ($stockStatus === 'empty') {
-            $query->where('stocks.quantity_on_hand', '<=', 0);
+            $query->whereRaw('GREATEST(0, stocks.quantity_on_hand - COALESCE(stocks.quantity_damaged, 0)) <= 0');
         }
 
         if (!empty($searchQuery)) {
@@ -549,6 +556,7 @@ class ReportPrintController extends Controller
             'products.name as product_name',
             'categories.name as category_name',
             'stocks.quantity_on_hand',
+            'stocks.quantity_damaged',
             'stocks.cost_price_tax as stock_cost_price_tax',
             'products.cost_price_tax as prod_cost_price_tax',
             'products.cost_price as prod_cost_price',
@@ -558,30 +566,111 @@ class ReportPrintController extends Controller
         ->get();
 
         $period = $this->getPeriodString($filters);
-        $columns = ['Cabang', 'SKU', 'Barcode', 'Produk', 'Kategori', 'Sisa Stok', 'Harga Pokok (Rata-rata)', 'Valuasi Stok'];
-        $columnWidths = ['12%', '13%', '13%', '26%', '12%', '7%', '8%', '9%'];
-        $alignments = ['left', 'left', 'left', 'left', 'left', 'right', 'right', 'right'];
 
-        $totalQty = 0;
-        $totalValuation = 0;
+        if ($stockStatus === 'has_bs') {
+            // Tampilan khusus ketika filter BS aktif
+            $title = 'Laporan Persediaan Barang BS / Karantina (Siap Retur)';
+            $columns = ['Cabang', 'SKU', 'Barcode', 'Produk', 'Kategori', 'Stok BS (Siap Retur)', 'Harga Pokok (Batch)', 'Valuasi BS'];
+            $columnWidths = ['12%', '13%', '13%', '26%', '12%', '8%', '8%', '8%'];
+            $alignments = ['left', 'left', 'left', 'left', 'left', 'right', 'right', 'right'];
+
+            $totalBsQty = 0;
+            $totalBsValuation = 0;
+            $rows = [];
+
+            foreach ($stocks as $s) {
+                $physicalQty = (float) $s->quantity_on_hand;
+                $bsQty = (float) ($s->quantity_damaged ?? 0);
+                $batchVal = (float) ($s->batch_valuation ?? 0);
+
+                if ($physicalQty > 0 && $batchVal > 0) {
+                    $costPriceTax = $batchVal / $physicalQty;
+                } else {
+                    $costPriceTax = (float) ($s->stock_cost_price_tax > 0 
+                        ? $s->stock_cost_price_tax 
+                        : ($s->prod_cost_price_tax ?? $s->prod_cost_price ?? 0));
+                }
+
+                $bsValuation = $bsQty * $costPriceTax;
+                $totalBsQty += $bsQty;
+                $totalBsValuation += $bsValuation;
+
+                $rows[] = [
+                    $s->branch_name ?? 'Pusat / Global',
+                    $s->sku ?? '-',
+                    $s->barcode ?? '-',
+                    $s->product_name ?? '-',
+                    $s->category_name ?? '-',
+                    $bsQty,
+                    number_format($costPriceTax, 0, ',', '.'),
+                    number_format($bsValuation, 0, ',', '.')
+                ];
+            }
+
+            if (!empty($rows)) {
+                $rows[] = [
+                    '<strong>TOTAL</strong>',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '<strong>' . number_format($totalBsQty, 0, ',', '.') . '</strong>',
+                    '',
+                    '<strong>' . number_format($totalBsValuation, 0, ',', '.') . '</strong>'
+                ];
+            }
+
+            return view('print.reports.generic', [
+                'title' => $title,
+                'period' => $period,
+                'columns' => $columns,
+                'columnWidths' => $columnWidths,
+                'alignments' => $alignments,
+                'rows' => $rows,
+                'summaryBox' => [
+                    'Total Varian Barang BS' => number_format(count($stocks), 0, ',', '.') . ' Item',
+                    'Total Kuantitas BS (Siap Retur)' => number_format($totalBsQty, 0, ',', '.') . ' Pcs',
+                    'Total Nilai Valuasi BS' => 'Rp ' . number_format($totalBsValuation, 0, ',', '.'),
+                ],
+                'note' => 'Catatan: Laporan ini hanya mencetak barang yang berstatus BS (Karantina) untuk persiapan retur ke supplier atau pemusnahan.'
+            ]);
+        }
+
+        // Tampilan umum (Layak Jual + BS + Total Fisik)
+        $title = 'Laporan Persediaan (Valuasi Stok)';
+        $columns = ['Cabang', 'SKU', 'Barcode', 'Produk', 'Kategori', 'Layak Jual', 'Stok BS', 'Total Fisik', 'Harga Pokok', 'Valuasi Layak Jual', 'Valuasi BS'];
+        $columnWidths = ['10%', '10%', '11%', '21%', '10%', '6%', '6%', '6%', '6%', '7%', '7%'];
+        $alignments = ['left', 'left', 'left', 'left', 'left', 'right', 'right', 'right', 'right', 'right', 'right'];
+
+        $totalSalableQty = 0;
+        $totalBsQty = 0;
+        $totalPhysicalQty = 0;
+        $totalSalableValuation = 0;
+        $totalBsValuation = 0;
         $rows = [];
 
         foreach ($stocks as $s) {
-            $qty = (float) $s->quantity_on_hand;
+            $physicalQty = (float) $s->quantity_on_hand;
+            $bsQty = (float) ($s->quantity_damaged ?? 0);
+            $salableQty = max(0, $physicalQty - $bsQty);
             $batchVal = (float) ($s->batch_valuation ?? 0);
 
-            if ($qty > 0 && $batchVal > 0) {
-                $costPriceTax = $batchVal / $qty;
-                $valuation = $batchVal;
+            if ($physicalQty > 0 && $batchVal > 0) {
+                $costPriceTax = $batchVal / $physicalQty;
             } else {
                 $costPriceTax = (float) ($s->stock_cost_price_tax > 0 
                     ? $s->stock_cost_price_tax 
                     : ($s->prod_cost_price_tax ?? $s->prod_cost_price ?? 0));
-                $valuation = $qty * $costPriceTax;
             }
 
-            $totalQty += $qty;
-            $totalValuation += $valuation;
+            $salableValuation = $salableQty * $costPriceTax;
+            $bsValuation = $bsQty * $costPriceTax;
+
+            $totalSalableQty += $salableQty;
+            $totalBsQty += $bsQty;
+            $totalPhysicalQty += $physicalQty;
+            $totalSalableValuation += $salableValuation;
+            $totalBsValuation += $bsValuation;
 
             $rows[] = [
                 $s->branch_name ?? 'Pusat / Global',
@@ -589,9 +678,12 @@ class ReportPrintController extends Controller
                 $s->barcode ?? '-',
                 $s->product_name ?? '-',
                 $s->category_name ?? '-',
-                $qty,
+                $salableQty,
+                $bsQty,
+                $physicalQty,
                 number_format($costPriceTax, 0, ',', '.'),
-                number_format($valuation, 0, ',', '.')
+                number_format($salableValuation, 0, ',', '.'),
+                number_format($bsValuation, 0, ',', '.')
             ];
         }
 
@@ -602,14 +694,17 @@ class ReportPrintController extends Controller
                 '',
                 '',
                 '',
-                '<strong>' . number_format($totalQty, 0, ',', '.') . '</strong>',
+                '<strong>' . number_format($totalSalableQty, 0, ',', '.') . '</strong>',
+                '<strong>' . number_format($totalBsQty, 0, ',', '.') . '</strong>',
+                '<strong>' . number_format($totalPhysicalQty, 0, ',', '.') . '</strong>',
                 '',
-                '<strong>' . number_format($totalValuation, 0, ',', '.') . '</strong>'
+                '<strong>' . number_format($totalSalableValuation, 0, ',', '.') . '</strong>',
+                '<strong>' . number_format($totalBsValuation, 0, ',', '.') . '</strong>'
             ];
         }
 
         return view('print.reports.generic', [
-            'title' => 'Laporan Persediaan',
+            'title' => $title,
             'period' => $period,
             'columns' => $columns,
             'columnWidths' => $columnWidths,
@@ -617,8 +712,12 @@ class ReportPrintController extends Controller
             'rows' => $rows,
             'summaryBox' => [
                 'Total Item Terdaftar' => number_format(count($stocks), 0, ',', '.') . ' Item',
-                'Total Kuantitas Fisik' => number_format($totalQty, 0, ',', '.'),
-                'Total Nilai Valuasi (HPP)' => 'Rp ' . number_format($totalValuation, 0, ',', '.'),
+                'Total Stok Layak Jual' => number_format($totalSalableQty, 0, ',', '.') . ' Pcs',
+                'Total Stok BS (Karantina)' => number_format($totalBsQty, 0, ',', '.') . ' Pcs',
+                'Total Fisik Toko' => number_format($totalPhysicalQty, 0, ',', '.') . ' Pcs',
+                'Total Valuasi Layak Jual' => 'Rp ' . number_format($totalSalableValuation, 0, ',', '.'),
+                'Total Valuasi BS (Siap Retur)' => 'Rp ' . number_format($totalBsValuation, 0, ',', '.'),
+                'Grand Total Valuasi Fisik' => 'Rp ' . number_format($totalSalableValuation + $totalBsValuation, 0, ',', '.'),
             ],
             'note' => 'Catatan: Nilai persediaan dihitung menggunakan metode FIFO (berdasarkan batch stok aktif).'
         ]);
@@ -627,12 +726,15 @@ class ReportPrintController extends Controller
     private function printRekapTotalStok($filters)
     {
         $branchId = auth()->user()?->branch_id;
-        if (!$branchId && isset($filters['branch_id']['value']) && !empty($filters['branch_id']['value'])) {
-            $branchId = $filters['branch_id']['value'];
+        if (!$branchId) {
+            $branchId = data_get($filters, 'branch_id.value', data_get($filters, 'branch_id', request('branch_id')));
         }
 
-        $categoryId = $filters['category_id']['value'] ?? ($filters['category']['category_id'] ?? null);
-        $subCategory = $filters['sub_category']['value'] ?? ($filters['category']['sub_category'] ?? null);
+        $categoryId = data_get($filters, 'category_id.value', data_get($filters, 'category_id', data_get($filters, 'category.category_id')));
+        $subCategory = data_get($filters, 'sub_category.value', data_get($filters, 'sub_category', data_get($filters, 'category.sub_category')));
+        $supplierId = data_get($filters, 'supplier_id.value', data_get($filters, 'supplier_id', request('supplier_id')));
+        $stockStatus = data_get($filters, 'stock_status.value', data_get($filters, 'stock_status', request('stock_status')));
+        $searchQuery = request()->input('tableSearchQuery');
 
         $query = \Illuminate\Support\Facades\DB::table('stocks')
             ->join('products', 'stocks.product_id', '=', 'products.id')
@@ -658,6 +760,10 @@ class ReportPrintController extends Controller
               ->orWhereNull('products.product_type');
         });
 
+        if (!empty($supplierId)) {
+            $query->where('products.supplier_id', $supplierId);
+        }
+
         if (!empty($categoryId)) {
             $query->where('products.category_id', $categoryId);
         }
@@ -666,10 +772,29 @@ class ReportPrintController extends Controller
             $query->where('products.sub_category', $subCategory);
         }
 
+        if ($stockStatus === 'available') {
+            $query->whereRaw('GREATEST(0, stocks.quantity_on_hand - COALESCE(stocks.quantity_damaged, 0)) > 0');
+        } elseif ($stockStatus === 'has_bs') {
+            $query->where('stocks.quantity_damaged', '>', 0);
+        } elseif ($stockStatus === 'empty') {
+            $query->whereRaw('GREATEST(0, stocks.quantity_on_hand - COALESCE(stocks.quantity_damaged, 0)) <= 0');
+        }
+
+        if (!empty($searchQuery)) {
+            $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $searchQuery);
+            $query->where(function ($q) use ($escaped) {
+                $q->where('products.sku', 'like', "%{$escaped}%")
+                  ->orWhere('products.barcode', 'like', "%{$escaped}%")
+                  ->orWhere('products.name', 'like', "%{$escaped}%")
+                  ->orWhere('categories.name', 'like', "%{$escaped}%");
+            });
+        }
+
         $stocks = $query->select([
             'categories.name as category_name',
             'products.sub_category',
             'stocks.quantity_on_hand',
+            'stocks.quantity_damaged',
             'stocks.cost_price_tax as stock_cost_price_tax',
             'products.cost_price_tax as prod_cost_price_tax',
             'products.cost_price as prod_cost_price',
@@ -677,7 +802,12 @@ class ReportPrintController extends Controller
         ])->get();
         
         $data = [];
-        $totalValuation = 0;
+        $grandTotalSalableQty = 0;
+        $grandTotalBsQty = 0;
+        $grandTotalPhysicalQty = 0;
+        $grandTotalSalableValuation = 0;
+        $grandTotalBsValuation = 0;
+        $grandTotalPhysicalValuation = 0;
         
         foreach ($stocks as $stock) {
             $catName = !empty($stock->category_name) ? $stock->category_name : 'Tanpa Kategori';
@@ -688,34 +818,76 @@ class ReportPrintController extends Controller
                 $data[$key] = [
                     'kategori' => $catName,
                     'sub_kategori' => $subCatName,
+                    'salable_qty' => 0,
+                    'damaged_qty' => 0,
                     'total_qty' => 0,
+                    'salable_valuation' => 0,
+                    'damaged_valuation' => 0,
                     'total_valuation' => 0,
                 ];
             }
             
-            $qty = (float) $stock->quantity_on_hand;
+            $physicalQty = (float) $stock->quantity_on_hand;
+            $damagedQty = (float) ($stock->quantity_damaged ?? 0);
+            $salableQty = max(0, $physicalQty - $damagedQty);
             $batchVal = (float) ($stock->batch_valuation ?? 0);
 
-            if ($qty > 0 && $batchVal > 0) {
-                $valuation = $batchVal;
+            if ($physicalQty > 0 && $batchVal > 0) {
+                $unitCost = $batchVal / $physicalQty;
             } else {
                 $costPriceTax = (float) ($stock->stock_cost_price_tax > 0 
                     ? $stock->stock_cost_price_tax 
                     : ($stock->prod_cost_price_tax ?? $stock->prod_cost_price ?? 0));
-                $valuation = $qty * $costPriceTax;
+                $unitCost = $costPriceTax;
             }
             
-            $data[$key]['total_qty'] += $qty;
-            $data[$key]['total_valuation'] += $valuation;
-            $totalValuation += $valuation;
+            $salableVal = $salableQty * $unitCost;
+            $damagedVal = $damagedQty * $unitCost;
+            $totalVal = $physicalQty * $unitCost;
+
+            if ($stockStatus === 'has_bs') {
+                $data[$key]['salable_qty'] = 0;
+                $data[$key]['damaged_qty'] += $damagedQty;
+                $data[$key]['total_qty'] += $damagedQty;
+                $data[$key]['salable_valuation'] = 0;
+                $data[$key]['damaged_valuation'] += $damagedVal;
+                $data[$key]['total_valuation'] += $damagedVal;
+
+                $grandTotalBsQty += $damagedQty;
+                $grandTotalPhysicalQty += $damagedQty;
+                $grandTotalBsValuation += $damagedVal;
+                $grandTotalPhysicalValuation += $damagedVal;
+            } else {
+                $data[$key]['salable_qty'] += $salableQty;
+                $data[$key]['damaged_qty'] += $damagedQty;
+                $data[$key]['total_qty'] += $physicalQty;
+                $data[$key]['salable_valuation'] += $salableVal;
+                $data[$key]['damaged_valuation'] += $damagedVal;
+                $data[$key]['total_valuation'] += $totalVal;
+
+                $grandTotalSalableQty += $salableQty;
+                $grandTotalBsQty += $damagedQty;
+                $grandTotalPhysicalQty += $physicalQty;
+                $grandTotalSalableValuation += $salableVal;
+                $grandTotalBsValuation += $damagedVal;
+                $grandTotalPhysicalValuation += $totalVal;
+            }
         }
 
-        // Hitung rata-rata
+        // Hitung rata-rata harga beli
         foreach ($data as $key => $row) {
-            if ($row['total_qty'] > 0) {
-                $data[$key]['avg_price'] = $row['total_valuation'] / $row['total_qty'];
+            if ($stockStatus === 'has_bs') {
+                if ($row['damaged_qty'] > 0) {
+                    $data[$key]['avg_price'] = $row['damaged_valuation'] / $row['damaged_qty'];
+                } else {
+                    $data[$key]['avg_price'] = 0;
+                }
             } else {
-                $data[$key]['avg_price'] = 0;
+                if ($row['total_qty'] > 0) {
+                    $data[$key]['avg_price'] = $row['total_valuation'] / $row['total_qty'];
+                } else {
+                    $data[$key]['avg_price'] = 0;
+                }
             }
         }
 
@@ -734,12 +906,21 @@ class ReportPrintController extends Controller
         }
 
         $period = date('d-m-Y H:i'); // Current time for recap
+        $title = $stockStatus === 'has_bs' 
+            ? 'Rekap Stok Barang BS / Karantina (Siap Retur)' 
+            : 'Rekap Total Stok (Layak Jual + BS)';
 
         return view('print.reports.rekap-stok', [
             'groupedData' => $groupedData,
-            'totalValuation' => $totalValuation,
+            'grandTotalSalableQty' => $grandTotalSalableQty,
+            'grandTotalBsQty' => $grandTotalBsQty,
+            'grandTotalQty' => $grandTotalPhysicalQty,
+            'grandTotalSalableValuation' => $grandTotalSalableValuation,
+            'grandTotalBsValuation' => $grandTotalBsValuation,
+            'totalValuation' => $grandTotalPhysicalValuation,
+            'stockStatus' => $stockStatus,
             'period' => $period,
-            'title' => 'Rekap Total Stok'
+            'title' => $title,
         ]);
     }
 

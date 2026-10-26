@@ -52,7 +52,7 @@ class StockTransferPos extends Component
                     ->where('product_id', $item->product_id)
                     ->first();
                 if ($stock) {
-                    $availableStock = $stock->quantity_on_hand;
+                    $availableStock = $stock->salable_quantity;
                 }
 
                 $this->cart[] = [
@@ -86,9 +86,10 @@ class StockTransferPos extends Component
             if ($productId && $this->from_branch_id) {
                 $product = Product::find($productId);
                 if ($product) {
-                    $availableStock = (float) (\App\Models\Stock::where('branch_id', $this->from_branch_id)
+                    $stockRec = \App\Models\Stock::where('branch_id', $this->from_branch_id)
                         ->where('product_id', $product->id)
-                        ->value('quantity_on_hand') ?? 0);
+                        ->first();
+                    $availableStock = $stockRec ? $stockRec->salable_quantity : 0;
                     $price = (float) ($product->cost_price_tax ?: $product->cost_price ?: $product->selling_price ?: 0);
                     $qtyToTransfer = $qty > 0 ? $qty : 1;
 
@@ -266,7 +267,7 @@ class StockTransferPos extends Component
             ->where('product_id', $product->id)
             ->first();
         
-        $availableStock = $stock ? $stock->quantity_on_hand : 0;
+        $availableStock = $stock ? $stock->salable_quantity : 0;
 
         if ($existingIndex !== false) {
             if ($this->cart[$existingIndex]['qty_transfer'] + 1 > $availableStock) {

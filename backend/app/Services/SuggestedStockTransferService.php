@@ -102,7 +102,7 @@ class SuggestedStockTransferService
             return $this->donorsByProduct[$productId]->filter(function ($ds) use ($destBranchId, $forceFromBranchId) {
                 if ($ds->branch_id == $destBranchId) return false;
                 if (!empty($forceFromBranchId) && $forceFromBranchId !== 'all' && $ds->branch_id != $forceFromBranchId) return false;
-                return $ds->quantity_on_hand > 0;
+                return ($ds->quantity_on_hand - ($ds->quantity_damaged ?? 0)) > 0;
             });
         }
 
@@ -135,7 +135,8 @@ class SuggestedStockTransferService
         }
 
         $destBranchId = $stock->branch_id;
-        $destQoh = (float) $stock->quantity_on_hand;
+        // Gunakan Stok Layak Jual (Total Fisik dikurangi Barang Rusak BS)
+        $destQoh = max(0, (float) $stock->quantity_on_hand - (float) ($stock->quantity_damaged ?? 0));
 
         // 1. Kecepatan jual di cabang tujuan (Destinasi) via Pre-aggregated Map
         $salesMap = $this->getSales30DaysMap();
@@ -168,7 +169,8 @@ class SuggestedStockTransferService
         $bestDonorDoh = 0;
 
         foreach ($donorStocks as $donorStock) {
-            $donorQoh = (float) $donorStock->quantity_on_hand;
+            // Gunakan Stok Layak Jual donor
+            $donorQoh = max(0, (float) $donorStock->quantity_on_hand - (float) ($donorStock->quantity_damaged ?? 0));
 
             // Kecepatan jual di cabang donor via Pre-aggregated Map
             $donorSales30Days = (float) ($salesMap[$donorStock->branch_id][$stock->product_id] ?? 0);
@@ -227,7 +229,7 @@ class SuggestedStockTransferService
             // Cabang Asal (Donor / Surplus)
             'source_branch_id' => $bestDonor->branch_id,
             'source_branch_name' => $bestDonor->branch?->name ?? 'Cabang Asal',
-            'source_qoh' => (float) $bestDonor->quantity_on_hand,
+            'source_qoh' => $bestDonor ? max(0, (float)$bestDonor->quantity_on_hand - (float)($bestDonor->quantity_damaged ?? 0)) : 0,
             'source_ads' => $bestDonorAds,
             'source_doh' => $bestDonorDoh,
             'source_status' => $bestDonorAds == 0 ? 'DEAD STOCK' : 'SLOW MOVING',

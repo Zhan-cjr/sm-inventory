@@ -35,9 +35,13 @@ class StockCard extends Component
             ->where('branch_id', $effectiveBranchId);
 
         $logs = $query->orderByDesc('created_at')->orderByDesc('id')->paginate(10);
+        $stock = \App\Models\Stock::where('product_id', $this->productId)
+            ->where('branch_id', $effectiveBranchId)
+            ->first();
 
         return view('livewire.stock-card', [
             'logs' => $logs,
+            'stock' => $stock,
             'noBranchSelected' => false,
         ]);
     }

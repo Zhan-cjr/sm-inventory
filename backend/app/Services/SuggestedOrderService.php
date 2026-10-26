@@ -447,7 +447,11 @@ class SuggestedOrderService
         $cartonSize = self::extractCartonQuantity($stock->product);
 
         // Smart Calculation: WMA 3 Bulan (Sesuai Sheet 2 Weight Moving Average di Forecast_PO.xlsx)
-        $current_qty = (float)$stock->quantity_on_hand;
+        // Stok Layak Jual (Salable Stock) = Total Fisik dikurangi Barang Karantina BS
+        $physical_qty = (float)$stock->quantity_on_hand;
+        $damaged_qty = (float)($stock->quantity_damaged ?? 0);
+        $current_qty = max(0, $physical_qty - $damaged_qty);
+
         $wmaSales = $this->getBranchWmaSales($stock->branch_id);
         $prodWma = $wmaSales[$stock->product_id] ?? null;
 
@@ -531,6 +535,9 @@ class SuggestedOrderService
             'sku' => $stock->product->sku ?? '-',
             'name' => $stock->product->name ?? '-',
             'current_qty' => $current_qty,
+            'physical_qty' => $physical_qty,
+            'salable_qty' => $current_qty,
+            'damaged_qty' => $damaged_qty,
             'on_order_qty' => $onOrderQty,
             'carton_size' => $cartonSize,
             'carton_suggested_text' => $cartonSuggestedText,

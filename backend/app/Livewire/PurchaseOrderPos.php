@@ -415,7 +415,8 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 $product = $stockRec->product;
                 if (!$product) continue;
 
-                $currentStock = (float)($stockRec->quantity_on_hand ?? 0);
+                // Min-Max menggunakan Stok Layak Jual (Total Fisik dikurangi Barang Rusak BS)
+                $currentStock = max(0, (float)($stockRec->quantity_on_hand ?? 0) - (float)($stockRec->quantity_damaged ?? 0));
                 $minQty = (float)($stockRec->min_qty ?? 0);
                 $maxQty = (float)($stockRec->max_qty ?? 0);
 
@@ -772,11 +773,15 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     {
         $stock = null;
         $stockModel = null;
+        $physicalStock = 0.0;
+        $damagedStock = 0.0;
         if ($branchId) {
             $stockModel = Stock::where('product_id', $product->id)
                 ->where('branch_id', $branchId)
                 ->first();
-            $stock = $stockModel ? (float)$stockModel->quantity_on_hand : 0;
+            $physicalStock = $stockModel ? (float)$stockModel->quantity_on_hand : 0;
+            $damagedStock = $stockModel ? (float)($stockModel->quantity_damaged ?? 0) : 0;
+            $stock = max(0, $physicalStock - $damagedStock);
         }
 
         if ($customCost !== null) {
@@ -978,6 +983,8 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             'avg_sales_active' => $avgSalesActive,
             'is_sales_from_history' => $isSalesFromHistory,
             'stock' => $stock ?? 0,
+            'physical_stock' => $physicalStock,
+            'damaged_stock' => $damagedStock,
             'min_qty' => $minQty,
             'max_qty' => $maxQty,
             'qty_saran' => (float)$qtySaran,

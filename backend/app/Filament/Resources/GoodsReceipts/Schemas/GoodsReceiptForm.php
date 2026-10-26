@@ -22,7 +22,7 @@ class GoodsReceiptForm
                         titleAttribute: 'po_number', 
                         modifyQueryUsing: function (\Illuminate\Database\Eloquent\Builder $query, ?\Illuminate\Database\Eloquent\Model $record) {
                             $query->where(function ($sub) {
-                                $sub->where('status', 'approved')
+                                $sub->whereIn('status', ['approved', 'APPROVED', 'partially_received', 'PARTIALLY_RECEIVED'])
                                     ->where(function ($q) {
                                         $q->whereNull('expired_date')
                                           ->orWhere('expired_date', '>=', now()->toDateString());

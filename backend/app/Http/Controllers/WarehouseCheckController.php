@@ -13,7 +13,7 @@ class WarehouseCheckController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $poQuery = \App\Models\PurchaseOrder::where('status', 'approved');
+        $poQuery = \App\Models\PurchaseOrder::whereIn('status', ['approved', 'APPROVED', 'partially_received', 'PARTIALLY_RECEIVED']);
 
         $branches = [];
         if ($user && $user->branch_id) {
@@ -57,7 +57,7 @@ class WarehouseCheckController extends Controller
 
         $user = Auth::user();
         $query = PurchaseOrder::where('po_number', $request->po_number)
-            ->where('status', 'approved');
+            ->whereIn('status', ['approved', 'APPROVED', 'partially_received', 'PARTIALLY_RECEIVED']);
 
         if ($user && $user->branch_id) {
             $query->where('branch_id', $user->branch_id);

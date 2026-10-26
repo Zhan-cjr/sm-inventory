@@ -236,6 +236,8 @@
                             $isSupplierMatch = ($res->supplier_id == $supplier_id);
                             $branchStock = $res->stocks->where('branch_id', $branch_id)->first();
                             $stockQty = $branchStock ? (float) $branchStock->quantity_on_hand : 0;
+                            $damagedQty = $branchStock ? (float) ($branchStock->quantity_damaged ?? 0) : 0;
+                            $salableQty = max(0, $stockQty - $damagedQty);
                         @endphp
                         <div wire:click="selectProduct('{{ $res->id }}')" 
                              class="search-result-item hover:bg-blue-50 dark:hover:bg-gray-700 dark:border-gray-700 transition-colors"
@@ -254,6 +256,13 @@
                                 <div style="font-size: 0.8rem; font-weight: 600; color: {{ $stockQty > 0 ? '#059669' : '#dc2626' }};">
                                     Stok: {{ number_format($stockQty, 0) }} Pcs
                                 </div>
+                                @if($damagedQty > 0)
+                                    <div style="margin-top: 1px;">
+                                        <span style="font-size: 0.65rem; font-weight: 700; color: #dc2626; background: #fee2e2; border: 1px solid #fecaca; border-radius: 3px; padding: 0px 4px; display: inline-block;">
+                                            BS Siap Retur: {{ (int)$damagedQty }} Pcs
+                                        </span>
+                                    </div>
+                                @endif
                                 <div style="font-size: 0.75rem; color: #3b82f6; font-weight: 500;">+ Tambah ke Retur</div>
                             </div>
                         </div>

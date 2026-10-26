@@ -533,7 +533,19 @@
                             </td> 
                         @endif
                         @if(in_array('avg_minggu', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #a855f7;">{{ $item['avg_minggu'] }}</td> @endif
-                        @if(in_array('stock', $visibleColumns)) <td class="pos-grid-td" style="text-align: right; color: #6b7280;">{{ $item['stock'] }}</td> @endif
+                        @if(in_array('stock', $visibleColumns)) 
+                            <td class="pos-grid-td" style="text-align: right; color: #6b7280; vertical-align: top;">
+                                <div>{{ $item['stock'] }}</div>
+                                @if(!empty($item['damaged_stock']) && (float)$item['damaged_stock'] > 0)
+                                    <div style="margin-top: 1px;">
+                                        <span style="display: inline-block; font-size: 0.58rem; color: #dc2626; background: #fee2e2; border: 1px solid #fecaca; padding: 0px 4px; border-radius: 3px; font-weight: 700; white-space: nowrap;"
+                                              title="Ada barang rusak di Karantina BS: {{ (int)$item['damaged_stock'] }} pcs (Total Fisik Toko: {{ (int)$item['physical_stock'] }} pcs)">
+                                            BS: {{ (int)$item['damaged_stock'] }}
+                                        </span>
+                                    </div>
+                                @endif
+                            </td> 
+                        @endif
                         @if(in_array('last_return', $visibleColumns))
                             <td class="pos-grid-td" style="text-align: right;">
                                 @if(!empty($item['last_return']))

@@ -21,7 +21,26 @@
             <p style="font-size: 0.875rem; color: #6b7280;" class="dark:text-gray-400">Silakan pilih salah satu cabang pada filter tabel Produk terlebih dahulu untuk dapat melihat Kartu Stok.</p>
         </div>
     @else
-        <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; flex-wrap: wrap;">
+            @if(isset($stock))
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px;">
+                    <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; padding: 4px 10px; border-radius: 6px;">
+                        <span style="color: #065f46; font-weight: 500;">Layak Jual:</span>
+                        <strong style="color: #047857; font-size: 13px; margin-left: 4px;">{{ (float) $stock->salable_quantity }}</strong>
+                    </div>
+                    <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 4px 10px; border-radius: 6px;">
+                        <span style="color: #991b1b; font-weight: 500;">Karantina / BS:</span>
+                        <strong style="color: #dc2626; font-size: 13px; margin-left: 4px;">{{ (float) $stock->quantity_damaged }}</strong>
+                    </div>
+                    <div style="background-color: #f3f4f6; border: 1px solid #e5e7eb; padding: 4px 10px; border-radius: 6px;">
+                        <span style="color: #374151; font-weight: 500;">Total Fisik:</span>
+                        <strong style="color: #111827; font-size: 13px; margin-left: 4px;">{{ (float) $stock->quantity_on_hand }}</strong>
+                    </div>
+                </div>
+            @else
+                <div></div>
+            @endif
+
             <a href="{{ route('print.stock-card', ['productId' => $productId, 'branchId' => $branchId ?? (\Illuminate\Support\Facades\Auth::user()->branch_id ?? \App\Models\Branch::first()->id)]) }}" 
                target="_blank" 
                style="background-color: #2563eb; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">
@@ -48,7 +67,14 @@
                             <td>{{ $log->created_at->format('d/m/Y H:i') }}</td>
                             <td style="font-family: monospace; font-size: 11px; font-weight: 600;">{{ $log->display_doc_number }}</td>
                             <td>
-                                <div style="font-weight: bold;">{{ $log->log_type }}</div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-weight: bold;">{{ $log->log_type }}</span>
+                                    @if($log->log_type === 'QUARANTINE_IN')
+                                        <span style="background: #fee2e2; color: #991b1b; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: bold;">PINDAH KE BS</span>
+                                    @elseif($log->log_type === 'QUARANTINE_RESTORE')
+                                        <span style="background: #dbeafe; color: #1e40af; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: bold;">PULIHKAN DARI BS</span>
+                                    @endif
+                                </div>
                                 <div style="font-size: 10px; color: #6b7280;">{{ $log->reason_code }} - {{ $log->notes }}</div>
                             </td>
                             <td class="text-right">{{ (float) $log->quantity_before }}</td>

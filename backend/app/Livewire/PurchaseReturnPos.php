@@ -13,6 +13,7 @@ use App\Models\Stock;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\StockBatch;
+use App\Models\StockQuarantineMovement;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 
@@ -653,19 +654,43 @@ class PurchaseReturnPos extends Component
                     }
                 }
 
-                // 2. Kurangi Stok Utama Cabang (Fisik gudang)
+                // 2. Kurangi Stok Utama Cabang (Prioritas potong dari Stok Karantina BS terlebih dahulu)
                 $stock = Stock::where('product_id', $item['product_id'])
                     ->where('branch_id', $this->branch_id)
                     ->first();
                     
                 if ($stock) {
+                    $qtyReturned = (float)$item['qty_returned'];
+                    $damaged = (float)($stock->quantity_damaged ?? 0);
+                    $cutFromDamaged = min($qtyReturned, $damaged);
+                    $cutFromSalable = $qtyReturned - $cutFromDamaged;
+
+                    if ($cutFromDamaged > 0) {
+                        $stock->decrement('quantity_damaged', $cutFromDamaged);
+
+                        // Catat mutasi resmi di riwayat karantina
+                        StockQuarantineMovement::create([
+                            'organization_id' => $stock->branch->organization_id ?? null,
+                            'branch_id' => $stock->branch_id,
+                            'product_id' => $stock->product_id,
+                            'movement_type' => 'PURCHASE_RETURN',
+                            'quantity' => $cutFromDamaged,
+                            'reason' => 'RETUR_KE_SUPPLIER',
+                            'reference_doc_type' => 'PURCHASE_RETURN',
+                            'reference_doc_id' => $pr->id,
+                            'notes' => 'Retur Pembelian ' . $pr->return_number,
+                            'created_by' => auth()->id(),
+                        ]);
+                    }
+
                     $stock->log_type = 'RETURN';
                     $stock->reason_code = 'PURCHASE_RETURN';
                     $stock->reference_doc_type = 'PURCHASE_RETURN';
                     $stock->reference_doc_id = $pr->return_number ?: $pr->id;
-                    $stock->notes = 'Retur Pembelian ' . $pr->return_number . (!empty($item['gr_number']) ? ' (Ref: ' . $item['gr_number'] . ')' : '');
+                    $detailNote = $cutFromDamaged > 0 ? " ({$cutFromDamaged} pcs dari BS, {$cutFromSalable} pcs dari Layak Jual)" : "";
+                    $stock->notes = 'Retur Pembelian ' . $pr->return_number . (!empty($item['gr_number']) ? ' (Ref: ' . $item['gr_number'] . ')' : '') . $detailNote;
                     
-                    $stock->decrement('quantity_on_hand', $item['qty_returned']);
+                    $stock->decrement('quantity_on_hand', $qtyReturned);
                 }
             }
 

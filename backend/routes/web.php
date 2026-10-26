@@ -143,14 +143,31 @@ Route::get('/admin/logout-get', function () {
 Route::get('/print/stock-card/{productId}/{branchId}', function ($productId, $branchId) {
     $product = \App\Models\Product::findOrFail($productId);
     $branch = \App\Models\Branch::findOrFail($branchId);
+    $stock = \App\Models\Stock::where('product_id', $productId)->where('branch_id', $branchId)->first();
     $logs = \App\Models\InventoryLog::where('product_id', $productId)
         ->where('branch_id', $branchId)
         ->orderByDesc('created_at')
         ->orderByDesc('id')
         ->get();
         
-    return view('print.documents.stock-card-print', compact('product', 'branch', 'logs'));
+    return view('print.documents.stock-card-print', compact('product', 'branch', 'logs', 'stock'));
 })->name('print.stock-card')->middleware(['web', 'auth']);
+
+Route::get('/print/stock-quarantine/{referenceNumber}', function ($referenceNumber) {
+    $movements = \App\Models\StockQuarantineMovement::with(['product', 'branch', 'creator'])
+        ->where('reference_doc_id', $referenceNumber)
+        ->orWhere('id', $referenceNumber)
+        ->get();
+
+    if ($movements->isEmpty()) {
+        abort(404, 'Dokumen Karantina BS tidak ditemukan.');
+    }
+
+    $branch = $movements->first()->branch;
+    $creator = $movements->first()->creator;
+
+    return view('print.documents.stock-quarantine-print', compact('movements', 'referenceNumber', 'branch', 'creator'));
+})->name('print.stock-quarantine')->middleware(['web', 'auth']);
 
 // Print Barcodes
 Route::middleware(['web', 'auth'])->group(function () {

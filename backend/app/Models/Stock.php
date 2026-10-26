@@ -66,7 +66,7 @@ class Stock extends Model
         'margin_gol_1', 'harga_jual_1', 'qty_min_gol_1',
         'margin_gol_2', 'harga_jual_2', 'qty_min_gol_2',
         'margin_gol_3', 'harga_jual_3', 'qty_min_gol_3',
-        'quantity_on_hand', 
+        'quantity_on_hand', 'quantity_damaged',
         'quantity_reserved', 'last_count_date', 'min_qty', 
         'max_qty', 'lead_time', 'safety_stock', 'desired_inventory_days', 'version', 'is_active'
     ];
@@ -81,6 +81,8 @@ class Stock extends Model
         'harga_jual_2' => 'decimal:2',
         'margin_gol_3' => 'decimal:2',
         'harga_jual_3' => 'decimal:2',
+        'quantity_on_hand' => 'decimal:2',
+        'quantity_damaged' => 'decimal:2',
         'qty_min_gol_1' => 'integer',
         'qty_min_gol_2' => 'integer',
         'qty_min_gol_3' => 'integer',
@@ -89,6 +91,122 @@ class Stock extends Model
         'desired_inventory_days' => 'integer',
         'is_active' => 'boolean',
     ];
+
+    /**
+     * Hitung stok layak jual saat ini (stok fisik dikurangi stok karantina BS).
+     */
+    public function getSalableQuantityAttribute(): float
+    {
+        return max(0, (float)$this->quantity_on_hand - (float)($this->quantity_damaged ?? 0));
+    }
+
+    /**
+     * Pindahkan stok dari Layak Jual ke Karantina BS (Bad Stock).
+     */
+    public function moveToQuarantine(float $qty, string $reason = '', ?string $notes = null, ?int $userId = null, ?string $referenceDocId = null): StockQuarantineMovement
+    {
+        if ($qty <= 0) {
+            throw new \InvalidArgumentException("Kuantitas karantina harus lebih dari 0.");
+        }
+
+        $salable = $this->salable_quantity;
+        if ($qty > $salable) {
+            throw new \InvalidArgumentException("Kuantitas melebihi stok layak jual yang tersedia ({$salable} pcs).");
+        }
+
+        $prevDamaged = (float)($this->quantity_damaged ?? 0);
+        $this->quantity_damaged = $prevDamaged + $qty;
+        $this->save();
+
+        $recordedBy = (string)($userId ?: (auth()->id() ?: (\App\Models\User::value('id') ?: '00000000-0000-0000-0000-000000000000')));
+
+        // Buat record riwayat mutasi karantina
+        $movement = StockQuarantineMovement::create([
+            'organization_id' => $this->branch->organization_id ?? null,
+            'branch_id' => $this->branch_id,
+            'product_id' => $this->product_id,
+            'movement_type' => 'MOVE_TO_BS',
+            'quantity' => $qty,
+            'reason' => $reason,
+            'reference_doc_type' => $referenceDocId ? 'STOCK_QUARANTINE_BATCH' : null,
+            'reference_doc_id' => $referenceDocId,
+            'notes' => $notes,
+            'created_by' => $userId ?: auth()->id(),
+        ]);
+
+        // Catat ke Kartu Stok (InventoryLog) sebagai catatan pemindahan status
+        try {
+            $docId = $referenceDocId ?: $movement->id;
+            InventoryLog::create([
+                'branch_id' => $this->branch_id,
+                'product_id' => $this->product_id,
+                'log_type' => 'QUARANTINE_IN',
+                'quantity_before' => (float)$this->quantity_on_hand,
+                'quantity_change' => 0, // Fisik di toko belum keluar
+                'quantity_after' => (float)$this->quantity_on_hand,
+                'reason_code' => $reason ?: 'BAD_STOCK',
+                'reference_doc_type' => 'STOCK_QUARANTINE',
+                'reference_doc_id' => $docId,
+                'notes' => ($referenceDocId ? "[{$referenceDocId}] " : '') . "Pindah ke Karantina BS ({$qty} pcs). Alasan: {$reason}. " . ($notes ? "Catatan: {$notes}. " : '') . "Saldo Layak Jual: {$this->salable_quantity} pcs, BS: {$this->quantity_damaged} pcs.",
+                'recorded_by' => $recordedBy,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Gagal mencatat InventoryLog Karantina BS: " . $e->getMessage());
+        }
+
+        return $movement;
+    }
+
+    /**
+     * Kembalikan stok dari Karantina BS ke Stok Layak Jual (Pembatalan/Restorasi).
+     */
+    public function restoreFromQuarantine(float $qty, ?string $notes = null, ?int $userId = null): StockQuarantineMovement
+    {
+        if ($qty <= 0) {
+            throw new \InvalidArgumentException("Kuantitas pengembalian harus lebih dari 0.");
+        }
+
+        $damaged = (float)($this->quantity_damaged ?? 0);
+        if ($qty > $damaged) {
+            throw new \InvalidArgumentException("Kuantitas melebihi stok karantina BS yang tersedia ({$damaged} pcs).");
+        }
+
+        $this->quantity_damaged = max(0, $damaged - $qty);
+        $this->save();
+
+        $recordedBy = (string)($userId ?: (auth()->id() ?: (\App\Models\User::value('id') ?: '00000000-0000-0000-0000-000000000000')));
+
+        $movement = StockQuarantineMovement::create([
+            'organization_id' => $this->branch->organization_id ?? null,
+            'branch_id' => $this->branch_id,
+            'product_id' => $this->product_id,
+            'movement_type' => 'RESTORE_TO_SALABLE',
+            'quantity' => $qty,
+            'reason' => 'PEMBATALAN_KARANTINA',
+            'notes' => $notes,
+            'created_by' => $userId ?: auth()->id(),
+        ]);
+
+        try {
+            InventoryLog::create([
+                'branch_id' => $this->branch_id,
+                'product_id' => $this->product_id,
+                'log_type' => 'QUARANTINE_RESTORE',
+                'quantity_before' => (float)$this->quantity_on_hand,
+                'quantity_change' => 0,
+                'quantity_after' => (float)$this->quantity_on_hand,
+                'reason_code' => 'RESTORE_SALABLE',
+                'reference_doc_type' => 'STOCK_QUARANTINE',
+                'reference_doc_id' => $movement->id,
+                'notes' => "Dikembalikan ke Stok Layak Jual ({$qty} pcs). " . ($notes ? "Catatan: {$notes}. " : '') . "Saldo Layak Jual: {$this->salable_quantity} pcs, BS: {$this->quantity_damaged} pcs.",
+                'recorded_by' => $recordedBy,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Gagal mencatat InventoryLog Restorasi Karantina: " . $e->getMessage());
+        }
+
+        return $movement;
+    }
 
     public function branch()
     {

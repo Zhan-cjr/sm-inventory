@@ -64,6 +64,16 @@
             <td><strong>Cabang</strong></td>
             <td>: {{ $branch->name }}</td>
         </tr>
+        @if(isset($stock))
+        <tr>
+            <td><strong>Status Stok Saat Ini</strong></td>
+            <td colspan="3">: 
+                <strong>Layak Jual:</strong> {{ (float) $stock->salable_quantity }} &nbsp;|&nbsp; 
+                <strong>Karantina / BS:</strong> {{ (float) $stock->quantity_damaged }} &nbsp;|&nbsp; 
+                <strong>Total Fisik:</strong> {{ (float) $stock->quantity_on_hand }}
+            </td>
+        </tr>
+        @endif
     </table>
 
     <table class="items-table">
@@ -84,7 +94,13 @@
                     <td>{{ $log->created_at->format('d/m/Y H:i') }}</td>
                     <td style="font-family: monospace; font-size: 11px; font-weight: 600;">{{ $log->display_doc_number }}</td>
                     <td>
-                        <strong>{{ $log->log_type }}</strong><br>
+                        <strong>{{ $log->log_type }}</strong>
+                        @if($log->log_type === 'QUARANTINE_IN')
+                            <span style="font-size: 9px; background-color: #fee2e2; padding: 1px 4px; border: 1px solid #dc2626;">PINDAH KE BS</span>
+                        @elseif($log->log_type === 'QUARANTINE_RESTORE')
+                            <span style="font-size: 9px; background-color: #dbeafe; padding: 1px 4px; border: 1px solid #2563eb;">PULIHKAN DARI BS</span>
+                        @endif
+                        <br>
                         <span style="font-size: 10px;">{{ $log->reason_code }} - {{ $log->notes }}</span>
                     </td>
                     <td class="text-right">{{ (float) $log->quantity_before }}</td>

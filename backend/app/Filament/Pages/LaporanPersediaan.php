@@ -34,6 +34,8 @@ class LaporanPersediaan extends Page implements HasTable
         return $table
             ->query(
                 Stock::query()
+                    ->select('stocks.*')
+                    ->selectRaw('GREATEST(0, stocks.quantity_on_hand - COALESCE(stocks.quantity_damaged, 0)) as salable_quantity')
                     ->whereHas('product', fn ($q) => $q->where(fn ($sub) => $sub->where('product_type', '!=', 'digital')->orWhereNull('product_type')))
                     ->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id))
                     ->with(['branch', 'product', 'product.category'])
@@ -57,13 +59,28 @@ class LaporanPersediaan extends Page implements HasTable
                 TextColumn::make('product.category.name')
                     ->label('Kategori')
                     ->searchable(),
-                TextColumn::make('quantity_on_hand')
-                    ->label('Sisa Stok')
-                    ->numeric()
+                TextColumn::make('salable_quantity')
+                    ->label('Stok Layak Jual')
+                    ->state(fn (Stock $record) => $record->salable_quantity)
+                    ->numeric(decimalPlaces: 2)
                     ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->sortable()
                     ->badge()
                     ->color(fn ($state, Stock $record) => $state <= ($record->reorder_point ?? 0) ? 'danger' : 'success'),
+                TextColumn::make('quantity_damaged')
+                    ->label('Stok BS (Karantina)')
+                    ->numeric(decimalPlaces: 2)
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
+                    ->sortable()
+                    ->badge()
+                    ->color(fn ($state) => (float)$state > 0 ? 'warning' : 'gray')
+                    ->tooltip(fn ($state) => (float)$state > 0 ? "Ada {$state} pcs barang rusak di karantina siap retur" : null),
+                TextColumn::make('quantity_on_hand')
+                    ->label('Total Fisik Toko')
+                    ->numeric(decimalPlaces: 2)
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('cost_price_tax')
                     ->label('Harga Pokok (Rata-rata Batch)')
                     ->money('IDR', true)
@@ -75,21 +92,36 @@ class LaporanPersediaan extends Page implements HasTable
                     })
                     ->sortable(),
                 TextColumn::make('valuation')
-                    ->label('Valuasi Stok (FIFO)')
+                    ->label('Valuasi Layak Jual (FIFO)')
                     ->money('IDR', true)
                     ->state(function (Stock $record) {
-                        if ($record->quantity_on_hand > 0 && $record->batch_valuation > 0) {
-                            return (float) $record->batch_valuation;
-                        }
-                        return (float) $record->quantity_on_hand * ($record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0));
+                        $unitCost = ($record->quantity_on_hand > 0 && $record->batch_valuation > 0)
+                            ? ($record->batch_valuation / $record->quantity_on_hand)
+                            : ($record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0));
+                        return (float)$record->salable_quantity * (float)$unitCost;
                     })
                     ->sortable(),
+                TextColumn::make('damaged_valuation')
+                    ->label('Valuasi BS / Siap Retur')
+                    ->money('IDR', true)
+                    ->state(function (Stock $record) {
+                        $unitCost = ($record->quantity_on_hand > 0 && $record->batch_valuation > 0)
+                            ? ($record->batch_valuation / $record->quantity_on_hand)
+                            : ($record->cost_price_tax > 0 ? $record->cost_price_tax : ($record->product->cost_price_tax ?? $record->product->cost_price ?? 0));
+                        return (float)($record->quantity_damaged ?? 0) * (float)$unitCost;
+                    })
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: false),
             ])
             ->filters([
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('branch', 'name')
                     ->hidden(fn () => Auth::user()->branch_id !== null),
+                SelectFilter::make('supplier_id')
+                    ->label('Supplier')
+                    ->relationship('product.supplier', 'name', fn ($query) => $query->where('is_active', true)->orderBy('name'))
+                    ->searchable(),
                 SelectFilter::make('category_id')
                     ->label('Kategori')
                     ->relationship('product.category', 'name', fn ($query) => $query->where('is_active', true)
@@ -99,15 +131,19 @@ class LaporanPersediaan extends Page implements HasTable
                 SelectFilter::make('stock_status')
                     ->label('Status Stok')
                     ->options([
-                        'available' => 'Hanya Stok Tersedia (> 0)',
+                        'available' => 'Hanya Stok Layak Jual (> 0)',
+                        'has_bs' => '⚠️ Hanya Barang BS / Karantina (Siap Retur)',
                         'empty' => 'Hanya Stok Kosong (<= 0)',
                     ])
                     ->query(function ($query, array $data) {
                         if (($data['value'] ?? null) === 'available') {
-                            return $query->where('stocks.quantity_on_hand', '>', 0);
+                            return $query->whereRaw('GREATEST(0, stocks.quantity_on_hand - COALESCE(stocks.quantity_damaged, 0)) > 0');
+                        }
+                        if (($data['value'] ?? null) === 'has_bs') {
+                            return $query->where('stocks.quantity_damaged', '>', 0);
                         }
                         if (($data['value'] ?? null) === 'empty') {
-                            return $query->where('stocks.quantity_on_hand', '<=', 0);
+                            return $query->whereRaw('GREATEST(0, stocks.quantity_on_hand - COALESCE(stocks.quantity_damaged, 0)) <= 0');
                         }
                         return $query;
                     }),
@@ -123,7 +159,7 @@ class LaporanPersediaan extends Page implements HasTable
                         'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
                 \Filament\Actions\Action::make('cetak_rekap')
-                    ->label('Cetak Rekap Total')
+                    ->label('Cetak Rekap Stok (Layak Jual + BS)')
                     ->icon('heroicon-o-document-chart-bar')
                     ->color('warning')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [

@@ -36,7 +36,7 @@ class InventoryLog extends Model
 
         // 2. Cek apakah di kolom notes terdapat nomor dokumen (misal ADJ-..., OP-..., GR-..., PR-..., TR-..., PH-...)
         if (!empty($this->notes)) {
-            if (preg_match('/\b(ADJ-[A-Z0-9]+|OP-[A-Z0-9-]+|GR-[0-9]+|PR-[A-Z0-9-]+|TR-[A-Z0-9-]+|PO-[0-9]+|PH-[A-Z0-9-]+)\b/i', $this->notes, $matches)) {
+            if (preg_match('/\b(ADJ-[A-Z0-9]+|OP-[A-Z0-9-]+|GR-[0-9]+|PR-[A-Z0-9-]+|TR-[A-Z0-9-]+|PO-[0-9]+|PH-[A-Z0-9-]+|BS-[A-Z0-9-]+)\b/i', $this->notes, $matches)) {
                 return $matches[1];
             }
         }
@@ -70,6 +70,10 @@ class InventoryLog extends Model
             if ($this->log_type === 'PURCHASE_RETURN') {
                 $pr = \App\Models\PurchaseReturn::find($doc);
                 if ($pr) return $pr->return_number ?: $doc;
+            }
+
+            if (in_array($this->log_type, ['QUARANTINE_IN', 'QUARANTINE_RESTORE'])) {
+                return 'BS-' . strtoupper(substr(str_replace('-', '', $doc), 0, 8));
             }
         }
 
