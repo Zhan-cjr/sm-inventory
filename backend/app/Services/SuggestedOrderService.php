@@ -333,6 +333,29 @@ class SuggestedOrderService
         } else if ($current_qty <= $reorderPoint && $ads > 0) {
             $suggested_qty = max(0, $targetQty - $current_qty);
             $status = $suggested_qty > 0 ? 'REORDER' : 'OK';
+        } else if ($ads == 0) {
+            // Ketika 30 hari penjualan = 0, tetapi stok menipis/kritis (di bawah min_qty, safety_stock, atau reorder_point)
+            $isCritical = ($stock->min_qty > 0 && $current_qty <= (float)$stock->min_qty) 
+                || ($current_qty <= $reorderPoint)
+                || ($stock->safety_stock > 0 && $current_qty <= (float)$stock->safety_stock);
+                
+            if ($isCritical) {
+                $branchSales90 = $this->getBranchSales90Days($stock->branch_id);
+                $sales90Days = (float)($branchSales90[$stock->product_id] ?? 0);
+                if ($sales90Days >= 10) {
+                    $isOosWithHistory = true;
+                    $activeAds = round($sales90Days / 90, 2);
+                    $targetQty = (float)ceil($activeAds * $targetDays);
+                    $suggested_qty = max(0, $targetQty - $current_qty);
+                    $status = $suggested_qty > 0 ? 'REORDER' : 'OK';
+                } else {
+                    $suggested_qty = 0;
+                    $status = 'OK';
+                }
+            } else {
+                $suggested_qty = 0;
+                $status = 'OK';
+            }
         } else {
             $suggested_qty = 0;
             $status = 'OK';

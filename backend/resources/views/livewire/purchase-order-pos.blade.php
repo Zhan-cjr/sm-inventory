@@ -435,8 +435,8 @@
                                     {{-- Smart Badge 3: Pasokan Sempat Kosong / OOS with history --}}
                                     <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
                                         <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 0.375rem; background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;"
-                                              title="Stok kosong karena pasokan macet. Penjualan 30 hari = 0, namun riwayat penjualan 90 hari tercatat {{ (int)$item['sales_90d'] }} pcs (rata-rata ~{{ $item['avg_sales_active'] }} pcs/bln saat aktif). Aman untuk diorder.">
-                                            📦 Pasokan Sempat Kosong (Riwayat 90 HR: {{ (int)$item['sales_90d'] }} pcs)
+                                              title="Stok menipis/kosong karena pasokan macet. Penjualan 30 hari = 0, namun riwayat penjualan 90 hari tercatat {{ (int)$item['sales_90d'] }} pcs (rata-rata ~{{ $item['avg_sales_active'] }} pcs/bln saat aktif). Aman untuk diorder.">
+                                            📦 Pasokan Menipis/Kosong (Riwayat 90 HR: {{ (int)$item['sales_90d'] }} pcs)
                                         </span>
                                     </div>
                                 @elseif(!empty($item['is_slow_moving_alert']))

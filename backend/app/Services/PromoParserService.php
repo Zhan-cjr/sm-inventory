@@ -337,12 +337,12 @@ class PromoParserService
                     if ($currentStock < $needQty) {
                         $qtySaran = max(1, $needQty - $currentStock);
                     }
-                } elseif ($currentStock <= 0 && $s90 >= 10) {
-                    // Fallback Pasokan Macet (OOS): Toko kehabisan stok, hitung kebutuhan dari riwayat 90 hari (hanya jika >= 10 pcs)
+                } elseif (($currentStock <= 0 || ($minQty > 0 && $currentStock <= $minQty)) && $s90 >= 10) {
+                    // Fallback Pasokan Macet (OOS): Toko kehabisan / menipis stok, hitung kebutuhan dari riwayat 90 hari (hanya jika >= 10 pcs)
                     $isOosWithHistory = true;
                     $dailyAvg = $s90 / 90;
                     $needQty = ceil($dailyAvg * 14);
-                    $qtySaran = max(1, $needQty);
+                    $qtySaran = max(1, $needQty - $currentStock);
                 }
 
                 $inCart = isset($cartMap[$product->id]);

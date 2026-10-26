@@ -886,10 +886,13 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             $isEmptyDueToReturn = !$hasNewReceipt;
         }
 
-        // Deteksi Pasokan Macet (OOS): Stok <= 0 dan Sales 30 HR = 0, tetapi ada penjualan aktif signifikan di 90 hari terakhir (>= 10 pcs)
+        // Deteksi Pasokan Macet (OOS): Sales 30 HR = 0, tetapi ada penjualan aktif signifikan di 90 hari terakhir (>= 10 pcs)
+        // Terpicu jika stok sudah habis (<= 0) atau stok kritis menipis (<= min_qty atau <= safety_stock)
         $isOosWithHistory = false;
         $avgSalesActive = 0;
-        if (!$isEmptyDueToReturn && $avgBln <= 0 && $stock <= 0) {
+        $safetyStockVal = (float)($stockModel->safety_stock ?? 0);
+        $isStockCriticalOrDepleted = ($stock <= 0) || ($minQty > 0 && $stock <= $minQty) || ($safetyStockVal > 0 && $stock <= $safetyStockVal);
+        if (!$isEmptyDueToReturn && $avgBln <= 0 && $isStockCriticalOrDepleted) {
             if ($sales90d >= 10) {
                 $isOosWithHistory = true;
                 $avgSalesActive = round($sales90d / 3, 1);
