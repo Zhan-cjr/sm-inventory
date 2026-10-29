@@ -43,3 +43,5 @@ ai-service/*.py
 ai-service/*.xlsx
 backend/import_ppob_ama.php
 backend/data_ppob_ama.json
+backend/sm_inventory
+*.sqlite
