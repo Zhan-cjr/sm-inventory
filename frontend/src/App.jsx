@@ -208,8 +208,10 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('pos_token');
     localStorage.removeItem('pos_user');
-    // Note: pos_active_shift is preserved across temporary logout/rest breaks
-    // and is only removed when the cashier performs an explicit Close Shift.
+    // Remove any obsolete legacy un-namespaced shift key
+    localStorage.removeItem('pos_active_shift');
+    // Note: User-specific shifts (pos_active_shift_{userId}_{terminalId}) are preserved
+    // across temporary logout/rest breaks and only removed on Close Shift (EOD).
     setToken(null);
     setUser(null);
   };

@@ -8,6 +8,21 @@ const safeSetItem = (key, value) => {
   }
 };
 
+// Purge & migrate obsolete global pos_active_shift key immediately to prevent cross-cashier pollution
+try {
+  const legacyGlobal = localStorage.getItem('pos_active_shift');
+  if (legacyGlobal) {
+    const parsed = JSON.parse(legacyGlobal);
+    if (parsed && parsed.user_id && parsed.terminal_id) {
+      const targetKey = `pos_active_shift_${parsed.user_id}_${parsed.terminal_id}`;
+      if (!localStorage.getItem(targetKey)) {
+        safeSetItem(targetKey, legacyGlobal);
+      }
+    }
+    localStorage.removeItem('pos_active_shift');
+  }
+} catch (e) {}
+
 const getCachedShift = (userId, terminalId) => {
   if (!userId) return null;
 
@@ -25,19 +40,6 @@ const getCachedShift = (userId, terminalId) => {
       const val = localStorage.getItem(k);
       if (val) return val;
     }
-  }
-
-  // 3. Fallback to legacy single key ONLY if user_id explicitly and strictly matches!
-  const legacy = localStorage.getItem('pos_active_shift');
-  if (legacy) {
-    try {
-      const parsed = JSON.parse(legacy);
-      if (parsed && String(parsed.user_id) === String(userId)) {
-        if (!terminalId || String(parsed.terminal_id) === String(terminalId)) {
-          return legacy;
-        }
-      }
-    } catch (e) {}
   }
 
   return null;
@@ -190,11 +192,20 @@ export const usePosShift = ({
       })
       .catch(err => {
         console.error('Failed to check shift:', err);
-        const cachedShift = getCachedShift(currentUserId, terminalId);
+        const resolvedUserId = user?.id || currentUserId || (() => {
+          try {
+            return JSON.parse(localStorage.getItem('pos_user'))?.id;
+          } catch {
+            return null;
+          }
+        })();
+
+        const cachedShift = getCachedShift(resolvedUserId, terminalId);
         if (cachedShift) {
           try {
             const parsed = JSON.parse(cachedShift);
-            if (parsed && (!parsed.terminal_id || parsed.terminal_id === terminalId)) {
+            // Strict check: verified cashier ownership of this shift
+            if (parsed && String(parsed.user_id) === String(resolvedUserId) && (!parsed.terminal_id || parsed.terminal_id === terminalId)) {
               // Cek tanggal shift offline apakah lintas hari
               const shiftDate = parsed.start_time ? new Date(parsed.start_time).toDateString() : null;
               const todayDate = new Date().toDateString();
