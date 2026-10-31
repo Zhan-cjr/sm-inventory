@@ -375,6 +375,7 @@ class ShiftController extends Controller
             $amount = $tx->final_amount;
             $tx_sales = 0;
             $tx_returns = 0;
+            $itemDiscounts = 0;
 
             foreach ($tx->items as $item) {
                 $itemDiscount = (float) ($item->discount_per_item ?? 0);
@@ -382,6 +383,7 @@ class ShiftController extends Controller
 
                 if ($item->quantity > 0) {
                     $tx_sales += ($item->quantity * $effectivePrice);
+                    $itemDiscounts += ($item->quantity * $itemDiscount);
                 } else {
                     $tx_returns += (abs($item->quantity) * $effectivePrice);
                     $returnItems[] = [
@@ -391,7 +393,11 @@ class ShiftController extends Controller
                     ];
                 }
             }
-            $tx_sales -= ($tx->manual_discount + $tx->promo_discount);
+
+            // Kurangkan hanya diskon level transaksi yang belum teralokasi di discount_per_item
+            $totalTxDiscount = (float) $tx->manual_discount + (float) $tx->promo_discount;
+            $unallocatedDiscount = max(0, $totalTxDiscount - $itemDiscounts);
+            $tx_sales -= $unallocatedDiscount;
             if ($tx_sales < 0) $tx_sales = 0;
 
             $method = strtoupper($tx->payment_method);
