@@ -64,6 +64,7 @@ export const POSTransaction = ({
   branchPhone,
   orgName,
   authToken,
+  user,
   userName,
   userRole,
   onLogout,
@@ -199,6 +200,7 @@ export const POSTransaction = ({
     closedShiftsToday
   } = usePosShift({
     authToken,
+    user,
     terminalInfo,
     onLogout,
     setAlertMsg,

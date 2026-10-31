@@ -489,22 +489,8 @@ export const usePosCatalog = ({
           const terminal = terminals.find((t) => t.id === activeTerminalId);
           if (terminal) setTerminalInfo(terminal);
 
-          // Restore cached shift when offline
-          const cachedShift = localStorage.getItem('pos_active_shift');
-          if (cachedShift) {
-            try {
-              const parsed = JSON.parse(cachedShift);
-              if (parsed && parsed.terminal_id === activeTerminalId) {
-                setActiveShift(parsed);
-              } else {
-                setIsOpenShiftModalOpen(true);
-              }
-            } catch (e) {
-              setIsOpenShiftModalOpen(true);
-            }
-          } else {
-            setIsOpenShiftModalOpen(true);
-          }
+          // Restore cached shift via isolated checkActiveShift
+          checkActiveShift(activeTerminalId);
         } else {
           if (terminals.length > 0) {
             setIsTerminalModalOpen(true);

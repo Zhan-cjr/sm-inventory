@@ -8,14 +8,74 @@ const safeSetItem = (key, value) => {
   }
 };
 
+const getCachedShift = (userId, terminalId) => {
+  if (userId && terminalId) {
+    const key = `pos_active_shift_${userId}_${terminalId}`;
+    const val = localStorage.getItem(key);
+    if (val) return val;
+  }
+  if (userId) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(`pos_active_shift_${userId}_`)) {
+        const val = localStorage.getItem(k);
+        if (val) return val;
+      }
+    }
+  }
+  const legacy = localStorage.getItem('pos_active_shift');
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy);
+      if ((!userId || parsed.user_id === userId) && (!terminalId || parsed.terminal_id === terminalId)) {
+        return legacy;
+      }
+    } catch (e) {}
+  }
+  return null;
+};
+
+const saveActiveShift = (shift, userId, terminalId) => {
+  const uId = userId || shift?.user_id;
+  const tId = terminalId || shift?.terminal_id;
+  if (uId && tId) {
+    safeSetItem(`pos_active_shift_${uId}_${tId}`, JSON.stringify(shift));
+  }
+  safeSetItem('pos_active_shift', JSON.stringify(shift));
+};
+
+const removeActiveShift = (userId, terminalId) => {
+  if (userId && terminalId) {
+    localStorage.removeItem(`pos_active_shift_${userId}_${terminalId}`);
+  }
+  if (userId) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(`pos_active_shift_${userId}_`)) {
+        localStorage.removeItem(k);
+      }
+    }
+  }
+  localStorage.removeItem('pos_active_shift');
+};
+
 export const usePosShift = ({
   authToken,
+  user,
   terminalInfo,
   onLogout,
   setAlertMsg,
   localPrinterSettings,
   syncTransactions
 }) => {
+  const currentUserId = user?.id || (() => {
+    try {
+      return JSON.parse(localStorage.getItem('pos_user'))?.id;
+    } catch {
+      return null;
+    }
+  })();
+
   const [activeShift, setActiveShift] = useState(null);
   const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
@@ -62,10 +122,10 @@ export const usePosShift = ({
         if (data.status === 'USER_HAS_OTHER_SHIFT' || data.status === 'TERMINAL_IN_USE') {
           setLockScreenInfo({ status: data.status, message: data.message });
           setActiveShift(null);
-          localStorage.removeItem('pos_active_shift');
+          removeActiveShift(currentUserId, terminalId);
         } else if (data.status === 'CROSS_DAY_SHIFT_EXPIRED') {
           setActiveShift(data.shift);
-          safeSetItem('pos_active_shift', JSON.stringify(data.shift));
+          saveActiveShift(data.shift, currentUserId, terminalId);
           setLockScreenInfo({
             status: 'CROSS_DAY_SHIFT_EXPIRED',
             message: data.message,
@@ -78,7 +138,7 @@ export const usePosShift = ({
           });
         } else if (data.shift) {
           setActiveShift(data.shift);
-          safeSetItem('pos_active_shift', JSON.stringify(data.shift));
+          saveActiveShift(data.shift, currentUserId, terminalId);
           setAlertMsg({
             text: `Melanjutkan ${data.shift.shift_name} yang belum ditutup. Harap tutup shift ini jika ingin membuka shift baru.`,
             type: 'info',
@@ -86,17 +146,17 @@ export const usePosShift = ({
           });
           setTimeout(() => setAlertMsg(null), 7000);
         } else {
-          localStorage.removeItem('pos_active_shift');
+          removeActiveShift(currentUserId, terminalId);
           setIsOpenShiftModalOpen(true);
         }
       })
       .catch(err => {
         console.error('Failed to check shift:', err);
-        const cachedShift = localStorage.getItem('pos_active_shift');
+        const cachedShift = getCachedShift(currentUserId, terminalId);
         if (cachedShift) {
           try {
             const parsed = JSON.parse(cachedShift);
-            if (parsed && parsed.terminal_id === terminalId) {
+            if (parsed && (!parsed.terminal_id || parsed.terminal_id === terminalId)) {
               // Cek tanggal shift offline apakah lintas hari
               const shiftDate = parsed.start_time ? new Date(parsed.start_time).toDateString() : null;
               const todayDate = new Date().toDateString();
@@ -128,7 +188,7 @@ export const usePosShift = ({
         }
       })
       .finally(() => setIsCheckingShift(false));
-  }, [authToken, setAlertMsg]);
+  }, [authToken, currentUserId, setAlertMsg]);
 
   // Sync offline active shift to server when back online
   useEffect(() => {
@@ -152,7 +212,7 @@ export const usePosShift = ({
           if (data.shift) {
             console.log('Offline shift successfully registered on server:', data.shift);
             setActiveShift(data.shift);
-            safeSetItem('pos_active_shift', JSON.stringify(data.shift));
+            saveActiveShift(data.shift, currentUserId, terminalInfo?.id);
             setAlertMsg({ text: `Shift offline Anda ("${activeShift.shift_name}") telah disinkronkan ke server secara otomatis!`, type: 'success' });
             setTimeout(() => setAlertMsg(null), 5000);
 
@@ -165,7 +225,7 @@ export const usePosShift = ({
         })
         .catch(err => console.error('Error registering offline shift:', err));
     }
-  }, [activeShift, terminalInfo?.id, authToken, setAlertMsg, syncTransactions]);
+  }, [activeShift, terminalInfo?.id, authToken, currentUserId, setAlertMsg, syncTransactions]);
 
   const handleOpenShift = () => {
     if (isProcessing) return;
@@ -190,6 +250,8 @@ export const usePosShift = ({
     if (!navigator.onLine) {
       const localShift = {
         id: null,
+        user_id: currentUserId,
+        terminal_id: terminalInfo?.id,
         is_offline: true,
         shift_name: selectedShiftName,
         start_time: new Date().toISOString(),
@@ -197,7 +259,7 @@ export const usePosShift = ({
         status: 'OPEN'
       };
       setActiveShift(localShift);
-      safeSetItem('pos_active_shift', JSON.stringify(localShift));
+      saveActiveShift(localShift, currentUserId, terminalInfo?.id);
       setIsOpenShiftModalOpen(false);
       if (window.electronAPI && window.electronAPI.openCashDrawer) {
         window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
@@ -234,7 +296,7 @@ export const usePosShift = ({
       .then(data => {
         if (data.shift) {
           setActiveShift(data.shift);
-          safeSetItem('pos_active_shift', JSON.stringify(data.shift));
+          saveActiveShift(data.shift, currentUserId, terminalInfo?.id);
           setIsOpenShiftModalOpen(false);
           if (window.electronAPI && window.electronAPI.openCashDrawer) {
             window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
@@ -259,6 +321,8 @@ export const usePosShift = ({
         console.error('Failed to open shift online, falling back to offline:', err);
         const localShift = {
           id: null,
+          user_id: currentUserId,
+          terminal_id: terminalInfo?.id,
           is_offline: true,
           shift_name: selectedShiftName,
           start_time: new Date().toISOString(),
@@ -266,7 +330,7 @@ export const usePosShift = ({
           status: 'OPEN'
         };
         setActiveShift(localShift);
-        safeSetItem('pos_active_shift', JSON.stringify(localShift));
+        saveActiveShift(localShift, currentUserId, terminalInfo?.id);
         setIsOpenShiftModalOpen(false);
         if (window.electronAPI && window.electronAPI.openCashDrawer) {
           window.electronAPI.openCashDrawer(localPrinterSettings?.printerName || 'LPT1').catch(e => console.error(e));
@@ -292,7 +356,7 @@ export const usePosShift = ({
     setIsProcessing(true);
 
     if (activeShift.is_offline || !navigator.onLine) {
-      localStorage.removeItem('pos_active_shift');
+      removeActiveShift(currentUserId, terminalInfo?.id);
       setActiveShift(null);
       setLockScreenInfo(null);
       setIsCloseShiftModalOpen(false);
@@ -320,7 +384,7 @@ export const usePosShift = ({
       .then(data => {
         setIsProcessing(false);
         if (data.shift) {
-          localStorage.removeItem('pos_active_shift');
+          removeActiveShift(currentUserId, terminalInfo?.id);
           setActiveShift(null);
           setLockScreenInfo(null);
           setIsCloseShiftModalOpen(false);
@@ -332,7 +396,7 @@ export const usePosShift = ({
       })
       .catch(err => {
         console.error('Failed to close shift online, closing locally:', err);
-        localStorage.removeItem('pos_active_shift');
+        removeActiveShift(currentUserId, terminalInfo?.id);
         setActiveShift(null);
         setLockScreenInfo(null);
         setIsCloseShiftModalOpen(false);
@@ -388,7 +452,7 @@ export const usePosShift = ({
           newShift.total_cash_out = (newShift.total_cash_out || 0) + parseFloat(cashMovementAmount);
         }
         setActiveShift(newShift);
-        safeSetItem('pos_active_shift', JSON.stringify(newShift));
+        saveActiveShift(newShift, currentUserId, terminalInfo?.id);
       })
       .catch(() => {
         setIsProcessing(false);

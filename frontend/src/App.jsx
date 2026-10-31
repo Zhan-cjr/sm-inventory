@@ -369,6 +369,7 @@ function App() {
                   branchPhone={deviceInfo?.branchPhone || user.branch_phone}
                   orgName={user.organization_name}
                   authToken={token}
+                  user={user}
                   userName={user.name}
                   userRole={user.role}
                   onLogout={handleLogout}
