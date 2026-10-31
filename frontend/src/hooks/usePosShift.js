@@ -9,29 +9,37 @@ const safeSetItem = (key, value) => {
 };
 
 const getCachedShift = (userId, terminalId) => {
-  if (userId && terminalId) {
+  if (!userId) return null;
+
+  // 1. Check exact user + terminal key
+  if (terminalId) {
     const key = `pos_active_shift_${userId}_${terminalId}`;
     const val = localStorage.getItem(key);
     if (val) return val;
   }
-  if (userId) {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith(`pos_active_shift_${userId}_`)) {
-        const val = localStorage.getItem(k);
-        if (val) return val;
-      }
+
+  // 2. Check user-specific key across terminals if terminalId not yet resolved
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(`pos_active_shift_${userId}_`)) {
+      const val = localStorage.getItem(k);
+      if (val) return val;
     }
   }
+
+  // 3. Fallback to legacy single key ONLY if user_id explicitly and strictly matches!
   const legacy = localStorage.getItem('pos_active_shift');
   if (legacy) {
     try {
       const parsed = JSON.parse(legacy);
-      if ((!userId || parsed.user_id === userId) && (!terminalId || parsed.terminal_id === terminalId)) {
-        return legacy;
+      if (parsed && String(parsed.user_id) === String(userId)) {
+        if (!terminalId || String(parsed.terminal_id) === String(terminalId)) {
+          return legacy;
+        }
       }
     } catch (e) {}
   }
+
   return null;
 };
 
@@ -41,7 +49,6 @@ const saveActiveShift = (shift, userId, terminalId) => {
   if (uId && tId) {
     safeSetItem(`pos_active_shift_${uId}_${tId}`, JSON.stringify(shift));
   }
-  safeSetItem('pos_active_shift', JSON.stringify(shift));
 };
 
 const removeActiveShift = (userId, terminalId) => {
@@ -97,6 +104,37 @@ export const usePosShift = ({
 
   // EOD Report
   const [eodReportData, setEodReportData] = useState(null);
+
+  const triggerOpenShiftModalOffline = useCallback((terminalId) => {
+    const runningShiftsOnTerminal = [];
+    if (terminalId) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('pos_active_shift_') && k.endsWith(`_${terminalId}`)) {
+          try {
+            const s = JSON.parse(localStorage.getItem(k));
+            if (s && s.status === 'OPEN' && s.shift_name) {
+              runningShiftsOnTerminal.push(s.shift_name);
+            }
+          } catch (e) {}
+        }
+      }
+    }
+    if (runningShiftsOnTerminal.length > 0) {
+      setClosedShiftsToday(prev => Array.from(new Set([...prev, ...runningShiftsOnTerminal])));
+      if (runningShiftsOnTerminal.includes('Shift 1') && !runningShiftsOnTerminal.includes('Shift 2')) {
+        setSelectedShiftName('Shift 2');
+      } else if (runningShiftsOnTerminal.includes('Shift 2') && !runningShiftsOnTerminal.includes('Shift 1')) {
+        setSelectedShiftName('Shift 1');
+      }
+    } else {
+      const preselected = localStorage.getItem('pos_preselected_shift');
+      if (preselected === 'Shift 1' || preselected === 'Shift 2') {
+        setSelectedShiftName(preselected);
+      }
+    }
+    setIsOpenShiftModalOpen(true);
+  }, []);
 
   const checkActiveShift = useCallback((terminalId) => {
     if (!terminalId) return;
@@ -178,17 +216,17 @@ export const usePosShift = ({
               });
               setTimeout(() => setAlertMsg(null), 7000);
             } else {
-              setIsOpenShiftModalOpen(true);
+              triggerOpenShiftModalOffline(terminalId);
             }
           } catch {
-            setIsOpenShiftModalOpen(true);
+            triggerOpenShiftModalOffline(terminalId);
           }
         } else {
-          setIsOpenShiftModalOpen(true);
+          triggerOpenShiftModalOffline(terminalId);
         }
       })
       .finally(() => setIsCheckingShift(false));
-  }, [authToken, currentUserId, setAlertMsg]);
+  }, [authToken, currentUserId, setAlertMsg, triggerOpenShiftModalOffline]);
 
   // Sync offline active shift to server when back online
   useEffect(() => {
