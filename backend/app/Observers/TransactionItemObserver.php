@@ -6,6 +6,7 @@ use App\Models\TransactionItem;
 use App\Models\Stock;
 use App\Models\StockBatch;
 use App\Models\StockBatchDeduction;
+use App\Models\ProductConversion;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -21,12 +22,62 @@ class TransactionItemObserver
             ->lockForUpdate()
             ->first();
 
+        $currentQty = $stock ? (float) $stock->quantity_on_hand : 0.0;
+
+        // Auto-Unpacking (Konversi Pecah Barang) jika stok tidak mencukupi saat penjualan
+        if ($quantity > 0 && $currentQty < $quantity) {
+            $conversion = ProductConversion::where('target_product_id', $productId)
+                ->where('auto_convert', true)
+                ->first();
+
+            if ($conversion && $conversion->conversion_qty > 0) {
+                $neededDeficit = $quantity - $currentQty;
+                $sourceQtyToUnpack = (int) ceil($neededDeficit / $conversion->conversion_qty);
+
+                $sourceStock = Stock::where('branch_id', $branchId)
+                    ->where('product_id', $conversion->source_product_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($sourceStock) {
+                    $sourceStock->log_type = 'UNPACKING';
+                    $sourceStock->reason_code = 'AUTO_CONVERSION';
+                    $sourceStock->reference_doc_type = 'TRANSACTION';
+                    $sourceStock->reference_doc_id = $docId;
+                    $sourceStock->log_date = $item->transaction->transaction_date ?? now();
+                    $sourceStock->notes = "Auto-unpacking ke " . ($item->product?->name ?? 'Pecahan') . " ({$docId})";
+                    $sourceStock->quantity_on_hand -= $sourceQtyToUnpack;
+                    $sourceStock->save();
+
+                    if (!$stock) {
+                        $stock = Stock::create([
+                            'branch_id' => $branchId,
+                            'product_id' => $productId,
+                            'quantity_on_hand' => 0,
+                            'selling_price' => $item->unit_price ?? 0,
+                            'is_active' => true,
+                        ]);
+                    }
+
+                    $stock->log_type = 'UNPACKING';
+                    $stock->reason_code = 'AUTO_CONVERSION';
+                    $stock->reference_doc_type = 'TRANSACTION';
+                    $stock->reference_doc_id = $docId;
+                    $stock->log_date = $item->transaction->transaction_date ?? now();
+                    $stock->notes = "Hasil auto-unpacking dari " . ($conversion->sourceProduct?->name ?? 'Induk') . " ({$docId})";
+                    $stock->quantity_on_hand += ($sourceQtyToUnpack * $conversion->conversion_qty);
+                    $stock->save();
+                }
+            }
+        }
+
         if ($stock) {
             $stock->log_type         = 'SALE';
             $stock->reason_code      = 'POS_SALE_ITEM';
             $stock->reference_doc_type = 'TRANSACTION';
             $stock->reference_doc_id = $docId;
             $stock->log_date         = $item->transaction->transaction_date ?? now();
+            $stock->notes            = 'Updated via Stock Management';
             $stock->quantity_on_hand -= $quantity;
             $stock->save();
         }
