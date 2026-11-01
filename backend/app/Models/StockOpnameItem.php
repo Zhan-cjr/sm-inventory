@@ -186,11 +186,17 @@ class StockOpnameItem extends Model
     {
         if (empty($items)) return;
 
+        $itemList = ($items instanceof \Illuminate\Contracts\Pagination\Paginator || $items instanceof \Illuminate\Contracts\Pagination\CursorPaginator)
+            ? $items->items()
+            : (is_array($items) ? $items : ($items instanceof \Illuminate\Support\Collection ? $items->all() : []));
+
+        if (empty($itemList)) return;
+
         // 1. Group items by session to preload external logs (deltas)
-        $sessionGroups = collect($items)->groupBy('session_id');
+        $sessionGroups = collect($itemList)->filter(fn ($i) => $i instanceof StockOpnameItem)->groupBy('session_id');
         foreach ($sessionGroups as $sessionId => $groupItems) {
             $firstItem = $groupItems->first();
-            $session = $firstItem->session;
+            $session = $firstItem?->session;
             if (!$session || !$session->branch_id) continue;
 
             $pids = $groupItems->pluck('product_id')->filter()->unique()->values()->all();
@@ -223,7 +229,8 @@ class StockOpnameItem extends Model
 
         // 2. Preload stock prices for all branch-product pairs
         $branchProductPairs = [];
-        foreach ($items as $item) {
+        foreach ($itemList as $item) {
+            if (!$item instanceof StockOpnameItem) continue;
             $branchId = $item->session?->branch_id;
             $pid = $item->product_id;
             if ($branchId && $pid && !isset(static::$stockPriceCache[$branchId . '_' . $pid])) {
@@ -245,7 +252,7 @@ class StockOpnameItem extends Model
 
             foreach ($uniquePids as $pid) {
                 if (!isset(static::$stockPriceCache[$bId . '_' . $pid])) {
-                    $item = collect($items)->firstWhere('product_id', $pid);
+                    $item = collect($itemList)->firstWhere('product_id', $pid);
                     $price = (float) ($item?->product?->cost_price_tax ?? $item?->product?->cost_price ?? 0);
                     static::$stockPriceCache[$bId . '_' . $pid] = $price;
                 }
