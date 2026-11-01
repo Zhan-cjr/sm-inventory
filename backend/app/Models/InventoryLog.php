@@ -34,9 +34,9 @@ class InventoryLog extends Model
             return $doc;
         }
 
-        // 2. Cek apakah di kolom notes terdapat nomor dokumen (misal ADJ-..., OP-..., GR-..., PR-..., TR-..., PH-...)
+        // 2. Cek apakah di kolom notes terdapat nomor dokumen (misal AUD-BS-..., ADJ-..., OP-..., GR-..., PR-..., TR-..., PH-...)
         if (!empty($this->notes)) {
-            if (preg_match('/\b(ADJ-[A-Z0-9]+|OP-[A-Z0-9-]+|GR-[0-9]+|PR-[A-Z0-9-]+|TR-[A-Z0-9-]+|PO-[0-9]+|PH-[A-Z0-9-]+|BS-[A-Z0-9-]+)\b/i', $this->notes, $matches)) {
+            if (preg_match('/\b(AUD-BS-[A-Z0-9-]+|ADJ-[A-Z0-9]+|OP-[A-Z0-9-]+|GR-[0-9]+|PR-[A-Z0-9-]+|TR-[A-Z0-9-]+|PO-[0-9]+|PH-[A-Z0-9-]+|BS-[A-Z0-9-]+)\b/i', $this->notes, $matches)) {
                 return $matches[1];
             }
         }

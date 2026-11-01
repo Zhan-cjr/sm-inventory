@@ -89,14 +89,14 @@ class LaporanPersediaan extends Page implements HasTable
                     ->badge()
                     ->color(function ($state) {
                         if (!$state) return 'gray';
-                        $days = \Carbon\Carbon::parse($state)->diffInDays(now());
+                        $days = (int) round(\Carbon\Carbon::parse($state)->diffInDays(now()));
                         if ($days <= 30) return 'success';
                         if ($days <= 60) return 'warning';
                         return 'danger';
                     })
                     ->tooltip(function ($state) {
                         if (!$state) return 'Belum pernah di-opname';
-                        $days = \Carbon\Carbon::parse($state)->diffInDays(now());
+                        $days = (int) round(\Carbon\Carbon::parse($state)->diffInDays(now()));
                         return "Di-opname {$days} hari yang lalu";
                     }),
                 TextColumn::make('last_so_number')

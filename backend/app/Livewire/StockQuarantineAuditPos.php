@@ -471,6 +471,7 @@ class StockQuarantineAuditPos extends Component
                     $qtyToAdd = $diff;
                     $stock = Stock::where('branch_id', $this->branch_id)->where('product_id', $productId)->first();
                     if ($stock) {
+                        $prevDamaged = (float)($stock->quantity_damaged ?? 0);
                         $stock->increment('quantity_damaged', $qtyToAdd);
 
                         StockQuarantineMovement::create([
@@ -485,6 +486,20 @@ class StockQuarantineAuditPos extends Component
                             'reference_doc_id'   => $audit->audit_number,
                             'notes'              => $item['notes'] ?: "Barang rusak ditemukan saat Audit {$audit->audit_number}",
                             'created_by'         => $userId,
+                        ]);
+
+                        InventoryLog::create([
+                            'branch_id'          => $this->branch_id,
+                            'product_id'         => $productId,
+                            'log_type'           => 'QUARANTINE_IN',
+                            'quantity_before'    => (float)$stock->quantity_on_hand,
+                            'quantity_change'    => 0,
+                            'quantity_after'     => (float)$stock->quantity_on_hand,
+                            'reason_code'        => 'PENAMBAHAN_HASIL_AUDIT_BS',
+                            'reference_doc_type' => 'STOCK_QUARANTINE_AUDIT',
+                            'reference_doc_id'   => $audit->audit_number,
+                            'notes'              => "[{$audit->audit_number}] Pindah ke Karantina BS ({$qtyToAdd} pcs) hasil temuan audit keranjang BS. " . ($item['notes'] ? "Catatan: {$item['notes']}. " : '') . "Saldo Layak Jual: {$stock->salable_quantity} pcs, BS: " . ($prevDamaged + $qtyToAdd) . " pcs.",
+                            'recorded_by'        => (string)$userId,
                         ]);
                     }
                 }
