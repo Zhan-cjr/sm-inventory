@@ -8,18 +8,26 @@ const safeSetItem = (key, value) => {
   }
 };
 
-// Purge & migrate obsolete global pos_active_shift key immediately to prevent cross-cashier pollution
+// Purge obsolete pos_active_shift and any cross-polluted/mismatched keys immediately
 try {
-  const legacyGlobal = localStorage.getItem('pos_active_shift');
-  if (legacyGlobal) {
-    const parsed = JSON.parse(legacyGlobal);
-    if (parsed && parsed.user_id && parsed.terminal_id) {
-      const targetKey = `pos_active_shift_${parsed.user_id}_${parsed.terminal_id}`;
-      if (!localStorage.getItem(targetKey)) {
-        safeSetItem(targetKey, legacyGlobal);
-      }
+  localStorage.removeItem('pos_active_shift');
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('pos_active_shift_')) {
+      try {
+        const parts = k.split('_');
+        if (parts.length >= 5) {
+          const expectedUserId = parts[3];
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && String(parsed.user_id) !== String(expectedUserId)) {
+              localStorage.removeItem(k);
+            }
+          }
+        }
+      } catch (e) {}
     }
-    localStorage.removeItem('pos_active_shift');
   }
 } catch (e) {}
 
@@ -30,7 +38,18 @@ const getCachedShift = (userId, terminalId) => {
   if (terminalId) {
     const key = `pos_active_shift_${userId}_${terminalId}`;
     const val = localStorage.getItem(key);
-    if (val) return val;
+    if (val) {
+      try {
+        const parsed = JSON.parse(val);
+        if (parsed && String(parsed.user_id) === String(userId)) {
+          return val;
+        } else {
+          localStorage.removeItem(key);
+        }
+      } catch (e) {
+        localStorage.removeItem(key);
+      }
+    }
   }
 
   // 2. Check user-specific key across terminals if terminalId not yet resolved
@@ -38,7 +57,18 @@ const getCachedShift = (userId, terminalId) => {
     const k = localStorage.key(i);
     if (k && k.startsWith(`pos_active_shift_${userId}_`)) {
       const val = localStorage.getItem(k);
-      if (val) return val;
+      if (val) {
+        try {
+          const parsed = JSON.parse(val);
+          if (parsed && String(parsed.user_id) === String(userId)) {
+            return val;
+          } else {
+            localStorage.removeItem(k);
+          }
+        } catch (e) {
+          localStorage.removeItem(k);
+        }
+      }
     }
   }
 
@@ -46,8 +76,9 @@ const getCachedShift = (userId, terminalId) => {
 };
 
 const saveActiveShift = (shift, userId, terminalId) => {
-  const uId = userId || shift?.user_id;
-  const tId = terminalId || shift?.terminal_id;
+  // CRITICAL: A shift MUST strictly be saved under its actual owner (shift.user_id)
+  const uId = shift?.user_id || userId;
+  const tId = shift?.terminal_id || terminalId;
   if (uId && tId) {
     safeSetItem(`pos_active_shift_${uId}_${tId}`, JSON.stringify(shift));
   }
@@ -114,7 +145,13 @@ export const usePosShift = ({
         const k = localStorage.key(i);
         if (k && k.startsWith('pos_active_shift_') && k.endsWith(`_${terminalId}`)) {
           try {
+            const parts = k.split('_');
+            const expectedUserId = parts.length >= 5 ? parts[3] : null;
             const s = JSON.parse(localStorage.getItem(k));
+            if (s && expectedUserId && String(s.user_id) !== String(expectedUserId)) {
+              localStorage.removeItem(k);
+              continue;
+            }
             if (s && s.status === 'OPEN' && s.shift_name) {
               runningShiftsOnTerminal.push(s.shift_name);
             }
