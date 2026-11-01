@@ -1400,7 +1400,9 @@ class ReportPrintController extends Controller
             $query->where('session_number', 'like', "%{$searchQuery}%");
         }
         
-        $sessions = $query->orderBy('created_at', 'desc')->get();
+        $sessions = $query->with(['branch', 'rackSessions', 'items.product', 'items.rackSession.rack'])
+            ->orderBy('created_at', 'desc')
+            ->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
         $columns = ['No Sesi', 'Cabang', 'Tgl Opname', 'Status', 'Progress Hitung', 'Item Selisih', 'Nominal (+)', 'Nominal (-)'];
@@ -1417,41 +1419,9 @@ class ReportPrintController extends Controller
             $summary = $s->getProductSummary();
             $grandTotalItems += count($summary);
             
-            $totalNominalPlus = 0;
-            $totalNominalMinus = 0;
-            $stocks = [];
-            if ($s->branch_id) {
-                $productIds = $summary->pluck('product_id')->filter()->toArray();
-                if (!empty($productIds)) {
-                    $stocks = \App\Models\Stock::where('branch_id', $s->branch_id)
-                                ->whereIn('product_id', $productIds)
-                                ->with('product')
-                                ->get()
-                                ->keyBy('product_id');
-                }
-            }
-
-            foreach($summary as $prodSummary) {
-                $diff = $prodSummary['final_disc'];
-                if ($diff == 0) continue;
-                
-                $pid = $prodSummary['product_id'];
-                $price = 0;
-                if ($s->branch_id && isset($stocks[$pid])) {
-                    $st = $stocks[$pid];
-                    $price = $st->cost_price_tax > 0 ? $st->cost_price_tax : ($st->product->cost_price_tax ?? $st->product->cost_price ?? 0);
-                } else {
-                    $p = \App\Models\Product::find($pid);
-                    if ($p) {
-                        $price = $p->cost_price_tax ?? $p->cost_price ?? 0;
-                    }
-                }
-                if ($diff > 0) {
-                    $totalNominalPlus += ($diff * $price);
-                } else {
-                    $totalNominalMinus += (abs($diff) * $price);
-                }
-            }
+            $nominals = $s->getDiscrepancyNominals();
+            $totalNominalPlus = (float) ($nominals['plus'] ?? 0);
+            $totalNominalMinus = (float) ($nominals['minus'] ?? 0);
             
             $grandTotalPlus += $totalNominalPlus;
             $grandTotalMinus += $totalNominalMinus;
@@ -1508,7 +1478,7 @@ class ReportPrintController extends Controller
             });
         }
 
-        $items = $query->orderBy('created_at', 'desc')->get();
+        $items = $query->with(['product', 'session.branch', 'rackSession.rack'])->orderBy('created_at', 'desc')->get();
         $period = $this->getPeriodString($filters, 'date_filter');
 
         $columns = ['No Sesi', 'Cabang', 'Rak', 'SKU', 'Barcode', 'Barang', 'Stok Sistem', 'Mutasi SO', 'Hitung 1', 'Hitung 2', 'Akhir', 'S.Plus', 'Nom.Plus', 'S.Minus', 'Nom.Minus'];
@@ -1517,19 +1487,8 @@ class ReportPrintController extends Controller
         $grandTotalPlus = 0;
         $grandTotalMinus = 0;
         
-        // Eager load stocks if any branch opname exists in items
-        $branchIds = $items->pluck('session.branch_id')->filter()->unique()->toArray();
-        $productIds = $items->pluck('product_id')->filter()->unique()->toArray();
-        $stocks = [];
-        if (!empty($branchIds) && !empty($productIds)) {
-            $stocksList = \App\Models\Stock::whereIn('branch_id', $branchIds)
-                        ->whereIn('product_id', $productIds)
-                        ->with('product')
-                        ->get();
-            foreach ($stocksList as $st) {
-                $stocks[$st->branch_id . '-' . $st->product_id] = $st;
-            }
-        }
+        // Batch preload deltas from external logs and stock prices in 2 fast queries
+        \App\Models\StockOpnameItem::preloadDeltasAndPricesForItems($items);
         
         foreach ($items as $i) {
             $delta = (float) $i->delta_during_session;
@@ -1547,18 +1506,7 @@ class ReportPrintController extends Controller
             $nominalPlus = 0;
             $nominalMinus = 0;
             if ($selisih != 0) {
-                $price = 0;
-                if ($i->session && $i->session->branch_id) {
-                    $key = $i->session->branch_id . '-' . $i->product_id;
-                    if (isset($stocks[$key])) {
-                        $st = $stocks[$key];
-                        $price = $st->cost_price_tax > 0 ? $st->cost_price_tax : ($st->product->cost_price_tax ?? $st->product->cost_price ?? 0);
-                    } else {
-                        $price = $i->product->cost_price_tax ?? $i->product->cost_price ?? 0;
-                    }
-                } else {
-                    $price = $i->product->cost_price_tax ?? $i->product->cost_price ?? 0;
-                }
+                $price = $i->getCostPrice();
                 
                 if ($selisih > 0) {
                     $nominalPlus = $selisih * $price;

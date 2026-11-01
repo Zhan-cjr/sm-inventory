@@ -81,8 +81,9 @@ class StockOpnameSessionResource extends Resource
                         if (!$branchId) return [];
                         return StockOpnameRack::where('branch_id', $branchId)
                             ->where('is_active', true)
-                            ->pluck('rack_name', 'id')
-                            ->map(fn ($name, $id) => $name . ' (' . StockOpnameRack::find($id)?->rack_code . ')')
+                            ->select('id', 'rack_name', 'rack_code')
+                            ->get()
+                            ->mapWithKeys(fn ($r) => [$r->id => "{$r->rack_name} ({$r->rack_code})"])
                             ->toArray();
                     })
                     ->helperText('Pilih semua rak yang akan dihitung dalam sesi ini')

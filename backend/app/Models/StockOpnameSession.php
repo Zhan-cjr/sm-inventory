@@ -49,11 +49,19 @@ class StockOpnameSession extends Model
         return $this->hasMany(StockOpnameItem::class, 'session_id');
     }
 
+    protected ?\Illuminate\Support\Collection $memoizedProductSummary = null;
+    protected ?array $memoizedDiscrepancyNominals = null;
+
     /**
      * Progress penghitung 1: berapa rak sudah COUNT1_DONE
      */
     public function getCount1ProgressAttribute(): array
     {
+        if ($this->relationLoaded('rackSessions')) {
+            $total = $this->rackSessions->count();
+            $done  = $this->rackSessions->where('count1_status', 'DONE')->count();
+            return ['done' => $done, 'total' => $total];
+        }
         $total = $this->rackSessions()->count();
         $done  = $this->rackSessions()->where('count1_status', 'DONE')->count();
         return ['done' => $done, 'total' => $total];
@@ -64,6 +72,11 @@ class StockOpnameSession extends Model
      */
     public function getCount2ProgressAttribute(): array
     {
+        if ($this->relationLoaded('rackSessions')) {
+            $total = $this->rackSessions->count();
+            $done  = $this->rackSessions->where('count2_status', 'DONE')->count();
+            return ['done' => $done, 'total' => $total];
+        }
         $total = $this->rackSessions()->count();
         $done  = $this->rackSessions()->where('count2_status', 'DONE')->count();
         return ['done' => $done, 'total' => $total];
@@ -83,11 +96,15 @@ class StockOpnameSession extends Model
      */
     public function getProductSummary()
     {
+        if ($this->memoizedProductSummary !== null) {
+            return $this->memoizedProductSummary;
+        }
+
         $branchId = $this->branch_id;
-        $itemsGrouped = $this->items()
-            ->with(['product'])
-            ->get()
-            ->groupBy('product_id');
+        $itemsGrouped = ($this->relationLoaded('items')
+            ? $this->items
+            : $this->items()->with(['product', 'rackSession.rack'])->get()
+        )->groupBy('product_id');
 
         $existingProductIds = \App\Models\Stock::where('branch_id', $branchId)
             ->whereIn('product_id', $itemsGrouped->keys()->filter())
@@ -113,7 +130,7 @@ class StockOpnameSession extends Model
             ->get()
             ->groupBy('product_id');
 
-        return $itemsGrouped->map(function ($items, $pid) use ($existingProductIds, $externalLogs) {
+        return $this->memoizedProductSummary = $itemsGrouped->map(function ($items, $pid) use ($existingProductIds, $externalLogs) {
             $product    = $items->first()->product;
             $totalC1    = (float) $items->whereNotNull('count1_quantity')->sum('count1_quantity');
             $totalC2    = (float) $items->whereNotNull('count2_quantity')->sum('count2_quantity');
@@ -158,5 +175,59 @@ class StockOpnameSession extends Model
                 ]),
             ];
         });
+    }
+
+    /**
+     * Hitung total nominal selisih (+) dan (-) dalam 1 pass kalkulasi ter-memoize
+     */
+    public function getDiscrepancyNominals(): array
+    {
+        if ($this->memoizedDiscrepancyNominals !== null) {
+            return $this->memoizedDiscrepancyNominals;
+        }
+
+        $summary = $this->getProductSummary();
+        $totalPlus = 0.0;
+        $totalMinus = 0.0;
+
+        $stocks = [];
+        if ($this->branch_id) {
+            $productIds = $summary->pluck('product_id')->filter()->toArray();
+            if (!empty($productIds)) {
+                $stocks = \App\Models\Stock::where('branch_id', $this->branch_id)
+                    ->whereIn('product_id', $productIds)
+                    ->with('product')
+                    ->get()
+                    ->keyBy('product_id');
+            }
+        }
+
+        foreach ($summary as $prodSummary) {
+            $diff = (float) $prodSummary['final_disc'];
+            if ($diff == 0.0) continue;
+
+            $pid = $prodSummary['product_id'];
+            $price = 0.0;
+            if ($this->branch_id && isset($stocks[$pid])) {
+                $st = $stocks[$pid];
+                $price = (float) ($st->cost_price_tax > 0 ? $st->cost_price_tax : ($st->product->cost_price_tax ?? $st->product->cost_price ?? 0));
+            } else {
+                $p = \App\Models\Product::find($pid);
+                if ($p) {
+                    $price = (float) ($p->cost_price_tax ?? $p->cost_price ?? 0);
+                }
+            }
+
+            if ($diff > 0) {
+                $totalPlus += ($diff * $price);
+            } else {
+                $totalMinus += (abs($diff) * $price);
+            }
+        }
+
+        return $this->memoizedDiscrepancyNominals = [
+            'plus' => $totalPlus > 0 ? $totalPlus : null,
+            'minus' => $totalMinus > 0 ? $totalMinus : null,
+        ];
     }
 }

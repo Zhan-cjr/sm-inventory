@@ -70,22 +70,27 @@ class LaporanShiftKasir extends Page implements HasTable
                 TextColumn::make('total_sales')
                     ->label('Pendapatan')
                     ->money('IDR', true)
-                    ->state(fn (Shift $record): float => (float) (
-                        $record->transactions()->where('is_voided', false)->sum('final_amount')
-                        - $record->transactions()->where('is_voided', false)->get()->sum(function ($tx) {
-                            $pointPayment = 0.0;
-                            if (!empty($tx->payment_details)) {
-                                $details = $tx->payment_details;
-                                if (is_string($details)) $details = json_decode($details, true);
-                                if (is_array($details)) {
-                                    $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+                    ->state(function (Shift $record): float {
+                        if ($record->status === 'CLOSED') {
+                            return (float) (($record->total_cash_sales ?? 0) + ($record->total_card_sales ?? 0) + ($record->total_voucher_sales ?? 0));
+                        }
+                        return (float) (
+                            $record->transactions()->where('is_voided', false)->sum('final_amount')
+                            - $record->transactions()->where('is_voided', false)->get()->sum(function ($tx) {
+                                $pointPayment = 0.0;
+                                if (!empty($tx->payment_details)) {
+                                    $details = $tx->payment_details;
+                                    if (is_string($details)) $details = json_decode($details, true);
+                                    if (is_array($details)) {
+                                        $pointPayment = (float) collect($details)->where('method', 'POINT')->sum('amount');
+                                    }
+                                } elseif (strtoupper($tx->payment_method) === 'POINT') {
+                                    $pointPayment = (float) $tx->final_amount;
                                 }
-                            } elseif (strtoupper($tx->payment_method) === 'POINT') {
-                                $pointPayment = (float) $tx->final_amount;
-                            }
-                            return $pointPayment;
-                        })
-                    )),
+                                return $pointPayment;
+                            })
+                        );
+                    }),
                 TextColumn::make('expected_ending_cash')
                     ->label('Kas Harapan')
                     ->money('IDR', true)

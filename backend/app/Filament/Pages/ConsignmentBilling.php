@@ -128,59 +128,111 @@ class ConsignmentBilling extends Page implements HasForms
 
         $data = [];
         $totalTagihan = 0;
+        $productIds = $products->pluck('id')->toArray();
+
+        if (empty($productIds)) {
+            $this->reportData = [];
+            $this->grandTotalTagihan = 0;
+            return;
+        }
+
+        // 1. Batch load Penerimaan
+        $receivedMap = GoodsReceiptItem::join('goods_receipts', 'goods_receipt_items.goods_receipt_id', '=', 'goods_receipts.id')
+            ->whereIn('goods_receipt_items.product_id', $productIds)
+            ->where('goods_receipts.branch_id', $this->branch_id)
+            ->whereBetween('goods_receipts.receipt_date', [$this->start_date, $this->end_date])
+            ->groupBy('goods_receipt_items.product_id')
+            ->select('goods_receipt_items.product_id', \Illuminate\Support\Facades\DB::raw('SUM(goods_receipt_items.quantity_received) as total_qty'))
+            ->pluck('total_qty', 'product_id');
+
+        // 2. Batch load Terjual POS di Periode Tersebut
+        $soldMap = TransactionItem::join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            ->whereIn('transaction_items.product_id', $productIds)
+            ->where('transactions.branch_id', $this->branch_id)
+            ->where('transactions.is_voided', false)
+            ->whereBetween('transactions.transaction_date', [$this->start_date . ' 00:00:00', $this->end_date . ' 23:59:59'])
+            ->groupBy('transaction_items.product_id')
+            ->select('transaction_items.product_id', \Illuminate\Support\Facades\DB::raw('SUM(transaction_items.quantity) as total_qty'))
+            ->pluck('total_qty', 'product_id');
+
+        // 3. Batch load Retur Beli
+        $returnedMap = PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+            ->whereIn('purchase_return_items.product_id', $productIds)
+            ->where('purchase_returns.branch_id', $this->branch_id)
+            ->whereBetween('purchase_returns.return_date', [$this->start_date, $this->end_date])
+            ->groupBy('purchase_return_items.product_id')
+            ->select('purchase_return_items.product_id', \Illuminate\Support\Facades\DB::raw('SUM(purchase_return_items.quantity) as total_qty'))
+            ->pluck('total_qty', 'product_id');
+
+        // 4. Batch load Unbilled POS Items
+        $allUnbilledPosItems = TransactionItem::join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+            ->whereIn('transaction_items.product_id', $productIds)
+            ->where('transactions.branch_id', $this->branch_id)
+            ->whereNull('transaction_items.kontrabon_id')
+            ->where('transactions.is_voided', false)
+            ->where('transactions.transaction_date', '<=', $this->end_date . ' 23:59:59')
+            ->select('transaction_items.id', 'transaction_items.product_id', 'transaction_items.quantity')
+            ->get()
+            ->groupBy('product_id');
+
+        $posItemIds = $allUnbilledPosItems->flatten(1)->pluck('id')->filter()->toArray();
+        $posBatchCogsMap = [];
+        if (!empty($posItemIds)) {
+            $posBatchCogsMap = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+                ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+                ->whereIn('sbd.transaction_item_id', $posItemIds)
+                ->groupBy('sbd.transaction_item_id')
+                ->select('sbd.transaction_item_id', \Illuminate\Support\Facades\DB::raw('SUM(sbd.quantity * sb.cost_price) as total_cogs'))
+                ->pluck('total_cogs', 'transaction_item_id')
+                ->toArray();
+        }
+
+        // 5. Batch load Unbilled Ecommerce Items
+        $allUnbilledEcomItems = \App\Models\EcommerceOrderItem::join('ecommerce_orders', 'ecommerce_order_items.ecommerce_order_id', '=', 'ecommerce_orders.id')
+            ->whereIn('ecommerce_order_items.product_id', $productIds)
+            ->where('ecommerce_orders.branch_id', $this->branch_id)
+            ->whereNull('ecommerce_order_items.kontrabon_id')
+            ->where('ecommerce_orders.status', 'COMPLETED')
+            ->where('ecommerce_orders.created_at', '<=', $this->end_date . ' 23:59:59')
+            ->select('ecommerce_order_items.id', 'ecommerce_order_items.product_id', 'ecommerce_order_items.quantity')
+            ->get()
+            ->groupBy('product_id');
+
+        $ecomItemIds = $allUnbilledEcomItems->flatten(1)->pluck('id')->filter()->toArray();
+        $ecomBatchCogsMap = [];
+        if (!empty($ecomItemIds)) {
+            $ecomBatchCogsMap = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+                ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+                ->whereIn('sbd.ecommerce_order_item_id', $ecomItemIds)
+                ->groupBy('sbd.ecommerce_order_item_id')
+                ->select('sbd.ecommerce_order_item_id', \Illuminate\Support\Facades\DB::raw('SUM(sbd.quantity * sb.cost_price) as total_cogs'))
+                ->pluck('total_cogs', 'ecommerce_order_item_id')
+                ->toArray();
+        }
+
+        // 6. Batch load Stocks
+        $stockMap = \App\Models\Stock::whereIn('product_id', $productIds)
+            ->where('branch_id', $this->branch_id)
+            ->get()
+            ->keyBy('product_id');
 
         foreach ($products as $product) {
-            // 1. Penerimaan
-            $received = GoodsReceiptItem::join('goods_receipts', 'goods_receipt_items.goods_receipt_id', '=', 'goods_receipts.id')
-                ->where('goods_receipt_items.product_id', $product->id)
-                ->where('goods_receipts.branch_id', $this->branch_id)
-                ->whereBetween('goods_receipts.receipt_date', [$this->start_date, $this->end_date])
-                ->sum('goods_receipt_items.quantity_received');
+            $received = (float) ($receivedMap[$product->id] ?? 0);
+            $soldQty = (float) ($soldMap[$product->id] ?? 0);
+            $returned = (float) ($returnedMap[$product->id] ?? 0);
 
-            // 2. Terjual di Periode Tersebut
-            $soldQty = TransactionItem::join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-                ->where('transaction_items.product_id', $product->id)
-                ->where('transactions.branch_id', $this->branch_id)
-                ->where('transactions.is_voided', false)
-                ->whereBetween('transactions.transaction_date', [$this->start_date . ' 00:00:00', $this->end_date . ' 23:59:59'])
-                ->sum('transaction_items.quantity');
-            
-            // 3. Retur Beli (Ke Supplier)
-            $returned = PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
-                ->where('purchase_return_items.product_id', $product->id)
-                ->where('purchase_returns.branch_id', $this->branch_id)
-                ->whereBetween('purchase_returns.return_date', [$this->start_date, $this->end_date])
-                ->sum('purchase_return_items.quantity');
+            $unbilledPosItems = $allUnbilledPosItems->get($product->id, collect());
+            $unbilledSold = (float) $unbilledPosItems->sum('quantity');
 
-            // 4. Hitung Unbilled Sold (Belum Pernah Ditagih sampai Cut-Off)
-            $unbilledPosItems = TransactionItem::join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-                ->where('transaction_items.product_id', $product->id)
-                ->where('transactions.branch_id', $this->branch_id)
-                ->whereNull('transaction_items.kontrabon_id')
-                ->where('transactions.is_voided', false)
-                ->where('transactions.transaction_date', '<=', $this->end_date . ' 23:59:59')
-                ->select('transaction_items.*')
-                ->get();
+            $unbilledEcomItems = $allUnbilledEcomItems->get($product->id, collect());
+            $unbilledEcommerceSold = (float) $unbilledEcomItems->sum('quantity');
 
-            $unbilledSold = $unbilledPosItems->sum('quantity');
-                
-            $unbilledEcomItems = \App\Models\EcommerceOrderItem::join('ecommerce_orders', 'ecommerce_order_items.ecommerce_order_id', '=', 'ecommerce_orders.id')
-                ->where('ecommerce_order_items.product_id', $product->id)
-                ->where('ecommerce_orders.branch_id', $this->branch_id)
-                ->whereNull('ecommerce_order_items.kontrabon_id')
-                ->where('ecommerce_orders.status', 'COMPLETED')
-                ->where('ecommerce_orders.created_at', '<=', $this->end_date . ' 23:59:59')
-                ->select('ecommerce_order_items.*')
-                ->get();
-                
-            $unbilledEcommerceSold = $unbilledEcomItems->sum('quantity');
-                
             $soldQty += $unbilledEcommerceSold; // Add to display total sold
             $unbilledSold += $unbilledEcommerceSold; // Add to unbilled calculation
 
             // Tagihan dihitung berdasarkan HPP dari Batch
             $amountOwed = 0;
-            $stock = \App\Models\Stock::where('product_id', $product->id)->where('branch_id', $this->branch_id)->first();
+            $stock = $stockMap->get($product->id);
             // Prioritas fallback jika transaksi tidak memiliki potongan batch FIFO: HPP dari Stok Cabang
             if ($stock && (float) $stock->cost_price > 0) {
                 $fallbackPrice = (float) (!$product->is_taxable 
@@ -194,10 +246,7 @@ class ConsignmentBilling extends Page implements HasForms
             }
 
             foreach ($unbilledPosItems as $item) {
-                $batchCogs = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
-                    ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
-                    ->where('sbd.transaction_item_id', $item->id)
-                    ->sum(\Illuminate\Support\Facades\DB::raw('sbd.quantity * sb.cost_price'));
+                $batchCogs = (float) ($posBatchCogsMap[$item->id] ?? 0);
 
                 if ($item->quantity > 0) {
                     $amountOwed += $batchCogs > 0 ? $batchCogs : ($item->quantity * $fallbackPrice);
@@ -208,10 +257,7 @@ class ConsignmentBilling extends Page implements HasForms
             }
 
             foreach ($unbilledEcomItems as $item) {
-                $batchCogs = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
-                    ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
-                    ->where('sbd.ecommerce_order_item_id', $item->id)
-                    ->sum(\Illuminate\Support\Facades\DB::raw('sbd.quantity * sb.cost_price'));
+                $batchCogs = (float) ($ecomBatchCogsMap[$item->id] ?? 0);
 
                 if ($item->quantity > 0) {
                     $amountOwed += $batchCogs > 0 ? $batchCogs : ($item->quantity * $fallbackPrice);

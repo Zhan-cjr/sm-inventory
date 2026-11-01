@@ -33,7 +33,7 @@ class LaporanStokOpnameRingkas extends Page implements HasTable
             ->query(
                 StockOpnameSession::query()
                     ->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id))
-                    ->with(['branch', 'creator', 'approver'])
+                    ->with(['branch', 'creator', 'approver', 'rackSessions', 'items.product', 'items.rackSession.rack'])
             )
             ->columns([
                 TextColumn::make('session_number')
@@ -73,79 +73,11 @@ class LaporanStokOpnameRingkas extends Page implements HasTable
                 TextColumn::make('nominal_plus')
                     ->label('Total Nominal (+)')
                     ->money('IDR', true)
-                    ->state(function (StockOpnameSession $record) {
-                        $summary = $record->getProductSummary();
-                        $totalNominal = 0;
-                        
-                        $stocks = [];
-                        if ($record->branch_id) {
-                            $productIds = $summary->pluck('product_id')->filter()->toArray();
-                            if (!empty($productIds)) {
-                                $stocks = \App\Models\Stock::where('branch_id', $record->branch_id)
-                                            ->whereIn('product_id', $productIds)
-                                            ->with('product')
-                                            ->get()
-                                            ->keyBy('product_id');
-                            }
-                        }
-
-                        foreach($summary as $prodSummary) {
-                            $diff = $prodSummary['final_disc'];
-                            if ($diff <= 0) continue;
-                            
-                            $pid = $prodSummary['product_id'];
-                            $price = 0;
-                            if ($record->branch_id && isset($stocks[$pid])) {
-                                $st = $stocks[$pid];
-                                $price = $st->cost_price_tax > 0 ? $st->cost_price_tax : ($st->product->cost_price_tax ?? $st->product->cost_price ?? 0);
-                            } else {
-                                $p = \App\Models\Product::find($pid);
-                                if ($p) {
-                                    $price = $p->cost_price_tax ?? $p->cost_price ?? 0;
-                                }
-                            }
-                            $totalNominal += ($diff * $price);
-                        }
-                        return $totalNominal > 0 ? $totalNominal : null;
-                    }),
+                    ->state(fn (StockOpnameSession $record) => $record->getDiscrepancyNominals()['plus']),
                 TextColumn::make('nominal_minus')
                     ->label('Total Nominal (-)')
                     ->money('IDR', true)
-                    ->state(function (StockOpnameSession $record) {
-                        $summary = $record->getProductSummary();
-                        $totalNominal = 0;
-                        
-                        $stocks = [];
-                        if ($record->branch_id) {
-                            $productIds = $summary->pluck('product_id')->filter()->toArray();
-                            if (!empty($productIds)) {
-                                $stocks = \App\Models\Stock::where('branch_id', $record->branch_id)
-                                            ->whereIn('product_id', $productIds)
-                                            ->with('product')
-                                            ->get()
-                                            ->keyBy('product_id');
-                            }
-                        }
-
-                        foreach($summary as $prodSummary) {
-                            $diff = $prodSummary['final_disc'];
-                            if ($diff >= 0) continue;
-                            
-                            $pid = $prodSummary['product_id'];
-                            $price = 0;
-                            if ($record->branch_id && isset($stocks[$pid])) {
-                                $st = $stocks[$pid];
-                                $price = $st->cost_price_tax > 0 ? $st->cost_price_tax : ($st->product->cost_price_tax ?? $st->product->cost_price ?? 0);
-                            } else {
-                                $p = \App\Models\Product::find($pid);
-                                if ($p) {
-                                    $price = $p->cost_price_tax ?? $p->cost_price ?? 0;
-                                }
-                            }
-                            $totalNominal += (abs($diff) * $price);
-                        }
-                        return $totalNominal > 0 ? $totalNominal : null;
-                    }),
+                    ->state(fn (StockOpnameSession $record) => $record->getDiscrepancyNominals()['minus']),
                 TextColumn::make('creator.name')
                     ->label('Dibuat Oleh')
                     ->toggleable(isToggledHiddenByDefault: true),

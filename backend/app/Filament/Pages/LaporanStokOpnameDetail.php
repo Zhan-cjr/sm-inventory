@@ -122,18 +122,7 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                         $diff = $qty - $sys;
                         if ($diff <= 0) return null;
 
-                        $price = 0;
-                        if ($record->session && $record->session->branch_id) {
-                            $stock = \App\Models\Stock::where('product_id', $record->product_id)
-                                        ->where('branch_id', $record->session->branch_id)->first();
-                            if ($stock) {
-                                $price = $stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->product->cost_price_tax ?? $stock->product->cost_price ?? 0);
-                            } else {
-                                $price = $record->product->cost_price_tax ?? $record->product->cost_price ?? 0;
-                            }
-                        } else {
-                            $price = $record->product->cost_price_tax ?? $record->product->cost_price ?? 0;
-                        }
+                        $price = $record->getCostPrice();
                         return $diff * $price;
                     }),
                 TextColumn::make('selisih_minus')
@@ -165,18 +154,7 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                         $diff = $qty - $sys;
                         if ($diff >= 0) return null;
 
-                        $price = 0;
-                        if ($record->session && $record->session->branch_id) {
-                            $stock = \App\Models\Stock::where('product_id', $record->product_id)
-                                        ->where('branch_id', $record->session->branch_id)->first();
-                            if ($stock) {
-                                $price = $stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->product->cost_price_tax ?? $stock->product->cost_price ?? 0);
-                            } else {
-                                $price = $record->product->cost_price_tax ?? $record->product->cost_price ?? 0;
-                            }
-                        } else {
-                            $price = $record->product->cost_price_tax ?? $record->product->cost_price ?? 0;
-                        }
+                        $price = $record->getCostPrice();
                         return abs($diff) * $price;
                     }),
             ])
@@ -227,5 +205,12 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                 ->button()
             ])
             ->defaultSort('created_at', 'desc');
+    }
+
+    public function getTableRecords(): \Illuminate\Support\Collection|\Illuminate\Contracts\Pagination\Paginator|\Illuminate\Contracts\Pagination\CursorPaginator
+    {
+        $records = parent::getTableRecords();
+        StockOpnameItem::preloadDeltasAndPricesForItems($records);
+        return $records;
     }
 }

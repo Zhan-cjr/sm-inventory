@@ -109,6 +109,8 @@ class StockOpnameItem extends Model
     }
 
     protected ?float $memoizedDelta = null;
+    protected static array $deltaCache = [];
+    protected static array $stockPriceCache = [];
 
     /**
      * Menghitung mutasi eksternal (penjualan kasir, penerimaan, dll.)
@@ -124,10 +126,15 @@ class StockOpnameItem extends Model
             return $this->memoizedDelta = 0.0;
         }
 
+        $cacheKey = $this->session_id . '_' . $this->product_id;
+        if (isset(static::$deltaCache[$cacheKey])) {
+            return $this->memoizedDelta = static::$deltaCache[$cacheKey];
+        }
+
         $start = $this->session->created_at;
         $end = $this->session->completed_at ?? now();
 
-        return $this->memoizedDelta = (float) \App\Models\InventoryLog::where('branch_id', $this->session->branch_id)
+        $delta = (float) \App\Models\InventoryLog::where('branch_id', $this->session->branch_id)
             ->where('product_id', $this->product_id)
             ->whereBetween('created_at', [$start, $end])
             ->where(function ($q) {
@@ -139,6 +146,111 @@ class StockOpnameItem extends Model
                   ->orWhere('reason_code', '!=', 'STOCK_OPNAME');
             })
             ->sum('quantity_change');
+
+        return $this->memoizedDelta = (static::$deltaCache[$cacheKey] = $delta);
+    }
+
+    /**
+     * Ambil HPP produk untuk sesi opname (dengan in-memory caching)
+     */
+    public function getCostPrice(): float
+    {
+        $branchId = $this->session?->branch_id;
+        $productId = $this->product_id;
+        if (!$productId) return 0.0;
+
+        $cacheKey = ($branchId ?? 'nobranch') . '_' . $productId;
+        if (isset(static::$stockPriceCache[$cacheKey])) {
+            return static::$stockPriceCache[$cacheKey];
+        }
+
+        if ($branchId) {
+            $stock = \App\Models\Stock::where('product_id', $productId)
+                ->where('branch_id', $branchId)
+                ->with('product')
+                ->first();
+            if ($stock) {
+                $price = (float) ($stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->product->cost_price_tax ?? $stock->product->cost_price ?? 0));
+                return static::$stockPriceCache[$cacheKey] = $price;
+            }
+        }
+
+        $price = (float) ($this->product?->cost_price_tax ?? $this->product?->cost_price ?? 0);
+        return static::$stockPriceCache[$cacheKey] = $price;
+    }
+
+    /**
+     * Batch preload deltas dan stock prices untuk sekumpulan item SO sekaligus (1-2 query saja)
+     */
+    public static function preloadDeltasAndPricesForItems($items): void
+    {
+        if (empty($items)) return;
+
+        // 1. Group items by session to preload external logs (deltas)
+        $sessionGroups = collect($items)->groupBy('session_id');
+        foreach ($sessionGroups as $sessionId => $groupItems) {
+            $firstItem = $groupItems->first();
+            $session = $firstItem->session;
+            if (!$session || !$session->branch_id) continue;
+
+            $pids = $groupItems->pluck('product_id')->filter()->unique()->values()->all();
+            $unloadedPids = array_filter($pids, fn ($pid) => !isset(static::$deltaCache[$sessionId . '_' . $pid]));
+
+            if (!empty($unloadedPids)) {
+                $start = $session->created_at;
+                $end = $session->completed_at ?? now();
+
+                $logs = \App\Models\InventoryLog::where('branch_id', $session->branch_id)
+                    ->whereIn('product_id', $unloadedPids)
+                    ->whereBetween('created_at', [$start, $end])
+                    ->where(function ($q) {
+                        $q->whereNull('reference_doc_type')
+                          ->orWhere('reference_doc_type', '!=', 'STOCK_OPNAME');
+                    })
+                    ->where(function ($q) {
+                        $q->whereNull('reason_code')
+                          ->orWhere('reason_code', '!=', 'STOCK_OPNAME');
+                    })
+                    ->groupBy('product_id')
+                    ->select('product_id', \Illuminate\Support\Facades\DB::raw('SUM(quantity_change) as total_change'))
+                    ->pluck('total_change', 'product_id');
+
+                foreach ($unloadedPids as $pid) {
+                    static::$deltaCache[$sessionId . '_' . $pid] = (float) ($logs[$pid] ?? 0.0);
+                }
+            }
+        }
+
+        // 2. Preload stock prices for all branch-product pairs
+        $branchProductPairs = [];
+        foreach ($items as $item) {
+            $branchId = $item->session?->branch_id;
+            $pid = $item->product_id;
+            if ($branchId && $pid && !isset(static::$stockPriceCache[$branchId . '_' . $pid])) {
+                $branchProductPairs[$branchId][] = $pid;
+            }
+        }
+
+        foreach ($branchProductPairs as $bId => $pids) {
+            $uniquePids = array_unique($pids);
+            $stocks = \App\Models\Stock::where('branch_id', $bId)
+                ->whereIn('product_id', $uniquePids)
+                ->with('product')
+                ->get();
+
+            foreach ($stocks as $st) {
+                $price = (float) ($st->cost_price_tax > 0 ? $st->cost_price_tax : ($st->product->cost_price_tax ?? $st->product->cost_price ?? 0));
+                static::$stockPriceCache[$bId . '_' . $st->product_id] = $price;
+            }
+
+            foreach ($uniquePids as $pid) {
+                if (!isset(static::$stockPriceCache[$bId . '_' . $pid])) {
+                    $item = collect($items)->firstWhere('product_id', $pid);
+                    $price = (float) ($item?->product?->cost_price_tax ?? $item?->product?->cost_price ?? 0);
+                    static::$stockPriceCache[$bId . '_' . $pid] = $price;
+                }
+            }
+        }
     }
 
     /**
