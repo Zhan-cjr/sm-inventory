@@ -33,6 +33,8 @@ class StockQuarantineAuditPos extends Component
     public $totalCost = 0;
     public $totalItemsCount = 0;
 
+    public $totalExpectedBsItems = 0;
+
     public function mount()
     {
         $this->audit_number = 'AUD-BS-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -4));
@@ -41,12 +43,33 @@ class StockQuarantineAuditPos extends Component
         $userBranchId = Auth::user()?->branch_id;
         $this->branch_id = $userBranchId ?: Branch::where('is_active', true)->first()?->id;
 
-        $this->loadBranchBsItems();
+        // Default: Tabel KOSONG agar pengguna bebas melakukan scan fisik barang per barang
+        $this->items = [];
+        $this->refreshExpectedCount();
+        $this->calculateTotals();
     }
 
-    public function loadBranchBsItems()
+    public function refreshExpectedCount()
+    {
+        if (empty($this->branch_id)) {
+            $this->totalExpectedBsItems = 0;
+            return;
+        }
+
+        $this->totalExpectedBsItems = Stock::where('branch_id', $this->branch_id)
+            ->where('quantity_damaged', '>', 0)
+            ->count();
+    }
+
+    public function updatedBranchId($value)
     {
         $this->items = [];
+        $this->refreshExpectedCount();
+        $this->calculateTotals();
+    }
+
+    public function loadAllBranchBsItems()
+    {
         if (empty($this->branch_id)) return;
 
         $stocks = Stock::where('branch_id', $this->branch_id)
@@ -54,6 +77,7 @@ class StockQuarantineAuditPos extends Component
             ->with(['product'])
             ->get();
 
+        $this->items = [];
         foreach ($stocks as $stock) {
             if (!$stock->product) continue;
 
@@ -68,20 +92,16 @@ class StockQuarantineAuditPos extends Component
                 'unit'           => $stock->product->unit_of_measure ?? 'PCS',
                 'cost_price'     => $cost,
                 'system_damaged' => $sys,
-                'actual_damaged' => $sys, // Default match, operator can edit discrepancy
+                'actual_damaged' => $sys,
                 'discrepancy'    => 0,
                 'total_cost'     => 0,
-                'action'         => 'NONE', // NONE, WRITE_OFF_DISPOSAL, RESTORE_TO_SALABLE, ADJUST_INCREASE
+                'action'         => 'NONE',
                 'notes'          => '',
             ];
         }
 
         $this->calculateTotals();
-    }
-
-    public function updatedBranchId($value)
-    {
-        $this->loadBranchBsItems();
+        Notification::make()->title("Memuat {$this->totalItemsCount} produk BS dari sistem.")->info()->send();
     }
 
     public function updatedSearchQuery($value)
@@ -95,8 +115,21 @@ class StockQuarantineAuditPos extends Component
         if (strlen($trimmed) >= 1) {
             $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $trimmed);
 
-            $this->searchResults = Product::query()
-                ->select('products.id', 'products.name', 'products.barcode', 'products.sku', 'products.unit_of_measure', 'products.cost_price_tax', 'products.cost_price')
+            $products = Product::query()
+                ->select(
+                    'products.id',
+                    'products.name',
+                    'products.barcode',
+                    'products.sku',
+                    'products.unit_of_measure',
+                    'products.cost_price_tax',
+                    'products.cost_price',
+                    'stocks.quantity_damaged'
+                )
+                ->leftJoin('stocks', function ($join) {
+                    $join->on('stocks.product_id', '=', 'products.id')
+                         ->where('stocks.branch_id', '=', $this->branch_id);
+                })
                 ->where('products.is_active', true)
                 ->where(function ($q) use ($trimmed, $escaped) {
                     $q->where('products.barcode', $trimmed)
@@ -106,32 +139,104 @@ class StockQuarantineAuditPos extends Component
                       ->orWhere('products.sku', 'like', "%{$escaped}%")
                       ->orWhere('products.name', 'like', "%{$escaped}%");
                 })
+                ->orderByRaw("
+                    CASE 
+                        WHEN products.barcode = ? OR products.sku = ? THEN 1
+                        WHEN products.barcode LIKE ? OR products.sku LIKE ? THEN 2
+                        WHEN products.name LIKE ? THEN 3
+                        ELSE 4
+                    END
+                ", [$trimmed, $trimmed, "{$escaped}%", "{$escaped}%", "{$escaped}%"])
+                ->orderByRaw('COALESCE(stocks.quantity_damaged, 0) DESC')
                 ->take(15)
-                ->get()
-                ->toArray();
+                ->get();
+
+            $formatted = [];
+            foreach ($products as $p) {
+                $formatted[] = [
+                    'id'               => $p->id,
+                    'name'             => $p->name,
+                    'barcode'          => $p->barcode,
+                    'sku'              => $p->sku,
+                    'unit_of_measure'  => $p->unit_of_measure ?? 'PCS',
+                    'cost_price_tax'   => $p->cost_price_tax,
+                    'cost_price'       => $p->cost_price,
+                    'quantity_damaged' => (float)($p->quantity_damaged ?? 0),
+                ];
+            }
+
+            $this->searchResults = $formatted;
+
+            // Jika scan barcode exact match (1 hasil persis dengan barcode)
+            if (count($formatted) === 1 && ($formatted[0]['barcode'] === $trimmed || $formatted[0]['sku'] === $trimmed)) {
+                $this->selectProduct($formatted[0]['id']);
+            }
         } else {
             $this->searchResults = [];
         }
     }
 
-    public function addProductFromSearch($productId)
+    public function handleScanEnter()
     {
-        // Check if already in items
-        foreach ($this->items as $item) {
+        $trimmed = trim((string)$this->searchQuery);
+        if (empty($trimmed)) return;
+
+        if (empty($this->searchResults)) {
+            $this->updatedSearchQuery($trimmed);
+        }
+
+        if (count($this->searchResults) === 1) {
+            $this->selectProduct($this->searchResults[0]['id']);
+        } elseif (count($this->searchResults) > 1) {
+            foreach ($this->searchResults as $res) {
+                if ($res['barcode'] === $trimmed || $res['sku'] === $trimmed) {
+                    $this->selectProduct($res['id']);
+                    return;
+                }
+            }
+            // Pilih hasil pertama
+            $this->selectProduct($this->searchResults[0]['id']);
+        }
+    }
+
+    public function selectProduct($productId)
+    {
+        $targetIndex = null;
+
+        // Cek jika produk sudah ada di tabel
+        foreach ($this->items as $idx => $item) {
             if ($item['product_id'] === $productId) {
-                Notification::make()->title('Produk sudah ada di daftar audit!')->warning()->send();
-                $this->searchQuery = '';
-                $this->searchResults = [];
-                return;
+                $targetIndex = $idx;
+                break;
             }
         }
 
+        if ($targetIndex !== null) {
+            // Sudah ada di tabel: fokuskan ke baris tersebut
+            $this->searchQuery = '';
+            $this->searchResults = [];
+            $this->dispatch('focus-row-actual', index: $targetIndex);
+            return;
+        }
+
+        // Jika belum ada di tabel, tambahkan baris baru
         $product = Product::find($productId);
         if (!$product) return;
 
         $stock = Stock::where('branch_id', $this->branch_id)->where('product_id', $productId)->first();
         $sys = $stock ? (float)($stock->quantity_damaged ?? 0) : 0;
         $cost = $stock ? (float)($stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->cost_price ?: 0)) : (float)($product->cost_price ?? 0);
+
+        // Kuantitas awal fisik 1 saat pertama kali discan
+        $initialActual = 1.0;
+        $diff = $initialActual - $sys;
+
+        $action = 'NONE';
+        if ($diff < 0) {
+            $action = 'WRITE_OFF_DISPOSAL';
+        } elseif ($diff > 0) {
+            $action = 'ADJUST_INCREASE';
+        }
 
         $this->items[] = [
             'product_id'     => $product->id,
@@ -141,18 +246,21 @@ class StockQuarantineAuditPos extends Component
             'unit'           => $product->unit_of_measure ?? 'PCS',
             'cost_price'     => $cost,
             'system_damaged' => $sys,
-            'actual_damaged' => 1,
-            'discrepancy'    => 1 - $sys,
-            'total_cost'     => (1 - $sys) * $cost,
-            'action'         => 'ADJUST_INCREASE',
-            'notes'          => 'Ditemukan di keranjang BS (belum tercatat)',
+            'actual_damaged' => $initialActual,
+            'discrepancy'    => $diff,
+            'total_cost'     => $diff * $cost,
+            'action'         => $action,
+            'notes'          => '',
         ];
+
+        $targetIndex = count($this->items) - 1;
 
         $this->searchQuery = '';
         $this->searchResults = [];
         $this->calculateTotals();
 
-        Notification::make()->title("{$product->name} ditambahkan ke audit BS.")->success()->send();
+        // Otomatis arahkan kursor ke input qty baris tersebut
+        $this->dispatch('focus-row-actual', index: $targetIndex);
     }
 
     public function updateActual($index, $val)
@@ -169,7 +277,6 @@ class StockQuarantineAuditPos extends Component
         $cost = (float)$this->items[$index]['cost_price'];
         $this->items[$index]['total_cost'] = $diff * $cost;
 
-        // Auto action based on discrepancy
         if ($diff < 0) {
             $this->items[$index]['action'] = 'WRITE_OFF_DISPOSAL';
         } elseif ($diff > 0) {
@@ -188,6 +295,21 @@ class StockQuarantineAuditPos extends Component
         }
     }
 
+    public function removeItem($index)
+    {
+        if (isset($this->items[$index])) {
+            unset($this->items[$index]);
+            $this->items = array_values($this->items);
+            $this->calculateTotals();
+        }
+    }
+
+    public function clearTable()
+    {
+        $this->items = [];
+        $this->calculateTotals();
+    }
+
     public function markAllMatch()
     {
         foreach ($this->items as $i => $item) {
@@ -197,7 +319,7 @@ class StockQuarantineAuditPos extends Component
             $this->items[$i]['action'] = 'NONE';
         }
         $this->calculateTotals();
-        Notification::make()->title('Semua fisik disamakan dengan saldo sistem BS.')->info()->send();
+        Notification::make()->title('Semua fisik pada tabel disamakan dengan saldo sistem BS.')->info()->send();
     }
 
     public function calculateTotals()
@@ -217,7 +339,7 @@ class StockQuarantineAuditPos extends Component
         }
 
         if (empty($this->items)) {
-            Notification::make()->title('Tidak ada barang di keranjang BS untuk diaudit!')->warning()->send();
+            Notification::make()->title('Tabel audit masih kosong! Silakan scan atau masukkan barang terlebih dahulu.')->warning()->send();
             return;
         }
 
@@ -226,6 +348,48 @@ class StockQuarantineAuditPos extends Component
             $userId = Auth::id() ?: 1;
             $userOrgId = Auth::user()?->organization_id;
 
+            // 1. Ambil seluruh barang di cabang ini yang punya quantity_damaged > 0
+            $existingDamagedStocks = Stock::where('branch_id', $this->branch_id)
+                ->where('quantity_damaged', '>', 0)
+                ->with('product')
+                ->get()
+                ->keyBy('product_id');
+
+            $scannedProductIds = collect($this->items)->pluck('product_id')->toArray();
+
+            // 2. Jika ada barang di sistem BS yang TIDAK discan oleh user,
+            // berarti barang tersebut memang tidak ada di keranjang BS (Fisik = 0 -> Hilang / Dibuang)
+            $finalAuditItems = $this->items;
+            foreach ($existingDamagedStocks as $pid => $stock) {
+                if (!in_array($pid, $scannedProductIds)) {
+                    $cost = (float)($stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->cost_price ?: ($stock->product->cost_price ?? 0)));
+                    $sys = (float)$stock->quantity_damaged;
+                    $diff = -$sys; // Fisik 0 - sistem = minus
+
+                    $finalAuditItems[] = [
+                        'product_id'     => $pid,
+                        'name'           => $stock->product->name,
+                        'barcode'        => $stock->product->barcode,
+                        'sku'            => $stock->product->sku,
+                        'unit'           => $stock->product->unit_of_measure ?? 'PCS',
+                        'cost_price'     => $cost,
+                        'system_damaged' => $sys,
+                        'actual_damaged' => 0.0,
+                        'discrepancy'    => $diff,
+                        'total_cost'     => $diff * $cost,
+                        'action'         => 'WRITE_OFF_DISPOSAL',
+                        'notes'          => 'Tidak ditemukan di keranjang fisik BS (Pemusnahan/Hilang)',
+                    ];
+                }
+            }
+
+            // Hitung total final
+            $finalTotalSystem = array_sum(array_column($finalAuditItems, 'system_damaged'));
+            $finalTotalActual = array_sum(array_column($finalAuditItems, 'actual_damaged'));
+            $finalTotalDisc = array_sum(array_column($finalAuditItems, 'discrepancy'));
+            $finalTotalCost = array_sum(array_column($finalAuditItems, 'total_cost'));
+
+            // 3. Simpan Header Audit
             $audit = StockQuarantineAudit::create([
                 'id'                    => Str::uuid()->toString(),
                 'organization_id'       => $userOrgId,
@@ -233,22 +397,22 @@ class StockQuarantineAuditPos extends Component
                 'audit_number'          => $this->audit_number,
                 'audit_date'            => $this->audit_date,
                 'status'                => 'COMPLETED',
-                'total_system_damaged'  => $this->totalSystem,
-                'total_actual_damaged'  => $this->totalActual,
-                'total_discrepancy_qty' => $this->totalDiscrepancy,
-                'total_discrepancy_cost'=> abs($this->totalCost),
+                'total_system_damaged'  => $finalTotalSystem,
+                'total_actual_damaged'  => $finalTotalActual,
+                'total_discrepancy_qty' => $finalTotalDisc,
+                'total_discrepancy_cost'=> abs($finalTotalCost),
                 'notes'                 => $this->notes ?: 'Audit Berkala Keranjang BS',
                 'audited_by'            => $userId,
                 'approved_by'           => $userId,
                 'completed_at'          => now(),
             ]);
 
-            foreach ($this->items as $item) {
+            // 4. Simpan Items & Lakukan Penyesuaian
+            foreach ($finalAuditItems as $item) {
                 $diff = (float)$item['discrepancy'];
                 $action = $item['action'];
                 $productId = $item['product_id'];
 
-                // Save Audit Item
                 StockQuarantineAuditItem::create([
                     'id'                 => Str::uuid()->toString(),
                     'audit_id'           => $audit->id,
@@ -262,7 +426,6 @@ class StockQuarantineAuditPos extends Component
                     'notes'              => $item['notes'] ?: null,
                 ]);
 
-                // Apply Stock Adjustments based on Action
                 if ($action === 'WRITE_OFF_DISPOSAL' && $diff < 0) {
                     $qtyToCut = abs($diff);
                     $stock = Stock::where('branch_id', $this->branch_id)->where('product_id', $productId)->first();
