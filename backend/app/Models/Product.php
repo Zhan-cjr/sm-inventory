@@ -73,8 +73,7 @@ class Product extends Model
                     ->where(function ($q) use ($primaryBarcode) {
                         $q->where('barcode', $primaryBarcode)
                           ->orWhere('sku', $primaryBarcode)
-                          ->orWhereJsonContains('metadata->additional_barcodes', $primaryBarcode)
-                          ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $primaryBarcode . '%');
+                          ->orWhereJsonContains('metadata->additional_barcodes', $primaryBarcode);
                     })->first();
 
                 if ($exists) {
@@ -112,8 +111,7 @@ class Product extends Model
                         ->where(function ($q) use ($code) {
                             $q->where('barcode', $code)
                               ->orWhere('sku', $code)
-                              ->orWhereJsonContains('metadata->additional_barcodes', $code)
-                              ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $code . '%');
+                              ->orWhereJsonContains('metadata->additional_barcodes', $code);
                         })->first();
 
                     if ($exists) {

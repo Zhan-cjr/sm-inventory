@@ -11,3 +11,4 @@ class CreateStockQuarantineAudit extends CreateRecord
     protected string $view = 'filament.resources.stock-quarantine-audits.pages.pos-view';
     protected static ?string $title = 'Pemeriksaan & Audit Keranjang BS';
 }
+

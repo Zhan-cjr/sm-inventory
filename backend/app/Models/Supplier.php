@@ -22,6 +22,27 @@ class Supplier extends Model
         'gr_requires_po' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (Supplier $supplier) {
+            if (empty($supplier->code)) {
+                $dateCode = now()->format('dmy');
+                $maxCode = static::where('code', 'like', "SUP-{$dateCode}%")
+                    ->orderBy('code', 'desc')
+                    ->value('code');
+
+                if ($maxCode && preg_match('/(\d{3})$/', $maxCode, $m)) {
+                    $lastSequence = (int) $m[1];
+                    $nextSequence = str_pad($lastSequence + 1, 3, '0', STR_PAD_LEFT);
+                } else {
+                    $nextSequence = '001';
+                }
+
+                $supplier->code = "SUP-{$dateCode}{$nextSequence}";
+            }
+        });
+    }
+
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);

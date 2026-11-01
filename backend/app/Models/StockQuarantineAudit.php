@@ -58,3 +58,4 @@ class StockQuarantineAudit extends Model
         return $this->hasMany(StockQuarantineAuditItem::class, 'audit_id');
     }
 }
+

@@ -18,3 +18,4 @@ class ViewPromotion extends ViewRecord
         ];
     }
 }
+

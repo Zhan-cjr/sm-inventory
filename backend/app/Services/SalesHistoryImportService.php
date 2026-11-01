@@ -36,8 +36,8 @@ class SalesHistoryImportService
     {
         $files = is_array($filePaths) ? $filePaths : [$filePaths];
 
-        // Eager load product lookup map: barcode -> Product, sku -> Product
-        $products = Product::select('id', 'name', 'barcode', 'sku')->get();
+        // Eager load product lookup map: barcode -> Product, sku -> Product, metadata -> Product
+        $products = Product::select('id', 'name', 'barcode', 'sku', 'metadata')->get();
         $barcodeMap = [];
         $skuMap = [];
 
@@ -47,6 +47,19 @@ class SalesHistoryImportService
             }
             if (!empty($p->sku)) {
                 $skuMap[trim((string)$p->sku)] = $p;
+            }
+            // Check metadata additional_barcodes
+            $meta = $p->metadata;
+            if (is_array($meta) && !empty($meta['additional_barcodes'])) {
+                $additional = is_array($meta['additional_barcodes']) 
+                    ? $meta['additional_barcodes'] 
+                    : explode(',', (string)$meta['additional_barcodes']);
+                foreach ($additional as $addBc) {
+                    $addBc = trim((string)$addBc);
+                    if (!empty($addBc) && !isset($barcodeMap[$addBc])) {
+                        $barcodeMap[$addBc] = $p;
+                    }
+                }
             }
         }
 
@@ -264,13 +277,22 @@ class SalesHistoryImportService
                 break;
             }
 
+            // Skip non-product lines (headers, store titles, report metadata)
+            if (preg_match('/^(selamat|jl\.|rekapitulasi|periode|lokasi|dicetak|kd\s*brg|barcode)/i', $skuVal) ||
+                preg_match('/^(selamat|jl\.|rekapitulasi|periode|lokasi|dicetak|kd\s*brg|barcode)/i', $nameVal)) {
+                continue;
+            }
+
             $totalRows++;
             $qty = $this->sanitizeQty($qtyRaw);
 
-            // Attempt match by Barcode first, then by SKU
+            // Attempt match by Barcode first, then by SKU, then normalized
             $matchedProduct = null;
+            $cleanBc = rtrim($barcodeVal, '.');
             if (!empty($barcodeVal) && isset($barcodeMap[$barcodeVal])) {
                 $matchedProduct = $barcodeMap[$barcodeVal];
+            } elseif (!empty($cleanBc) && isset($barcodeMap[$cleanBc])) {
+                $matchedProduct = $barcodeMap[$cleanBc];
             } elseif (!empty($skuVal) && isset($skuMap[$skuVal])) {
                 $matchedProduct = $skuMap[$skuVal];
             } elseif (!empty($barcodeVal)) {

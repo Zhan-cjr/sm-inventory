@@ -90,8 +90,7 @@ class ProductForm
                                             ->where(function ($q) use ($code) {
                                                 $q->where('barcode', $code)
                                                   ->orWhere('sku', $code)
-                                                  ->orWhereJsonContains('metadata->additional_barcodes', $code)
-                                                  ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $code . '%');
+                                                  ->orWhereJsonContains('metadata->additional_barcodes', $code);
                                             })->first();
 
                                         if ($exists) {
@@ -140,8 +139,7 @@ class ProductForm
                                                 ->where(function ($q) use ($code) {
                                                     $q->where('barcode', $code)
                                                       ->orWhere('sku', $code)
-                                                      ->orWhereJsonContains('metadata->additional_barcodes', $code)
-                                                      ->orWhere('metadata->additional_barcodes', 'LIKE', '%' . $code . '%');
+                                                      ->orWhereJsonContains('metadata->additional_barcodes', $code);
                                                 })->first();
 
                                             if ($exists) {
