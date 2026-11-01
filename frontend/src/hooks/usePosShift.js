@@ -116,7 +116,22 @@ export const usePosShift = ({
     }
   })();
 
-  const [activeShift, setActiveShift] = useState(null);
+  const [activeShift, setActiveShift] = useState(() => {
+    try {
+      const uId = user?.id || JSON.parse(localStorage.getItem('pos_user'))?.id;
+      const tId = terminalInfo?.id || localStorage.getItem('pos_terminal_id');
+      if (uId) {
+        const cached = getCachedShift(uId, tId);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && String(parsed.user_id) === String(uId)) {
+            return parsed;
+          }
+        }
+      }
+    } catch (e) {}
+    return null;
+  });
   const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
   const [startingCash, setStartingCash] = useState('');
@@ -125,7 +140,15 @@ export const usePosShift = ({
   const validInitialShift = (initialShift === 'Shift 1' || initialShift === 'Shift 2') ? initialShift : 'Shift 1';
   const [selectedShiftName, setSelectedShiftName] = useState(validInitialShift);
   const [closedShiftsToday, setClosedShiftsToday] = useState([]);
-  const [isCheckingShift, setIsCheckingShift] = useState(true);
+  const [isCheckingShift, setIsCheckingShift] = useState(() => {
+    if (!navigator.onLine) return false;
+    try {
+      const uId = user?.id || JSON.parse(localStorage.getItem('pos_user'))?.id;
+      const tId = terminalInfo?.id || localStorage.getItem('pos_terminal_id');
+      if (uId && getCachedShift(uId, tId)) return false;
+    } catch (e) {}
+    return true;
+  });
   const [lockScreenInfo, setLockScreenInfo] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -177,12 +200,64 @@ export const usePosShift = ({
 
   const checkActiveShift = useCallback((terminalId) => {
     if (!terminalId) return;
-    setIsCheckingShift(true);
+
+    const resolvedUserId = user?.id || currentUserId || (() => {
+      try {
+        return JSON.parse(localStorage.getItem('pos_user'))?.id;
+      } catch {
+        return null;
+      }
+    })();
+
+    // 1. FAST PATH: Check offline cache immediately
+    const cachedShift = getCachedShift(resolvedUserId, terminalId);
+    let parsedCached = null;
+    if (cachedShift) {
+      try {
+        const parsed = JSON.parse(cachedShift);
+        if (parsed && String(parsed.user_id) === String(resolvedUserId) && (!parsed.terminal_id || parsed.terminal_id === terminalId)) {
+          parsedCached = parsed;
+          setActiveShift(parsed);
+        }
+      } catch (e) {}
+    }
+
+    // Completely offline: resolve synchronously with zero network lag
+    if (!navigator.onLine) {
+      setIsCheckingShift(false);
+      setLockScreenInfo(null);
+      if (parsedCached) {
+        const shiftDate = parsedCached.start_time ? new Date(parsedCached.start_time).toDateString() : null;
+        const todayDate = new Date().toDateString();
+        if (shiftDate && shiftDate !== todayDate) {
+          setLockScreenInfo({
+            status: 'CROSS_DAY_SHIFT_EXPIRED',
+            message: `Peringatan: Shift ${parsedCached.shift_name} (Offline) dibuka pada tanggal kemarin dan belum ditutup! Anda wajib menutup shift kemarin terlebih dahulu sebelum membuka shift hari ini.`,
+            shift: parsedCached
+          });
+        }
+      } else {
+        setActiveShift(null);
+        triggerOpenShiftModalOffline(terminalId);
+      }
+      return;
+    }
+
+    // Online check: query backend with 2000ms timeout
+    if (!parsedCached) {
+      setIsCheckingShift(true);
+    }
     setLockScreenInfo(null);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
     fetch(`/api/v1/shifts/active?terminal_id=${terminalId}`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
+      headers: { 'Authorization': `Bearer ${authToken}` },
+      signal: controller.signal
     })
       .then(res => {
+        clearTimeout(timeoutId);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       })
@@ -228,53 +303,36 @@ export const usePosShift = ({
         }
       })
       .catch(err => {
-        console.error('Failed to check shift:', err);
-        const resolvedUserId = user?.id || currentUserId || (() => {
-          try {
-            return JSON.parse(localStorage.getItem('pos_user'))?.id;
-          } catch {
-            return null;
-          }
-        })();
+        clearTimeout(timeoutId);
+        console.warn('Failed to check shift online, falling back to cache:', err.message);
 
-        const cachedShift = getCachedShift(resolvedUserId, terminalId);
-        if (cachedShift) {
-          try {
-            const parsed = JSON.parse(cachedShift);
-            // Strict check: verified cashier ownership of this shift
-            if (parsed && String(parsed.user_id) === String(resolvedUserId) && (!parsed.terminal_id || parsed.terminal_id === terminalId)) {
-              // Cek tanggal shift offline apakah lintas hari
-              const shiftDate = parsed.start_time ? new Date(parsed.start_time).toDateString() : null;
-              const todayDate = new Date().toDateString();
-              if (shiftDate && shiftDate !== todayDate) {
-                setActiveShift(parsed);
-                setLockScreenInfo({
-                  status: 'CROSS_DAY_SHIFT_EXPIRED',
-                  message: `Peringatan: Shift ${parsed.shift_name} (Offline) dibuka pada tanggal kemarin dan belum ditutup! Anda wajib menutup shift kemarin terlebih dahulu sebelum membuka shift hari ini.`,
-                  shift: parsed
-                });
-                return;
-              }
-
-              setActiveShift(parsed);
-              setAlertMsg({
-                text: `Melanjutkan ${parsed.shift_name} (Offline) yang belum ditutup. Harap tutup shift ini jika ingin membuka shift baru.`,
-                type: 'info',
-                persist: true
-              });
-              setTimeout(() => setAlertMsg(null), 7000);
-            } else {
-              triggerOpenShiftModalOffline(terminalId);
-            }
-          } catch {
-            triggerOpenShiftModalOffline(terminalId);
+        if (parsedCached) {
+          const shiftDate = parsedCached.start_time ? new Date(parsedCached.start_time).toDateString() : null;
+          const todayDate = new Date().toDateString();
+          if (shiftDate && shiftDate !== todayDate) {
+            setActiveShift(parsedCached);
+            setLockScreenInfo({
+              status: 'CROSS_DAY_SHIFT_EXPIRED',
+              message: `Peringatan: Shift ${parsedCached.shift_name} (Offline) dibuka pada tanggal kemarin dan belum ditutup! Anda wajib menutup shift kemarin terlebih dahulu sebelum membuka shift hari ini.`,
+              shift: parsedCached
+            });
+            return;
           }
+
+          setActiveShift(parsedCached);
+          setAlertMsg({
+            text: `Melanjutkan ${parsedCached.shift_name} (Offline) yang belum ditutup. Harap tutup shift ini jika ingin membuka shift baru.`,
+            type: 'info',
+            persist: true
+          });
+          setTimeout(() => setAlertMsg(null), 7000);
         } else {
+          setActiveShift(null);
           triggerOpenShiftModalOffline(terminalId);
         }
       })
       .finally(() => setIsCheckingShift(false));
-  }, [authToken, currentUserId, setAlertMsg, triggerOpenShiftModalOffline]);
+  }, [authToken, currentUserId, setAlertMsg, triggerOpenShiftModalOffline, user]);
 
   // Sync offline active shift to server when back online
   useEffect(() => {

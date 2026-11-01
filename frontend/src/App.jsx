@@ -53,8 +53,23 @@ function App() {
 
   // States for Device Authorization
   const [deviceUuid, setDeviceUuid] = useState(localStorage.getItem('pos_device_uuid') || null);
-  const [deviceStatus, setDeviceStatus] = useState('checking'); // checking, pending, blocked, approved
-  const [deviceInfo, setDeviceInfo] = useState(null); // { branchId, branchName, terminalId, terminalName }
+  const [deviceStatus, setDeviceStatus] = useState(() => {
+    const cached = localStorage.getItem('pos_device_status');
+    return cached === 'APPROVED' ? 'approved' : (cached === 'BLOCKED' ? 'blocked' : 'checking');
+  });
+  const [deviceInfo, setDeviceInfo] = useState(() => {
+    if (localStorage.getItem('pos_device_status') === 'APPROVED') {
+      return {
+        branchId: localStorage.getItem('pos_device_branch_id'),
+        branchName: localStorage.getItem('pos_device_branch_name'),
+        branchCode: localStorage.getItem('pos_device_branch_code'),
+        branchAddress: localStorage.getItem('pos_device_branch_address') || '',
+        terminalId: localStorage.getItem('pos_device_terminal_id'),
+        terminalName: localStorage.getItem('pos_device_terminal_name')
+      };
+    }
+    return null;
+  });
   const [deviceError, setDeviceError] = useState(null); // Branch mismatch error messages
   const [copied, setCopied] = useState(false);
 
@@ -82,15 +97,36 @@ function App() {
     }
 
     const performHandshake = async () => {
+      if (!navigator.onLine) {
+        const cachedStatus = localStorage.getItem('pos_device_status');
+        if (cachedStatus === 'APPROVED') {
+          setDeviceStatus('approved');
+          setDeviceInfo({
+            branchId: localStorage.getItem('pos_device_branch_id'),
+            branchName: localStorage.getItem('pos_device_branch_name'),
+            branchCode: localStorage.getItem('pos_device_branch_code'),
+            branchAddress: localStorage.getItem('pos_device_branch_address') || '',
+            terminalId: localStorage.getItem('pos_device_terminal_id'),
+            terminalName: localStorage.getItem('pos_device_terminal_name')
+          });
+          return;
+        }
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
       try {
         const response = await fetch('/api/v1/devices/handshake', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             device_uuid: activeUuid,
             name: 'Kasir ' + (navigator.platform || 'Desktop')
           })
         });
+        clearTimeout(timeoutId);
 
         const data = await response.json();
         if (data.status === 'APPROVED') {
@@ -121,6 +157,7 @@ function App() {
           setTimeout(performHandshake, 8000);
         }
       } catch (error) {
+        clearTimeout(timeoutId);
         console.warn('Handshake failed, trying offline cache fallback:', error);
         const cachedStatus = localStorage.getItem('pos_device_status');
         if (cachedStatus === 'APPROVED') {
@@ -151,10 +188,17 @@ function App() {
   // Fetch /api/v1/user on token change to sync profile
   useEffect(() => {
     if (token && !user?.organization_name && deviceStatus === 'approved') {
+      if (!navigator.onLine) return;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
       fetch('/api/v1/user', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal: controller.signal
       })
         .then(res => {
+          clearTimeout(timeoutId);
           if (res.status === 401) {
             handleLogout();
             throw new Error('Session expired');
@@ -175,6 +219,7 @@ function App() {
           }
         })
         .catch(err => {
+          clearTimeout(timeoutId);
           console.warn('Failed to refresh user profile:', err.message);
         });
     }

@@ -145,24 +145,55 @@ export const usePosCatalog = ({
 
   // --- Initial & Periodic Catalog Synchronization ---
   useEffect(() => {
-    fetch('/api/v1/server-time', {
-      headers: { Authorization: `Bearer ${authToken}` }
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
+    if (navigator.onLine) {
+      const timeController = new AbortController();
+      const timeTimeoutId = setTimeout(() => timeController.abort(), 2000);
+      fetch('/api/v1/server-time', {
+        headers: { Authorization: `Bearer ${authToken}` },
+        signal: timeController.signal
       })
-      .then((data) => {
-        const serverMs = data.timestamp;
-        const clientMs = Date.now();
-        const offset = serverMs - clientMs;
-        setServerOffset(offset);
-        safeSetItem('pos_server_offset', offset.toString());
-        safeSetItem('pos_last_sync_time', serverMs.toString());
-      })
-      .catch((err) => console.error('Failed to sync server time:', err));
+        .then((res) => {
+          clearTimeout(timeTimeoutId);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then((data) => {
+          const serverMs = data.timestamp;
+          const clientMs = Date.now();
+          const offset = serverMs - clientMs;
+          setServerOffset(offset);
+          safeSetItem('pos_server_offset', offset.toString());
+          safeSetItem('pos_last_sync_time', serverMs.toString());
+        })
+        .catch((err) => {
+          clearTimeout(timeTimeoutId);
+          console.warn('Failed to sync server time:', err.message);
+        });
+    }
 
     const fetchCatalog = () => {
+      if (!navigator.onLine) {
+        idbCache.get('pos_cached_products').then((parsed) => {
+          if (parsed && Array.isArray(parsed)) {
+            setDbProducts((prev) => {
+              const services = prev.filter((p) => p.is_service);
+              return [...parsed, ...services];
+            });
+          }
+        }).catch(() => {});
+        const cachedPromos = localStorage.getItem('pos_cached_promotions');
+        if (cachedPromos) {
+          try {
+            const parsed = JSON.parse(cachedPromos);
+            setDbPromos(parsed);
+            if (discountEngine?.current) {
+              discountEngine.current = new DiscountEngine(parsed);
+            }
+          } catch (e) {}
+        }
+        return;
+      }
+
       fetch('/api/v1/products', {
         headers: { Authorization: `Bearer ${authToken}` }
       })
@@ -218,9 +249,10 @@ export const usePosCatalog = ({
           }
         });
 
-      fetch('/api/v1/banks', {
-        headers: { Authorization: `Bearer ${authToken}` }
-      })
+      if (navigator.onLine) {
+        fetch('/api/v1/banks', {
+          headers: { Authorization: `Bearer ${authToken}` }
+        })
         .then((res) => {
           if (!res.ok) throw new Error('HTTP ' + res.status);
           return res.json();
@@ -386,6 +418,7 @@ export const usePosCatalog = ({
             } catch (e) {}
           }
         });
+      }
     };
 
     fetchCatalog();
@@ -393,111 +426,125 @@ export const usePosCatalog = ({
       if (navigator.onLine) fetchCatalog();
     }, 60000); // 1 menit
 
-    fetch(`/api/v1/terminals?branch_id=${branchId}`, {
-      headers: { Authorization: `Bearer ${authToken}` }
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then((data) => {
-        setAllTerminals(data);
-        safeSetItem('pos_cached_terminals', JSON.stringify(data));
-
-        // Force bind locked terminal properties on startup if present
-        let activeTerminalId = lockedTerminalId || localStorage.getItem('pos_terminal_id');
-        if (lockedTerminalId) {
-          safeSetItem('pos_terminal_id', lockedTerminalId);
-          if (lockedTerminalName) safeSetItem('pos_terminal_name', lockedTerminalName);
-          safeSetItem('pos_terminal_branch_id', branchId);
-          safeSetItem('pos_terminal_branch_name', branchName);
+    const loadTerminalsFromCache = () => {
+      const cachedTerminals = localStorage.getItem('pos_cached_terminals');
+      let terminals = [];
+      if (cachedTerminals) {
+        try {
+          terminals = JSON.parse(cachedTerminals);
+          setAllTerminals(terminals);
+        } catch (e) {
+          console.error('Failed to parse cached terminals:', e);
         }
+      }
 
-        if (activeTerminalId) {
-          const terminal = data.find((t) => t.id === activeTerminalId);
-          if (terminal) {
-            setTerminalInfo(terminal);
-            checkActiveShift(activeTerminalId);
-          } else {
-            // Mismatch: previously saved terminal belongs to another branch!
-            if (userRole !== 'ADMIN') {
-              localStorage.removeItem('pos_terminal_id');
-              localStorage.removeItem('pos_terminal_name');
-              localStorage.removeItem('pos_terminal_branch_id');
-              localStorage.removeItem('pos_active_shift');
-              setBranchMismatchInfo({
-                userBranch: branchName || 'Cabang Anda',
-                terminalBranch: 'Cabang Terminal Lain'
-              });
-              setIsCheckingShift(false);
-            } else {
+      // Force bind locked terminal properties offline if present
+      let activeTerminalId = lockedTerminalId || localStorage.getItem('pos_terminal_id');
+      if (lockedTerminalId) {
+        safeSetItem('pos_terminal_id', lockedTerminalId);
+        if (lockedTerminalName) safeSetItem('pos_terminal_name', lockedTerminalName);
+        safeSetItem('pos_terminal_branch_id', branchId);
+        safeSetItem('pos_terminal_branch_name', branchName);
+      }
+
+      const terminalBranchId = localStorage.getItem('pos_terminal_branch_id');
+
+      // Check for offline branch mismatch (skip validation if locked by backend)
+      if (
+        !lockedTerminalId &&
+        activeTerminalId &&
+        terminalBranchId &&
+        terminalBranchId !== branchId &&
+        userRole !== 'ADMIN'
+      ) {
+        localStorage.removeItem('pos_terminal_id');
+        localStorage.removeItem('pos_terminal_name');
+        localStorage.removeItem('pos_terminal_branch_id');
+        localStorage.removeItem('pos_active_shift');
+        setBranchMismatchInfo({
+          userBranch: branchName || 'Cabang Anda',
+          terminalBranch: 'Cabang Terminal Lain'
+        });
+        setIsCheckingShift(false);
+        return;
+      }
+
+      if (activeTerminalId) {
+        const terminal = terminals.find((t) => t.id === activeTerminalId);
+        if (terminal) setTerminalInfo(terminal);
+
+        // Restore cached shift via isolated checkActiveShift
+        checkActiveShift(activeTerminalId);
+      } else {
+        if (terminals.length > 0) {
+          setIsTerminalModalOpen(true);
+        }
+      }
+      setIsCheckingShift(false);
+    };
+
+    if (!navigator.onLine) {
+      loadTerminalsFromCache();
+    } else {
+      const termController = new AbortController();
+      const termTimeoutId = setTimeout(() => termController.abort(), 2000);
+
+      fetch(`/api/v1/terminals?branch_id=${branchId}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+        signal: termController.signal
+      })
+        .then((res) => {
+          clearTimeout(termTimeoutId);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then((data) => {
+          setAllTerminals(data);
+          safeSetItem('pos_cached_terminals', JSON.stringify(data));
+
+          // Force bind locked terminal properties on startup if present
+          let activeTerminalId = lockedTerminalId || localStorage.getItem('pos_terminal_id');
+          if (lockedTerminalId) {
+            safeSetItem('pos_terminal_id', lockedTerminalId);
+            if (lockedTerminalName) safeSetItem('pos_terminal_name', lockedTerminalName);
+            safeSetItem('pos_terminal_branch_id', branchId);
+            safeSetItem('pos_terminal_branch_name', branchName);
+          }
+
+          if (activeTerminalId) {
+            const terminal = data.find((t) => t.id === activeTerminalId);
+            if (terminal) {
+              setTerminalInfo(terminal);
               checkActiveShift(activeTerminalId);
+            } else {
+              // Mismatch: previously saved terminal belongs to another branch!
+              if (userRole !== 'ADMIN') {
+                localStorage.removeItem('pos_terminal_id');
+                localStorage.removeItem('pos_terminal_name');
+                localStorage.removeItem('pos_terminal_branch_id');
+                localStorage.removeItem('pos_active_shift');
+                setBranchMismatchInfo({
+                  userBranch: branchName || 'Cabang Anda',
+                  terminalBranch: 'Cabang Terminal Lain'
+                });
+                setIsCheckingShift(false);
+              } else {
+                checkActiveShift(activeTerminalId);
+              }
+            }
+          } else {
+            setIsCheckingShift(false);
+            if (data.length > 0) {
+              setIsTerminalModalOpen(true);
             }
           }
-        } else {
-          setIsCheckingShift(false);
-          if (data.length > 0) {
-            setIsTerminalModalOpen(true);
-          }
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load terminals:', err);
-        const cachedTerminals = localStorage.getItem('pos_cached_terminals');
-        let terminals = [];
-        if (cachedTerminals) {
-          try {
-            terminals = JSON.parse(cachedTerminals);
-            setAllTerminals(terminals);
-          } catch (e) {
-            console.error('Failed to parse cached terminals:', e);
-          }
-        }
-
-        // Force bind locked terminal properties offline if present
-        let activeTerminalId = lockedTerminalId || localStorage.getItem('pos_terminal_id');
-        if (lockedTerminalId) {
-          safeSetItem('pos_terminal_id', lockedTerminalId);
-          if (lockedTerminalName) safeSetItem('pos_terminal_name', lockedTerminalName);
-          safeSetItem('pos_terminal_branch_id', branchId);
-          safeSetItem('pos_terminal_branch_name', branchName);
-        }
-
-        const terminalBranchId = localStorage.getItem('pos_terminal_branch_id');
-
-        // Check for offline branch mismatch (skip validation if locked by backend)
-        if (
-          !lockedTerminalId &&
-          activeTerminalId &&
-          terminalBranchId &&
-          terminalBranchId !== branchId &&
-          userRole !== 'ADMIN'
-        ) {
-          localStorage.removeItem('pos_terminal_id');
-          localStorage.removeItem('pos_terminal_name');
-          localStorage.removeItem('pos_terminal_branch_id');
-          localStorage.removeItem('pos_active_shift');
-          setBranchMismatchInfo({
-            userBranch: branchName || 'Cabang Anda',
-            terminalBranch: 'Cabang Terminal Lain'
-          });
-          setIsCheckingShift(false);
-          return;
-        }
-
-        if (activeTerminalId) {
-          const terminal = terminals.find((t) => t.id === activeTerminalId);
-          if (terminal) setTerminalInfo(terminal);
-
-          // Restore cached shift via isolated checkActiveShift
-          checkActiveShift(activeTerminalId);
-        } else {
-          if (terminals.length > 0) {
-            setIsTerminalModalOpen(true);
-          }
-        }
-        setIsCheckingShift(false);
-      });
+        })
+        .catch((err) => {
+          clearTimeout(termTimeoutId);
+          console.warn('Failed to load terminals online, using cache:', err.message);
+          loadTerminalsFromCache();
+        });
+    }
 
     return () => clearInterval(catalogTimer);
   }, [authToken, branchId]);

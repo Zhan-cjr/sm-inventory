@@ -38,14 +38,19 @@ export const Login = ({ onLoginSuccess }) => {
 
       if (!isOffline) {
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
+
           res = await fetch('/api/v1/login', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json'
             },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password }),
+            signal: controller.signal
           });
+          clearTimeout(timeoutId);
           
           if (!res.ok && res.status >= 500) {
             // Cloudflare (530, 521, etc) atau server error -> anggap offline
