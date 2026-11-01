@@ -19,7 +19,21 @@ class PromotionPolicy
 
     public function view(AuthUser $authUser, Promotion $promotion): bool
     {
-        return $authUser->can('View:Promotion');
+        if (!$authUser->can('View:Promotion')) {
+            return false;
+        }
+
+        // Jika user adalah User Cabang (memiliki branch_id)
+        if ($authUser->branch_id !== null) {
+            $branchCount = $promotion->branches()->count();
+            // Promo all-branches (0 cabang terdaftar) -> boleh dilihat
+            // Promo dengan target cabang -> harus mencakup cabang user
+            if ($branchCount > 0 && !$promotion->branches()->where('branches.id', $authUser->branch_id)->exists()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function create(AuthUser $authUser): bool
@@ -29,12 +43,54 @@ class PromotionPolicy
 
     public function update(AuthUser $authUser, Promotion $promotion): bool
     {
-        return $authUser->can('Update:Promotion');
+        if (!$authUser->can('Update:Promotion')) {
+            return false;
+        }
+
+        // Jika user adalah User Cabang (memiliki branch_id)
+        if ($authUser->branch_id !== null) {
+            $branchCount = $promotion->branches()->count();
+            // 1. Promo Nasional (berlaku di semua cabang / 0 pivot) -> Cabang DILARANG edit
+            if ($branchCount === 0) {
+                return false;
+            }
+            // 2. Promo bukan milik cabang ini -> Cabang DILARANG edit
+            if (!$promotion->branches()->where('branches.id', $authUser->branch_id)->exists()) {
+                return false;
+            }
+            // 3. Promo multi-cabang (dibuat pusat untuk beberapa cabang pilihan) -> Cabang DILARANG edit
+            if ($branchCount > 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function delete(AuthUser $authUser, Promotion $promotion): bool
     {
-        return $authUser->can('Delete:Promotion');
+        if (!$authUser->can('Delete:Promotion')) {
+            return false;
+        }
+
+        // Jika user adalah User Cabang (memiliki branch_id)
+        if ($authUser->branch_id !== null) {
+            $branchCount = $promotion->branches()->count();
+            // 1. Promo Nasional -> Cabang DILARANG hapus
+            if ($branchCount === 0) {
+                return false;
+            }
+            // 2. Promo bukan milik cabang ini -> Cabang DILARANG hapus
+            if (!$promotion->branches()->where('branches.id', $authUser->branch_id)->exists()) {
+                return false;
+            }
+            // 3. Promo multi-cabang -> Cabang DILARANG hapus
+            if ($branchCount > 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function deleteAny(AuthUser $authUser): bool

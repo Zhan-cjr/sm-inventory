@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\Promotions\Tables;
 
+use App\Models\Promotion;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -121,12 +123,27 @@ class PromotionsTable
                     ->label('Berlaku Sampai')
                     ->dateTime()
                     ->sortable(),
+                TextColumn::make('scope_type')
+                    ->label('Tingkat Promo')
+                    ->state(function (Promotion $record) {
+                        $count = $record->branches()->count();
+                        if ($count === 0) {
+                            return 'Pusat (Nasional)';
+                        }
+                        return $count === 1 ? 'Lokal Cabang' : 'Multi Cabang';
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Pusat (Nasional)' => 'info',
+                        'Lokal Cabang' => 'success',
+                        default => 'warning',
+                    }),
                 TextColumn::make('branches.name')
                     ->label('Berlaku di Cabang')
                     ->badge()
                     ->separator(',')
                     ->searchable()
-                    ->placeholder('Semua Cabang / Tidak Ditentukan'),
+                    ->placeholder('Semua Cabang (Nasional)'),
                 TextColumn::make('max_discount_per_transaction')
                     ->label('Maksimal Diskon')
                     ->money('IDR')
@@ -162,7 +179,9 @@ class PromotionsTable
                 //
             ])
             ->recordActions([
-                EditAction::make(),
+                ViewAction::make(),
+                EditAction::make()
+                    ->visible(fn (Promotion $record) => auth()->user()?->can('update', $record)),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

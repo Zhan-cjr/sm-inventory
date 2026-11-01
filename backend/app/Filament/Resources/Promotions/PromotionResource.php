@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Promotions;
 use App\Filament\Resources\Promotions\Pages\CreatePromotion;
 use App\Filament\Resources\Promotions\Pages\EditPromotion;
 use App\Filament\Resources\Promotions\Pages\ListPromotions;
+use App\Filament\Resources\Promotions\Pages\ViewPromotion;
 use App\Filament\Resources\Promotions\Schemas\PromotionForm;
 use App\Filament\Resources\Promotions\Tables\PromotionsTable;
 use App\Models\Promotion;
@@ -40,6 +41,24 @@ class PromotionResource extends Resource
         return PromotionsTable::configure($table);
     }
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        // User Cabang: Hanya melihat promosi cabangnya sendiri ATAU promosi nasional (semua cabang)
+        if ($user && $user->branch_id) {
+            $userBranchId = $user->branch_id;
+            $query->where(function ($q) use ($userBranchId) {
+                $q->whereHas('branches', function ($bq) use ($userBranchId) {
+                    $bq->where('branches.id', $userBranchId);
+                })->orWhereDoesntHave('branches');
+            });
+        }
+
+        return $query;
+    }
+
     public static function getRelations(): array
     {
         return [
@@ -52,6 +71,7 @@ class PromotionResource extends Resource
         return [
             'index' => ListPromotions::route('/'),
             'create' => CreatePromotion::route('/create'),
+            'view' => ViewPromotion::route('/{record}'),
             'edit' => EditPromotion::route('/{record}/edit'),
         ];
     }

@@ -23,6 +23,9 @@ class PromotionForm
                         Select::make('organization_id')
                             ->label('Organisasi')
                             ->relationship('organization', 'name')
+                            ->default(fn () => auth()->user()?->organization_id)
+                            ->disabled(fn () => auth()->user()?->branch_id !== null)
+                            ->dehydrated()
                             ->required(),
                         TextInput::make('name')
                             ->label('Nama Promosi')
@@ -56,7 +59,7 @@ class PromotionForm
                                     return 'Diskon nominal rupiah yang dihitung untuk setiap satuan item. Contoh: Diskon 3.000 per Item. Beli 1 diskon 3.000, Beli 2 total diskon jadi 6.000.';
                                 }
                                 if ($type === 'BUNDLING') {
-                                    return 'Promo beli produk A gratis produk B. Contoh: Beli 2 Susu gratis 1 Gelas.';
+                                    return 'Promo Beli X Gratis Y atau Beli N Gratis M. Bisa untuk produk berbeda (contoh: Beli 2 Susu Gratis 1 Roti) maupun produk sama (contoh: Beli 3 Teh Pucuk Gratis 1 Teh Pucuk).';
                                 }
                                 if ($type === 'TIERED') {
                                     return 'Diskon bertingkat berdasarkan minimum belanja. Contoh: Belanja 100rb diskon 5rb, belanja 200rb diskon 12rb.';
@@ -79,7 +82,12 @@ class PromotionForm
                             ->multiple()
                             ->preload()
                             ->label('Berlaku di Cabang')
-                            ->helperText('Pilih cabang mana saja promosi ini berlaku. Jika kosong, promosi berlaku di semua cabang.')
+                            ->default(fn () => auth()->user()?->branch_id ? [auth()->user()->branch_id] : [])
+                            ->disabled(fn () => auth()->user()?->branch_id !== null)
+                            ->dehydrated()
+                            ->helperText(fn () => auth()->user()?->branch_id !== null
+                                ? '🔒 Terkunci Otomatis: Anda adalah user cabang, promosi ini hanya berlaku khusus untuk cabang Anda.'
+                                : 'Pilih cabang mana saja promosi ini berlaku. Jika dikosongkan, promosi berlaku Nasional di seluruh cabang.')
                             ->columnSpanFull(),
                     ]),
 
@@ -316,9 +324,27 @@ class PromotionForm
 
                 Section::make('Aturan Khusus Bundling (Beli X Gratis Y)')
                     ->visible(fn (callable $get) => $get('promo_type') === 'BUNDLING')
+                    ->description('Atur daftar produk syarat dan produk gratis, beserta nominal potongan harganya.')
                     ->schema([
+                        Placeholder::make('bundling_guide')
+                            ->label('💡 Panduan Pengaturan Promo Bundling / Beli X Gratis Y')
+                            ->content(new \Illuminate\Support\HtmlString('
+                                <div class="text-sm p-3.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-700 text-amber-950 dark:text-amber-200 space-y-2">
+                                    <p class="font-semibold text-amber-800 dark:text-amber-300">⚠️ PENTING: Di kasir POS, seluruh barang fisik (termasuk barang gratis) WAJIB di-scan barcode-nya agar stok barang keluar secara sah di sistem. Komputer kasir akan otomatis memberikan diskon 100% senilai barang gratis tersebut.</p>
+                                    <hr class="border-amber-200 dark:border-amber-800 my-1"/>
+                                    <p><strong>Kasus 1 — Produk SAMA (Contoh: Beli 3 Teh Pucuk GRATIS 1 Teh Pucuk):</strong><br/>
+                                    • Masukkan <strong>1 baris saja</strong> di tabel produk di bawah.<br/>
+                                    • Pilih produk: <em>Teh Pucuk</em>, Jumlah Minimum (Qty): <strong>4</strong> (3 beli + 1 gratis = total 4 dibawa pelanggan ke kasir).<br/>
+                                    • Total Diskon Paket: Masukkan harga 1 botol (misal: <strong>Rp 4.000</strong>).</p>
+                                    <p><strong>Kasus 2 — Produk BEDA (Contoh: Beli 2 Susu Bear Brand GRATIS 1 Roti):</strong><br/>
+                                    • Baris 1: Pilih <em>Susu Bear Brand</em>, Qty: <strong>2</strong>.<br/>
+                                    • Baris 2: Pilih <em>Roti</em>, Qty: <strong>1</strong>.<br/>
+                                    • Total Diskon Paket: Masukkan harga 1 Roti (misal: <strong>Rp 5.000</strong>).</p>
+                                </div>
+                            '))
+                            ->columnSpanFull(),
                         Repeater::make('promo_config.rules')
-                            ->label('Produk dalam Paket Bundling')
+                            ->label('Daftar Produk dalam Paket Promo')
                             ->schema([
                                 Select::make('productId')
                                     ->label('Pilih Produk')
@@ -327,7 +353,8 @@ class PromotionForm
                                     ->preload()
                                     ->required(),
                                 TextInput::make('minQty')
-                                    ->label('Jumlah Minimum (Qty)')
+                                    ->label('Jumlah Minimum yang Dibawa ke Kasir (Qty)')
+                                    ->helperText('Total jumlah barang ini yang harus di-scan di kasir (termasuk barang gratis jika produk sama).')
                                     ->numeric()
                                     ->default(1)
                                     ->required(),
@@ -337,7 +364,7 @@ class PromotionForm
                             ->required(),
                         TextInput::make('promo_config.bundleDiscount')
                             ->label('Total Diskon Paket (Nominal Rupiah)')
-                            ->helperText('Jumlah potongan harga ketika seluruh syarat kuantitas produk terpenuhi.')
+                            ->helperText('Jumlah potongan harga ketika seluruh syarat kuantitas di atas terpenuhi. Masukkan nominal harga barang yang digratiskan.')
                             ->numeric()
                             ->prefix('Rp')
                             ->required(),
