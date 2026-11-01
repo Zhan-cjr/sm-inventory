@@ -351,12 +351,14 @@ class ShiftController extends Controller
     /**
      * Efficiently calculate all shift transaction totals and returns with eager loaded relations.
      */
-    private function calculateShiftData(Shift $shift)
+    public function calculateShiftData(Shift $shift)
     {
         $transactions = Transaction::with(['items.product', 'bank'])
             ->where('shift_id', $shift->id)
             ->where('is_voided', false)
             ->get();
+
+        $bankMap = \App\Models\Bank::pluck('name', 'id')->toArray();
 
         $cash_sales = 0;
         $card_sales = 0;
@@ -395,6 +397,11 @@ class ShiftController extends Controller
             $tx_sales -= $unallocatedDiscount;
             if ($tx_sales < 0) $tx_sales = 0;
 
+            // Fallback jika transaksi tidak memiliki items (misal PPOB atau layanan langsung)
+            if ($tx->items->isEmpty() && $tx_sales == 0) {
+                $tx_sales = (float) $tx->final_amount;
+            }
+
             $method = strtoupper($tx->payment_method);
             
             if ($method === 'CASH' || $method === 'POINT') {
@@ -404,6 +411,7 @@ class ShiftController extends Controller
                 $card_sales += $tx_sales;
                 $card_returns += $tx_returns;
                 $bankName = $tx->bank ? $tx->bank->name : 'EDC';
+                $bankName = trim(preg_replace('/^(Card|QRIS):\s*/i', '', $bankName)) ?: 'EDC';
                 if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
                 $cardSalesByBank[$bankName] += $amount;
             } elseif ($method === 'VOUCHER') {
@@ -421,11 +429,16 @@ class ShiftController extends Controller
                     $cash_returns += $tx_returns;
                     $cash_sales += ($cash_amt + $tx_returns);
                     
-                    $cardDetails = collect($details)->where('method', 'CARD');
+                    $cardDetails = collect($details)->filter(fn ($d) => in_array(strtoupper($d['method'] ?? ''), ['CARD', 'QRIS', 'DEBIT', 'CREDIT']));
                     foreach ($cardDetails as $c) {
                         $card_sales += $c['amount'];
-                        $bankName = $c['label'] ?? 'EDC';
-                        if (strpos($bankName, 'Card: ') === 0) $bankName = substr($bankName, 6);
+                        $bankId = $c['bankId'] ?? $c['bank_id'] ?? null;
+                        if ($bankId && isset($bankMap[$bankId])) {
+                            $bankName = $bankMap[$bankId];
+                        } else {
+                            $bankName = $c['label'] ?? 'EDC';
+                        }
+                        $bankName = trim(preg_replace('/^(Card|QRIS):\s*/i', '', $bankName)) ?: 'EDC';
                         if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
                         $cardSalesByBank[$bankName] += $c['amount'];
                     }

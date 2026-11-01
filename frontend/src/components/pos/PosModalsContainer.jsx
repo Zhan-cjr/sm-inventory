@@ -419,13 +419,15 @@ export const PosModalsContainer = ({
               setTimeout(() => setAlertMsg(null), 4000);
               return;
             }
+            const typePrefix = bank.type === 'QRIS' ? 'QRIS' : 'Card';
+            const bankLabel = bank.name.toUpperCase().includes(typePrefix.toUpperCase()) ? bank.name : `${typePrefix}: ${bank.name}`;
             setPayments([
               ...payments,
               {
                 method: 'CARD',
                 amount: pendingCardAmount,
                 bankId: bank.id,
-                label: `${bank.type === 'QRIS' ? 'QRIS' : 'Card'}: ${bank.name}`
+                label: bankLabel
               }
             ]);
             setIsMultiBankSelectOpen(false);

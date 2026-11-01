@@ -165,63 +165,17 @@ class ArsipLaporanEOD extends Page implements HasTable
     {
         $shift->load(['user', 'terminal', 'cashMovements', 'branch.organization']);
 
-        $expectedCash = $shift->starting_cash + $shift->total_cash_sales - $shift->total_cash_returns + $shift->total_cash_in - $shift->total_cash_out;
+        $shiftController = app(\App\Http\Controllers\Api\V1\ShiftController::class);
+        $shiftData = $shiftController->calculateShiftData($shift);
+
+        $cashSales = (float) ($shift->total_cash_sales > 0 ? $shift->total_cash_sales : $shiftData['cash_sales']);
+        $cashReturns = (float) ($shift->total_cash_returns > 0 ? $shift->total_cash_returns : $shiftData['cash_returns']);
+        $expectedCash = (float) $shift->starting_cash + $cashSales - $cashReturns + (float) ($shift->total_cash_in ?? 0) - (float) ($shift->total_cash_out ?? 0);
+        
         $shift->expected_cash = $expectedCash;
-
-        $cardSalesByBank = DB::table('transactions')
-            ->join('banks', 'transactions.bank_id', '=', 'banks.id')
-            ->where('transactions.shift_id', $shift->id)
-            ->where('transactions.payment_method', 'CARD')
-            ->where('transactions.is_voided', false)
-            ->select('banks.name', DB::raw('SUM(transactions.final_amount) as total_amount'))
-            ->groupBy('banks.id', 'banks.name')
-            ->get();
-
-        $returns = Transaction::with(['items.product'])
-            ->where('shift_id', $shift->id)
-            ->where('is_voided', false)
-            ->get();
-        
-        $returnItems = [];
-        foreach ($returns as $tx) {
-            foreach ($tx->items as $item) {
-                if ($item->quantity < 0) {
-                    $returnItems[] = [
-                        'product_name' => $item->product ? $item->product->name : 'Unknown Item',
-                        'quantity' => abs($item->quantity),
-                        'total' => abs($item->quantity * $item->unit_price)
-                    ];
-                }
-            }
-        }
-
-        $shiftTransactions = Transaction::where('shift_id', $shift->id)
-            ->where('is_voided', false)
-            ->get();
-            
-        $totalManual = $shiftTransactions->sum('manual_discount');
-        $totalPromo = $shiftTransactions->sum('promo_discount');
-        
-        $totalPointDeduction = 0;
-        foreach ($shiftTransactions as $tx) {
-            $details = $tx->payment_details;
-            if (is_string($details)) $details = json_decode($details, true);
-            if (is_array($details)) {
-                $totalPointDeduction += collect($details)->where('method', 'POINT')->sum('amount');
-            } elseif (strtoupper($tx->payment_method) === 'POINT') {
-                $totalPointDeduction += $tx->final_amount;
-            }
-        }
-
-        $discountDetails = [
-            'manual_discount' => $totalManual,
-            'promo_discount' => $totalPromo,
-            'point_deduction' => $totalPointDeduction
-        ];
-
-        $shift->card_sales_by_bank = $cardSalesByBank;
-        $shift->returns_detail = $returnItems;
-        $shift->discount_details = $discountDetails;
+        $shift->card_sales_by_bank = $shiftData['formatted_card_sales'];
+        $shift->returns_detail = $shiftData['return_items'];
+        $shift->discount_details = $shiftData['discount_details'];
 
         return $shift;
     }
