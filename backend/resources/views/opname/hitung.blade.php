@@ -330,14 +330,10 @@
             Terdapat produk bawaan rak yang belum di-scan. Tentukan status barang tersebut di rak ini:
         </div>
         <!-- Quick Action Buttons -->
-        <div style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
-            <button type="button" onclick="markAllReview('zero')"
-                    style="flex: 1; min-width: 130px; background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.3); color: #93c5fd; border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer;">
-                🔵 Tandai Semua Stok 0
-            </button>
+        <div style="margin-bottom: 14px;">
             <button type="button" onclick="markAllReview('remove')"
-                    style="flex: 1; min-width: 130px; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); color: #fca5a5; border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer;">
-                ⚪ Tandai Semua Pindah Rak
+                    style="width: 100%; background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.3); color: #93c5fd; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span>🔄</span> Tandai Semua: Pindah / Bukan di Rak Ini (Aman)
             </button>
         </div>
         <div id="review-list" style="overflow-y: auto; flex: 1; padding-right: 5px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
@@ -596,18 +592,24 @@
         unscannedItems.forEach((item, index) => {
             const isNewQty = item.input && item.input.name.includes('new_quantities');
             listEl.innerHTML += `
-                <div style="background: var(--surface); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
-                    <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">${item.name}</div>
-                    <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
-                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                            <input type="radio" name="review_action_${item.id}" value="zero" checked style="accent-color: var(--blue);">
-                            <span style="font-size: 13px;">Stok 0 (Habis)</span>
+                <div id="review-card-${item.id}" style="background: var(--surface); padding: 14px; border-radius: 12px; border: 1px solid var(--border); transition: border-color 0.2s;">
+                    <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">${item.name}</div>
+                    <div style="font-size: 11px; color: var(--muted); margin-bottom: 10px;">Barcode: ${item.barcode || '-'} &nbsp;&bull;&nbsp; SKU: ${item.sku || '-'}</div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 8px 10px; border-radius: 8px; background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.25);">
+                            <input type="radio" name="review_action_${item.id}" value="remove" onchange="clearReviewCardError('${item.id}')" style="accent-color: var(--blue); margin-top: 2px;">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600; color: #93c5fd;">🔄 Pindah Rak / Bukan di Rak Ini (Aman)</div>
+                                <div style="font-size: 11px; color: var(--muted); line-height: 1.3;">Dikeluarkan dari rak ini. Stok toko <b>TIDAK</b> dinolkan.</div>
+                            </div>
                         </label>
-                        ${isNewQty ? '' : `
-                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                            <input type="radio" name="review_action_${item.id}" value="remove" style="accent-color: #ef4444;">
-                            <span style="font-size: 13px; color: #fca5a5;">Bukan di Rak Ini (Keluarkan)</span>
-                        </label>`}
+                        <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 8px 10px; border-radius: 8px; background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.25);">
+                            <input type="radio" name="review_action_${item.id}" value="zero" onchange="clearReviewCardError('${item.id}')" style="accent-color: #ef4444; margin-top: 2px;">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600; color: #fca5a5;">⚠️ Stok 0 (Habis / Hilang di Toko)</div>
+                                <div style="font-size: 11px; color: #f87171; line-height: 1.3;">Barang dicatat 0 pcs dan diakui sebagai selisih hilang.</div>
+                            </div>
+                        </label>
                     </div>
                 </div>
             `;
@@ -616,6 +618,11 @@
         document.getElementById('review-modal').classList.add('open');
     };
     
+    window.clearReviewCardError = function(id) {
+        const card = document.getElementById(`review-card-${id}`);
+        if (card) card.style.borderColor = 'var(--border)';
+    };
+
     window.closeReviewModal = function() {
         document.getElementById('review-modal').classList.remove('open');
     };
@@ -624,6 +631,8 @@
         document.querySelectorAll('#review-list input[type="radio"]').forEach(r => {
             if (r.value === action) {
                 r.checked = true;
+                const id = r.name.replace('review_action_', '');
+                clearReviewCardError(id);
             }
         });
     };
@@ -631,14 +640,35 @@
     window.confirmReviewAndSubmit = function() {
         const form = document.getElementById('count-form');
         
+        // Cek validasi: semua barang yang belum discan harus dipilih secara sadar
+        let unselectedCount = 0;
+        unscannedItems.forEach(item => {
+            const checkedRadio = document.querySelector(`input[name="review_action_${item.id}"]:checked`);
+            const card = document.getElementById(`review-card-${item.id}`);
+            if (!checkedRadio) {
+                unselectedCount++;
+                if (card) card.style.borderColor = '#ef4444';
+            } else {
+                if (card) card.style.borderColor = 'var(--border)';
+            }
+        });
+
+        if (unselectedCount > 0) {
+            alert(`⚠️ Ada ${unselectedCount} barang yang belum ditentukan statusnya.\n\nMohon pilih salah satu opsi (Pindah Rak atau Stok 0) untuk setiap barang sebelum mengirim data.`);
+            return;
+        }
+
         // Remove old hidden inputs if any
         document.querySelectorAll('.remove-rack-input').forEach(el => el.remove());
         
         unscannedItems.forEach(item => {
             const checkedRadio = document.querySelector(`input[name="review_action_${item.id}"]:checked`);
-            const action = checkedRadio ? checkedRadio.value : 'zero';
+            const action = checkedRadio ? checkedRadio.value : 'remove';
             if (action === 'zero') {
-                if (item.input) item.input.value = '0';
+                if (item.input) {
+                    item.input.disabled = false;
+                    item.input.value = '0';
+                }
             } else if (action === 'remove') {
                 const hidden = document.createElement('input');
                 hidden.type = 'hidden';
@@ -647,7 +677,10 @@
                 hidden.className = 'remove-rack-input';
                 form.appendChild(hidden);
                 
-                if (item.input) item.input.value = '0';
+                // Jangan kirim nilai quantities untuk item yang dikeluarkan
+                if (item.input) {
+                    item.input.disabled = true;
+                }
             }
         });
         

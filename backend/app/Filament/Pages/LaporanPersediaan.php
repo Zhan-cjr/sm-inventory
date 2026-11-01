@@ -81,6 +81,30 @@ class LaporanPersediaan extends Page implements HasTable
                     ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('last_count_date')
+                    ->label('Tgl Terakhir SO')
+                    ->date('d/m/Y')
+                    ->placeholder('Belum Pernah')
+                    ->sortable()
+                    ->badge()
+                    ->color(function ($state) {
+                        if (!$state) return 'gray';
+                        $days = \Carbon\Carbon::parse($state)->diffInDays(now());
+                        if ($days <= 30) return 'success';
+                        if ($days <= 60) return 'warning';
+                        return 'danger';
+                    })
+                    ->tooltip(function ($state) {
+                        if (!$state) return 'Belum pernah di-opname';
+                        $days = \Carbon\Carbon::parse($state)->diffInDays(now());
+                        return "Di-opname {$days} hari yang lalu";
+                    }),
+                TextColumn::make('last_so_number')
+                    ->label('No Dokumen SO')
+                    ->placeholder('-')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('cost_price_tax')
                     ->label('Harga Pokok (Rata-rata Batch)')
                     ->money('IDR', true)

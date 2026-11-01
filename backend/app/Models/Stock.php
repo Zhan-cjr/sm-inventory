@@ -67,7 +67,7 @@ class Stock extends Model
         'margin_gol_2', 'harga_jual_2', 'qty_min_gol_2',
         'margin_gol_3', 'harga_jual_3', 'qty_min_gol_3',
         'quantity_on_hand', 'quantity_damaged',
-        'quantity_reserved', 'last_count_date', 'min_qty', 
+        'quantity_reserved', 'last_count_date', 'last_so_number', 'min_qty', 
         'max_qty', 'lead_time', 'safety_stock', 'desired_inventory_days', 'version', 'is_active'
     ];
 

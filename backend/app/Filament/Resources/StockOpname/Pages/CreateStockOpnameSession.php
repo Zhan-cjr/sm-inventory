@@ -73,7 +73,7 @@ class CreateStockOpnameSession extends CreateRecord
                         'session_id'      => $session->id,
                         'rack_session_id' => $rackSession->id,
                         'product_id'      => $stock->product_id,
-                        'system_quantity' => $stock->quantity_on_hand,
+                        'system_quantity' => $stock->salable_quantity,
                         'status'          => 'PENDING',
                         'created_at'      => $now,
                         'updated_at'      => $now,
@@ -115,7 +115,7 @@ class CreateStockOpnameSession extends CreateRecord
                             ],
                             [
                                 'session_id'      => $session->id,
-                                'system_quantity'  => $stock->quantity_on_hand,
+                                'system_quantity'  => $stock->salable_quantity,
                                 'status'          => 'PENDING',
                             ]
                         );

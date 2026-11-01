@@ -178,10 +178,12 @@ class ViewStockOpnameSession extends ViewRecord
                 }
 
                 $before = (float) $stock->quantity_on_hand;
+                $currentDamaged = (float) ($stock->quantity_damaged ?? 0);
+                $newQoh = $effectiveQty + $currentDamaged;
 
                 // Set properti kontekstual — akan dibaca StockObserver untuk mengisi log yang benar.
                 // Dengan cara ini hanya ada SATU entry di kartu stok (dari observer), bukan dua.
-                $stock->log_type           = $effectiveQty >= $before ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
+                $stock->log_type           = $newQoh >= $before ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
                 $stock->reason_code        = 'STOCK_OPNAME';
                 $stock->reference_doc_type = 'STOCK_OPNAME';
                 $stock->reference_doc_id   = $session->session_number ?: $session->id;
@@ -189,8 +191,9 @@ class ViewStockOpnameSession extends ViewRecord
                 $stock->recorded_by        = Auth::id();
 
                 $stock->update([
-                    'quantity_on_hand' => $effectiveQty,
+                    'quantity_on_hand' => $newQoh,
                     'last_count_date'  => $session->opname_date,
+                    'last_so_number'   => $session->session_number ?: $session->id,
                 ]);
             }
 

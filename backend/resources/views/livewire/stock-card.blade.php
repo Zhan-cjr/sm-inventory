@@ -36,6 +36,13 @@
                         <span style="color: #374151; font-weight: 500;">Total Fisik:</span>
                         <strong style="color: #111827; font-size: 13px; margin-left: 4px;">{{ (float) $stock->quantity_on_hand }}</strong>
                     </div>
+                    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 4px 10px; border-radius: 6px;">
+                        <span style="color: #1e40af; font-weight: 500;">Tgl Terakhir SO:</span>
+                        <strong style="color: #1d4ed8; font-size: 13px; margin-left: 4px;">{{ $stock->last_count_date ? \Carbon\Carbon::parse($stock->last_count_date)->format('d/m/Y') : 'Belum Pernah' }}</strong>
+                        @if($stock->last_so_number)
+                            <span style="font-size: 10px; color: #6b7280; margin-left: 2px;">({{ $stock->last_so_number }})</span>
+                        @endif
+                    </div>
                 </div>
             @else
                 <div></div>

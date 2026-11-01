@@ -169,6 +169,11 @@ Route::get('/print/stock-quarantine/{referenceNumber}', function ($referenceNumb
     return view('print.documents.stock-quarantine-print', compact('movements', 'referenceNumber', 'branch', 'creator'));
 })->name('print.stock-quarantine')->middleware(['web', 'auth']);
 
+Route::get('/print/stock-quarantine-audit/{auditId}', function ($auditId) {
+    $audit = \App\Models\StockQuarantineAudit::with(['items.product', 'branch', 'auditor', 'approver'])->findOrFail($auditId);
+    return view('print.documents.stock-quarantine-audit-print', compact('audit'));
+})->name('print.stock-quarantine-audit')->middleware(['web', 'auth']);
+
 // Print Barcodes
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/print/barcodes/label', [\App\Http\Controllers\BarcodePrintController::class, 'printLabel'])->name('print.barcode.label');
