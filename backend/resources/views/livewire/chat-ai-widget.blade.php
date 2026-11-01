@@ -1,15 +1,29 @@
-<div>
+<div x-data="aiDraggableWidget()"
+     x-init="init()"
+     @resize.window.debounce.150ms="onResize()"
+     @pointermove.window="onDrag($event)"
+     @pointerup.window="stopDrag($event)"
+     @pointercancel.window="stopDrag($event)">
+
     <style>
         .ai-chat-btn {
-            position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; 
+            position: fixed; width: 56px; height: 56px; 
+            bottom: 120px; right: 24px;
             background-color: var(--primary-600, #4f46e5); color: white; 
             border-radius: 9999px; display: flex; align-items: center; justify-content: center; 
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); 
-            cursor: pointer; z-index: 9999; transition: transform 0.2s; border: none;
+            cursor: grab; z-index: 9999; border: none;
+            touch-action: none; user-select: none; -webkit-user-select: none;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
         .ai-chat-btn:hover { transform: scale(1.05); }
+        .ai-chat-btn:active, .ai-chat-btn.is-dragging {
+            cursor: grabbing !important;
+            transform: scale(1.08);
+            box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.25), 0 15px 15px -5px rgba(0, 0, 0, 0.15);
+        }
         .ai-chat-window {
-            position: fixed; bottom: 90px; right: 24px; width: 380px; height: 500px; 
+            position: fixed; width: 380px; height: 500px; 
             background-color: white; border-radius: 16px; 
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border: 1px solid #e5e7eb; 
             display: flex; flex-direction: column; overflow: hidden; z-index: 9999;
@@ -18,6 +32,7 @@
         .ai-chat-header {
             background-color: var(--primary-600, #4f46e5); padding: 12px 16px; 
             display: flex; align-items: center; justify-content: space-between; color: white;
+            user-select: none;
         }
         .ai-chat-body {
             flex: 1; padding: 16px; overflow-y: auto; background-color: #f9fafb; 
@@ -58,8 +73,16 @@
         .dark .ai-table th, .dark .ai-table td { border-color: #4b5563; }
     </style>
 
-    <!-- Floating Button -->
-    <button wire:click="toggleChat" class="ai-chat-btn">
+    <!-- Floating Draggable Button -->
+    <button 
+        type="button"
+        @pointerdown="startDrag($event)"
+        @click="handleClick($event, $wire)"
+        :style="buttonStyle"
+        :class="{ 'is-dragging': isDragging }"
+        class="ai-chat-btn"
+        title="Klik untuk membuka chat, tahan & geser untuk memindahkan posisi"
+    >
         @if($isOpen)
             <x-heroicon-o-x-mark style="width: 28px; height: 28px;" />
         @else
@@ -68,9 +91,9 @@
         @endif
     </button>
 
-    <!-- Chat Window -->
+    <!-- Chat Window Anchored to Button -->
     @if($isOpen)
-    <div class="ai-chat-window">
+    <div class="ai-chat-window" :style="windowStyle">
         
         <!-- Header -->
         <div class="ai-chat-header">
@@ -81,7 +104,7 @@
                     <p style="margin: 0; font-size: 10px; opacity: 0.8;">Tanya data penjualan, stok, dll</p>
                 </div>
             </div>
-            <button wire:click="toggleChat" style="background: none; border: none; color: white; cursor: pointer; padding: 4px;">
+            <button wire:click="toggleChat" style="background: none; border: none; color: white; cursor: pointer; padding: 4px;" title="Tutup / Perkecil">
                 <x-heroicon-m-minus style="width: 20px; height: 20px;" />
             </button>
         </div>
@@ -154,6 +177,134 @@
     @endif
 
     <script>
+        window.aiDraggableWidget = window.aiDraggableWidget || function() {
+            return {
+                x: typeof window !== 'undefined' ? Math.max(16, window.innerWidth - 80) : 0,
+                y: typeof window !== 'undefined' ? Math.max(16, window.innerHeight - 150) : 0,
+                isDragging: false,
+                hasMoved: false,
+                dragStartX: 0,
+                dragStartY: 0,
+                initialX: 0,
+                initialY: 0,
+
+                init() {
+                    const btnSize = 56;
+                    const pad = 16;
+                    let posX = Math.max(pad, window.innerWidth - btnSize - 24);
+                    let posY = Math.max(pad, window.innerHeight - 150);
+
+                    try {
+                        const saved = localStorage.getItem('ai_chat_btn_pos');
+                        if (saved) {
+                            const parsed = JSON.parse(saved);
+                            if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+                                posX = parsed.x;
+                                posY = parsed.y;
+                            }
+                        }
+                    } catch (e) {}
+
+                    const maxX = Math.max(pad, window.innerWidth - btnSize - pad);
+                    const maxY = Math.max(pad, window.innerHeight - btnSize - pad);
+                    this.x = Math.min(Math.max(pad, posX), maxX);
+                    this.y = Math.min(Math.max(pad, posY), maxY);
+                },
+
+                onResize() {
+                    const btnSize = 56;
+                    const pad = 16;
+                    const maxX = Math.max(pad, window.innerWidth - btnSize - pad);
+                    const maxY = Math.max(pad, window.innerHeight - btnSize - pad);
+                    this.x = Math.min(Math.max(pad, this.x), maxX);
+                    this.y = Math.min(Math.max(pad, this.y), maxY);
+                },
+
+                startDrag(e) {
+                    if (e.pointerType === 'mouse' && e.button !== 0) return;
+                    this.isDragging = true;
+                    this.hasMoved = false;
+                    this.dragStartX = e.clientX;
+                    this.dragStartY = e.clientY;
+                    this.initialX = this.x;
+                    this.initialY = this.y;
+                },
+
+                onDrag(e) {
+                    if (!this.isDragging) return;
+                    const dx = e.clientX - this.dragStartX;
+                    const dy = e.clientY - this.dragStartY;
+
+                    if (!this.hasMoved && Math.hypot(dx, dy) > 5) {
+                        this.hasMoved = true;
+                    }
+
+                    if (this.hasMoved) {
+                        const btnSize = 56;
+                        const pad = 12;
+                        const maxX = Math.max(pad, window.innerWidth - btnSize - pad);
+                        const maxY = Math.max(pad, window.innerHeight - btnSize - pad);
+                        this.x = Math.min(Math.max(pad, this.initialX + dx), maxX);
+                        this.y = Math.min(Math.max(pad, this.initialY + dy), maxY);
+                    }
+                },
+
+                stopDrag(e) {
+                    if (!this.isDragging) return;
+                    this.isDragging = false;
+                    if (this.hasMoved) {
+                        try {
+                            localStorage.setItem('ai_chat_btn_pos', JSON.stringify({ x: this.x, y: this.y }));
+                        } catch (e) {}
+                        setTimeout(() => {
+                            this.hasMoved = false;
+                        }, 120);
+                    }
+                },
+
+                handleClick(e, wire) {
+                    if (this.hasMoved) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+                    if (wire && typeof wire.toggleChat === 'function') {
+                        wire.toggleChat();
+                    } else if (this.$wire && typeof this.$wire.toggleChat === 'function') {
+                        this.$wire.toggleChat();
+                    }
+                },
+
+                get buttonStyle() {
+                    return `position: fixed; left: ${this.x}px; top: ${this.y}px; bottom: auto; right: auto;`;
+                },
+
+                get windowStyle() {
+                    const winWidth = Math.min(380, window.innerWidth - 24);
+                    const winHeight = Math.min(500, window.innerHeight - 80);
+
+                    let left;
+                    if (this.x + 28 > window.innerWidth / 2) {
+                        left = (this.x + 56) - winWidth;
+                    } else {
+                        left = this.x;
+                    }
+                    left = Math.max(12, Math.min(window.innerWidth - winWidth - 12, left));
+
+                    let top;
+                    if (this.y - winHeight - 12 >= 12) {
+                        top = this.y - winHeight - 12;
+                    } else if (this.y + 56 + 12 + winHeight <= window.innerHeight - 12) {
+                        top = this.y + 56 + 12;
+                    } else {
+                        top = Math.max(12, Math.min(window.innerHeight - winHeight - 12, this.y - winHeight - 12));
+                    }
+
+                    return `position: fixed; left: ${left}px; top: ${top}px; width: ${winWidth}px; height: ${winHeight}px; bottom: auto; right: auto; z-index: 9999;`;
+                }
+            };
+        };
+
         document.addEventListener('livewire:initialized', () => {
             @this.on('chat-updated', () => {
                 setTimeout(() => {
