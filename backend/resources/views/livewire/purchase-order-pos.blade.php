@@ -517,10 +517,17 @@
                                 <div>{{ $item['avg_bln'] }}</div>
                                 @if(!empty($item['is_sales_from_history']) && (float)($item['avg_bln'] ?? 0) > 0)
                                     <div style="margin-top: 1px;">
-                                        <span style="display: inline-block; font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; background-color: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; white-space: nowrap;"
-                                              title="Rata-rata penjualan diambil dari histori import aplikasi lama">
-                                            Histori
-                                        </span>
+                                        @if(($item['sales_source_type'] ?? '') === 'blended')
+                                            <span style="display: inline-block; font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; white-space: nowrap;"
+                                                  title="Transisi migrasi: {{ $item['live_days'] ?? 1 }} hari kasir baru ({{ $item['live_sales_qty'] ?? 0 }} pcs) + sisa {{ max(0, 30 - ($item['live_days'] ?? 1)) }} hari histori Excel ({{ $item['hist_sales_qty'] ?? 0 }} pcs)">
+                                                Transisi
+                                            </span>
+                                        @else
+                                            <span style="display: inline-block; font-size: 0.58rem; font-weight: 700; padding: 1px 4px; border-radius: 3px; background-color: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; white-space: nowrap;"
+                                                  title="Rata-rata penjualan diambil dari histori import aplikasi lama">
+                                                Histori
+                                            </span>
+                                        @endif
                                     </div>
                                 @elseif(!empty($item['is_oos_with_history']))
                                     <div style="margin-top: 2px;">

@@ -819,7 +819,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$sevenDaysAgo, $refDate]))
                 ->sum('quantity');
         } elseif ($earliestLive) {
-            // Kasus B: Cabang aktif di SM Inventory < 30 hari. Sambungkan live + bulan sebelum migrasi dari Excel!
+            // Kasus B: Cabang aktif di SM Inventory < 30 hari. Sambungkan live + sisa proporsi histori Excel!
             $liveSales = (float)TransactionItem::where('product_id', $product->id)
                 ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$earliestLive, $refDate]))
                 ->sum('quantity');
@@ -835,20 +835,54 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                     ->sum('quantity_sold');
             }
 
-            $liveDays = max(1, $earliestLive->diffInDays($refDate));
-            if ($liveSales > 0) {
-                // Penjualan kasir live dinormalisasi ke bulanan
-                $avgBln = round(($liveSales / $liveDays) * 30, 1);
-                $isSalesFromHistory = false;
+            // Jika belum ada di bulan subMonth(), cari bulan histori terbaru sebelum live date
+            if ($histSales <= 0) {
+                $latestHist = ProductMonthlySalesHistory::where('branch_id', $branchId)
+                    ->where('product_id', $product->id)
+                    ->where(function ($q) use ($preLiveCutoff) {
+                        $q->where('year', '<', $preLiveCutoff->year)
+                          ->orWhere(function ($sq) use ($preLiveCutoff) {
+                              $sq->where('year', '=', $preLiveCutoff->year)
+                                ->where('month', '<', $preLiveCutoff->month);
+                          });
+                    })
+                    ->orderByDesc('year')
+                    ->orderByDesc('month')
+                    ->first();
+                if ($latestHist) {
+                    $histSales = (float)$latestHist->quantity_sold;
+                }
+            }
+
+            $liveDays = min(30, max(1, (int)$earliestLive->diffInDays($refDate)));
+            $remainingRatio = max(0, (30 - $liveDays) / 30);
+
+            // Pro-Rata Continuous Time-Series:
+            // Penjualan Kasir Baru (liveDays) + Sisa Hari dari Histori Excel (30 - liveDays)
+            $avgBln = round($liveSales + ($remainingRatio * $histSales), 1);
+
+            // Klasifikasi badge tampilan
+            if ($liveSales > 0 && $histSales > 0) {
+                $salesSourceType = 'blended';
+                $isSalesFromHistory = true;
             } elseif ($histSales > 0) {
-                // Di masa awal migrasi produk belum terjual di kasir baru, gunakan histori bulan sebelumnya
-                $avgBln = round($histSales, 1);
+                $salesSourceType = 'history';
                 $isSalesFromHistory = true;
             } else {
-                $avgBln = 0.0;
+                $salesSourceType = 'live';
                 $isSalesFromHistory = false;
             }
-            $avgMinggu = round($avgBln / 4, 1);
+
+            // Sales 7 Hari:
+            // Jika cabang sudah live >= 7 hari, gunakan data kasir riil 7 hari terakhir.
+            // Jika cabang live < 7 hari, pro-rata dari Sales 30 Hari dibagi 4.
+            if ($earliestLive->lte($sevenDaysAgo)) {
+                $avgMinggu = (float)TransactionItem::where('product_id', $product->id)
+                    ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$sevenDaysAgo, $refDate]))
+                    ->sum('quantity');
+            } else {
+                $avgMinggu = round($avgBln / 4, 1);
+            }
         } else {
             // Kasus C: Cabang belum ada transaksi kasir sama sekali di SM Inventory. 100% dari histori Excel!
             $latestHist = ProductMonthlySalesHistory::where('branch_id', $branchId)
@@ -982,6 +1016,10 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             'is_oos_with_history' => $isOosWithHistory,
             'avg_sales_active' => $avgSalesActive,
             'is_sales_from_history' => $isSalesFromHistory,
+            'sales_source_type' => $salesSourceType ?? ($isSalesFromHistory ? 'history' : 'live'),
+            'live_sales_qty' => $liveSales ?? 0,
+            'hist_sales_qty' => $histSales ?? 0,
+            'live_days' => $liveDays ?? 30,
             'stock' => $stock ?? 0,
             'physical_stock' => $physicalStock,
             'damaged_stock' => $damagedStock,

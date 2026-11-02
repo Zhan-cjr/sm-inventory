@@ -72,9 +72,18 @@ class SuggestedOrderService
             ->pluck('total_qty', 'product_id')
             ->toArray();
 
-        // Fallback cerdas: Jika ada produk yang belum memiliki transaksi POS (misal cabang baru migrasi),
-        // gunakan rata-rata bulanan dari histori import 3 bulan terakhir
+        // Fallback & Continuous Time-Series:
+        // Untuk cabang yang baru migrasi (< 30 hari), gabungkan kasir baru + sisa proporsi histori
         if ($branchId) {
+            $earliestTx = DB::table('transactions')
+                ->where('branch_id', $branchId)
+                ->where(function ($q) {
+                    $q->where('is_voided', 0)->orWhereNull('is_voided');
+                })
+                ->min('created_at');
+            $earliestLive = $earliestTx ? Carbon::parse($earliestTx) : null;
+            $now = Carbon::now();
+
             $latestPeriods = DB::table('product_monthly_sales_histories')
                 ->where('branch_id', $branchId)
                 ->select('year', 'month')
@@ -99,9 +108,16 @@ class SuggestedOrderService
                     ->pluck('avg_monthly', 'product_id')
                     ->toArray();
 
+                $liveDays = $earliestLive ? min(30, max(1, (int)$earliestLive->diffInDays($now))) : 0;
+                $remRatio = $earliestLive ? max(0, (30 - $liveDays) / 30) : 1.0;
+
                 foreach ($histSales as $prodId => $avgQty) {
-                    if (!isset($sales[$prodId]) || (float)$sales[$prodId] <= 0) {
-                        $sales[$prodId] = (float)$avgQty;
+                    $liveVal = (float)($sales[$prodId] ?? 0);
+                    $histVal = (float)$avgQty;
+                    if ($earliestLive && $liveDays < 30) {
+                        $sales[$prodId] = round($liveVal + ($remRatio * $histVal), 1);
+                    } elseif (!isset($sales[$prodId]) || (float)$sales[$prodId] <= 0) {
+                        $sales[$prodId] = $histVal;
                     }
                 }
             }
@@ -327,6 +343,8 @@ class SuggestedOrderService
 
             if (!$earliestLive || $earliestLive->gt($ninetyDaysAgo)) {
                 $preLiveCutoff = $earliestLive ? $earliestLive->copy()->startOfMonth() : $now;
+                $liveDays = $earliestLive ? min(30, max(1, (int)$earliestLive->diffInDays($now))) : 0;
+                $remRatio = $earliestLive ? max(0, (30 - $liveDays) / 30) : 1.0;
 
                 for ($m = 1; $m <= 3; $m++) {
                     $dt = $now->copy()->subMonths($m);
@@ -340,8 +358,12 @@ class SuggestedOrderService
                             ->pluck('qty', 'product_id');
 
                         foreach ($hist as $pId => $qty) {
-                            if ($m == 1 && empty($p1Sales[$pId])) {
-                                $p1Sales[$pId] = (float)$qty;
+                            if ($m == 1) {
+                                if ($earliestLive && $liveDays < 30) {
+                                    $p1Sales[$pId] = round(((float)($p1Sales[$pId] ?? 0)) + ($remRatio * (float)$qty), 1);
+                                } elseif (empty($p1Sales[$pId])) {
+                                    $p1Sales[$pId] = (float)$qty;
+                                }
                             } elseif ($m == 2 && empty($p2Sales[$pId])) {
                                 $p2Sales[$pId] = (float)$qty;
                             } elseif ($m == 3 && empty($p3Sales[$pId])) {
