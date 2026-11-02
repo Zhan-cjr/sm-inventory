@@ -336,6 +336,9 @@ class ShiftController extends Controller
         $expectedCash = $shift->starting_cash + $shiftData['cash_sales'] - $shiftData['cash_returns'] + $shift->total_cash_in - $shift->total_cash_out;
 
         $shift->expected_cash = $expectedCash;
+        if ($shift->actual_cash !== null) {
+            $shift->difference = $shift->actual_cash - $expectedCash;
+        }
         $shift->total_cash_sales = $shiftData['cash_sales'];
         $shift->total_card_sales = $shiftData['card_sales'];
         $shift->total_voucher_sales = $shiftData['voucher_sales'];

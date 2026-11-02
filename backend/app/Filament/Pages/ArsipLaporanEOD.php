@@ -168,11 +168,18 @@ class ArsipLaporanEOD extends Page implements HasTable
         $shiftController = app(\App\Http\Controllers\Api\V1\ShiftController::class);
         $shiftData = $shiftController->calculateShiftData($shift);
 
-        $cashSales = (float) ($shift->total_cash_sales > 0 ? $shift->total_cash_sales : $shiftData['cash_sales']);
-        $cashReturns = (float) ($shift->total_cash_returns > 0 ? $shift->total_cash_returns : $shiftData['cash_returns']);
-        $expectedCash = (float) $shift->starting_cash + $cashSales - $cashReturns + (float) ($shift->total_cash_in ?? 0) - (float) ($shift->total_cash_out ?? 0);
+        $shift->total_cash_sales = $shiftData['cash_sales'];
+        $shift->total_card_sales = $shiftData['card_sales'];
+        $shift->total_voucher_sales = $shiftData['voucher_sales'];
+        $shift->total_cash_returns = $shiftData['cash_returns'];
+        $shift->total_card_returns = $shiftData['card_returns'];
+
+        $expectedCash = (float) $shift->starting_cash + $shiftData['cash_sales'] - $shiftData['cash_returns'] + (float) ($shift->total_cash_in ?? 0) - (float) ($shift->total_cash_out ?? 0);
         
         $shift->expected_cash = $expectedCash;
+        if ($shift->actual_cash !== null) {
+            $shift->difference = (float) $shift->actual_cash - $expectedCash;
+        }
         $shift->card_sales_by_bank = $shiftData['formatted_card_sales'];
         $shift->returns_detail = $shiftData['return_items'];
         $shift->discount_details = $shiftData['discount_details'];
