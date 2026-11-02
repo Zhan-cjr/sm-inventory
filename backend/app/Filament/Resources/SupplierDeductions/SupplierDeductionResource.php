@@ -77,4 +77,16 @@ class SupplierDeductionResource extends Resource
             'edit' => EditSupplierDeduction::route('/{record}/edit'),
         ];
     }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user && $user->branch_id) {
+            $query->where(function ($q) use ($user) {
+                $q->whereNull('branch_id')->orWhere('branch_id', $user->branch_id);
+            });
+        }
+        return $query;
+    }
 }

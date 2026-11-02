@@ -17,9 +17,12 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use App\Traits\HasBranchScope;
 
 class RewardRedemptionResource extends Resource
 {
+    use HasBranchScope;
+
     protected static ?string $model = RewardRedemption::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-gift';

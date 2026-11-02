@@ -10,6 +10,7 @@ use App\Filament\Resources\PurchaseReturns\Schemas\PurchaseReturnForm;
 use App\Filament\Resources\PurchaseReturns\Schemas\PurchaseReturnInfolist;
 use App\Filament\Resources\PurchaseReturns\Tables\PurchaseReturnsTable;
 use App\Models\PurchaseReturn;
+use App\Traits\HasBranchScope;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -18,6 +19,8 @@ use Filament\Tables\Table;
 
 class PurchaseReturnResource extends Resource
 {
+    use HasBranchScope;
+
     protected static ?string $model = PurchaseReturn::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowPathRoundedSquare;

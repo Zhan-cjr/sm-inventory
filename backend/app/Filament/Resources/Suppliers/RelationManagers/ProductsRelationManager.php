@@ -279,7 +279,7 @@ class ProductsRelationManager extends RelationManager
                     ->label('Pindah Supplier / Sub Divisi')
                     ->icon('heroicon-o-arrow-path-rounded-square')
                     ->color('warning')
-                    ->fillForm(function ($record, $livewire) {
+                    ->fillForm(function ($record, $livewire) use ($currentSupplierId) {
                         $user = auth()->user();
                         $activeBranchFilter = $livewire->tableFilters['branch_id']['value'] ?? null;
                         $defaultBranch = $user->branch_id ?? $activeBranchFilter;
@@ -288,8 +288,8 @@ class ProductsRelationManager extends RelationManager
                         return [
                             'scope_type' => $defaultScope,
                             'branch_id' => $defaultBranch,
-                            'new_supplier_id' => null,
-                            'new_supplier_division_id' => null,
+                            'new_supplier_id' => $currentSupplierId,
+                            'new_supplier_division_id' => $record->supplier_division_id,
                         ];
                     })
                     ->form(function ($record, $livewire) use ($currentSupplierId) {
@@ -350,11 +350,11 @@ class ProductsRelationManager extends RelationManager
 
                         $fields[] = Forms\Components\Select::make('new_supplier_id')
                             ->label('Pilih Supplier Tujuan')
-                            ->options(function () use ($currentSupplierId) {
+                            ->options(function () {
                                 return \App\Models\Supplier::where('is_active', true)
-                                    ->where('id', '!=', $currentSupplierId)
                                     ->pluck('name', 'id');
                             })
+                            ->default($currentSupplierId)
                             ->visible(fn ($get) => $get('scope_type') !== 'revert_to_global')
                             ->required(fn ($get) => $get('scope_type') !== 'revert_to_global')
                             ->searchable()
@@ -364,8 +364,8 @@ class ProductsRelationManager extends RelationManager
                         $fields[] = Forms\Components\Select::make('new_supplier_division_id')
                             ->label('Pilih Sub Divisi Tujuan')
                             ->placeholder('Tanpa Sub Divisi (Supplier Global)')
-                            ->options(function (callable $get) {
-                                $supplierId = $get('new_supplier_id');
+                            ->options(function (callable $get) use ($currentSupplierId) {
+                                $supplierId = $get('new_supplier_id') ?: $currentSupplierId;
                                 if (!$supplierId) return [];
                                 return \App\Models\SupplierDivision::where('supplier_id', $supplierId)->pluck('name', 'id');
                             })
@@ -430,13 +430,15 @@ class ProductsRelationManager extends RelationManager
                         ->label('Pindah Supplier / Sub Divisi (Terpilih)')
                         ->icon('heroicon-o-arrow-path-rounded-square')
                         ->color('warning')
-                        ->fillForm(function ($livewire) {
+                        ->fillForm(function ($livewire) use ($currentSupplierId) {
                             $user = auth()->user();
                             $activeBranchFilter = $livewire->tableFilters['branch_id']['value'] ?? null;
                             $defaultBranch = $user->branch_id ?? $activeBranchFilter;
                             return [
                                 'scope_type' => $defaultBranch ? 'branch' : 'global',
                                 'branch_id' => $defaultBranch,
+                                'new_supplier_id' => $currentSupplierId,
+                                'new_supplier_division_id' => null,
                             ];
                         })
                         ->form(function ($livewire) use ($currentSupplierId) {
@@ -482,11 +484,11 @@ class ProductsRelationManager extends RelationManager
 
                             $fields[] = Forms\Components\Select::make('new_supplier_id')
                                 ->label('Pilih Supplier Tujuan')
-                                ->options(function () use ($currentSupplierId) {
+                                ->options(function () {
                                     return \App\Models\Supplier::where('is_active', true)
-                                        ->where('id', '!=', $currentSupplierId)
                                         ->pluck('name', 'id');
                                 })
+                                ->default($currentSupplierId)
                                 ->visible(fn ($get) => $get('scope_type') !== 'revert_to_global')
                                 ->required(fn ($get) => $get('scope_type') !== 'revert_to_global')
                                 ->searchable()
@@ -496,8 +498,8 @@ class ProductsRelationManager extends RelationManager
                             $fields[] = Forms\Components\Select::make('new_supplier_division_id')
                                 ->label('Pilih Sub Divisi Tujuan')
                                 ->placeholder('Tanpa Sub Divisi (Supplier Global)')
-                                ->options(function (callable $get) {
-                                    $supplierId = $get('new_supplier_id');
+                                ->options(function (callable $get) use ($currentSupplierId) {
+                                    $supplierId = $get('new_supplier_id') ?: $currentSupplierId;
                                     if (!$supplierId) return [];
                                     return \App\Models\SupplierDivision::where('supplier_id', $supplierId)->pluck('name', 'id');
                                 })

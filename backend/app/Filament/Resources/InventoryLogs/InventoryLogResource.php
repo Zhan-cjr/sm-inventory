@@ -8,6 +8,7 @@ use App\Filament\Resources\InventoryLogs\Pages\ListInventoryLogs;
 use App\Filament\Resources\InventoryLogs\Schemas\InventoryLogForm;
 use App\Filament\Resources\InventoryLogs\Tables\InventoryLogsTable;
 use App\Models\InventoryLog;
+use App\Traits\HasBranchScope;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -16,6 +17,8 @@ use Filament\Tables\Table;
 
 class InventoryLogResource extends Resource
 {
+    use HasBranchScope;
+
     protected static ?string $model = InventoryLog::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;

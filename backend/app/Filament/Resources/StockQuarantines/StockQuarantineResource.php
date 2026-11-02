@@ -18,9 +18,12 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Support\Colors\Color;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use App\Traits\HasBranchScope;
 
 class StockQuarantineResource extends Resource
 {
+    use HasBranchScope;
+
     protected static ?string $model = StockQuarantineMovement::class;
 
     protected static \UnitEnum|string|null $navigationGroup = 'TRANSAKSI';

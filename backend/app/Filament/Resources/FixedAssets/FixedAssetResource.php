@@ -26,11 +26,14 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
 use App\Services\AccountingService;
+use App\Traits\HasBranchScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class FixedAssetResource extends Resource
 {
+    use HasBranchScope;
+
     protected static ?string $model = FixedAsset::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-building-office-2';

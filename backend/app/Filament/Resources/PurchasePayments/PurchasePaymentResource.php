@@ -8,6 +8,7 @@ use App\Filament\Resources\PurchasePayments\Pages\ListPurchasePayments;
 use App\Filament\Resources\PurchasePayments\Schemas\PurchasePaymentForm;
 use App\Filament\Resources\PurchasePayments\Tables\PurchasePaymentsTable;
 use App\Models\PurchasePayment;
+use App\Traits\HasBranchScope;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -19,6 +20,8 @@ use Filament\Tables\Table;
 
 class PurchasePaymentResource extends Resource
 {
+    use HasBranchScope;
+
     protected static ?string $model = PurchasePayment::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';

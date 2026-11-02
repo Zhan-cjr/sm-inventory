@@ -7,6 +7,7 @@ use App\Filament\Resources\Kontrabons\Pages\ListKontrabons;
 use App\Filament\Resources\Kontrabons\Schemas\KontrabonForm;
 use App\Filament\Resources\Kontrabons\Tables\KontrabonsTable;
 use App\Models\Kontrabon;
+use App\Traits\HasBranchScope;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -15,6 +16,8 @@ use Filament\Tables;
 
 class KontrabonResource extends Resource
 {
+    use HasBranchScope;
+
     protected static ?string $model = Kontrabon::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-duplicate';

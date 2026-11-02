@@ -42,7 +42,9 @@
                         <td class="pos-label">Cabang</td>
                         <td>
                             <select class="pos-input" wire:model.live="branch_id" @if(auth()->user()->branch_id) disabled @endif>
-                                <option value="">Pusat</option>
+                                @if(!auth()->user()?->branch_id)
+                                    <option value="">Pusat</option>
+                                @endif
                                 @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                 @endforeach

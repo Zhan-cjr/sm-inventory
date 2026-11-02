@@ -12,9 +12,12 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use App\Traits\HasBranchScope;
 
 class StockQuarantineAuditResource extends Resource
 {
+    use HasBranchScope;
+
     protected static ?string $model = StockQuarantineAudit::class;
 
     protected static \UnitEnum|string|null $navigationGroup = 'STOK OPNAME';

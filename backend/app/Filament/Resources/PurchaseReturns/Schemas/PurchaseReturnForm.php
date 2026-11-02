@@ -27,7 +27,10 @@ class PurchaseReturnForm
                 Select::make('branch_id')
                     ->relationship('branch', 'name')
                     ->label('Cabang')
-                    ->default(fn () => auth()->user()->branch_id ?? null),
+                    ->default(fn () => auth()->user()->branch_id ?? null)
+                    ->disabled(fn () => auth()->user()->branch_id !== null)
+                    ->dehydrated()
+                    ->required(),
                 
                 Select::make('supplier_id')
                     ->relationship(
@@ -70,9 +73,15 @@ class PurchaseReturnForm
                         if (!$supplierId) {
                             return [];
                         }
-                        return GoodsReceipt::where('supplier_id', $supplierId)
-                            ->where('status', '!=', 'CANCELLED')
-                            ->orderBy('created_at', 'desc')
+                        $query = GoodsReceipt::where('supplier_id', $supplierId)
+                            ->where('status', '!=', 'CANCELLED');
+
+                        $branchId = auth()->user()?->branch_id ?? $get('branch_id');
+                        if ($branchId) {
+                            $query->where('branch_id', $branchId);
+                        }
+
+                        return $query->orderBy('created_at', 'desc')
                             ->pluck('receipt_number', 'id');
                     })
                     ->searchable()

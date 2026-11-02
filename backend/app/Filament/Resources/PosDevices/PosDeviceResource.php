@@ -8,6 +8,7 @@ use App\Filament\Resources\PosDevices\Pages\ListPosDevices;
 use App\Filament\Resources\PosDevices\Schemas\PosDeviceForm;
 use App\Filament\Resources\PosDevices\Tables\PosDevicesTable;
 use App\Models\PosDevice;
+use App\Traits\HasBranchScope;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -16,6 +17,8 @@ use Filament\Tables\Table;
 
 class PosDeviceResource extends Resource
 {
+    use HasBranchScope;
+
     protected static ?string $model = PosDevice::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-computer-desktop';

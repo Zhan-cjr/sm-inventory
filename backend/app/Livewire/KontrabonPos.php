@@ -37,9 +37,15 @@ class KontrabonPos extends Component
         // Default jatuh tempo 14 hari dari sekarang jika belum ada supplier
         $this->tanggal_jatuh_tempo = date('Y-m-d', strtotime('+14 days'));
         
-        $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
+        $userBranchId = auth()->user()?->branch_id;
+        if ($userBranchId) {
+            $this->branch_id = $userBranchId;
+            $this->branches = Branch::where('id', $userBranchId)->get();
+        } else {
+            $this->branch_id = \App\Models\Branch::first()?->id ?? '';
+            $this->branches = Branch::all();
+        }
         $this->suppliers = Supplier::where('is_active', true)->select('id', 'name', 'code', 'address', 'default_due_days')->get()->toArray();
-        $this->branches = Branch::all();
     }
     
     public function updatedSupplierId($value)
@@ -195,7 +201,7 @@ class KontrabonPos extends Component
                 'tanggal_kontrabon' => $this->tanggal_kontrabon,
                 'tanggal_jatuh_tempo' => $this->tanggal_jatuh_tempo,
                 'supplier_id' => $this->supplier_id,
-                'branch_id' => $this->branch_id,
+                'branch_id' => auth()->user()?->branch_id ?: ($this->branch_id ?: null),
                 'total_amount' => $this->grand_total,
                 'paid_amount' => 0,
                 'notes' => $this->notes,
