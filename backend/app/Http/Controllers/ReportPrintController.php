@@ -1245,7 +1245,7 @@ class ReportPrintController extends Controller
             }
 
             $q = $this->applyDateFilters($q, $filters, 'transaction_date', 'transaction_date');
-        })->whereNotNull('service_id')->with(['service', 'transaction']);
+        })->whereNotNull('service_id')->with(['service', 'transaction', 'transaction.branch']);
         
         if ($searchQuery = request()->input('tableSearchQuery')) {
             $query->where(function($q) use ($searchQuery) {
@@ -1257,23 +1257,93 @@ class ReportPrintController extends Controller
         $items = $query->get();
         $period = $this->getPeriodString($filters);
 
-        $columns = ['Tanggal', 'Jasa', 'Kode Jasa', 'Qty Terjual', 'Harga Satuan', 'Total Penjualan'];
+        if (request('tab') === 'rekap') {
+            $grouped = [];
+            foreach ($items as $i) {
+                $sid = $i->service_id;
+                if (!isset($grouped[$sid])) {
+                    $grouped[$sid] = [
+                        'code' => $i->service ? $i->service->code : '-',
+                        'name' => $i->service ? $i->service->name : '-',
+                        'price' => $i->service ? (float)$i->service->price : (float)$i->unit_price,
+                        'qty' => 0,
+                        'total_penjualan' => 0,
+                    ];
+                }
+                $subtotal = ($i->unit_price - $i->discount_per_item) * $i->quantity;
+                $grouped[$sid]['qty'] += $i->quantity;
+                $grouped[$sid]['total_penjualan'] += $subtotal;
+            }
+
+            usort($grouped, fn($a, $b) => strcmp($a['name'], $b['name']));
+
+            $columns = ['Kode Jasa', 'Nama Jasa', 'Tarif Master', 'Total Qty Terjual', 'Total Penjualan (Net)'];
+            $rows = [];
+            $t_qty = 0;
+            $t_penjualan = 0;
+            foreach ($grouped as $g) {
+                $t_qty += $g['qty'];
+                $t_penjualan += $g['total_penjualan'];
+                $rows[] = [
+                    $g['code'],
+                    $g['name'],
+                    number_format($g['price'], 0, ',', '.'),
+                    number_format($g['qty'], 0, ',', '.'),
+                    number_format($g['total_penjualan'], 0, ',', '.'),
+                ];
+            }
+            $rows[] = [
+                '<strong>TOTAL</strong>',
+                '',
+                '',
+                '<strong>' . number_format($t_qty, 0, ',', '.') . '</strong>',
+                '<strong>' . number_format($t_penjualan, 0, ',', '.') . '</strong>',
+            ];
+
+            $summaryBox = [
+                'Total Jenis Jasa' => count($grouped),
+                'Total Qty Terjual' => number_format($t_qty, 0, ',', '.'),
+                'Total Penjualan Jasa' => 'Rp ' . number_format($t_penjualan, 0, ',', '.'),
+            ];
+
+            return view('print.reports.generic', [
+                'title' => 'Laporan Rekap Jasa Terjual',
+                'period' => $period,
+                'columns' => $columns,
+                'rows' => $rows,
+                'summaryBox' => $summaryBox,
+            ]);
+        }
+
+        $columns = ['Tanggal', 'No Transaksi', 'Cabang', 'Kode Jasa', 'Nama Jasa', 'Qty', 'Harga Satuan', 'Diskon', 'Total Penjualan'];
         $rows = [];
         $t_qty = 0; $t_penjualan = 0;
         foreach($items as $i) {
             $subtotal = ($i->unit_price - $i->discount_per_item) * $i->quantity;
             $t_qty += $i->quantity;
             $t_penjualan += $subtotal;
+            $noTrans = !empty($i->transaction?->receipt_number) 
+                ? $i->transaction->receipt_number 
+                : (!empty($i->transaction?->local_transaction_id) 
+                    ? $i->transaction->local_transaction_id 
+                    : strtoupper(substr($i->transaction_id ?? '', 0, 8)));
             $rows[] = [
-                $i->transaction ? \Carbon\Carbon::parse($i->transaction->transaction_date)->format('d-m-Y') : '-',
-                $i->service ? $i->service->name : '-',
+                $i->transaction ? \Carbon\Carbon::parse($i->transaction->transaction_date)->format('d-m-Y H:i') : '-',
+                $noTrans,
+                $i->transaction?->branch?->name ?? '-',
                 $i->service ? $i->service->code : '-',
-                $i->quantity,
+                $i->service ? $i->service->name : '-',
+                number_format($i->quantity, 0, ',', '.'),
                 number_format($i->unit_price, 0, ',', '.'),
+                number_format($i->discount_per_item, 0, ',', '.'),
                 number_format($subtotal, 0, ',', '.')
             ];
         }
-        $rows[] = ['<strong>TOTAL</strong>', '', '', '<strong>'.$t_qty.'</strong>', '', '<strong>'.number_format($t_penjualan, 0, ',', '.').'</strong>'];
+        $rows[] = [
+            '<strong>TOTAL</strong>', '', '', '', '',
+            '<strong>'.number_format($t_qty, 0, ',', '.').'</strong>', '', '',
+            '<strong>'.number_format($t_penjualan, 0, ',', '.').'</strong>'
+        ];
 
         return view('print.reports.generic', ['title' => 'Laporan Jasa Terjual', 'period' => $period, 'columns' => $columns, 'rows' => $rows]);
     }

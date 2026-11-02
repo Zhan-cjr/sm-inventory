@@ -17,11 +17,15 @@ use App\Filament\Exports\TransactionItemExporter;
 use Illuminate\Support\Facades\Auth;
 
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
+use Livewire\Attributes\Url;
 
 class LaporanJasaTerjual extends Page implements HasTable
 {
     use InteractsWithTable;
     use HasPageShield;
+
+    #[Url(as: 'tab')]
+    public string $activeTab = 'detail';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-wrench-screwdriver';
     protected static ?string $navigationLabel = 'Laporan Jasa Terjual';
@@ -31,19 +35,87 @@ class LaporanJasaTerjual extends Page implements HasTable
 
     protected string $view = 'filament.pages.report-page';
 
+    public function getReportTabs(): array
+    {
+        return [
+            'detail' => [
+                'label' => 'Detail Per Transaksi',
+                'icon' => 'heroicon-o-list-bullet',
+            ],
+            'rekap' => [
+                'label' => 'Rekap Per Jasa',
+                'icon' => 'heroicon-o-squares-2x2',
+            ],
+        ];
+    }
+
+    public function updatedActiveTab(): void
+    {
+        $this->resetPage();
+    }
+
+    public function getTableRecordKey(\Illuminate\Database\Eloquent\Model|array $record): string
+    {
+        if (is_array($record)) {
+            return (string) ($record['id'] ?? $record['service_id'] ?? uniqid());
+        }
+
+        return (string) ($record->getKey() ?? $record->id ?? $record->service_id ?? uniqid());
+    }
+
     public function table(Table $table): Table
     {
+        $isRekap = $this->activeTab === 'rekap';
+
         return $table
+            ->defaultKeySort(false)
+            ->defaultSort($isRekap ? 'total_subtotal' : 'created_at', 'desc')
             ->query(
                 TransactionItem::query()
                     ->whereHas('transaction', fn (Builder $query) => 
                         $query->where('is_voided', false)
                             ->when(Auth::user()->branch_id !== null, fn ($q) => $q->where('branch_id', Auth::user()->branch_id))
                     )
-                    ->whereNotNull('service_id')
+                    ->whereNotNull('transaction_items.service_id')
+                    ->when($isRekap, function ($q) {
+                        $q->selectRaw("
+                            transaction_items.service_id as id,
+                            transaction_items.service_id,
+                            SUM(transaction_items.quantity) as total_qty,
+                            SUM((transaction_items.unit_price - transaction_items.discount_per_item) * transaction_items.quantity) as total_subtotal
+                        ")
+                        ->groupBy('transaction_items.service_id');
+                    })
                     ->with(['transaction', 'transaction.branch', 'service'])
             )
-            ->columns([
+            ->columns($isRekap ? [
+                TextColumn::make('service.code')
+                    ->label('Kode Jasa')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('service.name')
+                    ->label('Nama Jasa')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('service.price')
+                    ->label('Tarif Master')
+                    ->money('IDR', true)
+                    ->sortable(),
+                TextColumn::make('total_qty')
+                    ->label('Total Qty Terjual')
+                    ->numeric()
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Summarizer::make()->using(function (\Illuminate\Database\Query\Builder $query) {
+                        return (float) $query->sum('quantity');
+                    })->numeric())
+                    ->sortable(),
+                TextColumn::make('total_subtotal')
+                    ->label('Total Penjualan (Net)')
+                    ->money('IDR', true)
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Summarizer::make()->using(function (\Illuminate\Database\Query\Builder $query) {
+                        return (float) $query->sum(\Illuminate\Support\Facades\DB::raw('(unit_price - discount_per_item) * quantity'));
+                    })->money('IDR', true))
+                    ->sortable(),
+            ] : [
                 TextColumn::make('transaction.transaction_date')
                     ->label('Tanggal')
                     ->dateTime('d M Y H:i')
@@ -110,6 +182,7 @@ class LaporanJasaTerjual extends Page implements HasTable
                     ->color('info')
                     ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                         'type' => 'laporan-jasa-terjual',
+                        'tab' => $this->activeTab,
                         'tableFilters' => $livewire->tableFilters,
                         'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                     ]), true),
@@ -125,6 +198,7 @@ class LaporanJasaTerjual extends Page implements HasTable
                         ->url(fn (\Filament\Tables\Contracts\HasTable $livewire) => route('print.report', [
                             'type' => 'laporan-jasa-terjual',
                             'export' => 'xls',
+                            'tab' => $this->activeTab,
                             'tableFilters' => $livewire->tableFilters,
                             'tableSearchQuery' => method_exists($livewire, 'getTableSearch') ? $livewire->getTableSearch() : null,
                         ]), true)
