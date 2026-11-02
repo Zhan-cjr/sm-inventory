@@ -405,17 +405,17 @@ class ShiftController extends Controller
             $method = strtoupper($tx->payment_method);
             
             if ($method === 'CASH' || $method === 'POINT') {
-                $cash_sales += $tx_sales;
+                $cash_sales += ($amount + $tx_returns);
                 $cash_returns += $tx_returns;
             } elseif ($method === 'CARD') {
-                $card_sales += $tx_sales;
+                $card_sales += ($amount + $tx_returns);
                 $card_returns += $tx_returns;
                 $bankName = $tx->bank ? $tx->bank->name : 'EDC';
                 $bankName = trim(preg_replace('/^(Card|QRIS):\s*/i', '', $bankName)) ?: 'EDC';
                 if (!isset($cardSalesByBank[$bankName])) $cardSalesByBank[$bankName] = 0;
-                $cardSalesByBank[$bankName] += $amount;
+                $cardSalesByBank[$bankName] += ($amount + $tx_returns);
             } elseif ($method === 'VOUCHER') {
-                $voucher_sales += $tx_sales;
+                $voucher_sales += ($amount + $tx_returns);
             } elseif ($method === 'MULTI') {
                 $details = $tx->payment_details;
                 if (is_string($details)) $details = json_decode($details, true);
