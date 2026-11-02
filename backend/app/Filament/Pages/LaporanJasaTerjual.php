@@ -104,16 +104,12 @@ class LaporanJasaTerjual extends Page implements HasTable
                 TextColumn::make('total_qty')
                     ->label('Total Qty Terjual')
                     ->numeric()
-                    ->summarize(\Filament\Tables\Columns\Summarizers\Summarizer::make()->using(function (\Illuminate\Database\Query\Builder $query) {
-                        return (float) $query->sum('quantity');
-                    })->numeric())
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->numeric())
                     ->sortable(),
                 TextColumn::make('total_subtotal')
                     ->label('Total Penjualan (Net)')
                     ->money('IDR', true)
-                    ->summarize(\Filament\Tables\Columns\Summarizers\Summarizer::make()->using(function (\Illuminate\Database\Query\Builder $query) {
-                        return (float) $query->sum(\Illuminate\Support\Facades\DB::raw('(unit_price - discount_per_item) * quantity'));
-                    })->money('IDR', true))
+                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->money('IDR', true))
                     ->sortable(),
             ] : [
                 TextColumn::make('transaction.transaction_date')
