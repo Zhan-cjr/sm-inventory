@@ -24,7 +24,7 @@ class PurchaseOrder extends Model
     protected $fillable = [
         'organization_id', 'branch_id', 'supplier_id', 'supplier_division_id', 'po_number', 
         'po_date', 'faktur', 'expected_delivery_date', 'status', 
-        'total_amount', 'include_tax', 'tax_amount', 'notes', 'created_by',
+        'total_amount', 'include_tax', 'tax_amount', 'notes', 'over_order_reason', 'created_by',
         'po_expired_days', 'expired_date'
     ];
 

@@ -86,6 +86,10 @@ class PurchaseOrdersTable
                     })
                     ->limit(50)
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('over_order_reason')
+                    ->label('Alasan Over-Order')
+                    ->limit(50)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('total_amount')
                     ->label('Total Nominal')
                     ->numeric()

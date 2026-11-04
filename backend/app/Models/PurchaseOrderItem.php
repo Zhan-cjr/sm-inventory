@@ -15,12 +15,13 @@ class PurchaseOrderItem extends Model
     ];
 
     protected $fillable = [
-        'purchase_order_id', 'product_id', 'quantity_suggested', 'quantity_ordered', 
-        'quantity_received', 'unit_cost', 'discount_1', 'discount_2', 'discount_3', 'subtotal', 'promo_note'
+        'purchase_order_id', 'product_id', 'quantity_suggested', 'sales_30d', 'quantity_ordered', 
+        'quantity_received', 'unit_cost', 'discount_1', 'discount_2', 'discount_3', 'subtotal', 'promo_note', 'over_order_reason'
     ];
 
     protected $casts = [
         'quantity_suggested' => 'decimal:2',
+        'sales_30d' => 'decimal:2',
         'quantity_ordered' => 'decimal:2',
         'quantity_received' => 'decimal:2',
         'unit_cost' => 'decimal:2',

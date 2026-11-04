@@ -59,6 +59,28 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     public $showZeroQtyModal = false;
     public $zeroQtyProductNames = '';
 
+    public $showOverOrderModal = false;
+    public $overOrderReason = '';
+    public $overOrderProducts = [];
+    public $bulkReasonCode = '';
+    public $bulkReasonNote = '';
+
+    public const OVER_ORDER_REASON_PRESETS = [
+        'CARTON_PACK' => '📦 Pembulatan Kemasan Dus / Karton dari Pabrik',
+        'PROMO_SUPPLIER' => '🏷️ Promo Supplier (Diskon Ekstra / Bonus Barang)',
+        'CUSTOMER_REQUEST' => '🤝 Pesanan Khusus Pelanggan / Borongan / Acara',
+        'SALES_SPIKE' => '🎉 Antisipasi Lonjakan Pembeli (Gajian / Hari Libur / Akhir Pekan)',
+        'VENDOR_MOQ' => '🚚 Syarat Minimal Order dari Supplier (Bebas Ongkir)',
+        'SUPPLY_SHORTAGE' => '⚠️ Pasokan Barang Sedang Langka / Sering Kosong dari Pabrik',
+        'SHELF_DISPLAY' => '🛍️ Kebutuhan Pajangan Rak Toko agar Terlihat Penuh',
+        'OTHER' => '📝 Alasan Lainnya (Tuliskan pada catatan)',
+    ];
+
+    public function getOverOrderReasonPresetsProperty(): array
+    {
+        return self::OVER_ORDER_REASON_PRESETS;
+    }
+
     public $searchResults = [];
 
     public $purchaseOrder;
@@ -112,12 +134,13 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             $this->supplier_division_id = $purchaseOrder->supplier_division_id;
             $this->include_tax = $purchaseOrder->include_tax;
             $this->tax_amount = $purchaseOrder->tax_amount;
+            $this->overOrderReason = $purchaseOrder->over_order_reason ?? '';
 
             $items = \App\Models\PurchaseOrderItem::where('purchase_order_id', $purchaseOrder->id)->with('product')->get();
             foreach ($items as $item) {
                 if (!$item->product) continue;
 
-                $this->cart[] = $this->resolveCartItemData(
+                $cartItem = $this->resolveCartItemData(
                     $item->product,
                     $this->branch_id,
                     (float)$item->quantity_ordered,
@@ -129,8 +152,11 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                         'discount_3' => (float)$item->discount_3,
                     ],
                     (float)$item->subtotal,
-                    $item->promo_note
+                    $item->promo_note,
+                    $item->sales_30d !== null ? (float)$item->sales_30d : null
                 );
+                $cartItem['over_order_reason'] = $item->over_order_reason;
+                $this->cart[] = $cartItem;
             }
         } else {
             $this->po_number = 'PO-' . date('YmdHis');
@@ -318,6 +344,12 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     public function updateRow($index, $field, $value)
     {
         $this->cart[$index][$field] = $value;
+        if ($field === 'qty') {
+            $cartonSize = (int)($this->cart[$index]['carton_size'] ?? 0);
+            if ($cartonSize > 1 && ((float)$value > 0) && (((int)$value % $cartonSize) !== 0)) {
+                $this->cart[$index]['is_carton_rounded'] = false;
+            }
+        }
         $this->recalculateRow($index);
         $this->calculateTotals();
     }
@@ -454,6 +486,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         if ($qtySaran > 0 && $cartonSize > 1) {
             $targetQty = (int)ceil($qtySaran / $cartonSize) * $cartonSize;
             $this->cart[$index]['qty'] = $targetQty;
+            $this->cart[$index]['is_carton_rounded'] = true;
             $this->recalculateRow($index);
 
             Notification::make()
@@ -499,6 +532,78 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         Notification::make()->title('Produk dengan qty 0 berhasil dihapus dari keranjang.')->success()->send();
     }
 
+    public function applyBulkOverOrderReason()
+    {
+        if (empty($this->bulkReasonCode)) {
+            Notification::make()
+                ->title('Pilih Alasan Terlebih Dahulu')
+                ->body('Silakan pilih salah satu kategori alasan pada dropdown Samakan Semua.')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        foreach ($this->overOrderProducts as $idx => $data) {
+            $this->overOrderProducts[$idx]['reason_code'] = $this->bulkReasonCode;
+            if (!empty($this->bulkReasonNote)) {
+                $this->overOrderProducts[$idx]['reason_note'] = $this->bulkReasonNote;
+            }
+        }
+
+        Notification::make()
+            ->title('Alasan Diseragamkan')
+            ->body('Kategori alasan berhasil diterapkan ke seluruh item over-order.')
+            ->success()
+            ->send();
+    }
+
+    public function confirmOverOrderSave()
+    {
+        $presets = self::OVER_ORDER_REASON_PRESETS;
+        $summaryReasons = [];
+
+        // Validasi: seluruh produk wajib memiliki alasan yang dipilih
+        foreach ($this->overOrderProducts as $idx => $data) {
+            $code = $data['reason_code'] ?? '';
+            if (empty($code)) {
+                $productName = $data['name'] ?? 'Barang';
+                Notification::make()
+                    ->title('Alasan Belum Dipilih')
+                    ->body("Mohon pilih kategori alasan untuk produk: {$productName}")
+                    ->danger()
+                    ->send();
+                return;
+            }
+        }
+
+        foreach ($this->overOrderProducts as $idx => $data) {
+            $code = $data['reason_code'];
+            $label = $presets[$code] ?? $code;
+            $note = trim($data['reason_note'] ?? '');
+            
+            $formattedReason = $label;
+            if (!empty($note)) {
+                $formattedReason .= " ({$note})";
+            }
+
+            if (isset($this->cart[$idx])) {
+                $this->cart[$idx]['over_order_reason'] = $formattedReason;
+                $this->cart[$idx]['reason_code'] = $code;
+                $this->cart[$idx]['reason_note'] = $note;
+                $summaryReasons[] = "{$this->cart[$idx]['name']}: {$formattedReason}";
+            }
+        }
+
+        $this->overOrderReason = implode("; ", $summaryReasons);
+        $this->showOverOrderModal = false;
+        $this->save();
+    }
+
+    public function closeOverOrderModal()
+    {
+        $this->showOverOrderModal = false;
+    }
+
     public function calculateTotals()
     {
         $this->totalLines = count($this->cart);
@@ -517,6 +622,64 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
         $this->tax_amount = 0;
         $this->grandTotal = $netTotal;
+    }
+
+    public function detectSmartOverOrderReason(array $it): array
+    {
+        $qty = (float)($it['qty'] ?? 0);
+        $qtySaran = (float)($it['qty_saran'] ?? 0);
+        $cartonSize = (int)($it['carton_size'] ?? 0);
+        $promoNote = trim($it['promo_note'] ?? '');
+        $disc1 = (float)($it['discount_1'] ?? 0);
+        $disc2 = (float)($it['discount_2'] ?? 0);
+        $hasPromoDiscount = ($disc1 > 0 || $disc2 > 0);
+        $hasPromo = !empty($promoNote) || $hasPromoDiscount || !empty($it['is_promo']);
+
+        // 1. KASUS 1: ADA PROMO -> Otomatis ke Promo Supplier
+        if ($hasPromo) {
+            $note = $promoNote;
+            if (empty($note) && $hasPromoDiscount) {
+                $note = "Diskon Promo {$disc1}%";
+            }
+            return [
+                'code' => 'PROMO_SUPPLIER',
+                'note' => $note,
+                'auto_detected' => 'promo',
+            ];
+        }
+
+        // 2. KASUS 2: TIDAK ADA PROMO, TAPI QTY DIGENAPKAN PER DUS
+        // Dideteksi jika user mengklik tombol saran dus ATAU kuantitas pesanan adalah kelipatan dus resmi
+        $isCartonRounded = false;
+        $cartonNote = '';
+        if ($cartonSize > 1) {
+            $targetDusQty = (int)ceil($qtySaran / $cartonSize) * $cartonSize;
+            $dusCount = (int)ceil($qty / $cartonSize);
+
+            if (!empty($it['is_carton_rounded']) && (int)$qty === $targetDusQty) {
+                $isCartonRounded = true;
+                $cartonNote = "{$dusCount} Dus ({$qty} pcs)";
+            } elseif ($qty >= $cartonSize && ((int)$qty % $cartonSize === 0)) {
+                $isCartonRounded = true;
+                $cartonNote = "{$dusCount} Dus ({$qty} pcs)";
+            }
+        }
+
+        if ($isCartonRounded) {
+            return [
+                'code' => 'CARTON_PACK',
+                'note' => !empty($cartonNote) ? $cartonNote : ($it['carton_text'] ?? "1 Dus ({$cartonSize} pcs)"),
+                'auto_detected' => 'carton',
+            ];
+        }
+
+        // 3. KASUS 3: TIDAK ADA PROMO & TIDAK DIGENAPKAN PER DUS
+        // User WAJIB memilih opsi alasan secara manual (tidak boleh otomatis ke dus)
+        return [
+            'code' => '',
+            'note' => '',
+            'auto_detected' => null,
+        ];
     }
 
     public function save()
@@ -542,6 +705,56 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         $organization = \App\Models\Organization::find(auth()->user()->organization_id ?? \App\Models\Organization::first()->id);
+
+        // Deteksi apakah ada item yang kuantitasnya melebihi saran order AI
+        $hasUnfilledOverOrderItem = false;
+        foreach ($this->cart as $idx => $it) {
+            $qtySaran = (float)($it['qty_saran'] ?? 0);
+            if ((float)$it['qty'] > $qtySaran && empty($it['over_order_reason'])) {
+                $hasUnfilledOverOrderItem = true;
+                break;
+            }
+        }
+
+        if ($organization && $organization->po_approval_max_qty_enabled && $hasUnfilledOverOrderItem) {
+            $this->overOrderProducts = [];
+            foreach ($this->cart as $idx => $it) {
+                $qtySaran = (float)($it['qty_saran'] ?? 0);
+                if ((float)$it['qty'] > $qtySaran) {
+                    $smartReason = $this->detectSmartOverOrderReason($it);
+
+                    $this->overOrderProducts[$idx] = [
+                        'name' => $it['name'],
+                        'qty' => (float)$it['qty'],
+                        'qty_saran' => $qtySaran,
+                        'carton_text' => $it['carton_text'] ?? null,
+                        'reason_code' => $it['reason_code'] ?? $smartReason['code'],
+                        'reason_note' => isset($it['reason_note']) && $it['reason_note'] !== '' ? $it['reason_note'] : $smartReason['note'],
+                        'auto_detected' => $smartReason['auto_detected'],
+                    ];
+                }
+            }
+
+            // Tentukan default bulkReasonCode pada toolbar Samakan Semua
+            $promoCount = 0;
+            $cartonCount = 0;
+            $emptyCount = 0;
+            foreach ($this->overOrderProducts as $oop) {
+                if ($oop['reason_code'] === 'PROMO_SUPPLIER') $promoCount++;
+                elseif ($oop['reason_code'] === 'CARTON_PACK') $cartonCount++;
+                elseif (empty($oop['reason_code'])) $emptyCount++;
+            }
+            if ($promoCount > 0 && $cartonCount === 0 && $emptyCount === 0) {
+                $this->bulkReasonCode = 'PROMO_SUPPLIER';
+            } elseif ($cartonCount > 0 && $promoCount === 0 && $emptyCount === 0) {
+                $this->bulkReasonCode = 'CARTON_PACK';
+            } else {
+                $this->bulkReasonCode = '';
+            }
+
+            $this->showOverOrderModal = true;
+            return;
+        }
 
         $needsApproval = false;
         $approvalReason = [];
@@ -578,8 +791,9 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                             }
                         }
 
+                        $reasonSuffix = !empty($item['over_order_reason']) ? " [Alasan: {$item['over_order_reason']}]" : "";
                         if ($overCount <= 5) {
-                            $approvalReason[] = "{$item['name']} (Order: {$item['qty']} | Saran: {$qtySaran}{$cartonNote} | Stok: {$stockVal} | Jual: {$avgSales}/bln{$oosText}){$promoText}";
+                            $approvalReason[] = "{$item['name']} (Order: {$item['qty']} | Saran: {$qtySaran}{$cartonNote} | Stok: {$stockVal} | Jual: {$avgSales}/bln{$oosText}){$promoText}{$reasonSuffix}";
                         }
                     }
                 }
@@ -605,6 +819,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             'include_tax' => false,
             'tax_amount' => 0,
             'notes' => $this->notes,
+            'over_order_reason' => empty(trim($this->overOrderReason)) ? null : trim($this->overOrderReason),
             'created_by' => auth()->id(),
         ];
 
@@ -624,6 +839,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 'purchase_order_id' => $po->id,
                 'product_id' => $item['product_id'],
                 'quantity_suggested' => $item['qty_saran'] ?? 0,
+                'sales_30d' => $item['avg_bln'] ?? 0,
                 'quantity_ordered' => $item['qty'],
                 'unit_cost' => $item['unit_cost'],
                 'discount_1' => $item['discount_1'],
@@ -631,11 +847,17 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 'discount_3' => $item['discount_3'],
                 'subtotal' => $item['subtotal'],
                 'promo_note' => $item['promo_note'] ?? null,
+                'over_order_reason' => $item['over_order_reason'] ?? null,
             ]);
         }
 
         if ($needsApproval) {
-            $po->requestApproval('Otomatis: ' . implode(', ', $approvalReason));
+            $notes = "";
+            if (!empty(trim($this->overOrderReason))) {
+                $notes .= "Alasan Over-Order: " . trim($this->overOrderReason) . "\n";
+            }
+            $notes .= "Otomatis: " . implode(', ', $approvalReason);
+            $po->requestApproval($notes);
             Notification::make()->title('PO memerlukan persetujuan Manajer.')->warning()->send();
         } else {
             Notification::make()->title('Pesanan Pembelian berhasil disimpan.')->success()->send();
@@ -769,7 +991,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         return $lastReturn;
     }
 
-    public function resolveCartItemData($product, $branchId, $qty = 1, $qtySaran = 0, $customCost = null, $customDiscounts = null, $customSubtotal = null, $promoNote = null)
+    public function resolveCartItemData($product, $branchId, $qty = 1, $qtySaran = 0, $customCost = null, $customDiscounts = null, $customSubtotal = null, $promoNote = null, $savedSales30d = null)
     {
         $stock = null;
         $stockModel = null;
@@ -895,6 +1117,11 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 $avgMinggu = round($avgBln / 4, 1);
                 $isSalesFromHistory = true;
             }
+        }
+
+        // Jika dokumen PO ini sudah memiliki snapshot sales_30d tersimpan, gunakan snapshot tersebut!
+        if ($savedSales30d !== null) {
+            $avgBln = (float)$savedSales30d;
         }
 
         $minQty = (float)($stockModel->min_qty ?? 0);
@@ -1039,6 +1266,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             'is_empty_due_to_return' => $isEmptyDueToReturn,
             'is_slow_moving_alert' => $isSlowMovingAlert,
             'promo_note' => $promoNote,
+            'over_order_reason' => null,
         ];
     }
 

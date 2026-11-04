@@ -87,6 +87,13 @@ class GoodsReceiptsTable
                         'images' => is_array($record->faktur_image) ? $record->faktur_image : [$record->faktur_image]
                     ]))
                     ->visible(fn (\App\Models\GoodsReceipt $record) => !empty($record->faktur_image)),
+                \Filament\Actions\Action::make('cetak_barcode')
+                    ->label('Cetak Barcode')
+                    ->icon('heroicon-o-qr-code')
+                    ->color('warning')
+                    ->url(fn (\App\Models\GoodsReceipt $record) => \App\Filament\Pages\BarcodePrinter::getUrl(['goods_receipt_id' => $record->id]))
+                    ->openUrlInNewTab()
+                    ->visible(fn (\App\Models\GoodsReceipt $record) => strtoupper((string) $record->status) !== 'DRAFT'),
                 \Filament\Actions\Action::make('cetak_nota')
                     ->label('Cetak Nota')
                     ->icon('heroicon-o-printer')
@@ -99,16 +106,57 @@ class GoodsReceiptsTable
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
+                    \Filament\Actions\BulkAction::make('cetak_barcode_massal')
+                        ->label('Cetak Barcode')
+                        ->icon('heroicon-o-qr-code')
+                        ->color('warning')
+                        ->action(function (Collection $records, \Livewire\Component $livewire) {
+                            $validRecords = $records->filter(fn ($r) => strtoupper((string) $r->status) !== 'DRAFT');
+                            if ($validRecords->isEmpty()) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Pilih penerimaan barang yang sudah selesai (bukan draft)')
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+
+                            $ids = $validRecords->pluck('id')->toArray();
+                            $url = \App\Filament\Pages\BarcodePrinter::getUrl([
+                                'goods_receipt_ids' => implode(',', $ids)
+                            ]);
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Membuka Cetak Barcode')
+                                ->body(count($ids) . ' transaksi penerimaan barang siap dicetak.')
+                                ->success()
+                                ->actions([
+                                    Action::make('buka')
+                                        ->label('Buka Halaman Cetak Barcode')
+                                        ->button()
+                                        ->url($url)
+                                        ->openUrlInNewTab(),
+                                ])
+                                ->send();
+
+                            $livewire->js("window.open('{$url}', '_blank');");
+                        })
+                        ->deselectRecordsAfterCompletion(),
                     \Filament\Actions\BulkAction::make('cetak_nota_massal')
                         ->label('Cetak Nota')
                         ->icon('heroicon-o-printer')
                         ->color('info')
-                        ->action(function (Collection $records) {
+                        ->action(function (Collection $records, \Livewire\Component $livewire) {
                             $ids = $records->filter(fn ($r) => strtoupper((string) $r->status) !== 'DRAFT')->pluck('id')->toArray();
-                            if (empty($ids)) return;
+                            if (empty($ids)) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Tidak ada penerimaan barang selesai yang dipilih')
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+                            $url = route('print.document', ['type' => 'receipt', 'ids' => $ids]);
+                            $livewire->js("window.open('{$url}', '_blank');");
                         })
-                        ->url(fn (Collection $records) => route('print.document', ['type' => 'receipt', 'ids' => $records->filter(fn ($r) => strtoupper((string) $r->status) !== 'DRAFT')->pluck('id')->toArray()]))
-                        ->openUrlInNewTab()
                         ->deselectRecordsAfterCompletion(),
                 ]),
             ])

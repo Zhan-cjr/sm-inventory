@@ -310,7 +310,13 @@ export function MobileAuthQueue({ authToken, user }) {
                     <div>Total Nominal / Qty: <strong style={{ color: 'var(--text-main)', fontSize: '0.95rem' }}>{req.type === 'Otorisasi Penerimaan Qty Gudang' ? req.total + ' item' : 'Rp ' + parseFloat(req.total).toLocaleString('id-ID')}</strong></div>
                     <div>Dibuat oleh: <strong style={{ color: 'var(--text-main)' }}>{req.created_by}</strong></div>
                     {req.supplier_name && <div>Supplier: <strong style={{ color: 'var(--text-main)' }}>{req.supplier_name}</strong></div>}
-                    {req.notes && <div style={{ color: '#f59e0b', fontStyle: 'italic', marginTop: '2px' }}>Catatan: "{req.notes}"</div>}
+                    {req.over_order_reason ? (
+                      <div style={{ color: '#d97706', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', marginTop: '4px', fontWeight: 600 }}>
+                        📝 Alasan Over-Order: &ldquo;{req.over_order_reason}&rdquo;
+                      </div>
+                    ) : req.notes ? (
+                      <div style={{ color: '#f59e0b', fontStyle: 'italic', marginTop: '2px' }}>Catatan: &ldquo;{req.notes}&rdquo;</div>
+                    ) : null}
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.5rem' }}>

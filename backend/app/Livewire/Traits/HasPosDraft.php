@@ -34,10 +34,15 @@ trait HasPosDraft
             'scan_image', 'purchaseOrdersList', 'purchaseOrders',
             // Promo modal states & file uploads
             'promoFile', 'parsedPromoItems', 'excelSheets', 'excelColumns',
-            'showPromoModal', 'promoErrorMessage', 'promoText'
+            'showPromoModal', 'promoErrorMessage', 'promoText',
+            // Over-order modal states
+            'showOverOrderModal', 'overOrderProducts', 'bulkReasonCode', 'bulkReasonNote', 'overOrderReasonPresets'
         ];
 
         foreach ($properties as $prop) {
+            if ($prop->isStatic()) {
+                continue;
+            }
             // Only save properties declared in the specific component (not Livewire internals)
             if ($prop->class === static::class) {
                 $name = $prop->getName();
@@ -105,12 +110,28 @@ trait HasPosDraft
         $draft = Cache::get('pos_draft_' . static::class . '_' . auth()->id());
         
         if ($draft && is_array($draft) && !empty($draft['cart'])) {
+            $ignoredProperties = [
+                'purchaseOrder', 'goodsReceipt', 'purchaseReturn', 'stockAdjustment',
+                'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image',
+                'scan_image', 'purchaseOrdersList', 'purchaseOrders',
+                'promoFile', 'parsedPromoItems', 'excelSheets', 'excelColumns',
+                'showPromoModal', 'promoErrorMessage', 'promoText',
+                'showOverOrderModal', 'overOrderProducts', 'bulkReasonCode', 'bulkReasonNote', 'overOrderReasonPresets'
+            ];
+
             $reflection = new \ReflectionClass($this);
             foreach ($draft as $key => $value) {
+                if (in_array($key, $ignoredProperties)) {
+                    continue;
+                }
                 if ($reflection->hasProperty($key)) {
                     $prop = $reflection->getProperty($key);
-                    if ($prop->isPublic() && $prop->class === static::class) {
-                        $this->{$key} = $value;
+                    if ($prop->isPublic() && !$prop->isStatic() && $prop->class === static::class) {
+                        try {
+                            $this->{$key} = $value;
+                        } catch (\Throwable $e) {
+                            // ignore unassignable property
+                        }
                     }
                 }
             }

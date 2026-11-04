@@ -64,7 +64,13 @@ class RemindPendingPO extends Command
             $creatorName = $po->creator ? $po->creator->name : 'System';
             $poDate = $po->po_date ? $po->po_date->format('d M Y') : '-';
             
+            $supplierName = $po->supplier ? $po->supplier->name : '-';
+            if ($po->division?->name) {
+                $supplierName .= " ({$po->division->name})";
+            }
+            
             $message .= "🛒 *PO:* {$po->po_number}\n";
+            $message .= "Supplier: {$supplierName}\n";
             $message .= "Cabang: {$branchName}\n";
             $message .= "Dibuat: {$creatorName} ({$poDate})\n";
             $message .= "---------------------------\n";

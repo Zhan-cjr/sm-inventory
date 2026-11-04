@@ -224,6 +224,15 @@ export function useSuggestedOrders({ user, authToken, filterOnlyReorder = false 
       return false;
     }
 
+    const overItems = itemsToOrder.filter(it => (parseFloat(it.suggested_qty) || 0) > (parseFloat(it.original_qty) || 0));
+    let overOrderReason = null;
+    if (overItems.length > 0) {
+      overOrderReason = window.prompt(`Terdapat ${overItems.length} produk dipesan melebihi saran order AI.\nMasukkan catatan alasan over-order untuk otorisasi Manajer:`);
+      if (overOrderReason === null) {
+        return false;
+      }
+    }
+
     if (!redirectFilament && !window.confirm(`Buat satu draft Pesanan Pembelian untuk ${itemsToOrder.length} produk terpilih?`)) {
       return false;
     }
@@ -236,6 +245,7 @@ export function useSuggestedOrders({ user, authToken, filterOnlyReorder = false 
       const branchId = selectedBranchId || user?.branch_id || localStorage.getItem('pos_device_branch_id');
       const payload = { items: itemsToOrder };
       if (branchId) payload.branch_id = branchId;
+      if (overOrderReason) payload.over_order_reason = overOrderReason;
 
       const res = await fetch('/api/v1/purchase-orders/create-bulk-from-suggestions', {
         method: 'POST',

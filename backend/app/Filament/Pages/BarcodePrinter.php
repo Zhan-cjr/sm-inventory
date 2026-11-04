@@ -7,6 +7,7 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\TextInput;
 use Filament\Actions\Action;
 use App\Models\Product;
 use App\Models\GoodsReceipt;
@@ -40,6 +41,105 @@ class BarcodePrinter extends Page implements HasForms
             'add_product_id' => null,
             'print_items' => []
         ]);
+
+        $rawGrIds = request()->query('goods_receipt_ids') ?? request()->query('goods_receipt_id');
+        if (!empty($rawGrIds)) {
+            if (is_string($rawGrIds)) {
+                $rawGrIds = urldecode($rawGrIds);
+                $idList = array_filter(array_map('trim', explode(',', $rawGrIds)));
+            } elseif (is_array($rawGrIds)) {
+                $idList = array_filter(array_map('trim', $rawGrIds));
+            } else {
+                $idList = [];
+            }
+
+            if (!empty($idList)) {
+                $this->loadReceiptItemsByIds($idList);
+            }
+        }
+    }
+
+    public function loadReceiptItemsByIds(array $goodsReceiptIds, string $copiesMode = 'received', int $customCopies = 1): int
+    {
+        $goodsReceiptIds = array_filter($goodsReceiptIds);
+        if (empty($goodsReceiptIds)) return 0;
+
+        $receipts = GoodsReceipt::with(['items.product', 'supplier', 'branch'])->whereIn('id', $goodsReceiptIds)->get();
+        if ($receipts->isEmpty()) return 0;
+
+        // Auto-set branch if user has no branch set and receipts belong to the same branch
+        $branchIds = $receipts->pluck('branch_id')->filter()->unique();
+        if ($branchIds->count() === 1 && empty($this->data['branch_id']) && !auth()->user()->branch_id) {
+            $this->data['branch_id'] = $branchIds->first();
+            $this->form->fill(array_merge($this->data, ['branch_id' => $branchIds->first()]));
+        }
+
+        $branchId = $this->data['branch_id'] ?? auth()->user()->branch_id;
+        $currentItems = $this->data['print_items'] ?? [];
+        $existingMap = [];
+        foreach ($currentItems as $idx => $it) {
+            $existingMap[$it['product_id']] = $idx;
+        }
+
+        $countAdded = 0;
+        $receiptNumbers = $receipts->pluck('receipt_number')->take(3)->implode(', ');
+        if ($receipts->count() > 3) {
+            $receiptNumbers .= ' (+' . ($receipts->count() - 3) . ' lainnya)';
+        }
+
+        foreach ($receipts as $receipt) {
+            foreach ($receipt->items as $item) {
+                $product = $item->product;
+                if (!$product || !$product->is_active || $product->product_type === 'digital') {
+                    continue;
+                }
+
+                if ($copiesMode === 'single') {
+                    $copies = 1;
+                } elseif ($copiesMode === 'custom') {
+                    $copies = max(1, $customCopies);
+                } else {
+                    $copies = (int)($item->quantity_received > 0 ? $item->quantity_received : 1);
+                }
+
+                if (isset($existingMap[$product->id])) {
+                    $idx = $existingMap[$product->id];
+                    $currentItems[$idx]['copies'] += $copies;
+                } else {
+                    $stock = $branchId ? Stock::where('product_id', $product->id)->where('branch_id', $branchId)->first() : null;
+                    $price = ($stock && $stock->selling_price > 0) ? $stock->selling_price : $product->selling_price;
+                    $velocity = static::getProductVelocityCategory($product->id, $branchId);
+
+                    $currentItems[] = [
+                        'product_id' => $product->id,
+                        'name' => $product->name,
+                        'sku' => $product->sku ?? '-',
+                        'barcode' => $product->barcode ?? '-',
+                        'price' => (float) $price,
+                        'copies' => (int) $copies,
+                        'velocity' => $velocity,
+                    ];
+                    $existingMap[$product->id] = count($currentItems) - 1;
+                }
+                $countAdded++;
+            }
+        }
+
+        $this->data['print_items'] = $currentItems;
+
+        if ($countAdded > 0) {
+            \Filament\Notifications\Notification::make()
+                ->title("Berhasil memuat {$countAdded} produk dari Penerimaan ({$receiptNumbers})")
+                ->success()
+                ->send();
+        } else {
+            \Filament\Notifications\Notification::make()
+                ->title("Tidak ada produk fisik yang dapat dimuat dari Penerimaan ({$receiptNumbers})")
+                ->warning()
+                ->send();
+        }
+
+        return $countAdded;
     }
 
     public function form(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
@@ -313,35 +413,98 @@ class BarcodePrinter extends Page implements HasForms
                 ->label('Load Data Penerimaan (GR)')
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('info')
+                ->modalHeading('Load Data dari Penerimaan Barang (GR)')
+                ->modalDescription('Cari dokumen penerimaan barang berdasarkan Nama Supplier, No. Faktur, No. PO, atau No. GR.')
+                ->modalWidth('xl')
                 ->form([
                     Select::make('goods_receipt_id')
-                        ->label('Pilih Transaksi Penerimaan')
+                        ->label('Pilih Dokumen Penerimaan Barang')
+                        ->placeholder('Ketik nama supplier, no faktur, no PO, atau no GR...')
                         ->searchable()
+                        ->options(function () {
+                            $branchId = auth()->user()->branch_id ?? $this->data['branch_id'] ?? null;
+                            return GoodsReceipt::query()
+                                ->with(['supplier', 'purchaseOrder'])
+                                ->withCount('items')
+                                ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+                                ->where(fn($q) => $q->where('status', '!=', 'DRAFT')->orWhereNull('status'))
+                                ->orderBy('receipt_date', 'desc')
+                                ->limit(20)
+                                ->get()
+                                ->mapWithKeys(function ($gr) {
+                                    $supplier = $gr->supplier?->name ?? 'Tanpa Supplier';
+                                    $faktur = $gr->faktur_supplier ? " | Fak: {$gr->faktur_supplier}" : '';
+                                    $po = $gr->purchaseOrder?->po_number ? " | PO: {$gr->purchaseOrder->po_number}" : '';
+                                    $date = $gr->receipt_date ? $gr->receipt_date->format('d/m/Y') : '-';
+                                    $items = "({$gr->items_count} item)";
+                                    return [$gr->id => "[{$date}] {$gr->receipt_number} • {$supplier}{$faktur}{$po} {$items}"];
+                                })
+                                ->toArray();
+                        })
                         ->getSearchResultsUsing(function (string $search) {
                             $branchId = auth()->user()->branch_id ?? $this->data['branch_id'] ?? null;
-                            return GoodsReceipt::where('receipt_number', 'like', "%{$search}%")
+                            return GoodsReceipt::query()
+                                ->with(['supplier', 'purchaseOrder'])
+                                ->withCount('items')
                                 ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-                                ->limit(20)->pluck('receipt_number', 'id')->toArray();
+                                ->where(fn($q) => $q->where('status', '!=', 'DRAFT')->orWhereNull('status'))
+                                ->where(function ($q) use ($search) {
+                                    $q->where('receipt_number', 'like', "%{$search}%")
+                                      ->orWhere('faktur_supplier', 'like', "%{$search}%")
+                                      ->orWhereHas('supplier', fn($sq) => $sq->where('name', 'like', "%{$search}%"))
+                                      ->orWhereHas('purchaseOrder', fn($pq) => $pq->where('po_number', 'like', "%{$search}%"));
+                                })
+                                ->orderBy('receipt_date', 'desc')
+                                ->limit(30)
+                                ->get()
+                                ->mapWithKeys(function ($gr) {
+                                    $supplier = $gr->supplier?->name ?? 'Tanpa Supplier';
+                                    $faktur = $gr->faktur_supplier ? " | Fak: {$gr->faktur_supplier}" : '';
+                                    $po = $gr->purchaseOrder?->po_number ? " | PO: {$gr->purchaseOrder->po_number}" : '';
+                                    $date = $gr->receipt_date ? $gr->receipt_date->format('d/m/Y') : '-';
+                                    $items = "({$gr->items_count} item)";
+                                    return [$gr->id => "[{$date}] {$gr->receipt_number} • {$supplier}{$faktur}{$po} {$items}"];
+                                })
+                                ->toArray();
                         })
-                        ->getOptionLabelUsing(fn ($value): ?string => GoodsReceipt::find($value)?->receipt_number)
+                        ->getOptionLabelUsing(function ($value): ?string {
+                            $gr = GoodsReceipt::with(['supplier', 'purchaseOrder'])->withCount('items')->find($value);
+                            if (!$gr) return null;
+                            $supplier = $gr->supplier?->name ?? 'Tanpa Supplier';
+                            $faktur = $gr->faktur_supplier ? " | Fak: {$gr->faktur_supplier}" : '';
+                            $po = $gr->purchaseOrder?->po_number ? " | PO: {$gr->purchaseOrder->po_number}" : '';
+                            $date = $gr->receipt_date ? $gr->receipt_date->format('d/m/Y') : '-';
+                            $items = "({$gr->items_count} item)";
+                            return "[{$date}] {$gr->receipt_number} • {$supplier}{$faktur}{$po} {$items}";
+                        })
                         ->required(),
+
+                    Select::make('copies_mode')
+                        ->label('Aturan Jumlah Lembar Barcode')
+                        ->options([
+                            'received' => '📦 Sesuai Qty Diterima Faktur (Label Tempel Produk)',
+                            'single' => '🏷️ Tepat 1 Lembar Per Produk (Pricecard / Display Rak)',
+                            'custom' => '🔢 Kustom Jumlah Lembar Tetap Per Produk',
+                        ])
+                        ->default('received')
+                        ->live()
+                        ->required(),
+
+                    TextInput::make('custom_copies')
+                        ->label('Jumlah Lembar Per Produk')
+                        ->numeric()
+                        ->default(2)
+                        ->minValue(1)
+                        ->maxValue(1000)
+                        ->visible(fn ($get) => $get('copies_mode') === 'custom')
+                        ->required(fn ($get) => $get('copies_mode') === 'custom'),
                 ])
                 ->action(function (array $data) {
-                    $receipt = GoodsReceipt::with('items.product')->find($data['goods_receipt_id']);
-                    if ($receipt) {
-                        $countAdded = 0;
-                        foreach ($receipt->items as $item) {
-                            if ($item->product && $item->product->is_active && $item->product->product_type !== 'digital') {
-                                $copies = $item->quantity_received > 0 ? (int)$item->quantity_received : 1;
-                                $this->addProductToQueue($item->product_id, $copies);
-                                $countAdded++;
-                            }
-                        }
-                        \Filament\Notifications\Notification::make()
-                            ->title("Berhasil memuat {$countAdded} barang dari GR {$receipt->receipt_number}")
-                            ->success()
-                            ->send();
-                    }
+                    $this->loadReceiptItemsByIds(
+                        [$data['goods_receipt_id']],
+                        $data['copies_mode'] ?? 'received',
+                        (int)($data['custom_copies'] ?? 1)
+                    );
                 }),
                 
             Action::make('export_excel')

@@ -277,7 +277,7 @@ class TelegramWebhookController extends Controller
         // Handle Actions
         if ($action === 'review') {
             if ($modelClass === \App\Models\PurchaseOrder::class) {
-                $model->load(['items.product', 'supplier']);
+                $model->load(['items.product', 'supplier', 'division']);
                 
                 // Filter items: only those exceeding suggested qty
                 $overItems = $model->items->filter(function($item) {
@@ -287,6 +287,10 @@ class TelegramWebhookController extends Controller
                 $baseText = htmlspecialchars($callbackQuery['message']['text'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 $text = $baseText . "\n\n<b>🔍 Rincian Item (Over Order):</b>\n";
                 
+                $suggestedService = app(\App\Services\SuggestedOrderService::class);
+                $fallbackSales30 = null;
+                $fallbackSales90 = null;
+
                 if ($overItems->isEmpty()) {
                     $text .= "<i>Semua item (" . $model->items->count() . ") sesuai dengan saran order.</i>";
                 } else {
@@ -302,15 +306,22 @@ class TelegramWebhookController extends Controller
                             ->first();
                         $currentStock = $stock ? (float)$stock->quantity_on_hand : 0;
 
-                        $avgBln = (float)\App\Models\TransactionItem::where('product_id', $item->product_id)
-                            ->whereHas('transaction', fn($q) => $q->where('branch_id', $model->branch_id)->where('created_at', '>=', now()->subDays(30)))
-                            ->sum('quantity');
+                        // Gunakan snapshot sales_30d jika tersedia, jika tidak hitung dengan continuous stitching histori
+                        if ($item->sales_30d !== null && (float)$item->sales_30d > 0) {
+                            $avgBln = (float)$item->sales_30d;
+                        } else {
+                            if ($fallbackSales30 === null) {
+                                $fallbackSales30 = $suggestedService->getBranchSales30Days($model->branch_id);
+                            }
+                            $avgBln = (float)($fallbackSales30[$item->product_id] ?? 0);
+                        }
 
                         $oosInfo = '';
                         if ($avgBln <= 0 && $currentStock <= 0) {
-                            $s90 = (float)\App\Models\TransactionItem::where('product_id', $item->product_id)
-                                ->whereHas('transaction', fn($q) => $q->where('branch_id', $model->branch_id)->where('created_at', '>=', now()->subDays(90)))
-                                ->sum('quantity');
+                            if ($fallbackSales90 === null) {
+                                $fallbackSales90 = $suggestedService->getBranchSales90Days($model->branch_id);
+                            }
+                            $s90 = (float)($fallbackSales90[$item->product_id] ?? 0);
                             if ($s90 >= 10) {
                                 $oosInfo = " ⚠️ <i>(Pasokan Macet, 90hr: " . (int)$s90 . " pcs)</i>";
                             } elseif ($s90 > 0) {
@@ -329,6 +340,10 @@ class TelegramWebhookController extends Controller
                         $prodName = htmlspecialchars($item->product->name ?? 'Unknown', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                         $text .= "• <b>{$prodName}</b>\n";
                         $text .= "  Order: <b>" . (float)$item->quantity_ordered . "</b> (Saran: " . (float)$item->quantity_suggested . " | Stok: {$currentStock} | Jual: {$avgBln}/bln){$oosInfo}{$promoInfo}\n";
+                        if (!empty($item->over_order_reason)) {
+                            $safeReason = htmlspecialchars($item->over_order_reason, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                            $text .= "  ↳ 💡 <i>Alasan: {$safeReason}</i>\n";
+                        }
                         $count++;
                     }
                 }

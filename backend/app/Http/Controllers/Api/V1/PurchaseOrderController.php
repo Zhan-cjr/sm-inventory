@@ -17,6 +17,7 @@ class PurchaseOrderController extends Controller
         $request->validate([
             'product_id' => 'required|exists:products,id',
             'suggested_qty' => 'required|numeric|min:0.01',
+            'over_order_reason' => 'nullable|string',
         ]);
 
         $branchId = $request->input('branch_id') ?: $request->user()->branch_id;
@@ -32,9 +33,10 @@ class PurchaseOrderController extends Controller
         return $this->processBulk($request->user(), [
             [
                 'product_id' => $request->product_id,
-                'suggested_qty' => $request->suggested_qty
+                'suggested_qty' => $request->suggested_qty,
+                'original_qty' => $request->original_qty ?? $request->suggested_qty,
             ]
-        ], $branchId);
+        ], $branchId, $request->input('over_order_reason'));
     }
 
     public function createBulkFromSuggestions(Request $request)
@@ -43,6 +45,7 @@ class PurchaseOrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.suggested_qty' => 'required|numeric|min:0.01',
+            'over_order_reason' => 'nullable|string',
         ]);
 
         $branchId = $request->input('branch_id') ?: $request->user()->branch_id;
@@ -55,12 +58,16 @@ class PurchaseOrderController extends Controller
             }
         }
 
-        return $this->processBulk($request->user(), $request->items, $branchId);
+        return $this->processBulk($request->user(), $request->items, $branchId, $request->input('over_order_reason'));
     }
 
-    private function processBulk($user, $items, $branchId)
+    private function processBulk($user, $items, $branchId, $overOrderReason = null)
     {
-        return DB::transaction(function () use ($user, $items, $branchId) {
+        return DB::transaction(function () use ($user, $items, $branchId, $overOrderReason) {
+            // Pre-calculate sales 30 days via continuous stitching
+            $suggestedService = app(\App\Services\SuggestedOrderService::class);
+            $branchSales30 = $suggestedService->getBranchSales30Days($branchId);
+
             // Group items by supplier_id and supplier_division_id
             $itemsByGroup = [];
             foreach ($items as $item) {
@@ -77,7 +84,8 @@ class PurchaseOrderController extends Controller
                             'supplier_id' => $targetSupplierId,
                             'supplier_division_id' => $targetDivisionId,
                             'qty' => $item['suggested_qty'],
-                            'original_qty' => $item['original_qty'] ?? $item['suggested_qty']
+                            'original_qty' => $item['original_qty'] ?? $item['suggested_qty'],
+                            'sales_30d' => (float)($branchSales30[$product->id] ?? 0)
                         ];
                     }
                 }
@@ -121,6 +129,7 @@ class PurchaseOrderController extends Controller
                     'expired_date' => $expiredDate,
                     'status' => $needsApproval ? 'pending_approval' : 'approved',
                     'total_amount' => 0,
+                    'over_order_reason' => $needsApproval ? $overOrderReason : null,
                     'created_by' => $user->id,
                 ]);
 
@@ -134,6 +143,7 @@ class PurchaseOrderController extends Controller
                         'purchase_order_id' => $po->id,
                         'product_id' => $product->id,
                         'quantity_suggested' => $sItem['original_qty'] ?? $qty,
+                        'sales_30d' => $sItem['sales_30d'] ?? 0,
                         'quantity_ordered' => $qty,
                         'unit_cost' => $product->cost_price,
                         'subtotal' => $subtotal,
@@ -145,7 +155,12 @@ class PurchaseOrderController extends Controller
                 $po->update(['total_amount' => $totalAmount]);
 
                 if ($needsApproval) {
-                    $po->requestApproval('Otomatis: ' . implode(', ', $approvalReasons));
+                    $notes = "";
+                    if (!empty($overOrderReason)) {
+                        $notes .= "Alasan Over-Order: " . trim($overOrderReason) . "\n";
+                    }
+                    $notes .= "Otomatis: " . implode(', ', $approvalReasons);
+                    $po->requestApproval($notes);
                 }
 
                 $createdPOs[] = $po->po_number;

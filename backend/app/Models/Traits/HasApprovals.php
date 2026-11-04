@@ -61,19 +61,39 @@ trait HasApprovals
         }
         
         $creatorName = 'System';
+        $supplierName = null;
         if ($modelClass === 'PurchaseOrder') {
             $creatorName = $this->creator?->name ?? 'System';
+            $supplierName = $this->supplier?->name;
+            if ($this->division?->name) {
+                $supplierName .= ' (' . $this->division->name . ')';
+            }
         } elseif ($modelClass === 'WarehouseCheck') {
             $creatorName = $this->checker?->name ?? 'System';
+            $supplierName = $this->purchaseOrder?->supplier?->name;
         } else {
             $creatorName = $this->recorder?->name ?? 'System';
         }
         
+        $reasonText = null;
+        if ($modelClass === 'PurchaseOrder' && !empty($this->over_order_reason)) {
+            $reasonText = $this->over_order_reason;
+        } elseif ($approval && !empty($approval->notes)) {
+            $reasonText = $approval->notes;
+        }
+
         $message = "📄 <b>Permintaan Persetujuan Dokumen</b>\n\n";
         $message .= "<b>Tipe:</b> {$type}\n";
         $message .= "<b>No Dokumen:</b> {$docNumber}\n";
         $message .= "<b>Cabang:</b> {$branchName}\n";
+        if ($supplierName) {
+            $message .= "<b>Supplier:</b> {$supplierName}\n";
+        }
         $message .= "<b>Dibuat oleh:</b> {$creatorName}\n";
+        if ($reasonText) {
+            $safeReason = htmlspecialchars($reasonText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $message .= "\n📝 <b>Catatan / Alasan:</b>\n<i>{$safeReason}</i>\n";
+        }
 
         $replyMarkup = null;
         if ($approval) {
@@ -252,15 +272,40 @@ trait HasApprovals
                 $docNumber = $this->po_number ?? $this->adjustment_number ?? '-';
                 
                 $creatorName = 'System';
-                if ($modelClass === 'PurchaseOrder') $creatorName = $this->creator?->name ?? 'System';
-                elseif ($modelClass === 'WarehouseCheck') $creatorName = $this->checker?->name ?? 'System';
-                else $creatorName = $this->recorder?->name ?? 'System';
+                $supplierName = null;
+                if ($modelClass === 'PurchaseOrder') {
+                    $creatorName = $this->creator?->name ?? 'System';
+                    $supplierName = $this->supplier?->name;
+                    if ($this->division?->name) {
+                        $supplierName .= ' (' . $this->division->name . ')';
+                    }
+                } elseif ($modelClass === 'WarehouseCheck') {
+                    $creatorName = $this->checker?->name ?? 'System';
+                    $supplierName = $this->purchaseOrder?->supplier?->name;
+                } else {
+                    $creatorName = $this->recorder?->name ?? 'System';
+                }
+
+                $reasonText = null;
+                if ($modelClass === 'PurchaseOrder' && !empty($this->over_order_reason)) {
+                    $reasonText = $this->over_order_reason;
+                } elseif ($approval && !empty($approval->notes)) {
+                    $reasonText = $approval->notes;
+                }
 
                 $baseText = "📄 <b>Permintaan Persetujuan Dokumen</b>\n\n";
                 $baseText .= "<b>Tipe:</b> {$type}\n";
                 $baseText .= "<b>No Dokumen:</b> {$docNumber}\n";
                 $baseText .= "<b>Cabang:</b> {$branchName}\n";
-                $baseText .= "<b>Dibuat oleh:</b> {$creatorName}\n\n";
+                if ($supplierName) {
+                    $baseText .= "<b>Supplier:</b> {$supplierName}\n";
+                }
+                $baseText .= "<b>Dibuat oleh:</b> {$creatorName}\n";
+                if ($reasonText) {
+                    $safeReason = htmlspecialchars($reasonText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                    $baseText .= "\n📝 <b>Catatan / Alasan:</b>\n<i>{$safeReason}</i>\n";
+                }
+                $baseText .= "\n";
                 
                 $finalText = $baseText . $statusText;
 

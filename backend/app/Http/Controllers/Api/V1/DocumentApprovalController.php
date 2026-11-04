@@ -36,7 +36,7 @@ class DocumentApprovalController extends Controller
         $approvals->load([
             'approvable' => function ($morphTo) {
                 $morphTo->morphWith([
-                    \App\Models\PurchaseOrder::class => ['creator', 'supplier'],
+                    \App\Models\PurchaseOrder::class => ['creator', 'supplier', 'division'],
                     \App\Models\StockAdjustment::class => ['recorder'],
                     \App\Models\WarehouseCheck::class => ['checker', 'purchaseOrder.supplier']
                 ]);
@@ -53,6 +53,7 @@ class DocumentApprovalController extends Controller
             $userName = 'System';
             $supplierName = null;
             $branchName = $model->branch?->name;
+            $overOrderReason = null;
 
             if (get_class($model) === \App\Models\PurchaseOrder::class) {
                 $type = 'Otorisasi PO';
@@ -60,6 +61,10 @@ class DocumentApprovalController extends Controller
                 $total = $model->total_amount;
                 $userName = $model->creator?->name ?? 'System';
                 $supplierName = $model->supplier?->name;
+                if ($model->division?->name) {
+                    $supplierName .= ' (' . $model->division->name . ')';
+                }
+                $overOrderReason = $model->over_order_reason;
             } elseif (get_class($model) === \App\Models\StockAdjustment::class) {
                 $type = 'Otorisasi Koreksi Stok';
                 $number = $model->adjustment_number;
@@ -82,6 +87,7 @@ class DocumentApprovalController extends Controller
                 'created_by' => $userName,
                 'supplier_name' => $supplierName,
                 'notes' => $approval->notes,
+                'over_order_reason' => $overOrderReason,
                 'created_at' => $approval->created_at,
                 'branch_name' => $branchName,
             ];
@@ -132,24 +138,33 @@ class DocumentApprovalController extends Controller
         $modelClass = get_class($model);
 
         if ($modelClass === \App\Models\PurchaseOrder::class) {
-            $model->load(['items.product:id,name,sku', 'supplier:id,name']);
+            $model->load(['items.product:id,name,sku', 'supplier:id,name', 'division:id,name']);
+            $supplierName = $model->supplier?->name;
+            if ($model->division?->name) {
+                $supplierName .= ' (' . $model->division->name . ')';
+            }
+
+            $suggestedService = app(\App\Services\SuggestedOrderService::class);
+            $fallbackSales30 = null;
+
             return response()->json([
                 'type' => 'Otorisasi PO',
                 'number' => $model->po_number,
-                'supplier' => $model->supplier?->name,
+                'supplier' => $supplierName,
                 'date' => $model->po_date?->format('d-m-Y'),
                 'total' => $model->total_amount,
                 'notes' => $model->notes,
-                'items' => $model->items->map(function ($item) use ($model) {
-                    $thirtyDaysAgo = \Carbon\Carbon::now()->subDays(30);
-                    $soldLast30Days = \App\Models\InventoryLog::where('product_id', $item->product_id)
-                        ->where('created_at', '>=', $thirtyDaysAgo)
-                        ->where('log_type', 'SALE')
-                        ->when($model->branch_id, function($q) use ($model) {
-                            return $q->where('branch_id', $model->branch_id);
-                        })
-                        ->sum('quantity_change');
-                    $soldLast30Days = abs($soldLast30Days);
+                'over_order_reason' => $model->over_order_reason,
+                'approval_notes' => $approval->notes,
+                'items' => $model->items->map(function ($item) use ($model, $suggestedService, &$fallbackSales30) {
+                    if ($item->sales_30d !== null && (float)$item->sales_30d > 0) {
+                        $soldLast30Days = (float)$item->sales_30d;
+                    } else {
+                        if ($fallbackSales30 === null) {
+                            $fallbackSales30 = $suggestedService->getBranchSales30Days($model->branch_id);
+                        }
+                        $soldLast30Days = (float)($fallbackSales30[$item->product_id] ?? 0);
+                    }
 
                     $stockQuery = \App\Models\Stock::where('product_id', $item->product_id);
                     if ($model->branch_id) {
@@ -160,11 +175,13 @@ class DocumentApprovalController extends Controller
                     return [
                         'product_name' => $item->product?->name,
                         'product_sku' => $item->product?->sku,
-                        'qty' => $item->quantity_ordered,
-                        'price' => $item->unit_cost,
-                        'subtotal' => $item->subtotal,
-                        'avg_sales_per_month' => (float) $soldLast30Days,
-                        'current_stock' => (float) $currentStock,
+                        'qty' => (float)$item->quantity_ordered,
+                        'qty_saran' => (float)($item->quantity_suggested ?? 0),
+                        'price' => (float)$item->unit_cost,
+                        'subtotal' => (float)$item->subtotal,
+                        'avg_sales_per_month' => (float)$soldLast30Days,
+                        'current_stock' => (float)$currentStock,
+                        'over_order_reason' => $item->over_order_reason,
                     ];
                 })
             ]);

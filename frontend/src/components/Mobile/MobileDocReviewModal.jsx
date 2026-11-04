@@ -83,6 +83,16 @@ export function MobileDocReviewModal({
               <div>No: <strong style={{ color: 'var(--text-main)' }}>{data.number}</strong></div>
               <div>Tipe: <strong style={{ color: '#3b82f6' }}>{data.type}</strong></div>
               {data.supplier && <div>Supplier: <strong style={{ color: 'var(--text-main)' }}>{data.supplier}</strong></div>}
+              {data.over_order_reason && (
+                <div style={{ marginTop: '6px', padding: '6px 10px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '8px', color: '#d97706', fontWeight: 600 }}>
+                  📝 Alasan Over-Order: &ldquo;{data.over_order_reason}&rdquo;
+                </div>
+              )}
+              {data.notes && !data.over_order_reason && (
+                <div style={{ marginTop: '4px', fontStyle: 'italic' }}>
+                  Catatan: &ldquo;{data.notes}&rdquo;
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
@@ -103,9 +113,25 @@ export function MobileDocReviewModal({
                     {item.product_name}
                   </div>
                   {data.type === 'Otorisasi PO' ? (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                      <span>{item.qty} x Rp {parseFloat(item.price).toLocaleString('id-ID')}</span>
-                      <strong style={{ color: '#10b981' }}>Rp {parseFloat(item.subtotal).toLocaleString('id-ID')}</strong>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                        <span>
+                          Order: <strong style={{ color: (item.qty > item.qty_saran && item.qty_saran > 0) ? '#ef4444' : 'var(--text-main)' }}>{item.qty}</strong>
+                          {item.qty_saran !== undefined && (
+                            <span style={{ marginLeft: '4px', color: '#059669' }}>(Saran: {item.qty_saran})</span>
+                          )}
+                        </span>
+                        <strong style={{ color: '#10b981' }}>Rp {parseFloat(item.subtotal).toLocaleString('id-ID')}</strong>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <span>Stok: <strong>{item.current_stock ?? 0}</strong></span>
+                        <span>Jual 30hr: <strong>{item.avg_sales_per_month ?? 0}</strong>/bln</span>
+                      </div>
+                      {item.over_order_reason && (
+                        <div style={{ marginTop: '4px', fontSize: '0.74rem', color: '#d97706', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '2px 7px', borderRadius: '6px', fontWeight: 600 }}>
+                          ↳ 💡 {item.over_order_reason}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'var(--text-muted)' }}>

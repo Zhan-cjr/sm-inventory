@@ -48,7 +48,7 @@ class SuggestedOrderService
         }
     }
 
-    protected function getBranchSales30Days(?string $branchId = null): array
+    public function getBranchSales30Days(?string $branchId = null): array
     {
         $cacheKey = $branchId ?: 'all';
         if (isset($this->branchSales30DaysCache[$cacheKey])) {
@@ -127,7 +127,7 @@ class SuggestedOrderService
         return $sales;
     }
 
-    protected function getBranchSales90Days(?string $branchId = null): array
+    public function getBranchSales90Days(?string $branchId = null): array
     {
         $cacheKey = $branchId ?: 'all';
         if (isset($this->branchSales90DaysCache[$cacheKey])) {

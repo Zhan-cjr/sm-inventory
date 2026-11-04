@@ -514,7 +514,7 @@
                         @endif
                         @if(in_array('avg_bln', $visibleColumns)) 
                             <td class="pos-grid-td" style="text-align: right; color: #8b5cf6;">
-                                <div>{{ $item['avg_bln'] }}</div>
+                                <div>{{ $item['avg_bln'] ?? 0 }}</div>
                                 @if(!empty($item['is_sales_from_history']) && (float)($item['avg_bln'] ?? 0) > 0)
                                     <div style="margin-top: 1px;">
                                         @if(($item['sales_source_type'] ?? '') === 'blended')
@@ -737,6 +737,118 @@
                 </button>
                 <button wire:click="removeZeroQtyItems" type="button" class="pos-btn-danger">
                     Hapus Semua
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- MODAL ALASAN ORDER MELEBIHI SARAN --}}
+    @if($showOverOrderModal)
+    <div class="pos-modal-overlay" style="z-index: 9999999;">
+        <div class="pos-modal-card" style="max-width: 52rem; width: 95%; max-height: 90vh; display: flex; flex-direction: column;">
+            {{-- Header --}}
+            <div style="display: flex; align-items: flex-start; gap: 1rem; flex-shrink: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.75rem;" class="dark:border-gray-700">
+                <div style="background-color: #fef3c7; color: #d97706; padding: 0.75rem; border-radius: 9999px; flex-shrink: 0;" class="dark:bg-amber-950 dark:text-amber-300">
+                    <svg style="width: 26px; height: 26px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div style="flex: 1 1 0%;">
+                    <h3 class="pos-modal-title" style="color: #b45309;" class="dark:text-amber-400">Konfirmasi Alasan Order Melebihi Saran</h3>
+                    <p class="pos-modal-body" style="margin-top: 0.25rem;">
+                        Terdapat <strong>{{ count($overOrderProducts) }}</strong> produk yang dipesan melebihi saran order AI. Pilih alasan per item untuk otorisasi Manajer / Supervisor.
+                    </p>
+                </div>
+            </div>
+
+            {{-- Toolbar: Samakan Semua Alasan --}}
+            <div style="margin-top: 0.75rem; background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 0.5rem; padding: 0.65rem 0.85rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;" class="dark:bg-gray-800 dark:border-gray-700">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1 1 18rem;">
+                    <span style="font-size: 0.8rem; font-weight: 700; color: #475569; white-space: nowrap;" class="dark:text-gray-300">⚡ Samakan Semua:</span>
+                    <select wire:model="bulkReasonCode" class="pos-input" style="font-size: 0.8rem; padding: 0.25rem 0.5rem; flex: 1;">
+                        <option value="">-- Pilih Alasan untuk Disamakan --</option>
+                        @foreach(\App\Livewire\PurchaseOrderPos::OVER_ORDER_REASON_PRESETS as $code => $label)
+                            <option value="{{ $code }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1 1 18rem;">
+                    <input type="text" wire:model="bulkReasonNote" class="pos-input" style="font-size: 0.8rem; padding: 0.25rem 0.5rem; flex: 1;" placeholder="Catatan opsional...">
+                    <button type="button" wire:click="applyBulkOverOrderReason" style="background-color: #3b82f6; color: white; padding: 0.3rem 0.75rem; border-radius: 0.375rem; font-size: 0.78rem; font-weight: 600; border: none; cursor: pointer; white-space: nowrap;" class="hover:bg-blue-600 transition-colors">
+                        Terapkan ke Semua
+                    </button>
+                </div>
+            </div>
+
+            {{-- List of Over-order items --}}
+            <div style="flex: 1 1 auto; overflow-y: auto; max-height: 52vh; margin-top: 0.75rem; padding-right: 0.25rem; display: flex; flex-direction: column; gap: 0.6rem;">
+                @foreach($overOrderProducts as $idx => $overItem)
+                    <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.75rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);" class="dark:bg-gray-900 dark:border-gray-700">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.45rem; gap: 0.5rem;">
+                            <div style="font-weight: 700; font-size: 0.88rem; color: #1e293b;" class="dark:text-gray-100">
+                                {{ $overItem['name'] }}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end;">
+                                <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background-color: #ecfdf5; color: #047857; font-weight: 700; border: 1px solid #a7f3d0;">
+                                    Saran: {{ $overItem['qty_saran'] }}
+                                </span>
+                                <span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background-color: #fee2e2; color: #dc2626; font-weight: 700; border: 1px solid #fecaca;">
+                                    Pesan: {{ $overItem['qty'] }}
+                                </span>
+                                @if(($overItem['auto_detected'] ?? '') === 'promo')
+                                    <span style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; background-color: #f0fdf4; color: #15803d; font-weight: 700; border: 1px solid #bbf7d0;">
+                                        🏷️ Promo Terdeteksi
+                                    </span>
+                                @elseif(($overItem['auto_detected'] ?? '') === 'carton')
+                                    <span style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; background-color: #eff6ff; color: #1d4ed8; font-weight: 700; border: 1px solid #bfdbfe;">
+                                        📦 Pembulatan Dus
+                                    </span>
+                                @elseif(empty($overItem['reason_code']))
+                                    <span style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; background-color: #fef2f2; color: #b91c1c; font-weight: 700; border: 1px solid #fecaca;">
+                                        ⚠️ Wajib Pilih Alasan
+                                    </span>
+                                @endif
+                                @if(!empty($overItem['carton_text']) && ($overItem['auto_detected'] ?? '') !== 'carton')
+                                    <span style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; background-color: #f8fafc; color: #64748b; font-weight: 600; border: 1px solid #e2e8f0;">
+                                        📦 {{ $overItem['carton_text'] }}
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                            <div>
+                                <label style="display: block; font-size: 0.7rem; font-weight: 600; color: #64748b; margin-bottom: 2px;" class="dark:text-gray-400">
+                                    Kategori Alasan <span style="color: #ef4444;">*</span>:
+                                </label>
+                                <select wire:model="overOrderProducts.{{ $idx }}.reason_code" 
+                                        class="pos-input" 
+                                        style="width: 100%; font-size: 0.8rem; padding: 0.3rem 0.5rem; {{ empty($overItem['reason_code']) ? 'border: 1.5px solid #ef4444; background-color: #fef2f2;' : '' }}">
+                                    <option value="">-- Wajib Pilih Alasan Melebihi Saran --</option>
+                                    @foreach(\App\Livewire\PurchaseOrderPos::OVER_ORDER_REASON_PRESETS as $code => $label)
+                                        <option value="{{ $code }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.7rem; font-weight: 600; color: #64748b; margin-bottom: 2px;" class="dark:text-gray-400">
+                                    Catatan Penjelasan (Opsional):
+                                </label>
+                                <input type="text" wire:model="overOrderProducts.{{ $idx }}.reason_note" class="pos-input" style="width: 100%; font-size: 0.8rem; padding: 0.3rem 0.5rem;" placeholder="Misal: Beli 5 gratis 1, dus isi 4 pcs, pesanan borongan, dll...">
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            {{-- Footer Actions --}}
+            <div class="pos-modal-footer" style="margin-top: 1rem; border-top: 1px solid #e5e7eb; padding-top: 0.75rem; display: flex; justify-content: flex-end; gap: 0.5rem;" class="dark:border-gray-700">
+                <button wire:click="closeOverOrderModal" type="button" class="pos-btn-cancel">
+                    Kembali Periksa
+                </button>
+                <button wire:click="confirmOverOrderSave" type="button" style="background-color: #10b981; color: white; padding: 0.5rem 1.25rem; border-radius: 0.375rem; font-weight: 700; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors">
+                    Simpan & Ajukan Persetujuan
                 </button>
             </div>
         </div>
@@ -1019,12 +1131,21 @@
 
     /* Modal Theme Styles */
     .pos-modal-overlay {
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999999;
-        display: flex; align-items: center; justify-content: center;
-        background-color: rgba(0, 0, 0, 0.4) !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        filter: none !important;
+        position: fixed;
+        inset: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        min-width: 100vw;
+        height: 100%;
+        min-height: 100vh;
+        z-index: 9999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(15, 23, 42, 0.45) !important;
         padding: 1rem;
     }
     .pos-modal-card {

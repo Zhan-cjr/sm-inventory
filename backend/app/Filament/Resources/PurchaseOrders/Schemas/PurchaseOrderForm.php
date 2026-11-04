@@ -95,6 +95,11 @@ class PurchaseOrderForm
 
                 Textarea::make('notes')
                     ->columnSpanFull(),
+                Textarea::make('over_order_reason')
+                    ->label('Alasan Order Melebihi Saran')
+                    ->columnSpanFull()
+                    ->disabled()
+                    ->visible(fn ($record) => !empty($record?->over_order_reason)),
                 \Filament\Forms\Components\Hidden::make('created_by')
                     ->default(fn () => auth()->id()),
                 Checkbox::make('cetak_nota')
