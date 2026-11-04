@@ -13,6 +13,7 @@ const MobileEcommerceQueue = lazy(() => import('./components/Mobile/MobileEcomme
 const MobileDashboard = lazy(() => import('./components/Mobile/MobileDashboard').then(m => ({ default: m.MobileDashboard })));
 const MobileProductScanner = lazy(() => import('./components/Mobile/MobileProductScanner').then(m => ({ default: m.MobileProductScanner })));
 const MobileSuggestedOrders = lazy(() => import('./components/Mobile/MobileSuggestedOrders').then(m => ({ default: m.MobileSuggestedOrders })));
+const MobileStockAudit = lazy(() => import('./components/Mobile/MobileStockAudit').then(m => ({ default: m.MobileStockAudit })));
 
 const PageLoader = () => (
   <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-dark, #0f172a)', color: 'var(--text-main, #fff)' }}>
@@ -376,6 +377,7 @@ function App() {
   const isManagerOrAdmin = ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SPV', 'EDP', 'SUPERADMIN', 'SUPER_ADMIN'].includes(user?.role?.toUpperCase());
   const hasEcommerceAuth = user?.custom_authorizations?.includes('PROCESS_ECOMMERCE');
   const hasSmartOrderAuth = user?.custom_authorizations?.includes('ACCESS_SMART_ORDER');
+  const hasStockAuditAuth = isManagerOrAdmin || user?.custom_authorizations?.includes('ACCESS_STOCK_AUDIT');
   const hasBIAIAuth = user?.custom_authorizations?.includes('ACCESS_BI_AI');
   const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) ||
     user?.custom_authorizations?.includes('APPROVE_PO') ||
@@ -443,6 +445,7 @@ function App() {
             <Route path="auth" element={(!isManagerOrAdmin && !hasAuthMenu) ? <Navigate to="/mobile/scanner" replace /> : <MobileAuthQueue user={user} authToken={token} />} />
             <Route path="ecommerce" element={(!isManagerOrAdmin && !hasEcommerceAuth) ? <Navigate to="/mobile/scanner" replace /> : <MobileEcommerceQueue user={user} authToken={token} />} />
             <Route path="suggested-orders" element={(!isManagerOrAdmin && !hasSmartOrderAuth) ? <Navigate to="/mobile/scanner" replace /> : <MobileSuggestedOrders user={user} authToken={token} />} />
+            <Route path="stock-audit" element={(!hasStockAuditAuth) ? <Navigate to="/mobile/scanner" replace /> : <MobileStockAudit user={user} authToken={token} />} />
           </Route>
         </Routes>
       </Suspense>

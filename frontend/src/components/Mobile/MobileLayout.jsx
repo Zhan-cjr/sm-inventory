@@ -7,6 +7,7 @@ import {
   ShieldCheck, 
   ShoppingBag, 
   TrendingUp, 
+  ClipboardCheck,
   LogOut, 
   Sun, 
   Moon, 
@@ -43,6 +44,7 @@ export function MobileLayout({ user, onLogout }) {
 
   const hasEcommerceAuth = user?.custom_authorizations?.includes('PROCESS_ECOMMERCE');
   const hasSmartOrderAuth = user?.custom_authorizations?.includes('ACCESS_SMART_ORDER');
+  const hasStockAuditAuth = isManagerOrAdmin || user?.custom_authorizations?.includes('ACCESS_STOCK_AUDIT');
   const hasBIAIAuth = user?.custom_authorizations?.includes('ACCESS_BI_AI');
   const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) || 
                       user?.custom_authorizations?.includes('APPROVE_PO') || 
@@ -115,6 +117,16 @@ export function MobileLayout({ user, onLogout }) {
           <QrCode size={22} />
           <span>Cek Barang</span>
         </button>
+
+        {hasStockAuditAuth && (
+          <button
+            className={`dock-item ${isActive('/mobile/stock-audit') ? 'active' : ''}`}
+            onClick={() => navigate('/mobile/stock-audit')}
+          >
+            <ClipboardCheck size={22} color="#f59e0b" />
+            <span>Sidak SO</span>
+          </button>
+        )}
 
         {hasSmartOrderAuth && (
           <button

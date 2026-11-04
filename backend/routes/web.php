@@ -79,6 +79,11 @@ Route::middleware(['web', 'auth'])->group(function () {
 
         return view('print.opname-final-check', compact('session', 'groups'));
     })->name('opname.print-final-check');
+
+    Route::get('/stock-audits/{record}/print-bap', function ($record) {
+        $audit = \App\Models\StockAuditInspection::with(['items.product', 'items.rack', 'branch', 'auditor', 'adjustment'])->findOrFail($record);
+        return view('print.stock-audit-bap', compact('audit'));
+    })->name('stock-audits.print-bap');
 });
 
 // ============================================================

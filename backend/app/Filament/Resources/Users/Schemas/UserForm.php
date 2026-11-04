@@ -105,6 +105,7 @@ class UserForm
                                         'APPROVE_STOCK_ADJUSTMENT' => 'Approval Koreksi Stok (SO)',
                                         'PROCESS_ECOMMERCE' => 'Proses Pesanan E-Commerce',
                                         'ACCESS_SMART_ORDER' => 'Akses Menu Order Pintar (Mobile)',
+                                        'ACCESS_STOCK_AUDIT' => 'Akses Menu Sidak Audit Stok (Mobile)',
                                         'ACCESS_BI_AI' => 'Akses Menu BI & AI (Mobile)',
                                         'TOGGLE_SUPPLIER_GR_PO' => 'Ubah Wajib PO di Supplier',
                                         'BYPASS_GR_PO_REQUIRED' => 'Bypass Wajib PO (Penerimaan Barang)',

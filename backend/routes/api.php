@@ -285,6 +285,17 @@ Route::prefix('v1')->group(function () {
         Route::post('/stock-opname/scan', [StockOpnameApiController::class, 'scanProduct']);
         Route::post('/stock-opname/lock-rack', [StockOpnameApiController::class, 'lockRack']);
 
+        // Sidak Audit Stok (Mobile PWA)
+        Route::get('/stock-audits/racks', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'getActiveRacks']);
+        Route::get('/stock-audits/search-products', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'searchProduct']);
+        Route::get('/stock-audits', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'index']);
+        Route::post('/stock-audits', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'store']);
+        Route::get('/stock-audits/{id}', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'show']);
+        Route::post('/stock-audits/{id}/items', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'recordItem']);
+        Route::delete('/stock-audits/{id}/items/{itemId}', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'removeItem']);
+        Route::post('/stock-audits/{id}/finish', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'finish']);
+        Route::post('/stock-audits/{id}/adjust', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'applyAdjustment']);
+
         // Manager Dashboard Metrics
         Route::get('/dashboard/metrics', [\App\Http\Controllers\Api\V1\DashboardController::class, 'metrics']);
         Route::get('/dashboard/low-stock', [\App\Http\Controllers\Api\V1\DashboardController::class, 'lowStockProducts']);
