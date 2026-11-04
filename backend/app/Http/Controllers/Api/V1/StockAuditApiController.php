@@ -48,8 +48,14 @@ class StockAuditApiController extends Controller
         if ($deny = $this->authorizeAudit($request)) return $deny;
 
         $user = $request->user();
+        $branchId = $request->query('branch_id') ?: $user->branch_id;
+        if (!$branchId) {
+            $branchId = \App\Models\Branch::where('organization_id', $user->organization_id)->value('id')
+                ?? \App\Models\Branch::first()?->id;
+        }
+
         $inspections = StockAuditInspection::with(['auditor'])
-            ->where('branch_id', $user->branch_id)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->orderByDesc('created_at')
             ->limit(30)
             ->get();
@@ -66,6 +72,7 @@ class StockAuditApiController extends Controller
 
         $user = $request->user();
         $validator = Validator::make($request->all(), [
+            'branch_id'       => 'nullable|uuid',
             'inspection_mode' => 'nullable|in:FREE_SCAN,RANDOM_LOTTERY,RISK_BASED',
             'target_count'    => 'nullable|integer|min:1|max:200',
             'rack_ids'        => 'nullable|array',
@@ -78,8 +85,13 @@ class StockAuditApiController extends Controller
         }
 
         $data = $request->all();
-        $data['branch_id'] = $user->branch_id;
+        $data['branch_id'] = $request->input('branch_id') ?: $user->branch_id;
         $data['organization_id'] = $user->organization_id;
+
+        if (!$data['branch_id']) {
+            $data['branch_id'] = \App\Models\Branch::where('organization_id', $user->organization_id)->value('id')
+                ?? \App\Models\Branch::first()?->id;
+        }
 
         $inspection = $this->service->createInspection($data, $user);
 
@@ -111,8 +123,13 @@ class StockAuditApiController extends Controller
 
         $queryStr = $request->query('query', '');
         $user = $request->user();
+        $branchId = $request->query('branch_id') ?: $user->branch_id;
+        if (!$branchId) {
+            $branchId = \App\Models\Branch::where('organization_id', $user->organization_id)->value('id')
+                ?? \App\Models\Branch::first()?->id;
+        }
 
-        $results = $this->service->searchProduct($queryStr, $user->branch_id);
+        $results = $this->service->searchProduct($queryStr, $branchId);
 
         return response()->json(['data' => $results]);
     }
@@ -244,7 +261,13 @@ class StockAuditApiController extends Controller
         if ($deny = $this->authorizeAudit($request)) return $deny;
 
         $user = $request->user();
-        $racks = StockOpnameRack::where('branch_id', $user->branch_id)
+        $branchId = $request->query('branch_id') ?: $user->branch_id;
+        if (!$branchId) {
+            $branchId = \App\Models\Branch::where('organization_id', $user->organization_id)->value('id')
+                ?? \App\Models\Branch::first()?->id;
+        }
+
+        $racks = StockOpnameRack::where('branch_id', $branchId)
             ->where('is_active', true)
             ->select('id', 'rack_name', 'rack_code')
             ->orderBy('rack_name')

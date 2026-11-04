@@ -10,18 +10,16 @@ import {
   Trash2, 
   CheckCircle2, 
   AlertTriangle, 
-  TrendingDown, 
-  TrendingUp, 
   X, 
   Printer, 
   History, 
   Play, 
-  ShieldAlert, 
   Check, 
   Layers, 
   RotateCcw,
   Sparkles,
-  ArrowRight
+  Store,
+  Calendar
 } from 'lucide-react';
 
 export function MobileStockAudit({ user, authToken }) {
@@ -30,6 +28,12 @@ export function MobileStockAudit({ user, authToken }) {
   const [activeInspection, setActiveInspection] = useState(null);
   const [historyList, setHistoryList] = useState([]);
   const [racks, setRacks] = useState([]);
+  
+  // Branch Selector (for Admins or users without branch_id)
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState(user?.branch_id || '');
+  const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN'].includes(user?.role?.toUpperCase());
+  const showBranchSelector = !user?.branch_id || isAdmin;
 
   // Modal Start New Audit state
   const [showNewModal, setShowNewModal] = useState(false);
@@ -61,17 +65,32 @@ export function MobileStockAudit({ user, authToken }) {
 
   const formatCurrency = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
 
-  // Load active sessions and history on mount
-  const fetchInspections = async () => {
+  // Fetch branches
+  useEffect(() => {
+    if (showBranchSelector) {
+      fetch('/api/v1/branches', { headers: { 'Authorization': `Bearer ${authToken}` } })
+        .then(res => res.json())
+        .then(data => {
+          setBranches(data);
+          if (data.length > 0 && !selectedBranchId) {
+            setSelectedBranchId(data[0].id);
+          }
+        })
+        .catch(err => console.error(err));
+    }
+  }, [user, authToken, selectedBranchId, showBranchSelector]);
+
+  // Load active sessions and history on mount or branch change
+  const fetchInspections = async (branchId = selectedBranchId) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/stock-audits', {
+      const q = branchId ? `?branch_id=${branchId}` : '';
+      const res = await fetch(`/api/v1/stock-audits${q}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const json = await res.json();
       if (res.ok && json.data) {
         setHistoryList(json.data);
-        // Find if there is an in-progress DRAFT session
         const current = json.data.find(i => i.status === 'DRAFT');
         if (current) {
           loadInspectionDetail(current.id);
@@ -100,9 +119,10 @@ export function MobileStockAudit({ user, authToken }) {
     }
   };
 
-  const fetchRacks = async () => {
+  const fetchRacks = async (branchId = selectedBranchId) => {
     try {
-      const res = await fetch('/api/v1/stock-audits/racks', {
+      const q = branchId ? `?branch_id=${branchId}` : '';
+      const res = await fetch(`/api/v1/stock-audits/racks${q}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const json = await res.json();
@@ -115,9 +135,11 @@ export function MobileStockAudit({ user, authToken }) {
   };
 
   useEffect(() => {
-    fetchInspections();
-    fetchRacks();
-  }, [authToken]);
+    if (selectedBranchId || !showBranchSelector) {
+      fetchInspections(selectedBranchId);
+      fetchRacks(selectedBranchId);
+    }
+  }, [authToken, selectedBranchId]);
 
   // Handle Search Product
   useEffect(() => {
@@ -129,7 +151,8 @@ export function MobileStockAudit({ user, authToken }) {
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`/api/v1/stock-audits/search-products?query=${encodeURIComponent(searchQuery.trim())}`, {
+        const q = selectedBranchId ? `&branch_id=${selectedBranchId}` : '';
+        const res = await fetch(`/api/v1/stock-audits/search-products?query=${encodeURIComponent(searchQuery.trim())}${q}`, {
           headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const json = await res.json();
@@ -144,7 +167,7 @@ export function MobileStockAudit({ user, authToken }) {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, authToken]);
+  }, [searchQuery, authToken, selectedBranchId]);
 
   // Camera Barcode Scanner
   useEffect(() => {
@@ -166,9 +189,7 @@ export function MobileStockAudit({ user, authToken }) {
                 scanner.clear().catch(e => console.error(e));
               }
             },
-            (error) => {
-              // Ignore scan frame errors
-            }
+            () => {}
           );
           scannerRef.current = scanner;
         } catch (e) {
@@ -189,7 +210,8 @@ export function MobileStockAudit({ user, authToken }) {
   const handleBarcodeScanned = async (barcode) => {
     setSearching(true);
     try {
-      const res = await fetch(`/api/v1/stock-audits/search-products?query=${encodeURIComponent(barcode)}`, {
+      const q = selectedBranchId ? `&branch_id=${selectedBranchId}` : '';
+      const res = await fetch(`/api/v1/stock-audits/search-products?query=${encodeURIComponent(barcode)}${q}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
       const json = await res.json();
@@ -207,7 +229,6 @@ export function MobileStockAudit({ user, authToken }) {
 
   const openCountModal = (product) => {
     setSelectedProduct(product);
-    // Cek apakah item sudah pernah dihitung di sesi ini
     const existing = activeInspection?.items?.find(i => i.product_id === product.id);
     if (existing) {
       setPhysicalQty(parseFloat(existing.physical_quantity) || 0);
@@ -224,7 +245,9 @@ export function MobileStockAudit({ user, authToken }) {
   const handleCreateInspection = async () => {
     setCreating(true);
     try {
+      const effectiveBranchId = selectedBranchId || user?.branch_id || (branches[0]?.id);
       const payload = {
+        branch_id: effectiveBranchId,
         inspection_mode: newMode,
         target_count: newMode === 'RANDOM_LOTTERY' ? targetCount : null,
         rack_ids: newMode === 'RANDOM_LOTTERY' && selectedRacks.length > 0 ? selectedRacks : null,
@@ -245,7 +268,7 @@ export function MobileStockAudit({ user, authToken }) {
         setActiveInspection(json.data);
         setShowNewModal(false);
         setActiveTab('active');
-        fetchInspections();
+        fetchInspections(effectiveBranchId);
       } else {
         alert(json.error || 'Gagal membuat sesi sidak.');
       }
@@ -314,7 +337,7 @@ export function MobileStockAudit({ user, authToken }) {
     setFinishing(true);
     try {
       const payload = {
-        action: action, // 'INVESTIGATION' or 'ADJUST'
+        action: action,
         acknowledged_by: witnessName,
         notes: finishNotes,
       };
@@ -332,7 +355,7 @@ export function MobileStockAudit({ user, authToken }) {
         alert(json.message);
         setShowFinishModal(false);
         setActiveInspection(null);
-        fetchInspections();
+        fetchInspections(selectedBranchId);
         setActiveTab('history');
       } else {
         alert(json.error || 'Gagal menyelesaikan sidak.');
@@ -356,7 +379,7 @@ export function MobileStockAudit({ user, authToken }) {
       const json = await res.json();
       if (res.ok) {
         alert(json.message);
-        fetchInspections();
+        fetchInspections(selectedBranchId);
       } else {
         alert(json.error || 'Gagal menerapkan penyesuaian stok.');
       }
@@ -368,53 +391,69 @@ export function MobileStockAudit({ user, authToken }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', animation: 'fadeIn 0.3s ease-out' }}>
       
-      {/* Top Header & Tab Navigation */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
-            Internal Audit & Kontrol Stok
-          </div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ClipboardCheck size={26} color="#f59e0b" />
-            Sidak Audit Stok
-          </h2>
+      {/* Top Title Header */}
+      <div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+          Internal Audit & Kontrol Stok
         </div>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <ClipboardCheck size={26} color="#f59e0b" />
+          Sidak Audit Stok
+        </h2>
+      </div>
 
-        {/* Tab Toggle */}
-        <div style={{ display: 'flex', background: 'var(--card-bg, #1e293b)', padding: '3px', borderRadius: '10px', border: '1px solid var(--border-color, #334155)' }}>
-          <button
-            onClick={() => setActiveTab('active')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '7px',
-              border: 'none',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              background: activeTab === 'active' ? '#f59e0b' : 'transparent',
-              color: activeTab === 'active' ? '#000' : 'var(--text-muted)',
-              transition: 'all 0.2s'
-            }}
-          >
-            Sidak Aktif
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '7px',
-              border: 'none',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              background: activeTab === 'history' ? '#f59e0b' : 'transparent',
-              color: activeTab === 'history' ? '#000' : 'var(--text-muted)',
-              transition: 'all 0.2s'
-            }}
-          >
-            Riwayat ({historyList.length})
-          </button>
+      {/* Branch Selector for Admin */}
+      {showBranchSelector && (
+        <div style={{ 
+          background: 'var(--bg-card)', 
+          border: '1px solid var(--border-light)', 
+          padding: '0.75rem 1rem', 
+          borderRadius: '16px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '0.75rem' 
+        }}>
+          <Store size={18} color="#f59e0b" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>PILIH CABANG AUDIT</div>
+            <select 
+              value={selectedBranchId} 
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              style={{ 
+                width: '100%', 
+                cursor: 'pointer', 
+                border: 'none', 
+                background: 'transparent', 
+                color: 'var(--text-main)', 
+                fontWeight: 700, 
+                fontSize: '0.9rem', 
+                outline: 'none',
+                marginTop: '2px'
+              }}
+            >
+              <option value="" disabled style={{ background: 'var(--bg-dark)' }}>-- Pilih Cabang --</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id} style={{ background: 'var(--bg-dark)', color: 'var(--text-main)' }}>{b.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
+      )}
+
+      {/* Segmented Control Tabs */}
+      <div className="segmented-control">
+        <button
+          className={activeTab === 'active' ? 'active' : ''}
+          onClick={() => setActiveTab('active')}
+        >
+          Sidak Aktif
+        </button>
+        <button
+          className={activeTab === 'history' ? 'active' : ''}
+          onClick={() => setActiveTab('history')}
+        >
+          Riwayat ({historyList.length})
+        </button>
       </div>
 
       {/* TAB 1: ACTIVE AUDIT */}
@@ -422,22 +461,19 @@ export function MobileStockAudit({ user, authToken }) {
         <>
           {!activeInspection ? (
             /* No Active Session Card */
-            <div style={{ 
-              background: 'var(--card-bg, #1e293b)', 
-              borderRadius: '14px', 
-              padding: '2rem 1.5rem', 
+            <div className="pwa-card" style={{ 
               textAlign: 'center', 
-              border: '1px solid var(--border-color, #334155)',
+              padding: '2.5rem 1.5rem',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '1rem'
+              gap: '1.25rem'
             }}>
-              <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ClipboardCheck size={32} color="#f59e0b" />
+              <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ClipboardCheck size={36} color="#f59e0b" />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--text-main)' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--text-main)' }}>
                   Tidak Ada Sidak yang Sedang Berjalan
                 </h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', maxWidth: '380px', margin: '0 auto', lineHeight: 1.5 }}>
@@ -451,15 +487,15 @@ export function MobileStockAudit({ user, authToken }) {
                   background: 'linear-gradient(135deg, #f59e0b, #d97706)',
                   color: '#000',
                   border: 'none',
-                  borderRadius: '10px',
-                  padding: '12px 24px',
+                  borderRadius: '12px',
+                  padding: '14px 24px',
                   fontSize: '0.95rem',
                   fontWeight: 800,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)'
+                  boxShadow: '0 4px 16px rgba(245, 158, 11, 0.35)'
                 }}
               >
                 <Play size={18} fill="#000" />
@@ -471,19 +507,11 @@ export function MobileStockAudit({ user, authToken }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
               {/* Header Box: Session Info & Summary Badges */}
-              <div style={{ 
-                background: 'var(--card-bg, #1e293b)', 
-                borderRadius: '14px', 
-                padding: '1.25rem', 
-                border: '1px solid var(--border-color, #334155)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem'
-              }}>
+              <div className="pwa-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>NOMOR SIDAK</div>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f59e0b', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b', fontFamily: 'monospace' }}>
                       {activeInspection.audit_number}
                     </div>
                   </div>
@@ -493,9 +521,9 @@ export function MobileStockAudit({ user, authToken }) {
                       fontSize: '0.75rem', 
                       fontWeight: 700, 
                       padding: '4px 10px', 
-                      borderRadius: '6px', 
-                      background: activeInspection.inspection_mode === 'FREE_SCAN' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                      color: activeInspection.inspection_mode === 'FREE_SCAN' ? '#60a5fa' : '#f59e0b'
+                      borderRadius: '8px', 
+                      background: activeInspection.inspection_mode === 'FREE_SCAN' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                      color: activeInspection.inspection_mode === 'FREE_SCAN' ? '#3b82f6' : '#d97706'
                     }}>
                       {activeInspection.inspection_mode === 'FREE_SCAN' ? '⚡ Scan Bebas' : '🎲 Undian Acak'}
                     </span>
@@ -507,13 +535,14 @@ export function MobileStockAudit({ user, authToken }) {
                         color: '#fff',
                         border: 'none',
                         borderRadius: '8px',
-                        padding: '6px 14px',
+                        padding: '8px 14px',
                         fontSize: '0.8rem',
                         fontWeight: 700,
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px'
+                        gap: '4px',
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
                       }}
                     >
                       <Check size={16} />
@@ -524,17 +553,17 @@ export function MobileStockAudit({ user, authToken }) {
 
                 {/* 4 Mini Cards Summary */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-                  <div style={{ background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Item Dicek</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
+                  <div style={{ background: 'rgba(128,128,128,0.06)', padding: '10px 12px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Item Dicek</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '2px' }}>
                       {activeInspection.total_items_checked || 0}
                     </div>
                   </div>
 
-                  <div style={{ background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Item Selisih</div>
+                  <div style={{ background: 'rgba(128,128,128,0.06)', padding: '10px 12px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Item Selisih</div>
                     <div style={{ 
-                      fontSize: '1.2rem', 
+                      fontSize: '1.25rem', 
                       fontWeight: 800, 
                       color: (activeInspection.total_items_discrepancy || 0) > 0 ? '#ef4444' : '#10b981', 
                       marginTop: '2px' 
@@ -543,16 +572,16 @@ export function MobileStockAudit({ user, authToken }) {
                     </div>
                   </div>
 
-                  <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                    <div style={{ fontSize: '0.7rem', color: '#f87171', textTransform: 'uppercase' }}>Kerugian (Minus)</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ef4444', marginTop: '2px' }}>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '10px 12px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#ef4444', textTransform: 'uppercase', fontWeight: 600 }}>Kerugian (Minus)</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ef4444', marginTop: '2px' }}>
                       -{formatCurrency(activeInspection.total_loss_nominal || 0)}
                     </div>
                   </div>
 
-                  <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                    <div style={{ fontSize: '0.7rem', color: '#93c5fd', textTransform: 'uppercase' }}>Lebih (Plus)</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#3b82f6', marginTop: '2px' }}>
+                  <div style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '10px 12px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#3b82f6', textTransform: 'uppercase', fontWeight: 600 }}>Lebih (Plus)</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#3b82f6', marginTop: '2px' }}>
                       +{formatCurrency(activeInspection.total_gain_nominal || 0)}
                     </div>
                   </div>
@@ -560,15 +589,7 @@ export function MobileStockAudit({ user, authToken }) {
               </div>
 
               {/* Barcode Search Bar & Camera Trigger */}
-              <div style={{ 
-                background: 'var(--card-bg, #1e293b)', 
-                borderRadius: '14px', 
-                padding: '1rem', 
-                border: '1px solid var(--border-color, #334155)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem'
-              }}>
+              <div className="pwa-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <div style={{ position: 'relative', flex: 1 }}>
                     <input
@@ -584,9 +605,9 @@ export function MobileStockAudit({ user, authToken }) {
                       style={{
                         width: '100%',
                         padding: '12px 14px 12px 38px',
-                        borderRadius: '10px',
-                        border: '1px solid var(--border-color, #475569)',
-                        background: 'rgba(0,0,0,0.25)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-light)',
+                        background: 'rgba(128, 128, 128, 0.06)',
                         color: 'var(--text-main)',
                         fontSize: '0.95rem',
                         outline: 'none',
@@ -609,7 +630,7 @@ export function MobileStockAudit({ user, authToken }) {
                     onClick={() => setIsCameraActive(prev => !prev)}
                     style={{
                       padding: '12px 14px',
-                      borderRadius: '10px',
+                      borderRadius: '12px',
                       border: 'none',
                       background: isCameraActive ? '#ef4444' : '#6366f1',
                       color: '#fff',
@@ -617,7 +638,7 @@ export function MobileStockAudit({ user, authToken }) {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transition: 'all 0.2s'
+                      boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)'
                     }}
                     title="Buka Kamera Barcode"
                   >
@@ -627,23 +648,24 @@ export function MobileStockAudit({ user, authToken }) {
 
                 {/* Camera View Box */}
                 {isCameraActive && (
-                  <div style={{ border: '2px dashed #6366f1', borderRadius: '12px', padding: '0.75rem', background: 'rgba(0,0,0,0.3)' }}>
+                  <div style={{ border: '2px dashed #6366f1', borderRadius: '14px', padding: '0.75rem', background: 'rgba(0,0,0,0.04)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#a5b4fc' }}>Arahkan Kamera ke Barcode Produk</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6366f1' }}>Arahkan Kamera ke Barcode Produk</span>
                       <X size={18} color="#ef4444" style={{ cursor: 'pointer' }} onClick={() => setIsCameraActive(false)} />
                     </div>
-                    <div id="audit-camera-reader" style={{ width: '100%', borderRadius: '8px', overflow: 'hidden' }}></div>
+                    <div id="audit-camera-reader" style={{ width: '100%', borderRadius: '10px', overflow: 'hidden' }}></div>
                   </div>
                 )}
 
                 {/* Search Results Dropdown */}
                 {searchResults.length > 0 && (
                   <div style={{ 
-                    maxHeight: '220px', 
+                    maxHeight: '240px', 
                     overflowY: 'auto', 
-                    background: 'var(--surface-color, #0f172a)', 
-                    borderRadius: '10px', 
-                    border: '1px solid var(--border-color, #334155)',
+                    background: 'var(--bg-card)', 
+                    borderRadius: '12px', 
+                    border: '1px solid var(--border-light)',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
                     display: 'flex',
                     flexDirection: 'column'
                   }}>
@@ -652,8 +674,8 @@ export function MobileStockAudit({ user, authToken }) {
                         key={p.id}
                         onClick={() => openCountModal(p)}
                         style={{
-                          padding: '10px 12px',
-                          borderBottom: '1px solid var(--border-color, #1e293b)',
+                          padding: '12px 14px',
+                          borderBottom: '1px solid var(--border-light)',
                           cursor: 'pointer',
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -663,7 +685,7 @@ export function MobileStockAudit({ user, authToken }) {
                       >
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)' }}>{p.name}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '2px' }}>
                             {p.barcode || p.sku} &bull; Rak: {p.racks}
                           </div>
                         </div>
@@ -690,14 +712,12 @@ export function MobileStockAudit({ user, authToken }) {
                 </div>
 
                 {(!activeInspection.items || activeInspection.items.length === 0) ? (
-                  <div style={{ 
-                    background: 'var(--card-bg, #1e293b)', 
-                    padding: '2rem', 
-                    borderRadius: '12px', 
+                  <div className="pwa-card" style={{ 
+                    padding: '2.5rem 1.5rem', 
                     textAlign: 'center', 
                     color: 'var(--text-muted)',
                     fontSize: '0.875rem',
-                    border: '1px dashed var(--border-color, #334155)'
+                    border: '1px dashed var(--border-light)'
                   }}>
                     Belum ada barang yang dihitung. Scan barcode produk di rak untuk mulai mencatat.
                   </div>
@@ -705,20 +725,17 @@ export function MobileStockAudit({ user, authToken }) {
                   activeInspection.items.map((it, idx) => {
                     const isMinus = parseFloat(it.discrepancy_quantity) < 0;
                     const isPlus = parseFloat(it.discrepancy_quantity) > 0;
-                    const isMatch = !isMinus && !isPlus;
 
                     return (
                       <div
                         key={it.id}
+                        className="pwa-card"
                         style={{
-                          background: 'var(--card-bg, #1e293b)',
-                          borderRadius: '12px',
                           padding: '12px 14px',
-                          border: `1px solid ${isMinus ? 'rgba(239, 68, 68, 0.35)' : isPlus ? 'rgba(59, 130, 246, 0.35)' : 'var(--border-color, #334155)'}`,
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '0.5rem',
-                          position: 'relative'
+                          borderLeft: `4px solid ${isMinus ? '#ef4444' : isPlus ? '#3b82f6' : '#10b981'}`
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
@@ -726,7 +743,7 @@ export function MobileStockAudit({ user, authToken }) {
                             <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' }}>
                               {idx + 1}. {it.product?.name || 'Produk'}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '2px' }}>
                               {it.product?.barcode || it.product?.sku} {it.rack ? `• Rak: ${it.rack.rack_name}` : ''}
                             </div>
                           </div>
@@ -745,15 +762,15 @@ export function MobileStockAudit({ user, authToken }) {
                           display: 'flex', 
                           justifyContent: 'space-between', 
                           alignItems: 'center', 
-                          background: 'rgba(0,0,0,0.15)', 
-                          padding: '8px 10px', 
+                          background: 'rgba(128,128,128,0.06)', 
+                          padding: '8px 12px', 
                           borderRadius: '8px' 
                         }}>
                           <div>
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Sistem: </span>
                             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>{it.system_quantity}</span>
                             {parseFloat(it.delta_sales_quantity) !== 0 && (
-                              <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '4px' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>
                                 ({parseFloat(it.delta_sales_quantity) > 0 ? '+' : ''}{it.delta_sales_quantity} kasir)
                               </span>
                             )}
@@ -769,8 +786,8 @@ export function MobileStockAudit({ user, authToken }) {
                               fontSize: '0.8rem', 
                               fontWeight: 800, 
                               padding: '2px 8px', 
-                              borderRadius: '5px',
-                              background: isMinus ? 'rgba(239, 68, 68, 0.2)' : isPlus ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                              borderRadius: '6px',
+                              background: isMinus ? 'rgba(239, 68, 68, 0.15)' : isPlus ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
                               color: isMinus ? '#ef4444' : isPlus ? '#3b82f6' : '#10b981'
                             }}>
                               {isMinus ? `${it.discrepancy_quantity} pcs` : isPlus ? `+${it.discrepancy_quantity} pcs` : 'Cocok'}
@@ -789,7 +806,7 @@ export function MobileStockAudit({ user, authToken }) {
                         </div>
 
                         {it.clarification_notes && (
-                          <div style={{ fontSize: '0.75rem', color: '#cbd5e1', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-main)', background: 'rgba(128,128,128,0.08)', padding: '6px 10px', borderRadius: '6px' }}>
                             💬 {it.clarification_notes}
                           </div>
                         )}
@@ -807,10 +824,8 @@ export function MobileStockAudit({ user, authToken }) {
       {activeTab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {historyList.length === 0 ? (
-            <div style={{ 
-              background: 'var(--card-bg, #1e293b)', 
+            <div className="pwa-card" style={{ 
               padding: '2.5rem 1.5rem', 
-              borderRadius: '12px', 
               textAlign: 'center', 
               color: 'var(--text-muted)' 
             }}>
@@ -820,11 +835,9 @@ export function MobileStockAudit({ user, authToken }) {
             historyList.map(h => (
               <div
                 key={h.id}
+                className="pwa-card"
                 style={{
-                  background: 'var(--card-bg, #1e293b)',
-                  borderRadius: '12px',
                   padding: '14px',
-                  border: '1px solid var(--border-color, #334155)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.75rem'
@@ -835,29 +848,29 @@ export function MobileStockAudit({ user, authToken }) {
                     <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', fontFamily: 'monospace' }}>
                       {h.audit_number}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                       Tgl: {h.inspection_date} &bull; Auditor: {h.auditor?.name || '-'}
                     </div>
                   </div>
 
                   <div>
                     {h.status === 'DRAFT' && (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: 'rgba(245, 158, 11, 0.15)', color: '#d97706' }}>
                         Sedang Berjalan
                       </span>
                     )}
                     {h.status === 'INVESTIGATION_PENDING' && (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.15)', color: '#0284c7' }}>
                         Menunggu Investigasi
                       </span>
                     )}
                     {h.status === 'ADJUSTED' && (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
                         Stok Disesuaikan
                       </span>
                     )}
                     {h.status === 'CLOSED' && (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', background: 'rgba(148, 163, 184, 0.2)', color: '#94a3b8' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: 'rgba(148, 163, 184, 0.15)', color: '#64748b' }}>
                         Ditutup
                       </span>
                     )}
@@ -866,7 +879,7 @@ export function MobileStockAudit({ user, authToken }) {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   <div>
-                    Item Dicek: <strong style={{ color: 'var(--text-main)' }}>{h.total_items_checked}</strong>
+                    Item: <strong style={{ color: 'var(--text-main)' }}>{h.total_items_checked}</strong>
                   </div>
                   <div>
                     Selisih: <strong style={{ color: h.total_items_discrepancy > 0 ? '#ef4444' : '#10b981' }}>{h.total_items_discrepancy} item</strong>
@@ -877,16 +890,16 @@ export function MobileStockAudit({ user, authToken }) {
                 </div>
 
                 {/* Action Buttons in History Card */}
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', paddingTop: '0.5rem', borderTop: '1px solid var(--border-light)' }}>
                   <a
                     href={`/stock-audits/${h.id}/print-bap`}
                     target="_blank"
                     rel="noreferrer"
                     style={{
-                      background: 'rgba(255,255,255,0.08)',
+                      background: 'rgba(128,128,128,0.1)',
                       color: 'var(--text-main)',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
                       fontSize: '0.75rem',
                       fontWeight: 700,
                       textDecoration: 'none',
@@ -905,8 +918,8 @@ export function MobileStockAudit({ user, authToken }) {
                         background: '#10b981',
                         color: '#fff',
                         border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
+                        padding: '8px 14px',
+                        borderRadius: '8px',
                         fontSize: '0.75rem',
                         fontWeight: 700,
                         cursor: 'pointer',
@@ -927,10 +940,10 @@ export function MobileStockAudit({ user, authToken }) {
 
       {/* MODAL 1: START NEW AUDIT */}
       {showNewModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ background: 'var(--card-bg, #1e293b)', width: '100%', maxWidth: '440px', borderRadius: '16px', padding: '1.5rem', border: '1px solid var(--border-color, #334155)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="pwa-card" style={{ width: '100%', maxWidth: '440px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>
                 Mulai Sesi Sidak Baru
               </h3>
               <X size={20} color="var(--text-muted)" style={{ cursor: 'pointer' }} onClick={() => setShowNewModal(false)} />
@@ -945,16 +958,17 @@ export function MobileStockAudit({ user, authToken }) {
                 <div
                   onClick={() => setNewMode('FREE_SCAN')}
                   style={{
-                    border: `2px solid ${newMode === 'FREE_SCAN' ? '#f59e0b' : 'var(--border-color, #334155)'}`,
-                    borderRadius: '10px',
-                    padding: '12px 10px',
+                    border: `2px solid ${newMode === 'FREE_SCAN' ? '#f59e0b' : 'var(--border-light)'}`,
+                    borderRadius: '12px',
+                    padding: '14px 10px',
                     cursor: 'pointer',
-                    background: newMode === 'FREE_SCAN' ? 'rgba(245, 158, 11, 0.1)' : 'transparent',
-                    textAlign: 'center'
+                    background: newMode === 'FREE_SCAN' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(128,128,128,0.04)',
+                    textAlign: 'center',
+                    transition: 'all 0.2s'
                   }}
                 >
-                  <Barcode size={22} color={newMode === 'FREE_SCAN' ? '#f59e0b' : 'var(--text-muted)'} style={{ margin: '0 auto 6px' }} />
-                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: newMode === 'FREE_SCAN' ? '#f59e0b' : 'var(--text-main)' }}>
+                  <Barcode size={24} color={newMode === 'FREE_SCAN' ? '#f59e0b' : 'var(--text-muted)'} style={{ margin: '0 auto 6px' }} />
+                  <div style={{ fontWeight: 800, fontSize: '0.875rem', color: newMode === 'FREE_SCAN' ? '#f59e0b' : 'var(--text-main)' }}>
                     Scan Bebas
                   </div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -965,16 +979,17 @@ export function MobileStockAudit({ user, authToken }) {
                 <div
                   onClick={() => setNewMode('RANDOM_LOTTERY')}
                   style={{
-                    border: `2px solid ${newMode === 'RANDOM_LOTTERY' ? '#f59e0b' : 'var(--border-color, #334155)'}`,
-                    borderRadius: '10px',
-                    padding: '12px 10px',
+                    border: `2px solid ${newMode === 'RANDOM_LOTTERY' ? '#f59e0b' : 'var(--border-light)'}`,
+                    borderRadius: '12px',
+                    padding: '14px 10px',
                     cursor: 'pointer',
-                    background: newMode === 'RANDOM_LOTTERY' ? 'rgba(245, 158, 11, 0.1)' : 'transparent',
-                    textAlign: 'center'
+                    background: newMode === 'RANDOM_LOTTERY' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(128,128,128,0.04)',
+                    textAlign: 'center',
+                    transition: 'all 0.2s'
                   }}
                 >
-                  <Sparkles size={22} color={newMode === 'RANDOM_LOTTERY' ? '#f59e0b' : 'var(--text-muted)'} style={{ margin: '0 auto 6px' }} />
-                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: newMode === 'RANDOM_LOTTERY' ? '#f59e0b' : 'var(--text-main)' }}>
+                  <Sparkles size={24} color={newMode === 'RANDOM_LOTTERY' ? '#f59e0b' : 'var(--text-muted)'} style={{ margin: '0 auto 6px' }} />
+                  <div style={{ fontWeight: 800, fontSize: '0.875rem', color: newMode === 'RANDOM_LOTTERY' ? '#f59e0b' : 'var(--text-main)' }}>
                     Undian Acak
                   </div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -986,10 +1001,10 @@ export function MobileStockAudit({ user, authToken }) {
 
             {/* Random Lottery Options */}
             {newMode === 'RANDOM_LOTTERY' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'rgba(0,0,0,0.15)', padding: '12px', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'rgba(128,128,128,0.06)', padding: '12px', borderRadius: '12px' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Jumlah Item Diacak</label>
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '6px' }}>
                     {[10, 20, 30, 50].map(cnt => (
                       <button
                         key={cnt}
@@ -997,10 +1012,10 @@ export function MobileStockAudit({ user, authToken }) {
                         onClick={() => setTargetCount(cnt)}
                         style={{
                           flex: 1,
-                          padding: '6px',
-                          borderRadius: '6px',
-                          border: `1px solid ${targetCount === cnt ? '#f59e0b' : 'var(--border-color, #475569)'}`,
-                          background: targetCount === cnt ? '#f59e0b' : 'transparent',
+                          padding: '8px',
+                          borderRadius: '8px',
+                          border: `1px solid ${targetCount === cnt ? '#f59e0b' : 'var(--border-light)'}`,
+                          background: targetCount === cnt ? '#f59e0b' : 'rgba(128,128,128,0.04)',
                           color: targetCount === cnt ? '#000' : 'var(--text-main)',
                           fontWeight: 700,
                           cursor: 'pointer'
@@ -1026,10 +1041,10 @@ export function MobileStockAudit({ user, authToken }) {
                       }}
                       style={{
                         width: '100%',
-                        padding: '8px 10px',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-color, #475569)',
-                        background: 'rgba(0,0,0,0.3)',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-light)',
+                        background: 'var(--bg-card)',
                         color: 'var(--text-main)',
                         marginTop: '4px',
                         fontSize: '0.85rem'
@@ -1045,7 +1060,7 @@ export function MobileStockAudit({ user, authToken }) {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }} onClick={() => setHighRiskOnly(p => !p)}>
                   <input type="checkbox" checked={highRiskOnly} onChange={() => {}} />
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-main)' }}>Prioritaskan Produk Bernilai Tinggi (High Risk / Kategori A)</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', fontWeight: 600 }}>Prioritaskan Produk Bernilai Tinggi (High Risk / Kategori A)</span>
                 </div>
               </div>
             )}
@@ -1059,10 +1074,10 @@ export function MobileStockAudit({ user, authToken }) {
                 onChange={(e) => setNewNotes(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color, #475569)',
-                  background: 'rgba(0,0,0,0.2)',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-light)',
+                  background: 'rgba(128,128,128,0.06)',
                   color: 'var(--text-main)',
                   marginTop: '4px',
                   fontSize: '0.85rem',
@@ -1075,7 +1090,7 @@ export function MobileStockAudit({ user, authToken }) {
               <button
                 type="button"
                 onClick={() => setShowNewModal(false)}
-                style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #475569)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer' }}
+                style={{ padding: '10px 18px', borderRadius: '10px', border: '1px solid var(--border-light)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer' }}
               >
                 Batal
               </button>
@@ -1083,7 +1098,7 @@ export function MobileStockAudit({ user, authToken }) {
                 type="button"
                 disabled={creating}
                 onClick={handleCreateInspection}
-                style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#f59e0b', color: '#000', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                style={{ padding: '10px 22px', borderRadius: '10px', border: 'none', background: '#f59e0b', color: '#000', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 {creating ? 'Memproses...' : 'Mulai Sekarang'}
               </button>
@@ -1094,15 +1109,15 @@ export function MobileStockAudit({ user, authToken }) {
 
       {/* MODAL 2: INPUT PHYSICAL COUNT */}
       {selectedProduct && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ background: 'var(--card-bg, #1e293b)', width: '100%', maxWidth: '420px', borderRadius: '16px', padding: '1.25rem', border: '1px solid var(--border-color, #334155)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="pwa-card" style={{ width: '100%', maxWidth: '420px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                   {selectedProduct.barcode || selectedProduct.sku}
                 </div>
-                <h3 style={{ margin: '2px 0 0', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                <h3 style={{ margin: '2px 0 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
                   {selectedProduct.name}
                 </h3>
               </div>
@@ -1110,16 +1125,16 @@ export function MobileStockAudit({ user, authToken }) {
             </div>
 
             {/* System Info Box */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(128,128,128,0.06)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
               <div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>STOK SISTEM</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>STOK SISTEM</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#38bdf8', marginTop: '2px' }}>
                   {selectedProduct.stock} {selectedProduct.unit}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>HPP SATUAN</div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>HPP SATUAN</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>
                   {formatCurrency(selectedProduct.cost_price)}
                 </div>
               </div>
@@ -1133,7 +1148,7 @@ export function MobileStockAudit({ user, authToken }) {
                 <button
                   type="button"
                   onClick={() => setPhysicalQty(prev => Math.max(0, prev - 1))}
-                  style={{ width: 44, height: 44, borderRadius: '10px', border: '1px solid #475569', background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 800, cursor: 'pointer' }}
+                  style={{ width: 48, height: 48, borderRadius: '12px', border: '1px solid var(--border-light)', background: 'rgba(128,128,128,0.08)', color: 'var(--text-main)', fontSize: '1.25rem', fontWeight: 800, cursor: 'pointer' }}
                 >
                   -1
                 </button>
@@ -1145,10 +1160,10 @@ export function MobileStockAudit({ user, authToken }) {
                   onChange={(e) => setPhysicalQty(parseFloat(e.target.value) || 0)}
                   style={{
                     flex: 1,
-                    height: 44,
-                    borderRadius: '10px',
+                    height: 48,
+                    borderRadius: '12px',
                     border: '2px solid #f59e0b',
-                    background: 'rgba(0,0,0,0.3)',
+                    background: 'rgba(128,128,128,0.06)',
                     color: 'var(--text-main)',
                     fontSize: '1.4rem',
                     fontWeight: 800,
@@ -1160,14 +1175,14 @@ export function MobileStockAudit({ user, authToken }) {
                 <button
                   type="button"
                   onClick={() => setPhysicalQty(prev => prev + 1)}
-                  style={{ width: 44, height: 44, borderRadius: '10px', border: '1px solid #475569', background: 'rgba(255,255,255,0.05)', color: 'var(--text-main)', fontSize: '1.2rem', fontWeight: 800, cursor: 'pointer' }}
+                  style={{ width: 48, height: 48, borderRadius: '12px', border: '1px solid var(--border-light)', background: 'rgba(128,128,128,0.08)', color: 'var(--text-main)', fontSize: '1.25rem', fontWeight: 800, cursor: 'pointer' }}
                 >
                   +1
                 </button>
               </div>
 
               {/* Quick Adder Buttons */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '6px' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '8px' }}>
                 {[0, 5, 10, 20].map(add => (
                   <button
                     key={add}
@@ -1176,7 +1191,7 @@ export function MobileStockAudit({ user, authToken }) {
                       if (add === 0) setPhysicalQty(0);
                       else setPhysicalQty(prev => prev + add);
                     }}
-                    style={{ flex: 1, padding: '4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ flex: 1, padding: '6px', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'rgba(128,128,128,0.04)', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
                   >
                     {add === 0 ? 'Set 0' : `+${add}`}
                   </button>
@@ -1186,9 +1201,9 @@ export function MobileStockAudit({ user, authToken }) {
 
             {/* Difference Preview */}
             <div style={{ 
-              padding: '10px 12px', 
-              borderRadius: '10px', 
-              background: (physicalQty - selectedProduct.stock) < 0 ? 'rgba(239, 68, 68, 0.15)' : (physicalQty - selectedProduct.stock) > 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+              padding: '12px', 
+              borderRadius: '12px', 
+              background: (physicalQty - selectedProduct.stock) < 0 ? 'rgba(239, 68, 68, 0.1)' : (physicalQty - selectedProduct.stock) > 0 ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
               border: `1px solid ${(physicalQty - selectedProduct.stock) < 0 ? '#ef4444' : (physicalQty - selectedProduct.stock) > 0 ? '#3b82f6' : '#10b981'}`,
               display: 'flex',
               justifyContent: 'space-between',
@@ -1197,7 +1212,7 @@ export function MobileStockAudit({ user, authToken }) {
               <div>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Kalkulasi Selisih:</div>
                 <div style={{ 
-                  fontSize: '1rem', 
+                  fontSize: '1.05rem', 
                   fontWeight: 800, 
                   color: (physicalQty - selectedProduct.stock) < 0 ? '#ef4444' : (physicalQty - selectedProduct.stock) > 0 ? '#3b82f6' : '#10b981' 
                 }}>
@@ -1208,7 +1223,7 @@ export function MobileStockAudit({ user, authToken }) {
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Nominal:</div>
                 <div style={{ 
-                  fontSize: '0.95rem', 
+                  fontSize: '1rem', 
                   fontWeight: 800, 
                   color: (physicalQty - selectedProduct.stock) < 0 ? '#ef4444' : (physicalQty - selectedProduct.stock) > 0 ? '#3b82f6' : '#10b981' 
                 }}>
@@ -1227,10 +1242,10 @@ export function MobileStockAudit({ user, authToken }) {
                 onChange={(e) => setItemNotes(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '8px 10px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color, #475569)',
-                  background: 'rgba(0,0,0,0.2)',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-light)',
+                  background: 'rgba(128,128,128,0.06)',
                   color: 'var(--text-main)',
                   marginTop: '4px',
                   fontSize: '0.85rem',
@@ -1244,7 +1259,7 @@ export function MobileStockAudit({ user, authToken }) {
               <button
                 type="button"
                 onClick={() => setSelectedProduct(null)}
-                style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #475569', background: 'transparent', color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer' }}
+                style={{ padding: '10px 16px', borderRadius: '10px', border: '1px solid var(--border-light)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 700, cursor: 'pointer' }}
               >
                 Batal
               </button>
@@ -1252,7 +1267,7 @@ export function MobileStockAudit({ user, authToken }) {
                 type="button"
                 disabled={savingItem}
                 onClick={handleSaveItemCount}
-                style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#f59e0b', color: '#000', fontWeight: 800, cursor: 'pointer' }}
+                style={{ padding: '10px 22px', borderRadius: '10px', border: 'none', background: '#f59e0b', color: '#000', fontWeight: 800, cursor: 'pointer' }}
               >
                 {savingItem ? 'Menyimpan...' : 'Simpan Hitungan'}
               </button>
@@ -1263,21 +1278,21 @@ export function MobileStockAudit({ user, authToken }) {
 
       {/* MODAL 3: FINISH INSPECTION */}
       {showFinishModal && activeInspection && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ background: 'var(--card-bg, #1e293b)', width: '100%', maxWidth: '440px', borderRadius: '16px', padding: '1.5rem', border: '1px solid var(--border-color, #334155)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="pwa-card" style={{ width: '100%', maxWidth: '440px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>
                 Selesaikan Sesi Sidak
               </h3>
               <X size={20} color="var(--text-muted)" style={{ cursor: 'pointer' }} onClick={() => setShowFinishModal(false)} />
             </div>
 
             {/* Summary Highlights */}
-            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ background: 'rgba(128,128,128,0.06)', padding: '14px', borderRadius: '12px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Total Item Diperiksa:</span>
-                <strong>{activeInspection.total_items_checked} Produk</strong>
+                <strong style={{ color: 'var(--text-main)' }}>{activeInspection.total_items_checked} Produk</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Item Mengalami Selisih:</span>
@@ -1285,8 +1300,8 @@ export function MobileStockAudit({ user, authToken }) {
                   {activeInspection.total_items_discrepancy} Produk
                 </strong>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px' }}>
-                <span style={{ color: '#f87171' }}>Total Kerugian (Minus):</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', borderTop: '1px solid var(--border-light)', paddingTop: '8px' }}>
+                <span style={{ color: '#ef4444', fontWeight: 600 }}>Total Kerugian (Minus):</span>
                 <strong style={{ color: '#ef4444' }}>-{formatCurrency(activeInspection.total_loss_nominal)}</strong>
               </div>
             </div>
@@ -1301,10 +1316,10 @@ export function MobileStockAudit({ user, authToken }) {
                 onChange={(e) => setWitnessName(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color, #475569)',
-                  background: 'rgba(0,0,0,0.2)',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-light)',
+                  background: 'rgba(128,128,128,0.06)',
                   color: 'var(--text-main)',
                   marginTop: '4px',
                   fontSize: '0.85rem',
@@ -1322,10 +1337,10 @@ export function MobileStockAudit({ user, authToken }) {
                 onChange={(e) => setFinishNotes(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color, #475569)',
-                  background: 'rgba(0,0,0,0.2)',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-light)',
+                  background: 'rgba(128,128,128,0.06)',
                   color: 'var(--text-main)',
                   marginTop: '4px',
                   fontSize: '0.85rem',
@@ -1343,17 +1358,17 @@ export function MobileStockAudit({ user, authToken }) {
                 disabled={finishing}
                 onClick={() => handleFinishInspection('INVESTIGATION')}
                 style={{
-                  padding: '12px',
-                  borderRadius: '10px',
+                  padding: '14px',
+                  borderRadius: '12px',
                   border: '1px solid #38bdf8',
                   background: 'rgba(56, 189, 248, 0.1)',
-                  color: '#38bdf8',
+                  color: '#0284c7',
                   cursor: 'pointer',
                   textAlign: 'left'
                 }}
               >
                 <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>📋 Simpan Temuan Saja (Investigasi)</div>
-                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                   Stok sistem <b>BELUM diubah</b>. Memberikan waktu klarifikasi dan pencarian fisik di toko.
                 </div>
               </button>
@@ -1364,17 +1379,18 @@ export function MobileStockAudit({ user, authToken }) {
                 disabled={finishing}
                 onClick={() => handleFinishInspection('ADJUST')}
                 style={{
-                  padding: '12px',
-                  borderRadius: '10px',
+                  padding: '14px',
+                  borderRadius: '12px',
                   border: 'none',
                   background: 'linear-gradient(135deg, #10b981, #059669)',
                   color: '#fff',
                   cursor: 'pointer',
-                  textAlign: 'left'
+                  textAlign: 'left',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)'
                 }}
               >
                 <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>⚡ Simpan & Terapkan Koreksi Stok</div>
-                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', marginTop: '2px' }}>
+                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.85)', marginTop: '2px' }}>
                   Stok sistem <b>LANGSUNG disesuaikan</b> detik ini juga dengan membuat dokumen koreksi stok resmi.
                 </div>
               </button>

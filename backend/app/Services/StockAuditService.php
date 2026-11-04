@@ -24,6 +24,16 @@ class StockAuditService
         $orgId = $data['organization_id'] ?? $user->organization_id;
         $mode = $data['inspection_mode'] ?? 'FREE_SCAN';
 
+        // Fallback jika user adalah Super Admin / akun pusat tanpa branch_id
+        if (!$branchId) {
+            $branchId = \App\Models\Branch::where('organization_id', $orgId)->value('id') 
+                ?? \App\Models\Branch::first()?->id;
+        }
+
+        if (!$orgId && $branchId) {
+            $orgId = \App\Models\Branch::where('id', $branchId)->value('organization_id');
+        }
+
         $auditNumber = 'SDK-' . date('Ymd') . '-' . strtoupper(Str::random(4));
 
         return DB::transaction(function () use ($data, $user, $branchId, $orgId, $mode, $auditNumber) {
