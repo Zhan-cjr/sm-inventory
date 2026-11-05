@@ -45,8 +45,10 @@
     },
     syncHeaderPrintBtn() {
         const url = this.getPrintUrl();
-        document.querySelectorAll('a[href*=\"print-bap\"]').forEach(el => {
-            el.setAttribute('href', url);
+        document.querySelectorAll('a').forEach(el => {
+            if (el.href && el.href.includes('print-bap')) {
+                el.setAttribute('href', url);
+            }
         });
     },
     matchesFilter(itemStatus, itemName, itemBarcode, itemSku) {
@@ -920,8 +922,9 @@
             <div class="sa-filter-list">
                 <button
                     type="button"
+                    class="sa-filter-btn"
                     @click="activeFilter = 'all'"
-                    :class="activeFilter === 'all' ? 'sa-filter-btn active-all' : 'sa-filter-btn'"
+                    :class="{ 'active-all': activeFilter === 'all' }"
                 >
                     <span>Semua Item</span>
                     <span class="sa-filter-count">{{ $totalChecked }}</span>
@@ -929,8 +932,9 @@
 
                 <button
                     type="button"
+                    class="sa-filter-btn"
                     @click="activeFilter = 'discrepancy'"
-                    :class="activeFilter === 'discrepancy' ? 'sa-filter-btn active-disc' : 'sa-filter-btn'"
+                    :class="{ 'active-disc': activeFilter === 'discrepancy' }"
                 >
                     <span class="sa-dot amber"></span>
                     <span>Selisih Saja</span>
@@ -939,8 +943,9 @@
 
                 <button
                     type="button"
+                    class="sa-filter-btn"
                     @click="activeFilter = 'minus'"
-                    :class="activeFilter === 'minus' ? 'sa-filter-btn active-minus' : 'sa-filter-btn'"
+                    :class="{ 'active-minus': activeFilter === 'minus' }"
                 >
                     <span class="sa-dot" style="background: #ef4444;"></span>
                     <span>Minus (Kurang)</span>
@@ -949,8 +954,9 @@
 
                 <button
                     type="button"
+                    class="sa-filter-btn"
                     @click="activeFilter = 'plus'"
-                    :class="activeFilter === 'plus' ? 'sa-filter-btn active-plus' : 'sa-filter-btn'"
+                    :class="{ 'active-plus': activeFilter === 'plus' }"
                 >
                     <span class="sa-dot sky"></span>
                     <span>Plus (Lebih)</span>
@@ -959,8 +965,9 @@
 
                 <button
                     type="button"
+                    class="sa-filter-btn"
                     @click="activeFilter = 'match'"
-                    :class="activeFilter === 'match' ? 'sa-filter-btn active-match' : 'sa-filter-btn'"
+                    :class="{ 'active-match': activeFilter === 'match' }"
                 >
                     <span class="sa-dot emerald"></span>
                     <span>Cocok (Match)</span>
