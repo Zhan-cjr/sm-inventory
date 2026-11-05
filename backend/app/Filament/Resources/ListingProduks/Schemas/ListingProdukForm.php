@@ -132,6 +132,25 @@ class ListingProdukForm
                     ->schema([
                         Repeater::make('products')
                             ->relationship('products')
+                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data, \Filament\Schemas\Components\Utilities\Get $get): array {
+                                $data['organization_id'] = $data['organization_id'] ?? $get('organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
+                                $data['supplier_id'] = $get('supplier_id');
+                                $data['supplier_division_id'] = $get('supplier_division_id');
+                                $data['listing_status'] = 'TRIAL';
+                                $data['trial_start_date'] = $get('trial_start_date');
+                                $data['trial_end_date'] = $get('trial_end_date');
+                                $data['allowed_branch_ids'] = $get('allowed_branch_ids') ?? [];
+                                return $data;
+                            })
+                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data, \Filament\Schemas\Components\Utilities\Get $get): array {
+                                $data['organization_id'] = $data['organization_id'] ?? $get('organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
+                                $data['supplier_id'] = $get('supplier_id');
+                                $data['supplier_division_id'] = $get('supplier_division_id');
+                                $data['trial_start_date'] = $get('trial_start_date');
+                                $data['trial_end_date'] = $get('trial_end_date');
+                                $data['allowed_branch_ids'] = $get('allowed_branch_ids') ?? [];
+                                return $data;
+                            })
                             ->label('Item Produk')
                             ->addActionLabel('+ Tambah Baris Produk')
                             ->defaultItems(1)
@@ -295,6 +314,7 @@ class ListingProdukForm
                                 Hidden::make('selling_price')->default(0),
                                 Hidden::make('is_taxable')->default(true),
                                 Hidden::make('is_active')->default(true),
+                                Hidden::make('organization_id')->default(fn () => Auth::user()?->organization_id ?? Organization::first()?->id),
                             ]),
                     ]),
             ]);

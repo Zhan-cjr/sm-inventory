@@ -39,6 +39,13 @@ class Product extends Model
 
     protected static function booted()
     {
+        static::creating(function ($product) {
+            if (empty($product->organization_id)) {
+                $product->organization_id = \Illuminate\Support\Facades\Auth::user()?->organization_id
+                    ?? \App\Models\Organization::first()?->id;
+            }
+        });
+
         static::deleting(function ($product) {
             $hasHistory = \App\Models\TransactionItem::where('product_id', $product->id)->exists() ||
                          \App\Models\PurchaseOrderItem::where('product_id', $product->id)->exists() ||
