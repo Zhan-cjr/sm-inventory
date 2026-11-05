@@ -4,6 +4,22 @@ import { Printer, LogOut } from 'lucide-react';
 export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) => {
   if (!eodData) return null;
 
+  const [countdown, setCountdown] = React.useState(45);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          if (onClose) onClose();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [onClose]);
+
   const getReportText = () => {
     const columns = 35;
     const divider = '-'.repeat(columns);
@@ -131,6 +147,9 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
       if (onClose) onClose();
     } else {
       if (onPrint) onPrint();
+      setTimeout(() => {
+        if (onClose) onClose();
+      }, 1000);
     }
   };
 
@@ -195,7 +214,7 @@ export const EODReportPreview = ({ eodData, branchSettings, onPrint, onClose }) 
             <Printer size={18} /> CETAK TEKS (ESC/POS)
           </button>
           <button className="btn-danger" onClick={onClose} style={{ flex: '1 1 100%', padding: '0.75rem', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', fontWeight: 'bold' }}>
-            <LogOut size={18} /> SELESAI & LOGOUT
+            <LogOut size={18} /> SELESAI & LOGOUT KASIR ({countdown}s)
           </button>
         </footer>
       </div>

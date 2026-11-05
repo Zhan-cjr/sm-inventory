@@ -76,6 +76,7 @@ export const PosModalsContainer = ({
   eodReportData,
   setEodReportData,
   branchSettings,
+  user,
   onLogout,
 
   // Recall / Hold
@@ -246,6 +247,8 @@ export const PosModalsContainer = ({
       {isOpenShiftModalOpen && (
         <OpenShiftModal
           isOpen={isOpenShiftModalOpen}
+          user={user}
+          onLogout={onLogout}
           selectedShiftName={selectedShiftName}
           setSelectedShiftName={setSelectedShiftName}
           startingCash={startingCash}

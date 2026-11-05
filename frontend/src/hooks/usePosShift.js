@@ -505,6 +505,10 @@ export const usePosShift = ({
       setLockScreenInfo(null);
       setIsCloseShiftModalOpen(false);
       setIsProcessing(false);
+      // Immediately clear storage session so next boot starts cleanly at login
+      localStorage.removeItem('pos_token');
+      localStorage.removeItem('pos_user');
+      localStorage.removeItem('pos_login_date');
       setAlertMsg({ text: 'Shift offline berhasil ditutup (Lokal). Terima kasih!', type: 'success', persist: true });
       setTimeout(() => onLogout(), 2000);
       return;
@@ -532,6 +536,10 @@ export const usePosShift = ({
           setActiveShift(null);
           setLockScreenInfo(null);
           setIsCloseShiftModalOpen(false);
+          // Immediately clear session from localStorage so closing the app / PC doesn't leave session for next cashier
+          localStorage.removeItem('pos_token');
+          localStorage.removeItem('pos_user');
+          localStorage.removeItem('pos_login_date');
           setAlertMsg({ text: 'Shift berhasil ditutup. Menyiapkan Laporan EOD...', type: 'success' });
           setEodReportData(data.shift);
         } else {
@@ -545,6 +553,9 @@ export const usePosShift = ({
         setLockScreenInfo(null);
         setIsCloseShiftModalOpen(false);
         setIsProcessing(false);
+        localStorage.removeItem('pos_token');
+        localStorage.removeItem('pos_user');
+        localStorage.removeItem('pos_login_date');
         setAlertMsg({ text: 'Koneksi terputus. Shift ditutup secara lokal. Terima kasih!', type: 'success', persist: true });
         setTimeout(() => onLogout(), 2000);
       });

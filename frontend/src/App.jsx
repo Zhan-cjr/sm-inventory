@@ -88,6 +88,22 @@ function App() {
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
+  // Cross-day Session Invalidation: Prevent yesterday's cashier session from carrying over to today
+  useEffect(() => {
+    const savedToken = localStorage.getItem('pos_token');
+    const savedLoginDate = localStorage.getItem('pos_login_date');
+    const todayStr = new Date().toLocaleDateString('sv-SE');
+
+    if (savedToken) {
+      if (!savedLoginDate) {
+        localStorage.setItem('pos_login_date', todayStr);
+      } else if (savedLoginDate !== todayStr) {
+        console.warn(`[Security] Sesi kasir berasal dari tanggal kemarin (${savedLoginDate}). Memaksa login ulang untuk tanggal hari ini (${todayStr}).`);
+        handleLogout();
+      }
+    }
+  }, []);
+
   // Initialize and handshake device UUID
   useEffect(() => {
     let activeUuid = localStorage.getItem('pos_device_uuid');
@@ -236,8 +252,10 @@ function App() {
     }
 
     setDeviceError(null);
+    const todayStr = new Date().toLocaleDateString('sv-SE');
     localStorage.setItem('pos_token', newToken);
     localStorage.setItem('pos_user', JSON.stringify(userData));
+    localStorage.setItem('pos_login_date', todayStr);
 
     // Reset route according to device: Desktop goes to /pos, Mobile goes to /mobile
     const isMobile = isRealMobileDevice();
@@ -254,6 +272,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('pos_token');
     localStorage.removeItem('pos_user');
+    localStorage.removeItem('pos_login_date');
     // Remove any obsolete legacy un-namespaced shift key
     localStorage.removeItem('pos_active_shift');
     // Note: User-specific shifts (pos_active_shift_{userId}_{terminalId}) are preserved
