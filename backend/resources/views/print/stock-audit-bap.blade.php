@@ -1,6 +1,43 @@
 @extends('print.layout')
 
-@section('title', 'Berita Acara Pemeriksaan (BAP) Sidak Audit Stok — ' . $audit->audit_number)
+@php
+    $activeFilter = $filter ?? request('filter', 'all');
+    $searchQuery  = trim($search ?? request('q', ''));
+
+    $filteredItems = $audit->items->filter(function ($it) use ($activeFilter, $searchQuery) {
+        if ($activeFilter === 'discrepancy' && $it->status === 'MATCH') return false;
+        if ($activeFilter === 'minus' && $it->status !== 'MINUS') return false;
+        if ($activeFilter === 'plus' && $it->status !== 'PLUS') return false;
+        if ($activeFilter === 'match' && $it->status !== 'MATCH') return false;
+
+        if ($searchQuery !== '') {
+            $q = mb_strtolower($searchQuery);
+            $name = mb_strtolower($it->product?->name ?? '');
+            $barcode = mb_strtolower($it->product?->barcode ?? '');
+            $sku = mb_strtolower($it->product?->sku ?? '');
+            if (!str_contains($name, $q) && !str_contains($barcode, $q) && !str_contains($sku, $q)) {
+                return false;
+            }
+        }
+
+        return true;
+    })->values();
+
+    $filterLabel = match ($activeFilter) {
+        'discrepancy' => 'Hanya Item Selisih (Minus & Plus)',
+        'minus'       => 'Hanya Item Selisih Kurang (Minus)',
+        'plus'        => 'Hanya Item Selisih Lebih (Plus)',
+        'match'       => 'Hanya Item Cocok / Sesuai (Match)',
+        default       => 'Semua Item yang Diperiksa',
+    };
+
+    $sumSystemQty   = $filteredItems->sum('system_quantity');
+    $sumPhysicalQty = $filteredItems->sum('physical_quantity');
+    $sumDiscQty     = $filteredItems->sum('discrepancy_quantity');
+    $sumDiscCost    = $filteredItems->sum('discrepancy_cost');
+@endphp
+
+@section('title', 'Berita Acara Pemeriksaan (BAP) Sidak Audit Stok — ' . $audit->audit_number . ' (' . $filterLabel . ')')
 
 @section('content')
 <style>
@@ -10,6 +47,9 @@
         border-bottom: 2px solid #333;
         padding-bottom: 8px;
         margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
     }
     .doc-title {
         font-size: 15px;
@@ -17,6 +57,16 @@
         margin: 0 0 4px 0;
         text-transform: uppercase;
         letter-spacing: 0.05em;
+    }
+    .filter-pill-banner {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: bold;
+        background: #eef2ff;
+        color: #3730a3;
+        border: 1px solid #c7d2fe;
     }
     .meta-table {
         width: 100%;
@@ -76,7 +126,7 @@
     .audit-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 10px;
+        margin-top: 6px;
         font-size: 10px;
     }
     .audit-table th {
@@ -90,6 +140,12 @@
         border: 1px solid #ccc;
         padding: 5px 4px;
         vertical-align: middle;
+    }
+    .audit-table tfoot td {
+        background: #f3f4f6;
+        border: 1px solid #999;
+        padding: 6px 4px;
+        font-weight: bold;
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -112,8 +168,13 @@
 </style>
 
 <div class="doc-header">
-    <div class="doc-title">BERITA ACARA PEMERIKSAAN (BAP) SIDAK AUDIT STOK</div>
-    <div style="font-size: 11px; color: #555;">SM INVENTORY &bull; SISTEM AUDIT & KONTROL INTERNAL TOKO</div>
+    <div>
+        <div class="doc-title">BERITA ACARA PEMERIKSAAN (BAP) SIDAK AUDIT STOK</div>
+        <div style="font-size: 11px; color: #555;">SM INVENTORY &bull; SISTEM AUDIT & KONTROL INTERNAL TOKO</div>
+    </div>
+    <div>
+        <span class="filter-pill-banner">Filter Cetak: {{ $filterLabel }} ({{ $filteredItems->count() }} Item)</span>
+    </div>
 </div>
 
 <table class="meta-table">
@@ -186,7 +247,15 @@
     </div>
 </div>
 
-<div style="font-weight: bold; margin-bottom: 4px; text-transform: uppercase; font-size: 11px;">Rincian Hasil Penghitungan Fisik per Produk:</div>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+    <div style="font-weight: bold; text-transform: uppercase; font-size: 11px;">
+        Rincian Hasil Penghitungan Fisik — {{ $filterLabel }} ({{ $filteredItems->count() }} Item):
+    </div>
+    @if($searchQuery !== '')
+        <div style="font-size: 10px; color: #555;">Pencarian: "{{ $searchQuery }}"</div>
+    @endif
+</div>
+
 <table class="audit-table">
     <thead>
         <tr>
@@ -203,7 +272,7 @@
         </tr>
     </thead>
     <tbody>
-        @forelse($audit->items as $idx => $it)
+        @forelse($filteredItems as $idx => $it)
         <tr>
             <td class="text-center">{{ $idx + 1 }}</td>
             <td class="text-left font-mono" style="font-size: 9px;">
@@ -243,11 +312,40 @@
         @empty
         <tr>
             <td colspan="10" class="text-center" style="padding: 15px; color: #888;">
-                Belum ada produk yang dipindai dalam sesi sidak ini.
+                Tidak ada item untuk kategori filter "{{ $filterLabel }}".
             </td>
         </tr>
         @endforelse
     </tbody>
+    @if($filteredItems->count() > 0)
+    <tfoot>
+        <tr>
+            <td colspan="4" class="text-right">TOTAL REKAPITULASI ({{ $filteredItems->count() }} ITEM):</td>
+            <td class="text-right">{{ number_format($sumSystemQty, 0) }}</td>
+            <td class="text-right">{{ number_format($sumPhysicalQty, 0) }}</td>
+            <td class="text-right">
+                @if($sumDiscQty < 0)
+                    <span class="diff-minus">{{ number_format($sumDiscQty, 0) }}</span>
+                @elseif($sumDiscQty > 0)
+                    <span class="diff-plus">+{{ number_format($sumDiscQty, 0) }}</span>
+                @else
+                    <span class="diff-match">0</span>
+                @endif
+            </td>
+            <td></td>
+            <td class="text-right">
+                @if($sumDiscCost < 0)
+                    <span class="diff-minus">-Rp {{ number_format(abs($sumDiscCost), 0, ',', '.') }}</span>
+                @elseif($sumDiscCost > 0)
+                    <span class="diff-plus">+Rp {{ number_format($sumDiscCost, 0, ',', '.') }}</span>
+                @else
+                    <span class="diff-match">Rp 0</span>
+                @endif
+            </td>
+            <td></td>
+        </tr>
+    </tfoot>
+    @endif
 </table>
 
 <div class="signature-section">
@@ -272,7 +370,6 @@
 </div>
 
 <div style="margin-top: 20px; font-size: 9px; color: #777; border-top: 1px dashed #ccc; padding-top: 4px;">
-    Dicetak dari SM-Inventory ERP pada: {{ now()->translatedFormat('d F Y H:i:s') }} | Nomor Dokumen Resmi BAP Internal Audit.
+    Dicetak dari SM-Inventory ERP pada: {{ now()->translatedFormat('d F Y H:i:s') }} | Filter: {{ $filterLabel }} | Nomor Dokumen Resmi BAP Internal Audit.
 </div>
 @endsection
-

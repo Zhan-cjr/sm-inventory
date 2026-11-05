@@ -24,6 +24,31 @@
 <div class="sa-wrapper" x-data="{
     activeFilter: 'all',
     searchQuery: '',
+    basePrintUrl: '{{ route('stock-audits.print-bap', ['record' => $record->id]) }}',
+    getPrintUrl() {
+        let params = new URLSearchParams();
+        if (this.activeFilter && this.activeFilter !== 'all') {
+            params.set('filter', this.activeFilter);
+        }
+        if (this.searchQuery && this.searchQuery.trim() !== '') {
+            params.set('q', this.searchQuery.trim());
+        }
+        const qs = params.toString();
+        return qs ? `${this.basePrintUrl}?${qs}` : this.basePrintUrl;
+    },
+    getFilterLabel() {
+        if (this.activeFilter === 'discrepancy') return 'Selisih Saja';
+        if (this.activeFilter === 'minus') return 'Minus Saja';
+        if (this.activeFilter === 'plus') return 'Plus Saja';
+        if (this.activeFilter === 'match') return 'Cocok Saja';
+        return 'Semua Item';
+    },
+    syncHeaderPrintBtn() {
+        const url = this.getPrintUrl();
+        document.querySelectorAll('a[href*=\"print-bap\"]').forEach(el => {
+            el.setAttribute('href', url);
+        });
+    },
     matchesFilter(itemStatus, itemName, itemBarcode, itemSku) {
         const q = this.searchQuery.toLowerCase().trim();
         const matchesSearch = !q || 
@@ -40,7 +65,7 @@
         if (this.activeFilter === 'match') return itemStatus === 'MATCH';
         return true;
     }
-}">
+}" x-init="$watch('activeFilter', () => syncHeaderPrintBtn()); $watch('searchQuery', () => syncHeaderPrintBtn());">
     <style>
         .sa-wrapper {
             display: flex;
@@ -495,6 +520,38 @@
             padding: 2px;
         }
 
+        .sa-toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+        }
+        .sa-print-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.45rem 0.9rem;
+            border-radius: 0.65rem;
+            font-size: 0.76rem;
+            font-weight: 700;
+            text-decoration: none;
+            background: #0f172a;
+            color: #ffffff !important;
+            border: 1px solid #0f172a;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .sa-print-btn:hover {
+            background: #1e293b;
+        }
+        .dark .sa-print-btn {
+            background: #334155;
+            border-color: #475569;
+        }
+        .dark .sa-print-btn:hover {
+            background: #475569;
+        }
+
         /* Data Table */
         .sa-table-scroll {
             width: 100%;
@@ -911,24 +968,36 @@
                 </button>
             </div>
 
-            <div class="sa-search-box">
-                <span class="sa-search-icon">
-                    <x-heroicon-m-magnifying-glass style="width: 15px; height: 15px;" />
-                </span>
-                <input
-                    type="text"
-                    x-model="searchQuery"
-                    placeholder="Cari nama produk / barcode / SKU..."
-                    class="sa-search-input"
-                />
-                <button
-                    type="button"
-                    x-show="searchQuery"
-                    @click="searchQuery = ''"
-                    class="sa-search-clear"
+            <div class="sa-toolbar-right">
+                <div class="sa-search-box">
+                    <span class="sa-search-icon">
+                        <x-heroicon-m-magnifying-glass style="width: 15px; height: 15px;" />
+                    </span>
+                    <input
+                        type="text"
+                        x-model="searchQuery"
+                        placeholder="Cari nama produk / barcode / SKU..."
+                        class="sa-search-input"
+                    />
+                    <button
+                        type="button"
+                        x-show="searchQuery"
+                        @click="searchQuery = ''"
+                        class="sa-search-clear"
+                    >
+                        <x-heroicon-m-x-mark style="width: 15px; height: 15px;" />
+                    </button>
+                </div>
+
+                <a
+                    :href="getPrintUrl()"
+                    target="_blank"
+                    class="sa-print-btn"
+                    title="Cetak BAP sesuai filter tab yang sedang aktif"
                 >
-                    <x-heroicon-m-x-mark style="width: 15px; height: 15px;" />
-                </button>
+                    <x-heroicon-o-printer style="width: 15px; height: 15px;" />
+                    <span>Cetak BAP (<span x-text="getFilterLabel()">Semua Item</span>)</span>
+                </a>
             </div>
         </div>
 
