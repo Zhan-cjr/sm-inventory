@@ -268,7 +268,7 @@ class StockAuditService
         string $action,
         ?string $acknowledgedBy = null,
         ?string $notes = null,
-        User $user
+        ?User $user = null
     ): StockAuditInspection {
         return DB::transaction(function () use ($inspection, $action, $acknowledgedBy, $notes, $user) {
             $inspection->update([
