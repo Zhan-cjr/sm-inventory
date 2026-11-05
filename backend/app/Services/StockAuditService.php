@@ -298,16 +298,20 @@ class StockAuditService
         return DB::transaction(function () use ($inspection, $user) {
             $discrepancyItems = $inspection->items()->where('status', '!=', 'MATCH')->get();
             $adjNumber = 'ADJ-' . date('Ymd') . '-' . strtoupper(Str::random(4));
+            $reasonId = \App\Models\AdjustmentReason::where('name', 'like', '%Koreksi%')->first()?->id;
 
             $adjustment = StockAdjustment::create([
-                'adjustment_number' => $adjNumber,
-                'adjustment_date'   => now()->toDateString(),
-                'branch_id'         => $inspection->branch_id,
-                'notes'             => "Penyesuaian Hasil Sidak Audit {$inspection->audit_number}" . ($inspection->notes ? " - {$inspection->notes}" : ''),
-                'recorded_by'       => $user->id,
-                'status'            => 'COMPLETED',
+                'adjustment_number'    => $adjNumber,
+                'adjustment_date'      => now()->toDateString(),
+                'branch_id'            => $inspection->branch_id,
+                'adjustment_reason_id' => $reasonId,
+                'notes'                => "Penyesuaian Hasil Sidak Audit {$inspection->audit_number}" . ($inspection->notes ? " - {$inspection->notes}" : ''),
+                'recorded_by'          => (string) $user->id,
+                'status'               => 'COMPLETED',
+                'total_value'          => 0,
             ]);
 
+            $totalValue = 0;
             foreach ($discrepancyItems as $item) {
                 $stock = Stock::firstOrCreate([
                     'branch_id'  => $inspection->branch_id,
@@ -321,14 +325,19 @@ class StockAuditService
                 $beforeQoh = (float) $stock->quantity_on_hand;
                 $currentDamaged = (float) ($stock->quantity_damaged ?? 0);
                 $newQoh = (float) $item->physical_quantity + $currentDamaged;
+                $unitCost = (float) ($stock->cost_price ?? $item->cost_price ?? 0);
+                $discrepancy = (float) $item->discrepancy_quantity;
+                $totalCost = abs($discrepancy) * $unitCost;
+                $totalValue += $totalCost;
 
                 StockAdjustmentItem::create([
                     'stock_adjustment_id' => $adjustment->id,
                     'product_id'          => $item->product_id,
-                    'previous_quantity'   => (int) $beforeQoh,
-                    'adjustment_quantity' => (int) $item->discrepancy_quantity,
-                    'new_quantity'        => (int) $newQoh,
-                    'reason_code'         => 'AUDIT_SIDAK',
+                    'previous_quantity'   => $beforeQoh,
+                    'adjustment_quantity' => $discrepancy,
+                    'new_quantity'        => $newQoh,
+                    'unit_cost'           => $unitCost,
+                    'total_cost'          => $totalCost,
                 ]);
 
                 // Update stock with Observer metadata for audit log
@@ -344,6 +353,14 @@ class StockAuditService
                     'last_count_date'  => $inspection->inspection_date,
                     'last_so_number'   => $inspection->audit_number,
                 ]);
+            }
+
+            $adjustment->update(['total_value' => $totalValue]);
+
+            try {
+                (new \App\Services\AccountingService())->recordStockAdjustmentJournal($adjustment);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Accounting journal skipped for {$adjNumber}: " . $e->getMessage());
             }
 
             $inspection->update([
