@@ -398,18 +398,26 @@ class StockAuditService
             $branch = Branch::find($inspection->branch_id);
             $orgId = $branch?->organization_id ?? \App\Models\Organization::first()?->id;
 
+            // Tentukan status Sesi SO berdasarkan status Sidak Audit
+            $soStatus = 'FINAL_CHECK';
+            if ($inspection->status === 'ADJUSTED') {
+                $soStatus = 'COMPLETED';
+            } elseif ($inspection->status === 'CLOSED') {
+                $soStatus = 'CANCELLED';
+            }
+
             $session = StockOpnameSession::updateOrCreate(
                 ['session_number' => $inspection->audit_number],
                 [
                     'branch_id'       => $inspection->branch_id,
                     'organization_id' => $orgId,
                     'opname_date'     => $inspection->inspection_date ?? now()->toDateString(),
-                    'status'          => 'COMPLETED',
+                    'status'          => $soStatus,
                     'session_token'   => 'SDK-' . Str::random(24),
                     'notes'           => "Hasil Sidak Audit Stok: {$inspection->audit_number}" . ($inspection->notes ? " - {$inspection->notes}" : ''),
                     'created_by'      => $inspection->auditor_id,
-                    'approved_by'     => $inspection->auditor_id,
-                    'completed_at'    => $inspection->updated_at ?? now(),
+                    'approved_by'     => $inspection->status === 'ADJUSTED' ? $inspection->auditor_id : null,
+                    'completed_at'    => $inspection->status === 'ADJUSTED' ? ($inspection->updated_at ?? now()) : null,
                 ]
             );
 
@@ -463,7 +471,29 @@ class StockAuditService
                     );
                 }
 
-                $status = $item->status === 'MATCH' ? 'COUNT2_DONE' : 'FINAL_DONE';
+                $isMatch = $item->status === 'MATCH';
+
+                if ($inspection->status === 'ADJUSTED') {
+                    // Ketika sudah resmi disesuaikan (ADJUSTED):
+                    $itemStatus = $isMatch ? 'COUNT2_DONE' : 'FINAL_DONE';
+                    $finalQty   = (float) $item->physical_quantity;
+                    $c1Qty      = (float) $item->physical_quantity;
+                    $c2Qty      = (float) $item->physical_quantity;
+                } elseif ($inspection->status === 'CLOSED') {
+                    // Ketika ditutup tanpa koreksi (CLOSED):
+                    // Selisih pembukuan = 0 (karena tidak ada koreksi fisik / stok sistem tetap)
+                    $itemStatus = 'COUNT2_DONE';
+                    $finalQty   = (float) $item->system_quantity;
+                    $c1Qty      = (float) $item->system_quantity;
+                    $c2Qty      = (float) $item->system_quantity;
+                } else {
+                    // Sedang investigasi (INVESTIGATION_PENDING):
+                    // Item cocok selesai, item selisih berstatus DISCREPANCY (belum final)
+                    $itemStatus = $isMatch ? 'COUNT2_DONE' : 'DISCREPANCY';
+                    $finalQty   = $isMatch ? (float) $item->physical_quantity : null;
+                    $c1Qty      = (float) $item->physical_quantity;
+                    $c2Qty      = (float) $item->physical_quantity;
+                }
 
                 StockOpnameItem::updateOrCreate(
                     [
@@ -473,14 +503,14 @@ class StockAuditService
                     ],
                     [
                         'system_quantity' => $item->system_quantity,
-                        'count1_quantity' => $item->physical_quantity,
-                        'count2_quantity' => $item->physical_quantity,
-                        'final_quantity'  => $item->physical_quantity,
-                        'status'          => $status,
+                        'count1_quantity' => $c1Qty,
+                        'count2_quantity' => $c2Qty,
+                        'final_quantity'  => $finalQty,
+                        'status'          => $itemStatus,
                         'count1_at'       => $item->created_at,
                         'count2_at'       => $item->created_at,
-                        'final_at'        => $item->updated_at,
-                        'final_by'        => $inspection->auditor_id,
+                        'final_at'        => $finalQty !== null ? $item->updated_at : null,
+                        'final_by'        => $finalQty !== null ? $inspection->auditor_id : null,
                     ]
                 );
             }

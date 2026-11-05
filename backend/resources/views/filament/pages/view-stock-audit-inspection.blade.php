@@ -25,6 +25,34 @@
     activeFilter: 'all',
     searchQuery: '',
     basePrintUrl: '{{ route('stock-audits.print-bap', ['record' => $record->id]) }}',
+    showReviseModal: false,
+    reviseItemId: '',
+    reviseProductName: '',
+    reviseSystemQty: 0,
+    revisePhysicalQty: 0,
+    reviseNotes: '',
+    isRevising: false,
+    openReviseModal(id, name, sysQty, physQty, notes) {
+        this.reviseItemId = id;
+        this.reviseProductName = name;
+        this.reviseSystemQty = sysQty;
+        this.revisePhysicalQty = physQty;
+        this.reviseNotes = notes || '';
+        this.showReviseModal = true;
+    },
+    async submitRevise() {
+        if (this.revisePhysicalQty === '' || isNaN(this.revisePhysicalQty)) {
+            alert('Masukkan jumlah fisik yang valid');
+            return;
+        }
+        this.isRevising = true;
+        try {
+            await $wire.reviseItem(this.reviseItemId, parseFloat(this.revisePhysicalQty), this.reviseNotes);
+            this.showReviseModal = false;
+        } finally {
+            this.isRevising = false;
+        }
+    },
     getPrintUrl() {
         let params = new URLSearchParams();
         if (this.activeFilter && this.activeFilter !== 'all') {
@@ -1022,6 +1050,7 @@
                         <th class="text-right" style="min-width: 105px;">HPP Satuan</th>
                         <th class="text-right" style="min-width: 130px;">Total Selisih (Rp)</th>
                         <th style="min-width: 150px;">Keterangan</th>
+                        <th class="text-center" style="width: 80px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1103,10 +1132,25 @@
                             <td class="text-muted" style="font-size: 0.75rem;">
                                 {{ $it->clarification_notes ?: '-' }}
                             </td>
+
+                            <td class="text-center">
+                                @if($record->status !== 'ADJUSTED')
+                                    <button 
+                                        type="button"
+                                        @click="openReviseModal('{{ $it->id }}', '{{ $pName }}', {{ (float)$it->system_quantity }}, {{ (float)$it->physical_quantity }}, '{{ addslashes($it->clarification_notes ?? '') }}')"
+                                        style="padding: 4px 8px; font-size: 0.73rem; font-weight: 700; border-radius: 6px; background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;"
+                                        title="Revisi Qty Fisik"
+                                    >
+                                        <x-heroicon-m-pencil-square style="width: 13px; height: 13px;" /> Revisi
+                                    </button>
+                                @else
+                                    <span class="text-muted font-mono" style="font-size: 0.75rem;">-</span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center text-muted" style="padding: 3rem 1rem;">
+                            <td colspan="10" class="text-center text-muted" style="padding: 3rem 1rem;">
                                 Belum ada item yang diperiksa dalam sesi sidak ini.
                             </td>
                         </tr>
@@ -1139,9 +1183,110 @@
                             @endif
                         </td>
                         <td></td>
+                        <td></td>
                     </tr>
                 </tfoot>
             </table>
+        </div>
+    </div>
+
+    {{-- Modal Revisi Qty Fisik --}}
+    <div 
+        x-show="showReviseModal" 
+        x-cloak
+        style="position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); padding: 1rem;"
+    >
+        <div 
+            @click.away="if (!isRevising) showReviseModal = false"
+            style="background: #ffffff; border-radius: 1rem; width: 100%; max-width: 480px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border: 1px solid #e2e8f0; overflow: hidden; display: flex; flex-direction: column;"
+            class="dark:bg-gray-900 dark:border-gray-800"
+        >
+            <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;" class="dark:border-gray-800">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: #eef2ff; color: #4f46e5; display: flex; align-items: center; justify-content: center;">
+                        <x-heroicon-m-pencil-square style="width: 18px; height: 18px;" />
+                    </div>
+                    <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0;" class="dark:text-white">
+                        Revisi Qty Fisik Sidak
+                    </h3>
+                </div>
+                <button 
+                    type="button" 
+                    @click="showReviseModal = false" 
+                    style="border: none; background: transparent; cursor: pointer; color: #94a3b8; font-size: 1.25rem;"
+                >&times;</button>
+            </div>
+
+            <div style="padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+                <div>
+                    <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 2px;">PRODUK</div>
+                    <div style="font-size: 0.95rem; font-weight: 800; color: #0f172a;" class="dark:text-white" x-text="reviseProductName"></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background: #f8fafc; padding: 0.85rem; border-radius: 0.75rem; border: 1px solid #e2e8f0;" class="dark:bg-gray-800 dark:border-gray-700">
+                    <div>
+                        <div style="font-size: 0.7rem; font-weight: 700; color: #64748b;">STOK SISTEM</div>
+                        <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; font-family: monospace;" class="dark:text-white" x-text="reviseSystemQty"></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; font-weight: 700; color: #64748b;">SELISIH REVISI</div>
+                        <div 
+                            style="font-size: 1.1rem; font-weight: 800; font-family: monospace;"
+                            :style="(revisePhysicalQty - reviseSystemQty) < 0 ? 'color: #e11d48;' : (revisePhysicalQty - reviseSystemQty) > 0 ? 'color: #2563eb;' : 'color: #10b981;'"
+                            x-text="(revisePhysicalQty - reviseSystemQty) > 0 ? '+' + (revisePhysicalQty - reviseSystemQty) : (revisePhysicalQty - reviseSystemQty)"
+                        ></div>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 0.35rem;" class="dark:text-gray-300">
+                        Qty Fisik Sebenarnya (Hasil Hitung Ulang) <span style="color: #e11d48;">*</span>
+                    </label>
+                    <input 
+                        type="number" 
+                        step="1" 
+                        x-model="revisePhysicalQty" 
+                        style="width: 100%; padding: 0.65rem 0.85rem; border-radius: 0.6rem; border: 1.5px solid #cbd5e1; font-size: 1rem; font-weight: 700; font-family: monospace;" 
+                        class="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                        placeholder="0"
+                        autofocus
+                    />
+                </div>
+
+                <div>
+                    <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 0.35rem;" class="dark:text-gray-300">
+                        Catatan Klarifikasi / Alasan Revisi
+                    </label>
+                    <textarea 
+                        x-model="reviseNotes" 
+                        rows="2" 
+                        style="width: 100%; padding: 0.65rem 0.85rem; border-radius: 0.6rem; border: 1.5px solid #cbd5e1; font-size: 0.85rem;" 
+                        class="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                        placeholder="Contoh: Ditemukan 1 pcs terselip di kolong display toko"
+                    ></textarea>
+                </div>
+            </div>
+
+            <div style="padding: 1rem 1.5rem; background: #f8fafc; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 0.65rem;" class="dark:bg-gray-800/50 dark:border-gray-800">
+                <button 
+                    type="button" 
+                    @click="showReviseModal = false"
+                    :disabled="isRevising"
+                    style="padding: 0.55rem 1rem; border-radius: 0.6rem; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-size: 0.85rem; font-weight: 700; cursor: pointer;"
+                    class="dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+                >
+                    Batal
+                </button>
+                <button 
+                    type="button" 
+                    @click="submitRevise()"
+                    :disabled="isRevising"
+                    style="padding: 0.55rem 1.25rem; border-radius: 0.6rem; border: none; background: #4f46e5; color: #ffffff; font-size: 0.85rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;"
+                >
+                    <span x-show="!isRevising">Simpan Revisi Qty</span>
+                    <span x-show="isRevising">Menyimpan...</span>
+                </button>
+            </div>
         </div>
     </div>
 </div>

@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  QrCode, 
-  Sparkles, 
-  ShieldCheck, 
-  ShoppingBag, 
-  TrendingUp, 
+import {
+  LayoutDashboard,
+  QrCode,
+  Sparkles,
+  ShieldCheck,
+  ShoppingBag,
+  TrendingUp,
   ClipboardCheck,
-  LogOut, 
-  Sun, 
-  Moon, 
-  Wifi 
+  LogOut,
+  Sun,
+  Moon,
+  Wifi
 } from 'lucide-react';
 import '../../index.css';
 
@@ -46,13 +46,13 @@ export function MobileLayout({ user, onLogout }) {
   const hasSmartOrderAuth = user?.custom_authorizations?.includes('ACCESS_SMART_ORDER');
   const hasStockAuditAuth = user?.custom_authorizations?.includes('ACCESS_STOCK_AUDIT');
   const hasBIAIAuth = user?.custom_authorizations?.includes('ACCESS_BI_AI');
-  const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) || 
-                      user?.custom_authorizations?.includes('APPROVE_PO') || 
-                      user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
+  const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) ||
+    user?.custom_authorizations?.includes('APPROVE_PO') ||
+    user?.custom_authorizations?.includes('APPROVE_STOCK_ADJUSTMENT');
 
   // Get user initials for avatar
-  const userInitials = user?.name 
-    ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() 
+  const userInitials = user?.name
+    ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
     : 'US';
 
   return (
@@ -72,9 +72,9 @@ export function MobileLayout({ user, onLogout }) {
 
         <div className="mobile-header-right">
           {/* Light / Dark Mode Toggle */}
-          <button 
-            className="theme-toggle-btn" 
-            onClick={toggleTheme} 
+          <button
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
             title={theme === 'dark' ? "Mode Terang" : "Mode Gelap"}
             aria-label="Toggle Theme"
           >

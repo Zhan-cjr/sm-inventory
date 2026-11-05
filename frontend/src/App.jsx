@@ -202,9 +202,9 @@ function App() {
     performHandshake();
   }, []);
 
-  // Fetch /api/v1/user on token change to sync profile
+  // Fetch /api/v1/user on token change to sync profile and latest permissions
   useEffect(() => {
-    if (token && !user?.organization_name && deviceStatus === 'approved') {
+    if (token && deviceStatus === 'approved') {
       if (!navigator.onLine) return;
 
       const controller = new AbortController();

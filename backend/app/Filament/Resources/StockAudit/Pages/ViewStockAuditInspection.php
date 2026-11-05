@@ -57,6 +57,7 @@ class ViewStockAuditInspection extends ViewRecord
                 ->modalDescription('Gunakan opsi ini jika barang yang sempat dicurigai hilang sudah berhasil ditemukan di toko/gudang, sehingga stok sistem tidak perlu diubah.')
                 ->action(function () use ($record) {
                     $record->update(['status' => 'CLOSED']);
+                    app(StockAuditService::class)->syncToStockOpnameSession($record);
                     Notification::make()
                         ->title('Sesi Sidak Ditutup')
                         ->body('Status diubah menjadi DITUTUP tanpa melakukan perubahan stok.')
@@ -65,6 +66,53 @@ class ViewStockAuditInspection extends ViewRecord
                     $this->refreshFormData(['status']);
                 }),
         ];
+    }
+
+    /**
+     * Revisi Qty Fisik / Klarifikasi Hasil Hitung Temuan Sidak
+     */
+    public function reviseItem(string $itemId, float $newPhysicalQty, ?string $notes = null): void
+    {
+        /** @var StockAuditInspection $inspection */
+        $inspection = $this->record;
+
+        if ($inspection->status === 'ADJUSTED') {
+            Notification::make()->title('Gagal: Sidak ini sudah dikoreksi ke stok')->danger()->send();
+            return;
+        }
+
+        $item = $inspection->items()->where('id', $itemId)->firstOrFail();
+        $sysQty = (float) $item->system_quantity;
+        $discQty = $newPhysicalQty - $sysQty;
+        $unitCost = (float) $item->unit_cost;
+        $discCost = $discQty * $unitCost;
+
+        $status = 'MATCH';
+        if ($discQty < 0) {
+            $status = 'MINUS';
+        } elseif ($discQty > 0) {
+            $status = 'PLUS';
+        }
+
+        $item->update([
+            'physical_quantity'    => $newPhysicalQty,
+            'discrepancy_quantity' => $discQty,
+            'discrepancy_cost'     => $discCost,
+            'status'               => $status,
+            'clarification_notes'  => $notes ?: $item->clarification_notes,
+        ]);
+
+        $inspection->recalculateSummary();
+        app(StockAuditService::class)->syncToStockOpnameSession($inspection);
+
+        Notification::make()->title('Hasil hitung fisik berhasil direvisi')->success()->send();
+        $this->refreshFormData([
+            'total_items_checked',
+            'total_items_discrepancy',
+            'total_loss_nominal',
+            'total_gain_nominal',
+            'accuracy_percentage'
+        ]);
     }
 }
 

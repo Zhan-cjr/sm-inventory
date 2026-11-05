@@ -11,6 +11,7 @@ import {
   CheckCircle2, 
   AlertTriangle, 
   X, 
+  Edit,
   Printer, 
   History, 
   Play, 
@@ -799,13 +800,46 @@ export function MobileStockAudit({ user, authToken }) {
                             </div>
                           </div>
 
-                          <button
-                            onClick={() => handleDeleteItem(it.id)}
-                            style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                            title="Hapus"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const prod = it.product;
+                                if (prod) {
+                                  openCountModal({
+                                    ...prod,
+                                    stock: it.system_quantity,
+                                    unit: prod.unit_of_measure || 'pcs'
+                                  });
+                                }
+                              }}
+                              style={{ 
+                                background: 'rgba(99, 102, 241, 0.12)', 
+                                border: 'none', 
+                                color: '#6366f1', 
+                                cursor: 'pointer', 
+                                padding: '4px 8px', 
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '0.73rem',
+                                fontWeight: 700
+                              }}
+                              title="Ubah / Revisi Qty Fisik"
+                            >
+                              <Edit size={13} /> Ubah
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItem(it.id)}
+                              style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                              title="Hapus"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </div>
 
                         {/* Counts Comparison Row */}
@@ -1176,6 +1210,21 @@ export function MobileStockAudit({ user, authToken }) {
               <X size={20} color="var(--text-muted)" style={{ cursor: 'pointer' }} onClick={() => setSelectedProduct(null)} />
             </div>
 
+            {/* Revision Banner if Item already audited */}
+            {activeInspection?.items?.find(i => i.product_id === selectedProduct.id) && (
+              <div style={{
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                fontSize: '0.78rem',
+                color: '#6366f1',
+                fontWeight: 600
+              }}>
+                ✏️ <b>Mode Revisi:</b> Produk ini sebelumnya dicatat <b>{activeInspection.items.find(i => i.product_id === selectedProduct.id).physical_quantity} {selectedProduct.unit || 'pcs'}</b>. Ubah angka di bawah untuk merevisi hasil hitung.
+              </div>
+            )}
+
             {/* System Info Box */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(128,128,128,0.06)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
               <div>
@@ -1321,7 +1370,7 @@ export function MobileStockAudit({ user, authToken }) {
                 onClick={handleSaveItemCount}
                 style={{ padding: '10px 22px', borderRadius: '10px', border: 'none', background: '#f59e0b', color: '#000', fontWeight: 800, cursor: 'pointer' }}
               >
-                {savingItem ? 'Menyimpan...' : 'Simpan Hitungan'}
+                {savingItem ? 'Menyimpan...' : (activeInspection?.items?.some(i => i.product_id === selectedProduct.id) ? 'Simpan Revisi Qty' : 'Simpan Hitungan')}
               </button>
             </div>
           </div>
