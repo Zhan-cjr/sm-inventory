@@ -88,10 +88,17 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'COUNT2_DONE', 'MATCHED' => 'Cocok',
+                        'FINAL_DONE' => 'Disetujui',
+                        'DISCREPANCY' => 'Selisih',
+                        'COUNT1_DONE', 'COUNTED' => 'Hitung Selesai',
+                        default => $state,
+                    })
                     ->color(fn (string $state): string => match ($state) {
                         'PENDING' => 'gray',
-                        'COUNTED' => 'info',
-                        'MATCHED' => 'success',
+                        'COUNTED', 'COUNT1_DONE' => 'info',
+                        'MATCHED', 'COUNT2_DONE' => 'success',
                         'DISCREPANCY' => 'danger',
                         'FINAL_DONE' => 'success',
                         default => 'gray',

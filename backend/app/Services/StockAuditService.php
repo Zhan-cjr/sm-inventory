@@ -463,7 +463,7 @@ class StockAuditService
                     );
                 }
 
-                $status = $item->status === 'MATCH' ? 'MATCHED' : 'FINAL_DONE';
+                $status = $item->status === 'MATCH' ? 'COUNT2_DONE' : 'FINAL_DONE';
 
                 StockOpnameItem::updateOrCreate(
                     [
