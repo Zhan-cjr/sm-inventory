@@ -152,7 +152,7 @@ class StockAuditInspectionResource extends Resource
                     ->label('Terapkan Koreksi')
                     ->icon('heroicon-o-check-badge')
                     ->color('success')
-                    ->visible(fn (StockAuditInspection $record) => $record->status === 'INVESTIGATION_PENDING' && $record->total_items_discrepancy > 0)
+                    ->visible(fn (StockAuditInspection $record) => in_array($record->status, ['INVESTIGATION_PENDING', 'CLOSED']) && empty($record->adjustment_id) && $record->total_items_discrepancy > 0)
                     ->requiresConfirmation()
                     ->modalHeading('Terapkan Koreksi Stok Sekarang?')
                     ->modalDescription('Stok di sistem akan langsung disesuaikan dengan hasil fisik sidak audit ini. Lanjutkan?')

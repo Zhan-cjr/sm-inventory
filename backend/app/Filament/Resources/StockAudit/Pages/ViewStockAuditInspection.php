@@ -33,7 +33,7 @@ class ViewStockAuditInspection extends ViewRecord
                 ->label('Terapkan Koreksi Stok')
                 ->icon('heroicon-o-check-badge')
                 ->color('success')
-                ->visible(fn () => $record->status === 'INVESTIGATION_PENDING' && $record->total_items_discrepancy > 0)
+                ->visible(fn () => in_array($record->status, ['INVESTIGATION_PENDING', 'CLOSED']) && empty($record->adjustment_id) && $record->total_items_discrepancy > 0)
                 ->requiresConfirmation()
                 ->modalHeading('Terapkan Koreksi Stok Sekarang?')
                 ->modalDescription("Stok fisik hasil sidak akan langsung menggantikan stok sistem untuk {$record->total_items_discrepancy} produk yang selisih. Dokumen penyesuaian stok resmi akan otomatis dibuat. Lanjutkan?")
