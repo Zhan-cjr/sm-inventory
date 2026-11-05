@@ -20,7 +20,7 @@
     $totalDiscrepancyQty = $record->items->sum('discrepancy_quantity');
 @endphp
 
-<div class="space-y-6" x-data="{
+<div class="so-audit-container space-y-6" x-data="{
     activeFilter: 'all',
     searchQuery: '',
     matchesFilter(itemStatus, itemName, itemBarcode, itemSku) {
@@ -40,125 +40,203 @@
         return true;
     }
 }">
-    {{-- 1. HEADER METADATA BANNER --}}
-    <div class="relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200/80 dark:border-gray-700/80 p-6">
-        <div class="absolute top-0 right-0 w-64 h-64 bg-primary-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+    {{-- SCOPED CSS TO PREVENT ANY JUMBO ICONS ACROSS ALL BROWSERS & THEMES --}}
+    <style>
+        .so-audit-container svg {
+            width: 1.25rem !important;
+            height: 1.25rem !important;
+            max-width: 1.5rem !important;
+            max-height: 1.5rem !important;
+            display: inline-block !important;
+            vertical-align: middle !important;
+            flex-shrink: 0 !important;
+        }
+        .so-audit-container svg.icon-xs {
+            width: 0.875rem !important;
+            height: 0.875rem !important;
+            max-width: 0.875rem !important;
+            max-height: 0.875rem !important;
+        }
+        .so-audit-container svg.icon-sm {
+            width: 1rem !important;
+            height: 1rem !important;
+            max-width: 1rem !important;
+            max-height: 1rem !important;
+        }
+        .so-audit-container svg.icon-md {
+            width: 1.25rem !important;
+            height: 1.25rem !important;
+            max-width: 1.25rem !important;
+            max-height: 1.25rem !important;
+        }
+        .so-audit-container svg.icon-lg {
+            width: 1.5rem !important;
+            height: 1.5rem !important;
+            max-width: 1.5rem !important;
+            max-height: 1.5rem !important;
+        }
+    </style>
 
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div class="flex items-start gap-4">
-                <div class="w-14 h-14 rounded-2xl bg-primary-50 dark:bg-primary-950/50 border border-primary-200/60 dark:border-primary-800/60 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0 shadow-inner">
-                    <x-heroicon-o-clipboard-document-check class="w-8 h-8" />
+    {{-- 1. INFORMASI DOKUMEN & PELAKSANAAN DALAM CARD-CARD --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        
+        {{-- Card 1: Identitas Dokumen --}}
+        <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-200/80 dark:border-gray-700/80 shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-primary-500/5 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none"></div>
+            <div>
+                <div class="flex items-center justify-between gap-2 mb-3">
+                    <div class="flex items-center gap-2">
+                        <div style="width: 34px; height: 34px; min-width: 34px; min-height: 34px;" class="rounded-xl bg-primary-50 dark:bg-primary-950/50 border border-primary-200/60 dark:border-primary-800/60 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
+                            <x-heroicon-o-document-text class="icon-sm" style="width: 18px; height: 18px; min-width: 18px; min-height: 18px;" />
+                        </div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Dokumen Sidak</span>
+                    </div>
+                    
+                    {{-- Status Badge --}}
+                    @if($record->status === 'DRAFT')
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Berjalan
+                        </span>
+                    @elseif($record->status === 'INVESTIGATION_PENDING')
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                            <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Klarifikasi
+                        </span>
+                    @elseif($record->status === 'ADJUSTED')
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Selesai (Adjusted)
+                        </span>
+                    @else
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                            Ditutup
+                        </span>
+                    @endif
                 </div>
-                <div>
-                    <div class="flex items-center gap-2.5 flex-wrap">
-                        <h2 class="text-xl font-bold font-mono tracking-tight text-gray-900 dark:text-gray-100">
-                            {{ $record->audit_number }}
-                        </h2>
-                        
-                        {{-- Status Pill --}}
-                        @if($record->status === 'DRAFT')
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Sedang Berjalan
-                            </span>
-                        @elseif($record->status === 'INVESTIGATION_PENDING')
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-                                <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Menunggu Klarifikasi Toko
-                            </span>
-                        @elseif($record->status === 'ADJUSTED')
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Stok Telah Disesuaikan
-                            </span>
-                        @else
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                                Selesai / Ditutup
-                            </span>
-                        @endif
 
-                        {{-- Mode Pill --}}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                <div class="text-xl font-bold font-mono tracking-tight text-gray-900 dark:text-gray-100">
+                    {{ $record->audit_number }}
+                </div>
+
+                <div class="mt-3 space-y-1.5 text-xs text-gray-600 dark:text-gray-300">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Tanggal:</span>
+                        <span class="font-medium text-gray-800 dark:text-gray-200">
+                            {{ $record->inspection_date?->translatedFormat('d F Y') ?: $record->created_at->format('d/m/Y') }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Metode:</span>
+                        <span class="font-semibold text-primary-600 dark:text-primary-400">
                             @if($record->inspection_mode === 'FREE_SCAN')
-                                Mode: Spot Check (Scan Bebas)
+                                Spot Check (Bebas)
                             @elseif($record->inspection_mode === 'RANDOM_LOTTERY')
-                                Mode: Undian Acak Sistem
+                                Undian Acak Sistem
                             @else
-                                Mode: Berbasis Risiko
+                                Berbasis Risiko
                             @endif
                         </span>
                     </div>
-
-                    <div class="mt-2.5 flex items-center gap-y-1.5 gap-x-5 flex-wrap text-xs text-gray-500 dark:text-gray-400">
-                        <div class="flex items-center gap-1.5">
-                            <x-heroicon-m-building-storefront class="w-4 h-4 text-gray-400" />
-                            <span>Cabang: <strong class="text-gray-800 dark:text-gray-200">{{ $record->branch?->name ?: 'Semua Cabang' }}</strong></span>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <x-heroicon-m-user class="w-4 h-4 text-gray-400" />
-                            <span>Auditor: <strong class="text-gray-800 dark:text-gray-200">{{ $record->auditor?->name ?: '-' }}</strong></span>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <x-heroicon-m-user-group class="w-4 h-4 text-gray-400" />
-                            <span>Saksi Toko: <strong class="text-gray-800 dark:text-gray-200">{{ $record->acknowledged_by ?: '-' }}</strong></span>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <x-heroicon-m-calendar class="w-4 h-4 text-gray-400" />
-                            <span>Tanggal: {{ $record->inspection_date?->translatedFormat('d F Y') ?: $record->created_at->format('d/m/Y') }}</span>
-                        </div>
-                        @if($record->adjustment)
-                            <div class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
-                                <x-heroicon-m-document-check class="w-4 h-4" />
-                                <span>No. Adj: {{ $record->adjustment->adjustment_number }}</span>
-                            </div>
-                        @endif
-                    </div>
                 </div>
             </div>
-
-            @if($record->notes)
-                <div class="bg-gray-50 dark:bg-gray-750 p-3.5 rounded-xl border border-gray-200/80 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300 max-w-md">
-                    <span class="font-bold text-gray-700 dark:text-gray-200">Catatan Sidak:</span>
-                    <p class="mt-0.5 line-clamp-2 italic">{{ $record->notes }}</p>
-                </div>
-            @endif
         </div>
+
+        {{-- Card 2: Lokasi & Tim Pemeriksa --}}
+        <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-200/80 dark:border-gray-700/80 shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <div>
+                <div class="flex items-center gap-2 mb-3">
+                    <div style="width: 34px; height: 34px; min-width: 34px; min-height: 34px;" class="rounded-xl bg-sky-50 dark:bg-sky-950/50 border border-sky-200/60 dark:border-sky-800/60 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                        <x-heroicon-o-building-storefront class="icon-sm" style="width: 18px; height: 18px; min-width: 18px; min-height: 18px;" />
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Cabang & Tim Pelaksana</span>
+                </div>
+
+                <div class="text-base font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                    {{ $record->branch?->name ?: 'Semua Cabang' }}
+                </div>
+
+                <div class="mt-3 space-y-1.5 text-xs text-gray-600 dark:text-gray-300">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Auditor:</span>
+                        <span class="font-medium text-gray-800 dark:text-gray-200">{{ $record->auditor?->name ?: '-' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Saksi Toko:</span>
+                        <span class="font-medium text-gray-800 dark:text-gray-200">{{ $record->acknowledged_by ?: '-' }}</span>
+                    </div>
+                    @if($record->adjustment)
+                        <div class="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-semibold pt-0.5">
+                            <span class="text-gray-400">No. Koreksi:</span>
+                            <span class="font-mono">{{ $record->adjustment->adjustment_number }}</span>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        {{-- Card 3: Catatan & Ringkasan Hasil --}}
+        <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-200/80 dark:border-gray-700/80 shadow-sm flex flex-col justify-between relative overflow-hidden">
+            <div>
+                <div class="flex items-center gap-2 mb-3">
+                    <div style="width: 34px; height: 34px; min-width: 34px; min-height: 34px;" class="rounded-xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200/60 dark:border-purple-800/60 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+                        <x-heroicon-o-chat-bubble-bottom-center-text class="icon-sm" style="width: 18px; height: 18px; min-width: 18px; min-height: 18px;" />
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Catatan Sidak</span>
+                </div>
+
+                <div class="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-750 p-2.5 rounded-xl border border-gray-200/60 dark:border-gray-700 min-h-[46px] line-clamp-2 italic">
+                    {{ $record->notes ?: 'Tidak ada catatan tambahan yang dicantumkan saat inspeksi.' }}
+                </div>
+
+                <div class="mt-2.5 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <span>Akurasi Stok (IRA):</span>
+                    <span class="font-mono font-bold {{ $accuracyRate >= 95 ? 'text-emerald-600 dark:text-emerald-400' : ($accuracyRate >= 80 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
+                        {{ $accuracyRate }}% ({{ $matchCount }}/{{ $totalChecked }})
+                    </span>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    {{-- 2. EXECUTIVE KPI CARDS --}}
+    {{-- 2. KPI / METRIC CARDS --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {{-- Total Checked --}}
+        
+        {{-- Card Metrik: Total Checked --}}
         <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-200/80 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
             <div>
-                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-400">Total Diperiksa</div>
-                <div class="text-3xl font-extrabold text-gray-900 dark:text-gray-50 mt-1.5 font-mono">
+                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-400">Jumlah Item Dicek</div>
+                <div class="text-3xl font-extrabold text-gray-900 dark:text-gray-50 mt-1 font-mono">
                     {{ number_format($totalChecked, 0) }}
                 </div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Item / SKU produk</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Fisik: <strong class="text-gray-700 dark:text-gray-300">{{ number_format($totalPhysicalQty, 0) }}</strong> | Sistem: {{ number_format($totalSystemQty, 0) }}
+                </div>
             </div>
-            <div class="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                <x-heroicon-o-cube class="w-6 h-6" />
+            <div style="width: 44px; height: 44px; min-width: 44px; min-height: 44px;" class="rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 shrink-0">
+                <x-heroicon-o-cube class="icon-lg" style="width: 22px; height: 22px; min-width: 22px; min-height: 22px;" />
             </div>
         </div>
 
-        {{-- Stock Accuracy (IRA) --}}
+        {{-- Card Metrik: Stock Accuracy (Match) --}}
         <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-200/80 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
             <div>
-                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-400">Akurasi Stok (IRA)</div>
-                <div class="text-3xl font-extrabold mt-1.5 font-mono {{ $accuracyRate >= 95 ? 'text-emerald-600 dark:text-emerald-400' : ($accuracyRate >= 80 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') }}">
-                    {{ $accuracyRate }}%
+                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-400">Item Cocok (Match)</div>
+                <div class="text-3xl font-extrabold mt-1 font-mono text-emerald-600 dark:text-emerald-400">
+                    {{ number_format($matchCount, 0) }}
                 </div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <strong class="text-emerald-600 dark:text-emerald-400">{{ $matchCount }}</strong> produk cocok sempurna
+                    <strong class="text-emerald-600 dark:text-emerald-400">{{ $accuracyRate }}%</strong> dari total item diperiksa
                 </div>
             </div>
-            <div class="w-12 h-12 rounded-xl {{ $accuracyRate >= 90 ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600' }} flex items-center justify-center">
-                <x-heroicon-o-check-badge class="w-6 h-6" />
+            <div style="width: 44px; height: 44px; min-width: 44px; min-height: 44px;" class="rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <x-heroicon-o-check-badge class="icon-lg" style="width: 22px; height: 22px; min-width: 22px; min-height: 22px;" />
             </div>
         </div>
 
-        {{-- Discrepancy Count --}}
+        {{-- Card Metrik: Discrepancy Count --}}
         <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-200/80 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
             <div>
-                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-400">Item Selisih</div>
-                <div class="text-3xl font-extrabold mt-1.5 font-mono {{ $discCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400' }}">
+                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-400">Jumlah Selisih</div>
+                <div class="text-3xl font-extrabold mt-1 font-mono {{ $discCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400' }}">
                     {{ number_format($discCount, 0) }}
                 </div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5">
@@ -167,33 +245,35 @@
                     <span class="text-blue-600 dark:text-blue-400 font-semibold">{{ $plusCount }} Plus</span>
                 </div>
             </div>
-            <div class="w-12 h-12 rounded-xl {{ $discCount > 0 ? 'bg-red-50 dark:bg-red-950/50 text-red-600' : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600' }} flex items-center justify-center">
-                <x-heroicon-o-exclamation-triangle class="w-6 h-6" />
+            <div style="width: 44px; height: 44px; min-width: 44px; min-height: 44px;" class="rounded-xl {{ $discCount > 0 ? 'bg-red-50 dark:bg-red-950/50 text-red-600' : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600' }} flex items-center justify-center shrink-0">
+                <x-heroicon-o-exclamation-triangle class="icon-lg" style="width: 22px; height: 22px; min-width: 22px; min-height: 22px;" />
             </div>
         </div>
 
-        {{-- Discrepancy Nominal (Loss vs Gain) --}}
+        {{-- Card Metrik: Total Nominal Selisih --}}
         <div class="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-200/80 dark:border-gray-700/80 shadow-sm flex items-center justify-between">
             <div>
-                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-400">Total Kerugian (Minus)</div>
-                <div class="text-2xl font-black text-red-600 dark:text-red-400 mt-1.5 font-mono">
+                <div class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-400">Total Nominal Kerugian</div>
+                <div class="text-2xl font-black text-red-600 dark:text-red-400 mt-1 font-mono">
                     -Rp {{ number_format($record->total_loss_nominal, 0, ',', '.') }}
                 </div>
                 <div class="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
                     Lebih: +Rp {{ number_format($record->total_gain_nominal, 0, ',', '.') }}
                 </div>
             </div>
-            <div class="w-12 h-12 rounded-xl bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 flex items-center justify-center">
-                <x-heroicon-o-banknotes class="w-6 h-6" />
+            <div style="width: 44px; height: 44px; min-width: 44px; min-height: 44px;" class="rounded-xl bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+                <x-heroicon-o-banknotes class="icon-lg" style="width: 22px; height: 22px; min-width: 22px; min-height: 22px;" />
             </div>
         </div>
+
     </div>
 
-    {{-- 3. TABEL HASIL AUDIT DENGAN FILTER INTERAKTIF --}}
+    {{-- 3. TABEL ITEM YANG DICEK DENGAN FILTER & SEARCH --}}
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200/80 dark:border-gray-700/80 overflow-hidden">
         
-        {{-- Filter Bar & Live Search --}}
+        {{-- Card Header Tabel --}}
         <div class="p-4 sm:p-5 border-b border-gray-200/80 dark:border-gray-700/80 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/50 dark:bg-gray-800/50">
+            
             {{-- Filter Pills --}}
             <div class="flex items-center gap-1.5 flex-wrap">
                 <button
@@ -202,7 +282,7 @@
                     :class="activeFilter === 'all' ? 'bg-primary-600 text-white shadow-sm font-bold' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 font-medium'"
                     class="px-3.5 py-1.5 rounded-lg text-xs transition-all border border-gray-200/70 dark:border-gray-600 flex items-center gap-1.5"
                 >
-                    <span>Semua Produk</span>
+                    <span>Semua Item</span>
                     <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/20">{{ $totalChecked }}</span>
                 </button>
 
@@ -252,23 +332,23 @@
             </div>
 
             {{-- Live Search Input --}}
-            <div class="relative w-full md:w-64">
+            <div class="relative w-full md:w-72">
                 <input
                     type="text"
                     x-model="searchQuery"
-                    placeholder="Cari nama / barcode..."
-                    class="w-full text-xs rounded-xl bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 pl-8 pr-3 py-2 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    placeholder="Cari nama produk / barcode / SKU..."
+                    class="w-full text-xs rounded-xl bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 pl-8 pr-8 py-2 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-gray-800 dark:text-gray-100"
                 />
-                <div class="absolute left-2.5 top-2.5 text-gray-400 pointer-events-none">
-                    <x-heroicon-m-magnifying-glass class="w-4 h-4" />
+                <div class="absolute left-2.5 top-2.5 text-gray-400 pointer-events-none flex items-center justify-center">
+                    <x-heroicon-m-magnifying-glass class="icon-xs text-gray-400" style="width: 15px; height: 15px; min-width: 15px; min-height: 15px;" />
                 </div>
                 <button
                     type="button"
                     x-show="searchQuery"
                     @click="searchQuery = ''"
-                    class="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                    class="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center justify-center"
                 >
-                    <x-heroicon-m-x-mark class="w-4 h-4" />
+                    <x-heroicon-m-x-mark class="icon-xs" style="width: 15px; height: 15px; min-width: 15px; min-height: 15px;" />
                 </button>
             </div>
         </div>
@@ -278,15 +358,15 @@
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
                     <tr class="bg-slate-800 text-slate-100 font-semibold tracking-wider uppercase text-[11px] border-b border-slate-700">
-                        <th class="py-3 px-3.5 text-center w-12">No</th>
-                        <th class="py-3 px-4 min-w-[240px]">Produk & Barcode</th>
-                        <th class="py-3 px-3 text-center min-w-[90px]">Lokasi Rak</th>
-                        <th class="py-3 px-3.5 text-right font-mono min-w-[95px]">Stok Sistem</th>
-                        <th class="py-3 px-3.5 text-right font-mono min-w-[95px] bg-slate-750">Fisik Dihitung</th>
-                        <th class="py-3 px-3.5 text-center font-mono min-w-[110px]">Selisih Qty</th>
-                        <th class="py-3 px-3.5 text-right font-mono min-w-[95px]">HPP Satuan</th>
-                        <th class="py-3 px-4 text-right font-mono min-w-[125px]">Total Selisih (Rp)</th>
-                        <th class="py-3 px-4 min-w-[150px]">Keterangan</th>
+                        <th class="py-3.5 px-3.5 text-center w-12">No</th>
+                        <th class="py-3.5 px-4 min-w-[260px]">Produk & Barcode</th>
+                        <th class="py-3.5 px-3 text-center min-w-[95px]">Lokasi Rak</th>
+                        <th class="py-3.5 px-3.5 text-right font-mono min-w-[100px]">Stok Sistem</th>
+                        <th class="py-3.5 px-3.5 text-right font-mono min-w-[100px] bg-slate-750">Fisik Dihitung</th>
+                        <th class="py-3.5 px-3.5 text-center font-mono min-w-[110px]">Selisih Qty</th>
+                        <th class="py-3.5 px-3.5 text-right font-mono min-w-[100px]">HPP Satuan</th>
+                        <th class="py-3.5 px-4 text-right font-mono min-w-[130px]">Total Selisih (Rp)</th>
+                        <th class="py-3.5 px-4 min-w-[160px]">Keterangan</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-750 font-medium">
@@ -320,7 +400,7 @@
                                 </div>
                             </td>
 
-                            {{-- Rak --}}
+                            {{-- Lokasi Rak --}}
                             <td class="py-3.5 px-3 text-center">
                                 @if($it->rack)
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80">
@@ -353,7 +433,7 @@
                                     </span>
                                 @else
                                     <span class="inline-flex items-center justify-center gap-1 min-w-[70px] px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                                        <x-heroicon-m-check class="w-3.5 h-3.5" /> 0
+                                        <x-heroicon-m-check class="icon-xs" style="width: 14px; height: 14px; min-width: 14px; min-height: 14px;" /> 0
                                     </span>
                                 @endif
                             </td>

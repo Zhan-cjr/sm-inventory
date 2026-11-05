@@ -139,8 +139,8 @@ export function MobileStockAudit({ user, authToken }) {
   };
 
   useEffect(() => {
-    if (selectedBranchId || !showBranchSelector) {
-      fetchInspections(selectedBranchId);
+    fetchInspections(selectedBranchId);
+    if (selectedBranchId) {
       fetchRacks(selectedBranchId);
     }
   }, [authToken, selectedBranchId]);
@@ -474,7 +474,7 @@ export function MobileStockAudit({ user, authToken }) {
                 marginTop: '2px'
               }}
             >
-              <option value="" disabled style={{ background: 'var(--bg-dark)' }}>-- Pilih Cabang --</option>
+              <option value="" style={{ background: 'var(--bg-dark)', color: 'var(--text-main)' }}>-- Semua Cabang --</option>
               {branches.map(b => (
                 <option key={b.id} value={b.id} style={{ background: 'var(--bg-dark)', color: 'var(--text-main)' }}>{b.name}</option>
               ))}
@@ -900,6 +900,7 @@ export function MobileStockAudit({ user, authToken }) {
                       {h.audit_number}
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {h.branch?.name && <span style={{ color: '#f59e0b', fontWeight: 700, marginRight: '4px' }}>[{h.branch.name}]</span>}
                       Tgl: {h.inspection_date} &bull; Auditor: {h.auditor?.name || '-'}
                     </div>
                   </div>

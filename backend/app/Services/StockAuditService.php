@@ -250,11 +250,6 @@ class StockAuditService
         return $item;
     }
 
-        $inspection->recalculateSummary();
-
-        return $item;
-    }
-
     /**
      * Hapus Item dari Sesi Sidak
      */

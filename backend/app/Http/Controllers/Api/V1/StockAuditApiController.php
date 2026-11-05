@@ -48,16 +48,15 @@ class StockAuditApiController extends Controller
         if ($deny = $this->authorizeAudit($request)) return $deny;
 
         $user = $request->user();
-        $branchId = $request->query('branch_id') ?: $user->branch_id;
-        if (!$branchId) {
-            $branchId = \App\Models\Branch::where('organization_id', $user->organization_id)->value('id')
-                ?? \App\Models\Branch::first()?->id;
+        $branchId = $request->query('branch_id');
+        if (!$branchId && $user->branch_id) {
+            $branchId = $user->branch_id;
         }
 
-        $inspections = StockAuditInspection::with(['auditor'])
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+        $inspections = StockAuditInspection::with(['auditor', 'branch'])
+            ->when($branchId && $branchId !== 'all', fn ($q) => $q->where('branch_id', $branchId))
             ->orderByDesc('created_at')
-            ->limit(30)
+            ->limit(50)
             ->get();
 
         return response()->json(['data' => $inspections]);
