@@ -42,7 +42,8 @@ class LaporanStokOpnameDetail extends Page implements HasTable
                 TextColumn::make('session.session_number')
                     ->label('No Sesi')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->description(fn (StockOpnameItem $record) => ($record->session && str_starts_with($record->session->session_number, 'SDK-')) ? 'Sidak Spot Check' : null),
                 TextColumn::make('session.branch.name')
                     ->label('Cabang')
                     ->hidden(fn () => Auth::user()->branch_id !== null),
@@ -162,6 +163,19 @@ class LaporanStokOpnameDetail extends Page implements HasTable
             ])
             ->filters([
                 \App\Filament\Filters\DateFilterHelper::make('session.opname_date'),
+                SelectFilter::make('tipe_audit')
+                    ->label('Tipe Audit')
+                    ->options([
+                        'so_rak' => 'SO Rak Terjadwal',
+                        'sidak'  => 'Sidak Audit (Spot Check)',
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        if ($data['value'] === 'so_rak') {
+                            $query->whereHas('session', fn ($q) => $q->where('session_number', 'not like', 'SDK-%'));
+                        } elseif ($data['value'] === 'sidak') {
+                            $query->whereHas('session', fn ($q) => $q->where('session_number', 'like', 'SDK-%'));
+                        }
+                    }),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('session.branch', 'name')

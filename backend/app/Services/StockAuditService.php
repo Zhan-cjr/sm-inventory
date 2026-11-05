@@ -9,6 +9,11 @@ use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
 use App\Models\StockAuditInspection;
 use App\Models\StockAuditInspectionItem;
+use App\Models\Branch;
+use App\Models\StockOpnameSession;
+use App\Models\StockOpnameRack;
+use App\Models\StockOpnameRackSession;
+use App\Models\StockOpnameItem;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -286,6 +291,12 @@ class StockAuditService
                 $inspection->update(['status' => 'INVESTIGATION_PENDING']);
             }
 
+            try {
+                $this->syncToStockOpnameSession($inspection);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Failed to sync audit {$inspection->audit_number} to StockOpnameSession: " . $e->getMessage());
+            }
+
             return $inspection->fresh(['items.product', 'auditor', 'adjustment']);
         });
     }
@@ -368,7 +379,113 @@ class StockAuditService
                 'adjustment_id' => $adjustment->id,
             ]);
 
+            try {
+                $this->syncToStockOpnameSession($inspection);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Failed to sync audit {$inspection->audit_number} to StockOpnameSession: " . $e->getMessage());
+            }
+
             return $adjustment;
+        });
+    }
+
+    /**
+     * Sinkronisasi data Sidak Audit ke Sesi Stok Opname agar muncul di Laporan Stok Opname
+     */
+    public function syncToStockOpnameSession(StockAuditInspection $inspection): StockOpnameSession
+    {
+        return DB::transaction(function () use ($inspection) {
+            $branch = Branch::find($inspection->branch_id);
+            $orgId = $branch?->organization_id ?? \App\Models\Organization::first()?->id;
+
+            $session = StockOpnameSession::updateOrCreate(
+                ['session_number' => $inspection->audit_number],
+                [
+                    'branch_id'       => $inspection->branch_id,
+                    'organization_id' => $orgId,
+                    'opname_date'     => $inspection->inspection_date ?? now()->toDateString(),
+                    'status'          => 'COMPLETED',
+                    'session_token'   => 'SDK-' . Str::random(24),
+                    'notes'           => "Hasil Sidak Audit Stok: {$inspection->audit_number}" . ($inspection->notes ? " - {$inspection->notes}" : ''),
+                    'created_by'      => $inspection->auditor_id,
+                    'approved_by'     => $inspection->auditor_id,
+                    'completed_at'    => $inspection->updated_at ?? now(),
+                ]
+            );
+
+            // Pastikan ada rak default SPOT CHECK untuk cabang ini jika item tidak memiliki rak spesifik
+            $defaultRack = StockOpnameRack::firstOrCreate(
+                [
+                    'branch_id' => $inspection->branch_id,
+                    'rack_code' => 'SPOT CHECK',
+                ],
+                [
+                    'rack_name' => 'Area Sidak Audit',
+                    'is_active' => true,
+                ]
+            );
+
+            $defaultRackSession = StockOpnameRackSession::updateOrCreate(
+                [
+                    'session_id' => $session->id,
+                    'rack_id'    => $defaultRack->id,
+                ],
+                [
+                    'rack_token'    => 'RACK-' . Str::random(24),
+                    'count1_status' => 'DONE',
+                    'count2_status' => 'DONE',
+                    'count1_by_name'=> $inspection->auditor?->name ?? 'Auditor',
+                    'count2_by_name'=> $inspection->witness_name ?: 'Saksi Toko',
+                    'count1_at'     => $inspection->created_at,
+                    'count2_at'     => $inspection->updated_at,
+                ]
+            );
+
+            foreach ($inspection->items()->with('product')->get() as $item) {
+                $rackId = $item->rack_id;
+                $rackSession = $defaultRackSession;
+
+                if ($rackId && $rackId !== $defaultRack->id) {
+                    $rackSession = StockOpnameRackSession::firstOrCreate(
+                        [
+                            'session_id' => $session->id,
+                            'rack_id'    => $rackId,
+                        ],
+                        [
+                            'rack_token'    => 'RACK-' . Str::random(24),
+                            'count1_status' => 'DONE',
+                            'count2_status' => 'DONE',
+                            'count1_by_name'=> $inspection->auditor?->name ?? 'Auditor',
+                            'count2_by_name'=> $inspection->witness_name ?: 'Saksi Toko',
+                            'count1_at'     => $item->created_at,
+                            'count2_at'     => $item->updated_at,
+                        ]
+                    );
+                }
+
+                $status = $item->status === 'MATCH' ? 'MATCHED' : 'FINAL_DONE';
+
+                StockOpnameItem::updateOrCreate(
+                    [
+                        'session_id'      => $session->id,
+                        'rack_session_id' => $rackSession->id,
+                        'product_id'      => $item->product_id,
+                    ],
+                    [
+                        'system_quantity' => $item->system_quantity,
+                        'count1_quantity' => $item->physical_quantity,
+                        'count2_quantity' => $item->physical_quantity,
+                        'final_quantity'  => $item->physical_quantity,
+                        'status'          => $status,
+                        'count1_at'       => $item->created_at,
+                        'count2_at'       => $item->created_at,
+                        'final_at'        => $item->updated_at,
+                        'final_by'        => $inspection->auditor_id,
+                    ]
+                );
+            }
+
+            return $session;
         });
     }
 }
