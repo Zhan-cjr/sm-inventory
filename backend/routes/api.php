@@ -288,6 +288,7 @@ Route::prefix('v1')->group(function () {
         // Sidak Audit Stok (Mobile PWA)
         Route::get('/stock-audits/racks', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'getActiveRacks']);
         Route::get('/stock-audits/search-products', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'searchProduct']);
+        Route::post('/stock-audits/assign-branch-product', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'assignBranchProduct']);
         Route::get('/stock-audits', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'index']);
         Route::post('/stock-audits', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'store']);
         Route::get('/stock-audits/{id}', [\App\Http\Controllers\Api\V1\StockAuditApiController::class, 'show']);

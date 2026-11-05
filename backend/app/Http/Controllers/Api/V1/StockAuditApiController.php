@@ -135,6 +135,43 @@ class StockAuditApiController extends Controller
     }
 
     /**
+     * Tetapkan produk katalog global ke cabang saat sidak
+     */
+    public function assignBranchProduct(Request $request): JsonResponse
+    {
+        if ($deny = $this->authorizeAudit($request)) return $deny;
+
+        $validator = Validator::make($request->all(), [
+            'product_id' => 'required|uuid',
+            'branch_id'  => 'required|uuid',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()->first()], 422);
+        }
+
+        $stock = $this->service->assignProductToBranch($request->product_id, $request->branch_id);
+        $product = $stock->product;
+
+        return response()->json([
+            'message' => 'Produk berhasil ditetapkan ke cabang ini.',
+            'data'    => [
+                'id'                    => $product->id,
+                'name'                  => $product->name,
+                'sku'                   => $product->sku,
+                'barcode'               => $product->barcode,
+                'unit'                  => $product->unit ?? 'pcs',
+                'cost_price'            => (float) ($stock->cost_price_tax ?: $stock->cost_price ?: $product->cost_price_tax ?: $product->cost_price ?: 0),
+                'stock'                 => (float) $stock->salable_quantity,
+                'is_assigned_to_branch' => true,
+                'branch_id'             => $stock->branch_id,
+                'racks'                 => '-',
+                'rack_id'               => null,
+            ]
+        ]);
+    }
+
+    /**
      * Scan / Input hitung fisik produk ke sesi sidak
      */
     public function recordItem(Request $request, string $id): JsonResponse

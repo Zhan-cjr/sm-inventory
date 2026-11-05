@@ -147,25 +147,51 @@ class StockAuditService
             ->get()
             ->keyBy('product_id');
 
-        return $products->map(function ($p) use ($stocks) {
+        return $products->map(function ($p) use ($stocks, $branchId) {
             $st = $stocks->get($p->id);
+            $isAssigned = $st !== null;
             $qoh = (float) ($st?->quantity_on_hand ?? 0);
             $salable = (float) ($st?->salable_quantity ?? $qoh);
             $cost = (float) ($st?->cost_price_tax > 0 ? $st->cost_price_tax : ($st?->cost_price > 0 ? $st->cost_price : ($p->cost_price_tax ?? $p->cost_price ?? 0)));
             $racks = $st?->racks?->pluck('rack_name')->toArray() ?? [];
 
             return [
-                'id'         => $p->id,
-                'name'       => $p->name,
-                'sku'        => $p->sku,
-                'barcode'    => $p->barcode,
-                'unit'       => $p->unit ?? 'pcs',
-                'cost_price' => $cost,
-                'stock'      => $salable,
-                'racks'      => !empty($racks) ? implode(', ', $racks) : '-',
-                'rack_id'    => $st?->racks?->first()?->id,
+                'id'                    => $p->id,
+                'name'                  => $p->name,
+                'sku'                   => $p->sku,
+                'barcode'               => $p->barcode,
+                'unit'                  => $p->unit ?? 'pcs',
+                'cost_price'            => $cost,
+                'stock'                 => $salable,
+                'is_assigned_to_branch' => $isAssigned,
+                'branch_id'             => $branchId,
+                'racks'                 => !empty($racks) ? implode(', ', $racks) : '-',
+                'rack_id'               => $st?->racks?->first()?->id,
             ];
         });
+    }
+
+    /**
+     * Tetapkan produk katalog global ke cabang saat sidak
+     */
+    public function assignProductToBranch(string $productId, string $branchId): Stock
+    {
+        $product = Product::findOrFail($productId);
+        $stock = Stock::firstOrCreate([
+            'branch_id'  => $branchId,
+            'product_id' => $productId,
+        ], [
+            'quantity_on_hand' => 0,
+            'quantity_damaged' => 0,
+            'cost_price'       => $product->cost_price,
+            'cost_price_tax'   => $product->cost_price_tax,
+            'selling_price'    => $product->selling_price,
+            'harga_jual_1'     => $product->harga_jual_1 ?? $product->selling_price,
+            'is_active'        => true,
+            'version'          => 1,
+        ]);
+
+        return $stock;
     }
 
     /**
@@ -189,22 +215,12 @@ class StockAuditService
         ]);
 
         $unitCost = (float) ($stock->cost_price_tax > 0 ? $stock->cost_price_tax : ($stock->cost_price > 0 ? $stock->cost_price : ($product->cost_price_tax ?? $product->cost_price ?? 0)));
+        
+        // Murni mengambil data stok dari cabang yang bersangkutan
         $systemQty = (float) $stock->salable_quantity;
 
-        // Hitung mutasi eksternal (penjualan kasir/retur) selama sidak berlangsung
-        $start = $inspection->created_at;
-        $end = now();
-        $deltaDuringSo = (float) InventoryLog::where('branch_id', $inspection->branch_id)
-            ->where('product_id', $productId)
-            ->whereBetween('created_at', [$start, $end])
-            ->where(function ($q) {
-                $q->whereNull('reference_doc_type')
-                  ->orWhere('reference_doc_type', '!=', 'STOCK_AUDIT');
-            })
-            ->sum('quantity_change');
-
-        $adjustedSystemQty = $systemQty + $deltaDuringSo;
-        $discrepancyQty = $physicalQty - $adjustedSystemQty;
+        // Selisih murni: Fisik Dihitung - Stok Sistem Cabang saat ini
+        $discrepancyQty = $physicalQty - $systemQty;
         $discrepancyCost = $discrepancyQty * $unitCost;
 
         $status = 'MATCH';
@@ -220,7 +236,7 @@ class StockAuditService
         ], [
             'rack_id'              => $rackId ?: $stock->racks()->first()?->id,
             'system_quantity'      => $systemQty,
-            'delta_sales_quantity' => $deltaDuringSo,
+            'delta_sales_quantity' => 0,
             'physical_quantity'    => $physicalQty,
             'discrepancy_quantity' => $discrepancyQty,
             'unit_cost'            => $unitCost,
@@ -228,6 +244,11 @@ class StockAuditService
             'status'               => $status,
             'clarification_notes'  => $notes,
         ]);
+
+        $inspection->recalculateSummary();
+
+        return $item;
+    }
 
         $inspection->recalculateSummary();
 

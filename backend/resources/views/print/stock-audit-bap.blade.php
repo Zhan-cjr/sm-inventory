@@ -194,13 +194,12 @@
             <th style="width: 100px;">Barcode / SKU</th>
             <th>Nama Produk</th>
             <th style="width: 60px;">Rak</th>
-            <th style="width: 55px;">Sistem</th>
-            <th style="width: 45px;">Mutasi</th>
-            <th style="width: 55px;">Fisik</th>
-            <th style="width: 55px;">Selisih</th>
-            <th style="width: 75px;">HPP Satuan</th>
-            <th style="width: 85px;">Total Selisih (Rp)</th>
-            <th style="width: 110px;">Keterangan / Klarifikasi</th>
+            <th style="width: 65px;">Stok Sistem</th>
+            <th style="width: 65px;">Fisik Dihitung</th>
+            <th style="width: 60px;">Selisih</th>
+            <th style="width: 80px;">HPP Satuan</th>
+            <th style="width: 90px;">Total Selisih (Rp)</th>
+            <th style="width: 120px;">Keterangan / Klarifikasi</th>
         </tr>
     </thead>
     <tbody>
@@ -217,9 +216,6 @@
                 {{ $it->rack?->rack_name ?? '-' }}
             </td>
             <td class="text-right">{{ number_format($it->system_quantity, 0) }}</td>
-            <td class="text-right" style="color: #666; font-size: 9px;">
-                {{ $it->delta_sales_quantity != 0 ? ($it->delta_sales_quantity > 0 ? '+' : '') . number_format($it->delta_sales_quantity, 0) : '-' }}
-            </td>
             <td class="text-right" style="font-weight: bold;">{{ number_format($it->physical_quantity, 0) }}</td>
             <td class="text-right">
                 @if($it->discrepancy_quantity < 0)
@@ -246,7 +242,7 @@
         </tr>
         @empty
         <tr>
-            <td colspan="11" class="text-center" style="padding: 15px; color: #888;">
+            <td colspan="10" class="text-center" style="padding: 15px; color: #888;">
                 Belum ada produk yang dipindai dalam sesi sidak ini.
             </td>
         </tr>

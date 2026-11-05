@@ -57,6 +57,10 @@ export function MobileStockAudit({ user, authToken }) {
   const [itemNotes, setItemNotes] = useState('');
   const [savingItem, setSavingItem] = useState(false);
 
+  // Unassigned Global Product Prompt
+  const [unassignedProductPrompt, setUnassignedProductPrompt] = useState(null);
+  const [isAssigning, setIsAssigning] = useState(false);
+
   // Finish Modal
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [witnessName, setWitnessName] = useState('');
@@ -216,14 +220,53 @@ export function MobileStockAudit({ user, authToken }) {
       });
       const json = await res.json();
       if (res.ok && json.data && json.data.length > 0) {
-        openCountModal(json.data[0]);
+        const prod = json.data[0];
+        handleSelectProduct(prod);
       } else {
-        alert(`Produk dengan barcode/SKU "${barcode}" tidak ditemukan.`);
+        alert(`Barcode/SKU "${barcode}" tidak ditemukan di sistem (tidak ada di cabang maupun katalog global).`);
       }
     } catch (err) {
       console.error("Gagal barcode search", err);
     } finally {
       setSearching(false);
+    }
+  };
+
+  const handleSelectProduct = (product) => {
+    if (!product.is_assigned_to_branch) {
+      setUnassignedProductPrompt(product);
+      return;
+    }
+    openCountModal(product);
+  };
+
+  const handleAssignAndCount = async (product) => {
+    setIsAssigning(true);
+    try {
+      const branchId = selectedBranchId || activeInspection?.branch_id || user?.branch_id;
+      const res = await fetch('/api/v1/stock-audits/assign-branch-product', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          product_id: product.id,
+          branch_id: branchId
+        })
+      });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setUnassignedProductPrompt(null);
+        openCountModal(json.data);
+      } else {
+        alert(json.error || json.message || "Gagal menetapkan produk ke cabang.");
+      }
+    } catch (e) {
+      console.error("Gagal assign produk ke cabang", e);
+      alert("Terjadi kesalahan jaringan saat menetapkan produk ke cabang.");
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -672,7 +715,7 @@ export function MobileStockAudit({ user, authToken }) {
                     {searchResults.map(p => (
                       <div
                         key={p.id}
-                        onClick={() => openCountModal(p)}
+                        onClick={() => handleSelectProduct(p)}
                         style={{
                           padding: '12px 14px',
                           borderBottom: '1px solid var(--border-light)',
@@ -680,18 +723,26 @@ export function MobileStockAudit({ user, authToken }) {
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          gap: '0.5rem'
+                          gap: '0.5rem',
+                          background: !p.is_assigned_to_branch ? 'rgba(245, 158, 11, 0.04)' : 'transparent'
                         }}
                       >
                         <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)' }}>{p.name}</div>
+                          <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                            <span>{p.name}</span>
+                            {!p.is_assigned_to_branch && (
+                              <span style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                                Belum Ada di Cabang
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '2px' }}>
                             {p.barcode || p.sku} &bull; Rak: {p.racks}
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#38bdf8' }}>
-                            Sistem: {p.stock} {p.unit}
+                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: p.is_assigned_to_branch ? '#38bdf8' : '#f59e0b' }}>
+                            {p.is_assigned_to_branch ? `Sistem: ${p.stock} ${p.unit}` : 'Belum Ditetapkan'}
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             HPP: {formatCurrency(p.cost_price)}
@@ -1403,6 +1454,74 @@ export function MobileStockAudit({ user, authToken }) {
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
               >
                 Kembali ke Pemeriksaan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: PRODUK GLOBAL BELUM DITETAPKAN KE CABANG */}
+      {unassignedProductPrompt && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="pwa-card" style={{ width: '100%', maxWidth: '400px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '0.5rem' }}>
+              <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <AlertTriangle size={28} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                Belum Ditetapkan ke Cabang
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                Produk ini terdaftar di <strong>Katalog Global</strong>, namun belum ada di data stok cabang ini.
+              </p>
+            </div>
+
+            <div style={{ background: 'rgba(128,128,128,0.06)', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)' }}>
+                {unassignedProductPrompt.name}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '3px' }}>
+                Barcode: {unassignedProductPrompt.barcode || '-'} &bull; SKU: {unassignedProductPrompt.sku}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                disabled={isAssigning}
+                onClick={() => handleAssignAndCount(unassignedProductPrompt)}
+                className="pwa-btn pwa-btn-primary"
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  color: '#fff',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                {isAssigning ? 'Menetapkan ke Cabang...' : '+ Tetapkan ke Cabang Ini & Hitung'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setUnassignedProductPrompt(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  padding: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                Batal
               </button>
             </div>
           </div>
