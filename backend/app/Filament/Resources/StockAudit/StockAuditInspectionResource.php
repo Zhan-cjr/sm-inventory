@@ -32,11 +32,8 @@ class StockAuditInspectionResource extends Resource
     {
         $user = Auth::user();
         if (!$user) return false;
-        
-        $role = strtoupper($user->role ?? '');
-        $isManagerOrAdmin = in_array($role, ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SPV', 'EDP', 'SUPERADMIN', 'SUPER_ADMIN', 'AUDITOR']);
-        
-        return $isManagerOrAdmin || $user->hasCustomAuthorization('ACCESS_STOCK_AUDIT');
+
+        return $user->hasCustomAuthorization('ACCESS_STOCK_AUDIT');
     }
 
     public static function table(Table $table): Table

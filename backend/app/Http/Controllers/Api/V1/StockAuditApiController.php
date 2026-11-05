@@ -29,11 +29,7 @@ class StockAuditApiController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $role = strtoupper($user->role ?? '');
-        $isManagerOrAdmin = in_array($role, ['MANAGER', 'ADMIN', 'SUPERVISOR', 'SPV', 'EDP', 'SUPERADMIN', 'SUPER_ADMIN', 'AUDITOR']);
-        $hasAuth = $user->hasCustomAuthorization('ACCESS_STOCK_AUDIT');
-
-        if (!$isManagerOrAdmin && !$hasAuth) {
+        if (!$user->hasCustomAuthorization('ACCESS_STOCK_AUDIT')) {
             return response()->json(['error' => 'Akses Ditolak: Anda tidak memiliki izin Sidak Audit Stok.'], 403);
         }
 

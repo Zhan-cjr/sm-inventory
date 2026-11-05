@@ -29,6 +29,14 @@ class StockQuarantineAuditResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-check';
 
+    public static function canViewAny(): bool
+    {
+        $user = Auth::user();
+        if (!$user) return false;
+
+        return $user->hasCustomAuthorization('ACCESS_QUARANTINE_AUDIT');
+    }
+
     public static function table(Table $table): Table
     {
         return $table

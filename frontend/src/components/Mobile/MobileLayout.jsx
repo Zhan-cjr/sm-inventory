@@ -44,7 +44,7 @@ export function MobileLayout({ user, onLogout }) {
 
   const hasEcommerceAuth = user?.custom_authorizations?.includes('PROCESS_ECOMMERCE');
   const hasSmartOrderAuth = user?.custom_authorizations?.includes('ACCESS_SMART_ORDER');
-  const hasStockAuditAuth = isManagerOrAdmin || user?.custom_authorizations?.includes('ACCESS_STOCK_AUDIT');
+  const hasStockAuditAuth = user?.custom_authorizations?.includes('ACCESS_STOCK_AUDIT');
   const hasBIAIAuth = user?.custom_authorizations?.includes('ACCESS_BI_AI');
   const hasAuthMenu = (user?.pos_authorizations && user.pos_authorizations.length > 0) || 
                       user?.custom_authorizations?.includes('APPROVE_PO') || 
