@@ -130,7 +130,7 @@ class QuickCreateProductAction
                                 ->label('Proses Teks ke Tabel & Deteksi Master')
                                 ->icon('heroicon-o-arrow-down-tray')
                                 ->color('info')
-                                ->action(function (callable $get, callable $set) {
+                                ->action(function (callable $get, callable $set, $livewire = null) {
                                     $text = $get('paste_text');
                                     if (blank($text)) {
                                         Notification::make()
@@ -141,13 +141,50 @@ class QuickCreateProductAction
                                         return;
                                     }
 
-                                    $supplierId = $get('supplier_id');
-                                    $defaultCatId = $get('default_category_id');
-                                    $defaultSubCat = $get('default_sub_category');
+                                    $formData = null;
+                                    if (isset($livewire)) {
+                                        $formData = data_get($livewire, 'mountedActions.0.data') 
+                                            ?? data_get($livewire, 'mountedActionsData.0') 
+                                            ?? data_get($livewire, 'data');
+                                    }
 
-                                    // Ambil master produk yang sudah ada di supplier ini
-                                    $existingProducts = Product::query()
-                                        ->when($supplierId, fn($q) => $q->where('supplier_id', $supplierId))
+                                    $supplierId = $get('supplier_id')
+                                        ?? $get('../../supplier_id')
+                                        ?? $get('../supplier_id')
+                                        ?? data_get($formData, 'supplier_id');
+
+                                    $defaultCatId = $get('default_category_id')
+                                        ?? $get('../../default_category_id')
+                                        ?? data_get($formData, 'default_category_id');
+
+                                    $defaultSubCat = $get('default_sub_category')
+                                        ?? $get('../../default_sub_category')
+                                        ?? data_get($formData, 'default_sub_category');
+
+                                    // Jika supplier belum terpilih di form, coba deteksi dari kata pertama di teks
+                                    if (blank($supplierId)) {
+                                        $firstWord = strtoupper(strtok(trim($text), " \t\n\r|"));
+                                        if (strlen($firstWord) >= 3) {
+                                            $matchedSup = Supplier::where('name', 'like', "%{$firstWord}%")->first();
+                                            if ($matchedSup) {
+                                                $supplierId = $matchedSup->id;
+                                                $set('../../supplier_id', $supplierId);
+                                            }
+                                        }
+                                    }
+
+                                    // Jika tetap belum ada supplier, beri peringatan agar tidak salah mencocokkan lintas supplier
+                                    if (blank($supplierId)) {
+                                        Notification::make()
+                                            ->title('Pilih Supplier Terlebih Dahulu')
+                                            ->body('Silakan pilih Supplier pada "1. Header Default Batch" terlebih dahulu agar sistem hanya mencocokkan produk dari supplier tersebut.')
+                                            ->warning()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    // Ambil master produk KHUSUS supplier ini saja
+                                    $existingProducts = Product::where('supplier_id', $supplierId)
                                         ->get(['id', 'sku', 'barcode', 'name', 'category_id', 'sub_category', 'supplier_id']);
 
                                     $normMap = [];
@@ -480,10 +517,12 @@ class QuickCreateProductAction
     public static function findBestMatch(string $inputName, $products): ?array
     {
         $normInput = static::normalizeProductName($inputName);
+        $inputTokens = explode(' ', $normInput);
+        $inputFirstWord = $inputTokens[0] ?? '';
         
         $inputWords = array_values(array_filter(
-            explode(' ', $normInput), 
-            fn($w) => strlen($w) > 1 && !in_array($w, ['KRAOS', 'SUPPLIER'])
+            $inputTokens, 
+            fn($w) => strlen($w) > 1 && $w !== $inputFirstWord
         ));
         
         $bestMatch = null;
@@ -491,7 +530,14 @@ class QuickCreateProductAction
 
         foreach ($products as $p) {
             $normProd = static::normalizeProductName($p->name);
-            
+            $prodTokens = explode(' ', $normProd);
+            $prodFirstWord  = $prodTokens[0] ?? '';
+
+            // ATURAN 1: Merek/Kata pertama harus sama jika sama-sama memiliki prefiks (contoh: KRAOS tidak boleh cocok dengan BERKAH)
+            if ($inputFirstWord !== '' && $prodFirstWord !== '' && $inputFirstWord !== $prodFirstWord) {
+                continue;
+            }
+
             // 1. Exact normalized match
             if ($normProd === $normInput) {
                 return [
@@ -502,8 +548,8 @@ class QuickCreateProductAction
             }
 
             $prodWords = array_values(array_filter(
-                explode(' ', $normProd), 
-                fn($w) => strlen($w) > 1 && !in_array($w, ['KRAOS', 'SUPPLIER'])
+                $prodTokens, 
+                fn($w) => strlen($w) > 1 && $w !== $prodFirstWord
             ));
             
             $matchedWords = array_intersect($inputWords, $prodWords);
@@ -513,7 +559,7 @@ class QuickCreateProductAction
                 $inputRatio = $matchCount / count($inputWords);
                 $prodRatio = $matchCount / max(1, count($prodWords));
                 
-                // 2. All content words of query exist in target (e.g. RAMBO in RAMBO KUMBANG PDS, or KRP SEBLAK in KRP PDS SEBLAK)
+                // 2. Semua kata input ada di target (contoh: RAMBO di RAMBO KUMBANG PDS, atau KRP SEBLAK di KRP PDS SEBLAK)
                 if ($inputRatio == 1.0) {
                     similar_text($normInput, $normProd, $sim);
                     $score = 80 + ($prodRatio * 15) + ($sim * 0.05);
