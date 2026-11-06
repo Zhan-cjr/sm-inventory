@@ -16,7 +16,7 @@ return new class extends Migration
                 $table->foreignUuid('branch_id')->nullable()->after('supplier_id')->constrained('branches')->nullOnDelete();
             }
             if (!Schema::hasColumn('supplier_divisions', 'created_by')) {
-                $table->foreignUuid('created_by')->nullable()->after('notes')->constrained('users')->nullOnDelete();
+                $table->foreignId('created_by')->nullable()->after('notes')->constrained('users')->nullOnDelete();
             }
         });
     }
