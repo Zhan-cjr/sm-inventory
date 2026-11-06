@@ -226,21 +226,12 @@ class QuickCreateProductAction
 
                                         if (empty($name)) continue;
 
-                                        // Deteksi kecocokan dengan master lama
-                                        $normInput = static::normalizeProductName($name);
-                                        $matched = $normMap[$normInput] ?? null;
+                                        // Deteksi kecocokan dengan master lama menggunakan Smart Matcher
+                                        $matchResult = static::findBestMatch($name, $existingProducts);
 
-                                        if (!$matched) {
-                                            foreach ($normMap as $normKey => $prod) {
-                                                similar_text($normInput, $normKey, $percent);
-                                                if ($percent >= 90) {
-                                                    $matched = $prod;
-                                                    break;
-                                                }
-                                            }
-                                        }
-
-                                        if ($matched) {
+                                        if ($matchResult) {
+                                            $matched = $matchResult['product'];
+                                            $score = $matchResult['score'];
                                             $existingItems[] = [
                                                 'id' => (string) Str::uuid(),
                                                 'name' => $name,
@@ -251,6 +242,7 @@ class QuickCreateProductAction
                                                 'status' => 'MATCHED',
                                                 'product_id' => $matched->id,
                                                 'matched_name' => $matched->name,
+                                                'match_score' => $score,
                                                 'barcode' => $matched->barcode,
                                                 'sku' => $matched->sku,
                                                 'force_new' => false,
@@ -272,6 +264,7 @@ class QuickCreateProductAction
                                                 'status' => 'NEW',
                                                 'product_id' => null,
                                                 'matched_name' => null,
+                                                'match_score' => 0,
                                                 'barcode' => $barcode,
                                                 'sku' => $sku,
                                                 'force_new' => false,
@@ -482,6 +475,72 @@ class QuickCreateProductAction
                         ->send();
                 }
             });
+    }
+
+    public static function findBestMatch(string $inputName, $products): ?array
+    {
+        $normInput = static::normalizeProductName($inputName);
+        
+        $inputWords = array_values(array_filter(
+            explode(' ', $normInput), 
+            fn($w) => strlen($w) > 1 && !in_array($w, ['KRAOS', 'SUPPLIER'])
+        ));
+        
+        $bestMatch = null;
+        $highestScore = 0;
+
+        foreach ($products as $p) {
+            $normProd = static::normalizeProductName($p->name);
+            
+            // 1. Exact normalized match
+            if ($normProd === $normInput) {
+                return [
+                    'product' => $p,
+                    'score'   => 100,
+                    'type'    => 'EXACT',
+                ];
+            }
+
+            $prodWords = array_values(array_filter(
+                explode(' ', $normProd), 
+                fn($w) => strlen($w) > 1 && !in_array($w, ['KRAOS', 'SUPPLIER'])
+            ));
+            
+            $matchedWords = array_intersect($inputWords, $prodWords);
+            $matchCount = count($matchedWords);
+            
+            if (count($inputWords) > 0) {
+                $inputRatio = $matchCount / count($inputWords);
+                $prodRatio = $matchCount / max(1, count($prodWords));
+                
+                // 2. All content words of query exist in target (e.g. RAMBO in RAMBO KUMBANG PDS, or KRP SEBLAK in KRP PDS SEBLAK)
+                if ($inputRatio == 1.0) {
+                    similar_text($normInput, $normProd, $sim);
+                    $score = 80 + ($prodRatio * 15) + ($sim * 0.05);
+                    if ($score > $highestScore) {
+                        $highestScore = $score;
+                        $bestMatch = [
+                            'product' => $p,
+                            'score'   => round($score, 1),
+                            'type'    => 'SUBSET',
+                        ];
+                    }
+                } else {
+                    // 3. High fuzzy similarity
+                    similar_text($normInput, $normProd, $sim);
+                    if ($sim >= 85 && $sim > $highestScore) {
+                        $highestScore = $sim;
+                        $bestMatch = [
+                            'product' => $p,
+                            'score'   => round($sim, 1),
+                            'type'    => 'FUZZY',
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $highestScore >= 75 ? $bestMatch : null;
     }
 
     public static function normalizeProductName(string $name): string

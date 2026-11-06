@@ -440,6 +440,9 @@
                                         </span>
                                         <div style="font-size: 11px; color: #64748b; margin-top: 3px; line-height: 1.2;">
                                             Tautkan ke: <strong style="color: #334155;" x-text="item.matched_name"></strong>
+                                            <template x-if="item.match_score">
+                                                <span style="display: inline-block; font-size: 10px; font-weight: 700; color: #059669; background: #ecfdf5; padding: 1px 4px; border-radius: 4px; margin-left: 2px;" x-text="item.match_score + '%'"></span>
+                                            </template>
                                         </div>
                                     </div>
                                 </template>
