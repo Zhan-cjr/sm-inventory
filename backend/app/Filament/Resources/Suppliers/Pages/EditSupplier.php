@@ -13,7 +13,8 @@ class EditSupplier extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->hidden(fn ($record) => $record->products()->exists()),
         ];
     }
 }

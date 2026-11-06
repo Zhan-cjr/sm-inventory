@@ -41,6 +41,13 @@ class Supplier extends Model
                 $supplier->code = "SUP-{$dateCode}{$nextSequence}";
             }
         });
+
+        static::deleting(function (Supplier $supplier) {
+            $count = $supplier->products()->count();
+            if ($count > 0) {
+                throw new \Exception("Supplier '{$supplier->name}' tidak dapat dihapus karena masih memiliki {$count} barang terdaftar.");
+            }
+        });
     }
 
     public function organization(): BelongsTo

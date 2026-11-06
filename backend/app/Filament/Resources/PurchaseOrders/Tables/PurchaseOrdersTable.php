@@ -36,6 +36,14 @@ class PurchaseOrdersTable
                     ->label('Supplier')
                     ->searchable()
                     ->toggleable(),
+                TextColumn::make('division.name')
+                    ->label('Sub Divisi')
+                    ->placeholder('-')
+                    ->badge()
+                    ->color('info')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('po_number')
                     ->label('No. PO')
                     ->searchable()
@@ -112,6 +120,16 @@ class PurchaseOrdersTable
             ])
             ->filters([
                 DateFilterHelper::make('po_date'),
+                SelectFilter::make('supplier_id')
+                    ->label('Supplier')
+                    ->relationship('supplier', 'name')
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('supplier_division_id')
+                    ->label('Sub Divisi')
+                    ->relationship('division', 'name')
+                    ->searchable()
+                    ->preload(),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('branch', 'name')
