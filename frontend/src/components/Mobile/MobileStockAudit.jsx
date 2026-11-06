@@ -1195,8 +1195,8 @@ export function MobileStockAudit({ user, authToken }) {
 
       {/* MODAL 2: INPUT PHYSICAL COUNT */}
       {selectedProduct && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="pwa-card" style={{ width: '100%', maxWidth: '420px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', boxSizing: 'border-box' }}>
+          <div className="pwa-card" style={{ width: '100%', maxWidth: '420px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', boxSizing: 'border-box' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
@@ -1245,11 +1245,32 @@ export function MobileStockAudit({ user, authToken }) {
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>JUMLAH FISIK DI RAK & GUDANG</label>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', marginTop: '6px', boxSizing: 'border-box' }}>
                 <button
                   type="button"
-                  onClick={() => setPhysicalQty(prev => Math.max(0, prev - 1))}
-                  style={{ width: 48, height: 48, borderRadius: '12px', border: '1px solid var(--border-light)', background: 'rgba(128,128,128,0.08)', color: 'var(--text-main)', fontSize: '1.25rem', fontWeight: 800, cursor: 'pointer' }}
+                  onClick={() => setPhysicalQty(prev => Math.max(0, Math.round((prev - 1) * 100) / 100))}
+                  style={{ 
+                    flex: '0 0 52px',
+                    width: '52px', 
+                    minWidth: '52px',
+                    maxWidth: '52px',
+                    height: '48px', 
+                    flexShrink: 0,
+                    flexGrow: 0,
+                    borderRadius: '12px', 
+                    border: '1px solid var(--border-light)', 
+                    background: 'rgba(128,128,128,0.08)', 
+                    color: 'var(--text-main)', 
+                    fontSize: '1.2rem', 
+                    fontWeight: 800, 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    boxSizing: 'border-box'
+                  }}
+                  title="Kurang 1"
                 >
                   -1
                 </button>
@@ -1257,26 +1278,56 @@ export function MobileStockAudit({ user, authToken }) {
                 <input
                   type="number"
                   step="any"
+                  min="0"
+                  className="no-spin"
                   value={physicalQty}
-                  onChange={(e) => setPhysicalQty(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setPhysicalQty(v === '' ? 0 : (parseFloat(v) || 0));
+                  }}
+                  onFocus={(e) => e.target.select()}
                   style={{
-                    flex: 1,
-                    height: 48,
+                    flex: '1 1 0%',
+                    minWidth: 0,
+                    width: '100%',
+                    height: '48px',
                     borderRadius: '12px',
                     border: '2px solid #f59e0b',
                     background: 'rgba(128,128,128,0.06)',
                     color: 'var(--text-main)',
-                    fontSize: '1.4rem',
+                    fontSize: '1.5rem',
                     fontWeight: 800,
                     textAlign: 'center',
-                    outline: 'none'
+                    outline: 'none',
+                    boxSizing: 'border-box'
                   }}
                 />
 
                 <button
                   type="button"
-                  onClick={() => setPhysicalQty(prev => prev + 1)}
-                  style={{ width: 48, height: 48, borderRadius: '12px', border: '1px solid var(--border-light)', background: 'rgba(128,128,128,0.08)', color: 'var(--text-main)', fontSize: '1.25rem', fontWeight: 800, cursor: 'pointer' }}
+                  onClick={() => setPhysicalQty(prev => Math.round((prev + 1) * 100) / 100)}
+                  style={{ 
+                    flex: '0 0 52px',
+                    width: '52px', 
+                    minWidth: '52px',
+                    maxWidth: '52px',
+                    height: '48px', 
+                    flexShrink: 0,
+                    flexGrow: 0,
+                    borderRadius: '12px', 
+                    border: '1px solid var(--border-light)', 
+                    background: 'rgba(128,128,128,0.08)', 
+                    color: 'var(--text-main)', 
+                    fontSize: '1.2rem', 
+                    fontWeight: 800, 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    boxSizing: 'border-box'
+                  }}
+                  title="Tambah 1"
                 >
                   +1
                 </button>
@@ -1292,7 +1343,7 @@ export function MobileStockAudit({ user, authToken }) {
                       if (add === 0) setPhysicalQty(0);
                       else setPhysicalQty(prev => prev + add);
                     }}
-                    style={{ flex: 1, padding: '6px', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'rgba(128,128,128,0.04)', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ flex: 1, padding: '7px 4px', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'rgba(128,128,128,0.05)', color: 'var(--text-main)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                   >
                     {add === 0 ? 'Set 0' : `+${add}`}
                   </button>

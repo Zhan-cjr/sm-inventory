@@ -2287,6 +2287,15 @@ body {
 }
 
 /* Premium Card Widgets */
+.no-spin::-webkit-inner-spin-button,
+.no-spin::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spin {
+  -moz-appearance: textfield;
+}
+
 .pwa-card {
   background: var(--bg-card);
   backdrop-filter: blur(16px);
