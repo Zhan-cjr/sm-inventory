@@ -133,22 +133,85 @@ class ListingProdukForm
                         Repeater::make('products')
                             ->relationship('products')
                             ->mutateRelationshipDataBeforeCreateUsing(function (array $data, \Filament\Schemas\Components\Utilities\Get $get): array {
-                                $data['organization_id'] = $data['organization_id'] ?? $get('organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
+                                $orgId = $data['organization_id'] ?? $get('organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
+                                $data['organization_id'] = $orgId;
                                 $data['supplier_id'] = $get('supplier_id');
                                 $data['supplier_division_id'] = $get('supplier_division_id');
                                 $data['listing_status'] = 'TRIAL';
                                 $data['trial_start_date'] = $get('trial_start_date');
                                 $data['trial_end_date'] = $get('trial_end_date');
                                 $data['allowed_branch_ids'] = $get('allowed_branch_ids') ?? [];
+
+                                // Pencegahan Tabrakan SKU Otomatis
+                                $prefixSku = 'SKU-' . date('dmy');
+                                $sku = trim($data['sku'] ?? '');
+
+                                if (empty($sku) || Product::where('sku', $sku)->where('organization_id', $orgId)->exists()) {
+                                    $lastSkuRecord = Product::where('sku', 'like', $prefixSku . '%')
+                                        ->where('organization_id', $orgId)
+                                        ->orderBy('sku', 'desc')
+                                        ->first();
+                                    $lastNum = $lastSkuRecord ? (int) substr($lastSkuRecord->sku, -4) : 0;
+
+                                    do {
+                                        $lastNum++;
+                                        $candidateSku = $prefixSku . str_pad($lastNum, 4, '0', STR_PAD_LEFT);
+                                    } while (Product::where('sku', $candidateSku)->where('organization_id', $orgId)->exists());
+
+                                    $data['sku'] = $candidateSku;
+                                }
+
+                                // Pencegahan Barcode Kosong
+                                if (empty(trim($data['barcode'] ?? ''))) {
+                                    $prefixBarcode = date('dmy');
+                                    $lastBarcodeRecord = Product::where('barcode', 'like', $prefixBarcode . '%')
+                                        ->orderBy('barcode', 'desc')
+                                        ->first();
+                                    $lastBNum = $lastBarcodeRecord ? (int) substr($lastBarcodeRecord->barcode, -4) : 0;
+
+                                    do {
+                                        $lastBNum++;
+                                        $candidateBarcode = $prefixBarcode . str_pad($lastBNum, 4, '0', STR_PAD_LEFT);
+                                    } while (Product::where('barcode', $candidateBarcode)->exists());
+
+                                    $data['barcode'] = $candidateBarcode;
+                                }
+
                                 return $data;
                             })
                             ->mutateRelationshipDataBeforeSaveUsing(function (array $data, \Filament\Schemas\Components\Utilities\Get $get): array {
-                                $data['organization_id'] = $data['organization_id'] ?? $get('organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
+                                $orgId = $data['organization_id'] ?? $get('organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
+                                $data['organization_id'] = $orgId;
                                 $data['supplier_id'] = $get('supplier_id');
                                 $data['supplier_division_id'] = $get('supplier_division_id');
                                 $data['trial_start_date'] = $get('trial_start_date');
                                 $data['trial_end_date'] = $get('trial_end_date');
                                 $data['allowed_branch_ids'] = $get('allowed_branch_ids') ?? [];
+
+                                $sku = trim($data['sku'] ?? '');
+                                if (!empty($sku) && !empty($data['id'])) {
+                                    $conflict = Product::where('sku', $sku)
+                                        ->where('organization_id', $orgId)
+                                        ->where('id', '!=', $data['id'])
+                                        ->exists();
+
+                                    if ($conflict) {
+                                        $prefixSku = 'SKU-' . date('dmy');
+                                        $lastSkuRecord = Product::where('sku', 'like', $prefixSku . '%')
+                                            ->where('organization_id', $orgId)
+                                            ->orderBy('sku', 'desc')
+                                            ->first();
+                                        $lastNum = $lastSkuRecord ? (int) substr($lastSkuRecord->sku, -4) : 0;
+
+                                        do {
+                                            $lastNum++;
+                                            $candidateSku = $prefixSku . str_pad($lastNum, 4, '0', STR_PAD_LEFT);
+                                        } while (Product::where('sku', $candidateSku)->where('organization_id', $orgId)->exists());
+
+                                        $data['sku'] = $candidateSku;
+                                    }
+                                }
+
                                 return $data;
                             })
                             ->label('Item Produk')
@@ -157,7 +220,7 @@ class ListingProdukForm
                             ->minItems(1)
                             ->compact()
                             ->table([
-                                TableColumn::make('SKU')->width('135px')->markAsRequired(),
+                                TableColumn::make('SKU')->width('135px'),
                                 TableColumn::make('Barcode')->width('130px'),
                                 TableColumn::make('Nama Produk')->markAsRequired(),
                                 TableColumn::make('Kategori')->width('180px')->markAsRequired(),
@@ -171,20 +234,7 @@ class ListingProdukForm
                                 TextInput::make('sku')
                                     ->label('SKU')
                                     ->hiddenLabel()
-                                    ->required()
-                                    ->default(function () {
-                                        $prefix = 'SKU-' . date('dmy');
-                                        $lastProduct = Product::where('sku', 'like', $prefix . '%')
-                                            ->orderBy('sku', 'desc')
-                                            ->first();
-                                        
-                                        if ($lastProduct) {
-                                            $lastNumber = (int) substr($lastProduct->sku, -4);
-                                            return $prefix . str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-                                        }
-                                        
-                                        return $prefix . '0001';
-                                    })
+                                    ->nullable()
                                     ->placeholder('Otomatis'),
 
                                 TextInput::make('barcode')
