@@ -7,7 +7,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Actions;
@@ -20,6 +20,7 @@ use App\Models\Branch;
 use App\Models\Organization;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class QuickCreateProductAction
 {
@@ -31,7 +32,7 @@ class QuickCreateProductAction
             ->color('warning')
             ->modalWidth('7xl')
             ->modalHeading('Tambah Produk Cepat (Batch / Paste Teks)')
-            ->modalDescription('Fitur penambahan produk massal dengan pilihan mode Tabel dan Copy-Paste Teks. Kode SKU & Barcode akan dibuatkan otomatis berurutan.')
+            ->modalDescription('Fitur penambahan produk massal dengan deteksi otomatis master lama vs baru, pencegahan duplikasi, dan tinjauan tabel sebelum disimpan.')
             ->visible(function () {
                 $user = Auth::user();
                 if (!$user) return false;
@@ -57,13 +58,14 @@ class QuickCreateProductAction
                                 ->default(fn() => Auth::user()?->branch_id ?? Branch::first()?->id)
                                 ->required()
                                 ->searchable()
-                                ->helperText('Stok awal barang akan otomatis di-assign ke cabang ini.'),
+                                ->helperText('Stok awal dan harga cabang akan diterapkan ke cabang ini.'),
                             Select::make('supplier_id')
                                 ->label('Supplier')
                                 ->options(Supplier::where('is_active', true)->pluck('name', 'id'))
                                 ->required()
                                 ->searchable()
-                                ->preload(),
+                                ->preload()
+                                ->helperText('Katalog supplier ini akan dijadikan acuan pencocokan master lama.'),
                         ]),
                         Grid::make(3)->schema([
                             Select::make('default_category_id')
@@ -114,19 +116,18 @@ class QuickCreateProductAction
                         ]),
                     ]),
 
-                Section::make('2. Import dari Copy-Paste Teks (Opsional)')
-                    ->description('Tempelkan teks daftar barang dari chat/catatan, lalu klik "Proses Teks" untuk memasukkannya ke tabel di bawah.')
+                Section::make('2. Import dari Copy-Paste Teks')
+                    ->description('Tempelkan teks daftar barang dari chat/catatan (Format: NAMA | HPP | JUAL), lalu klik tombol "Proses Teks ke Tabel & Deteksi Master".')
                     ->collapsible()
-                    ->collapsed()
                     ->schema([
                         Textarea::make('paste_text')
                             ->label('Teks Daftar Barang')
                             ->rows(6)
-                            ->placeholder("Contoh Format 1 (3 Kolom):\nUI. CAPIT KUKU BESAR | 6000 | 7500\nUI. CAPIT KUKU KECIL | 2000 | 2500\n\nContoh Format 2 (5 Kolom Beda Kategori):\nUI. CAPIT KUKU BESAR | 6000 | 7500 | KONSINYASI | KONSINYASI @BLN\nUI. DOMPET CANTIK | 15000 | 20000 | AKSESORIS | FASHION"),
+                            ->placeholder("Contoh Format 1 (3 Kolom):\nKRAOS BASO | 10000 | 12000\nKRAOS CIKI BALL KEJU | 11000 | 13500\n\nContoh Format 2 (5 Kolom Beda Kategori):\nKRAOS BASO | 10000 | 12000 | KONSINYASI | KONSINYASI @BLN"),
                         
                         Actions::make([
                             Action::make('parse_text_action')
-                                ->label('Proses Teks ke Tabel')
+                                ->label('Proses Teks ke Tabel & Deteksi Master')
                                 ->icon('heroicon-o-arrow-down-tray')
                                 ->color('info')
                                 ->action(function (callable $get, callable $set) {
@@ -140,9 +141,43 @@ class QuickCreateProductAction
                                         return;
                                     }
 
+                                    $supplierId = $get('supplier_id');
+                                    $defaultCatId = $get('default_category_id');
+                                    $defaultSubCat = $get('default_sub_category');
+
+                                    // Ambil master produk yang sudah ada di supplier ini
+                                    $existingProducts = Product::query()
+                                        ->when($supplierId, fn($q) => $q->where('supplier_id', $supplierId))
+                                        ->get(['id', 'sku', 'barcode', 'name', 'category_id', 'sub_category', 'supplier_id']);
+
+                                    $normMap = [];
+                                    foreach ($existingProducts as $p) {
+                                        $normKey = static::normalizeProductName($p->name);
+                                        if (!isset($normMap[$normKey])) {
+                                            $normMap[$normKey] = $p;
+                                        }
+                                    }
+
+                                    // Siapkan prefix Barcode & SKU hari ini
+                                    $prefixSku = 'SKU-' . date('dmy');
+                                    $prefixBarcode = date('dmy');
+
+                                    $lastSkuRecord = Product::where('sku', 'like', $prefixSku . '%')
+                                        ->orderBy('sku', 'desc')
+                                        ->first();
+                                    $lastSkuNum = $lastSkuRecord ? (int) substr($lastSkuRecord->sku, -4) : 0;
+
+                                    $lastBarcodeRecord = Product::where('barcode', 'like', $prefixBarcode . '%')
+                                        ->orderBy('barcode', 'desc')
+                                        ->first();
+                                    $lastBarcodeNum = $lastBarcodeRecord ? (int) substr($lastBarcodeRecord->barcode, -4) : 0;
+
+                                    $nextSeq = max($lastSkuNum, $lastBarcodeNum);
+
                                     $lines = explode("\n", str_replace("\r", "", $text));
                                     $existingItems = $get('items') ?? [];
-                                    $parsedCount = 0;
+                                    $matchedCount = 0;
+                                    $newCount = 0;
 
                                     $currentName = null;
                                     $currentM = null;
@@ -155,7 +190,13 @@ class QuickCreateProductAction
                                             continue;
                                         }
 
-                                        // Check pipe delimited format
+                                        $name = null;
+                                        $m = 0.0;
+                                        $jual = 0.0;
+                                        $catId = null;
+                                        $subCat = null;
+
+                                        // Format pemisah pipa (pipe)
                                         if (str_contains($trimmed, '|')) {
                                             $parts = array_map('trim', explode('|', $trimmed));
                                             if (count($parts) >= 3) {
@@ -164,33 +205,17 @@ class QuickCreateProductAction
                                                 $jual = static::cleanNumber($parts[2]);
                                                 $catId = isset($parts[3]) && !empty($parts[3]) ? static::findCategoryId($parts[3]) : null;
                                                 $subCat = isset($parts[4]) && !empty($parts[4]) ? $parts[4] : null;
-
-                                                $existingItems[] = [
-                                                    'name' => $name,
-                                                    'cost_price' => $m,
-                                                    'selling_price' => $jual,
-                                                    'category_id' => $catId,
-                                                    'sub_category' => $subCat,
-                                                ];
-                                                $parsedCount++;
                                             }
-                                            continue;
                                         }
-
-                                        // Check multi-line M : 6000 / JUAL : 7500 format
-                                        if (preg_match('/^M\s*:\s*(.+)$/i', $trimmed, $matches)) {
+                                        // Format multi-line M : 6000 / JUAL : 7500
+                                        elseif (preg_match('/^M\s*:\s*(.+)$/i', $trimmed, $matches)) {
                                             $currentM = static::cleanNumber($matches[1]);
                                         } elseif (preg_match('/^JUAL\s*:\s*(.+)$/i', $trimmed, $matches)) {
                                             $currentJual = static::cleanNumber($matches[1]);
                                             if (!empty($currentName) && $currentM !== null && $currentJual !== null) {
-                                                $existingItems[] = [
-                                                    'name' => $currentName,
-                                                    'cost_price' => $currentM,
-                                                    'selling_price' => $currentJual,
-                                                    'category_id' => null,
-                                                    'sub_category' => null,
-                                                ];
-                                                $parsedCount++;
+                                                $name = $currentName;
+                                                $m = $currentM;
+                                                $jual = $currentJual;
                                                 $currentName = null;
                                                 $currentM = null;
                                                 $currentJual = null;
@@ -198,56 +223,80 @@ class QuickCreateProductAction
                                         } else {
                                             $currentName = $trimmed;
                                         }
+
+                                        if (empty($name)) continue;
+
+                                        // Deteksi kecocokan dengan master lama
+                                        $normInput = static::normalizeProductName($name);
+                                        $matched = $normMap[$normInput] ?? null;
+
+                                        if (!$matched) {
+                                            foreach ($normMap as $normKey => $prod) {
+                                                similar_text($normInput, $normKey, $percent);
+                                                if ($percent >= 90) {
+                                                    $matched = $prod;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        if ($matched) {
+                                            $existingItems[] = [
+                                                'id' => (string) Str::uuid(),
+                                                'name' => $name,
+                                                'cost_price' => $m,
+                                                'selling_price' => $jual,
+                                                'category_id' => $catId ?: $matched->category_id ?: $defaultCatId,
+                                                'sub_category' => $subCat ?: $matched->sub_category ?: $defaultSubCat,
+                                                'status' => 'MATCHED',
+                                                'product_id' => $matched->id,
+                                                'matched_name' => $matched->name,
+                                                'barcode' => $matched->barcode,
+                                                'sku' => $matched->sku,
+                                                'force_new' => false,
+                                            ];
+                                            $matchedCount++;
+                                        } else {
+                                            $nextSeq++;
+                                            $seqStr = str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+                                            $barcode = $prefixBarcode . $seqStr;
+                                            $sku = $prefixSku . $seqStr;
+
+                                            $existingItems[] = [
+                                                'id' => (string) Str::uuid(),
+                                                'name' => $name,
+                                                'cost_price' => $m,
+                                                'selling_price' => $jual,
+                                                'category_id' => $catId ?: $defaultCatId,
+                                                'sub_category' => $subCat ?: $defaultSubCat,
+                                                'status' => 'NEW',
+                                                'product_id' => null,
+                                                'matched_name' => null,
+                                                'barcode' => $barcode,
+                                                'sku' => $sku,
+                                                'force_new' => false,
+                                            ];
+                                            $newCount++;
+                                        }
                                     }
 
                                     $set('items', $existingItems);
                                     Notification::make()
-                                        ->title('Teks Berhasil Diproses')
-                                        ->body("{$parsedCount} produk berhasil ditambahkan ke tabel isian di bawah.")
+                                        ->title('Hasil Analisa Batch Selesai')
+                                        ->body("Ditemukan {$matchedCount} produk cocok dengan master lama, dan {$newCount} produk master baru. Silakan tinjau tabel di bawah.")
                                         ->success()
                                         ->send();
                                 }),
                         ]),
                     ]),
 
-                Section::make('3. Tabel Daftar Produk Massal')
-                    ->description('Isi atau edit daftar barang yang akan dibuat. Kategori & Sub Kategori opsional terisi otomatis dari Header jika dikosongkan.')
+                Section::make('3. Tabel Daftar Produk & Review Deteksi')
+                    ->description('Tinjau kode lama vs kode baru hasil pencocokan sistem. Anda dapat mengedit nama/harga langsung di tabel atau mengubah status jika barang berbeda.')
                     ->schema([
-                        Repeater::make('items')
-                            ->label('Item Produk')
-                            ->schema([
-                                Grid::make(5)->schema([
-                                    TextInput::make('name')
-                                        ->label('Nama Produk')
-                                        ->required()
-                                        ->columnSpan(2),
-                                    TextInput::make('cost_price')
-                                        ->label('Harga Beli (M)')
-                                        ->numeric()
-                                        ->required()
-                                        ->default(0),
-                                    TextInput::make('selling_price')
-                                        ->label('Harga Jual')
-                                        ->numeric()
-                                        ->required()
-                                        ->default(0),
-                                    Select::make('category_id')
-                                        ->label('Kategori (Beda)')
-                                        ->placeholder('Ikuti Header')
-                                        ->options(Category::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
-                                        ->searchable(),
-                                ]),
-                                Grid::make(2)->schema([
-                                    TextInput::make('sub_category')
-                                        ->label('Sub Kategori (Beda)')
-                                        ->placeholder('Ikuti Header'),
-                                ]),
-                            ])
-                            ->defaultItems(1)
-                            ->addActionLabel('Tambah Baris Barang')
-                            ->reorderable(false)
-                            ->columns(1)
-                            ->required(),
+                        ViewField::make('items')
+                            ->label('')
+                            ->view('filament.forms.components.quick-create-items-table')
+                            ->default([]),
                     ]),
             ])
             ->action(function (array $data) {
@@ -275,26 +324,22 @@ class QuickCreateProductAction
                 $lastSkuRecord = Product::where('sku', 'like', $prefixSku . '%')
                     ->orderBy('sku', 'desc')
                     ->first();
-                $lastSkuNum = 0;
-                if ($lastSkuRecord) {
-                    $lastSkuNum = (int) substr($lastSkuRecord->sku, -4);
-                }
+                $lastSkuNum = $lastSkuRecord ? (int) substr($lastSkuRecord->sku, -4) : 0;
 
                 $lastBarcodeRecord = Product::where('barcode', 'like', $prefixBarcode . '%')
                     ->orderBy('barcode', 'desc')
                     ->first();
-                $lastBarcodeNum = 0;
-                if ($lastBarcodeRecord) {
-                    $lastBarcodeNum = (int) substr($lastBarcodeRecord->barcode, -4);
-                }
+                $lastBarcodeNum = $lastBarcodeRecord ? (int) substr($lastBarcodeRecord->barcode, -4) : 0;
 
                 $maxCounter = max($lastSkuNum, $lastBarcodeNum);
 
                 $createdCount = 0;
-                $errors = [];
+                $linkedCount = 0;
 
                 DB::beginTransaction();
                 try {
+                    $taxRate = \App\Services\RetailIntelligenceService::getActiveTaxRate();
+
                     foreach ($items as $item) {
                         $name = trim($item['name'] ?? '');
                         if (empty($name)) continue;
@@ -304,16 +349,48 @@ class QuickCreateProductAction
                         $catId = !empty($item['category_id']) ? $item['category_id'] : $defaultCatId;
                         $subCat = !empty($item['sub_category']) ? $item['sub_category'] : $defaultSubCat;
 
-                        $maxCounter++;
-                        $seqStr = str_pad($maxCounter, 4, '0', STR_PAD_LEFT);
-                        $sku = $prefixSku . $seqStr;
-                        $barcode = $prefixBarcode . $seqStr;
-
-                        $taxRate = \App\Services\RetailIntelligenceService::getActiveTaxRate();
                         $costTax = $isTaxable ? round($costPrice * (1 + ($taxRate / 100)), 2) : $costPrice;
                         $margin = ($costTax > 0 && $sellingPrice > 0) 
                             ? round((($sellingPrice - $costTax) / $costTax) * 100, 2) 
                             : 0;
+
+                        $isMatched = ($item['status'] ?? '') === 'MATCHED' && empty($item['force_new']) && !empty($item['product_id']);
+
+                        if ($isMatched) {
+                            $product = Product::find($item['product_id']);
+                            if ($product) {
+                                // Update atau Buat record Stok di cabang target
+                                Stock::updateOrCreate(
+                                    [
+                                        'branch_id'  => $branchId,
+                                        'product_id' => $product->id,
+                                    ],
+                                    [
+                                        'cost_price'        => $costPrice,
+                                        'cost_price_tax'    => $costTax,
+                                        'selling_price'     => $sellingPrice,
+                                        'harga_jual_1'      => $sellingPrice,
+                                        'qty_min_gol_1'     => 1,
+                                        'margin_gol_1'      => $margin,
+                                        'harga_jual_2'      => 0,
+                                        'qty_min_gol_2'     => 0,
+                                        'margin_gol_2'      => 0,
+                                        'harga_jual_3'      => 0,
+                                        'qty_min_gol_3'     => 0,
+                                        'margin_gol_3'      => 0,
+                                        'is_active'         => true,
+                                    ]
+                                );
+                                $linkedCount++;
+                                continue;
+                            }
+                        }
+
+                        // Jika Master Baru (atau Dipaksa Baru)
+                        $maxCounter++;
+                        $seqStr = str_pad($maxCounter, 4, '0', STR_PAD_LEFT);
+                        $sku = $prefixSku . $seqStr;
+                        $barcode = $prefixBarcode . $seqStr;
 
                         $product = Product::create([
                             'organization_id'      => $orgId,
@@ -321,7 +398,7 @@ class QuickCreateProductAction
                             'barcode'              => $barcode,
                             'name'                 => $name,
                             'category_id'          => $catId,
-                            'sub_category'          => $subCat,
+                            'sub_category'         => $subCat,
                             'supplier_id'          => $supplierId,
                             'cost_price'           => $costPrice,
                             'cost_price_tax'       => $costTax,
@@ -366,14 +443,33 @@ class QuickCreateProductAction
                             'is_active'         => true,
                         ]);
 
+                        // Pastikan cabang lain juga memiliki record stock dengan 0 QOH
+                        $otherBranches = Branch::where('id', '!=', $branchId)->get();
+                        foreach ($otherBranches as $ob) {
+                            Stock::firstOrCreate(
+                                ['branch_id' => $ob->id, 'product_id' => $product->id],
+                                [
+                                    'cost_price'        => $costPrice,
+                                    'cost_price_tax'    => $costTax,
+                                    'selling_price'     => $sellingPrice,
+                                    'harga_jual_1'      => $sellingPrice,
+                                    'qty_min_gol_1'     => 1,
+                                    'margin_gol_1'      => $margin,
+                                    'quantity_on_hand'  => 0,
+                                    'quantity_reserved' => 0,
+                                    'is_active'         => true,
+                                ]
+                            );
+                        }
+
                         $createdCount++;
                     }
 
                     DB::commit();
 
                     Notification::make()
-                        ->title('Berhasil Menambahkan Produk')
-                        ->body("Sebanyak {$createdCount} produk baru berhasil dibuat dan didaftarkan ke cabang.")
+                        ->title('Batch Berhasil Disimpan')
+                        ->body("Sebanyak {$createdCount} master baru berhasil dibuat, dan {$linkedCount} produk berhasil ditautkan ke cabang.")
                         ->success()
                         ->send();
 
@@ -386,6 +482,27 @@ class QuickCreateProductAction
                         ->send();
                 }
             });
+    }
+
+    public static function normalizeProductName(string $name): string
+    {
+        $name = strtoupper(trim($name));
+        $name = preg_replace('/[\-_\/.,]/', ' ', $name);
+        $name = preg_replace('/\s+/', ' ', $name);
+        $replacements = [
+            'CHIKI'   => 'CIKI',
+            'SETIK'   => 'STIK',
+            'BANTAT'  => 'BANTAL',
+            'KERUPUK' => 'KRP',
+            'KRPK'    => 'KRP',
+            'PEDAS'   => 'PDS',
+        ];
+        $words = explode(' ', $name);
+        $res = [];
+        foreach ($words as $w) {
+            $res[] = $replacements[$w] ?? $w;
+        }
+        return implode(' ', $res);
     }
 
     protected static function cleanNumber($val): float
