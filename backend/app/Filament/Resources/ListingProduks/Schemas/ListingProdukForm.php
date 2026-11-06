@@ -127,11 +127,161 @@ class ListingProdukForm
                     ]),
 
                 Section::make('Daftar Produk yang Diajukan')
-                    ->description('Daftarkan satu atau beberapa produk yang masuk dalam perjanjian listing ini')
+                    ->description('Daftarkan satu atau beberapa produk yang masuk dalam perjanjian listing ini. Kategori massal akan otomatis digunakan jika baris produk dikosongkan.')
                     ->columnSpanFull()
                     ->schema([
+                        // 1. Header Pemilihan Kategori & Sub Kategori Massal
+                        Grid::make(3)
+                            ->schema([
+                                Select::make('default_category_id')
+                                    ->label('Kategori Default (Massal)')
+                                    ->placeholder('Pilih Kategori untuk Semua Item...')
+                                    ->options(Category::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                                    ->searchable()
+                                    ->preload()
+                                    ->live()
+                                    ->afterStateUpdated(fn (callable $set) => $set('default_sub_category', null))
+                                    ->dehydrated(false)
+                                    ->default(function ($record) {
+                                        return $record?->products?->first()?->category_id ?? Category::where('name', 'FOOD')->first()?->id;
+                                    })
+                                    ->helperText('Otomatis diterapkan ke seluruh baris di bawah.'),
+
+                                Select::make('default_sub_category')
+                                    ->label('Sub Kategori Default (Massal)')
+                                    ->placeholder('Pilih / Ketik Sub Kategori...')
+                                    ->options(function (callable $get) {
+                                        $catId = $get('default_category_id');
+                                        if (blank($catId)) return [];
+                                        return Product::where('category_id', $catId)
+                                            ->whereNotNull('sub_category')
+                                            ->where('sub_category', '!=', '')
+                                            ->distinct()
+                                            ->orderBy('sub_category')
+                                            ->pluck('sub_category', 'sub_category')
+                                            ->toArray();
+                                    })
+                                    ->searchable()
+                                    ->createOptionForm([
+                                        TextInput::make('sub_category')->label('Sub Kategori Baru')->required(),
+                                    ])
+                                    ->createOptionUsing(fn (array $data) => $data['sub_category'])
+                                    ->live()
+                                    ->dehydrated(false)
+                                    ->default(function ($record) {
+                                        return $record?->products?->first()?->sub_category ?? 'MAKANAN KALENG & OLAHAN';
+                                    })
+                                    ->helperText('Otomatis diterapkan ke seluruh baris di bawah.'),
+
+                                Placeholder::make('info_kategori_massal')
+                                    ->label('Panduan Pengisian')
+                                    ->content(new \Illuminate\Support\HtmlString(
+                                        '<div style="font-size: 0.8125rem; color: #64748b; line-height: 1.45; padding-top: 0.2rem;">' .
+                                        '<span style="display:inline-block; margin-bottom: 3px;">✅ <strong>Kategori Massal:</strong> Mengisi otomatis kategori semua barang.</span><br>' .
+                                        '<span>💡 <strong>Kategori Berbeda:</strong> Cukup pilih di kolom <em>Kategori (Beda)</em> pada baris barang terkait jika ada item yang berbeda.</span>' .
+                                        '</div>'
+                                    )),
+                            ]),
+
+                        // 2. Custom CSS Injection untuk Dark Navy Header & Premium Table Grid
+                        Placeholder::make('listing_repeater_custom_css')
+                            ->hiddenLabel()
+                            ->content(new \Illuminate\Support\HtmlString('
+                                <style>
+                                    .listing-products-table-repeater table {
+                                        width: 100% !important;
+                                        border-collapse: separate !important;
+                                        border-spacing: 0 !important;
+                                        border: 1px solid #cbd5e1 !important;
+                                        border-radius: 0.65rem !important;
+                                        overflow: hidden !important;
+                                        background: #ffffff !important;
+                                        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
+                                    }
+                                    .dark .listing-products-table-repeater table {
+                                        border-color: #334155 !important;
+                                        background: #0f172a !important;
+                                    }
+                                    .listing-products-table-repeater table thead tr {
+                                        background: #1e293b !important;
+                                        color: #ffffff !important;
+                                        border-bottom: 2px solid #0f172a !important;
+                                    }
+                                    .listing-products-table-repeater table thead th {
+                                        background: #1e293b !important;
+                                        color: #f8fafc !important;
+                                        font-size: 0.72rem !important;
+                                        font-weight: 700 !important;
+                                        text-transform: uppercase !important;
+                                        letter-spacing: 0.05em !important;
+                                        padding: 0.8rem 0.65rem !important;
+                                        border: none !important;
+                                        border-right: 1px solid #334155 !important;
+                                        vertical-align: middle !important;
+                                    }
+                                    .listing-products-table-repeater table thead th:last-child {
+                                        border-right: none !important;
+                                    }
+                                    .listing-products-table-repeater table thead th sup {
+                                        color: #f87171 !important;
+                                        font-weight: bold !important;
+                                    }
+                                    .listing-products-table-repeater table tbody tr {
+                                        border-bottom: 1px solid #f1f5f9 !important;
+                                        transition: background-color 0.15s ease !important;
+                                    }
+                                    .dark .listing-products-table-repeater table tbody tr {
+                                        border-bottom-color: #1e293b !important;
+                                    }
+                                    .listing-products-table-repeater table tbody tr:nth-child(even) {
+                                        background: #f8fafc !important;
+                                    }
+                                    .dark .listing-products-table-repeater table tbody tr:nth-child(even) {
+                                        background: #131d31 !important;
+                                    }
+                                    .listing-products-table-repeater table tbody tr:hover {
+                                        background: #f1f5f9 !important;
+                                    }
+                                    .dark .listing-products-table-repeater table tbody tr:hover {
+                                        background: #1e293b !important;
+                                    }
+                                    .listing-products-table-repeater table tbody td {
+                                        padding: 0.55rem 0.6rem !important;
+                                        vertical-align: middle !important;
+                                        border-right: 1px solid #f8fafc !important;
+                                    }
+                                    .dark .listing-products-table-repeater table tbody td {
+                                        border-right-color: #1e293b !important;
+                                    }
+                                    .listing-products-table-repeater .fi-input-wrp {
+                                        border-radius: 0.45rem !important;
+                                        box-shadow: none !important;
+                                    }
+                                    .listing-products-table-repeater input,
+                                    .listing-products-table-repeater select {
+                                        font-size: 0.8125rem !important;
+                                    }
+                                    .listing-products-table-repeater .fi-fo-table-repeater-add {
+                                        margin-top: 0.75rem !important;
+                                    }
+                                    .listing-products-table-repeater .fi-fo-table-repeater-add button {
+                                        background: #4f46e5 !important;
+                                        color: #ffffff !important;
+                                        font-weight: 700 !important;
+                                        border-radius: 0.5rem !important;
+                                        padding: 0.45rem 1rem !important;
+                                        box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3) !important;
+                                    }
+                                    .listing-products-table-repeater .fi-fo-table-repeater-add button:hover {
+                                        background: #4338ca !important;
+                                    }
+                                </style>
+                            ')),
+
+                        // 3. Tabel Repeater Produk
                         Repeater::make('products')
                             ->relationship('products')
+                            ->extraAttributes(['class' => 'listing-products-table-repeater'])
                             ->mutateRelationshipDataBeforeCreateUsing(function (array $data, \Filament\Schemas\Components\Utilities\Get $get): array {
                                 $orgId = $data['organization_id'] ?? $get('organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
                                 $data['organization_id'] = $orgId;
@@ -141,6 +291,17 @@ class ListingProdukForm
                                 $data['trial_start_date'] = $get('trial_start_date');
                                 $data['trial_end_date'] = $get('trial_end_date');
                                 $data['allowed_branch_ids'] = $get('allowed_branch_ids') ?? [];
+
+                                // Fallback Kategori & Sub Kategori dari Header Massal
+                                $defaultCat = $get('default_category_id') ?? $get('../../default_category_id');
+                                $defaultSubCat = $get('default_sub_category') ?? $get('../../default_sub_category');
+
+                                if (empty($data['category_id']) && !empty($defaultCat)) {
+                                    $data['category_id'] = $defaultCat;
+                                }
+                                if (empty(trim($data['sub_category'] ?? '')) && !empty($defaultSubCat)) {
+                                    $data['sub_category'] = $defaultSubCat;
+                                }
 
                                 // Pencegahan Tabrakan SKU Otomatis
                                 $prefixSku = 'SKU-' . date('dmy');
@@ -188,6 +349,17 @@ class ListingProdukForm
                                 $data['trial_end_date'] = $get('trial_end_date');
                                 $data['allowed_branch_ids'] = $get('allowed_branch_ids') ?? [];
 
+                                // Fallback Kategori & Sub Kategori dari Header Massal
+                                $defaultCat = $get('default_category_id') ?? $get('../../default_category_id');
+                                $defaultSubCat = $get('default_sub_category') ?? $get('../../default_sub_category');
+
+                                if (empty($data['category_id']) && !empty($defaultCat)) {
+                                    $data['category_id'] = $defaultCat;
+                                }
+                                if (empty(trim($data['sub_category'] ?? '')) && !empty($defaultSubCat)) {
+                                    $data['sub_category'] = $defaultSubCat;
+                                }
+
                                 $sku = trim($data['sku'] ?? '');
                                 if (!empty($sku) && !empty($data['id'])) {
                                     $conflict = Product::where('sku', $sku)
@@ -220,88 +392,68 @@ class ListingProdukForm
                             ->minItems(1)
                             ->compact()
                             ->table([
-                                TableColumn::make('SKU')->width('135px'),
-                                TableColumn::make('Barcode')->width('130px'),
-                                TableColumn::make('Nama Produk')->markAsRequired(),
-                                TableColumn::make('Kategori')->width('180px')->markAsRequired(),
-                                TableColumn::make('Sub Kategori')->width('160px'),
-                                TableColumn::make('Satuan')->width('85px')->markAsRequired(),
-                                TableColumn::make('Modal (HPP)')->width('135px')->markAsRequired(),
-                                TableColumn::make('HPP + PPN (11%)')->width('135px'),
-                                TableColumn::make('Harga Jual (Eceran)')->width('135px'),
+                                TableColumn::make('Produk & Identitas')->width('320px')->markAsRequired(),
+                                TableColumn::make('Kategori (Beda)')->width('210px'),
+                                TableColumn::make('Satuan')->width('75px')->markAsRequired(),
+                                TableColumn::make('Modal (DPP)')->width('125px')->markAsRequired(),
+                                TableColumn::make('HPP + PPN (11%)')->width('125px'),
+                                TableColumn::make('Harga Jual')->width('125px')->markAsRequired(),
                             ])
                             ->schema([
-                                TextInput::make('sku')
-                                    ->label('SKU')
-                                    ->hiddenLabel()
-                                    ->nullable()
-                                    ->placeholder('Otomatis'),
+                                // Kolom 1: Produk & Identitas (Nama Produk + Barcode/SKU)
+                                Group::make([
+                                    TextInput::make('name')
+                                        ->label('Nama Produk')
+                                        ->hiddenLabel()
+                                        ->required()
+                                        ->placeholder('Nama produk lengkap...'),
+                                    Grid::make(2)->schema([
+                                        TextInput::make('barcode')
+                                            ->label('Barcode')
+                                            ->hiddenLabel()
+                                            ->nullable()
+                                            ->placeholder('Barcode / Scan')
+                                            ->extraAttributes(['style' => 'font-family: monospace; font-size: 0.75rem;']),
+                                        TextInput::make('sku')
+                                            ->label('SKU')
+                                            ->hiddenLabel()
+                                            ->nullable()
+                                            ->placeholder('SKU: Otomatis')
+                                            ->extraAttributes(['style' => 'font-family: monospace; font-size: 0.75rem; color: #64748b;']),
+                                    ]),
+                                ]),
 
-                                TextInput::make('barcode')
-                                    ->label('Barcode')
-                                    ->hiddenLabel()
-                                    ->nullable()
-                                    ->placeholder('Scan / ketik'),
+                                // Kolom 2: Kategori & Sub Kategori Opsional (Jika Berbeda dari Header)
+                                Group::make([
+                                    Select::make('category_id')
+                                        ->label('Kategori')
+                                        ->hiddenLabel()
+                                        ->placeholder('Ikuti Kategori Massal')
+                                        ->options(Category::where('is_active', true)->orderBy('name')->pluck('name', 'id'))
+                                        ->searchable()
+                                        ->preload()
+                                        ->nullable()
+                                        ->live()
+                                        ->afterStateUpdated(fn (callable $set) => $set('sub_category', null)),
 
-                                TextInput::make('name')
-                                    ->label('Nama Produk')
-                                    ->hiddenLabel()
-                                    ->required()
-                                    ->placeholder('Nama produk...'),
+                                    TextInput::make('sub_category')
+                                        ->label('Sub Kategori')
+                                        ->hiddenLabel()
+                                        ->nullable()
+                                        ->placeholder('Ikuti Sub Kategori Massal'),
+                                ]),
 
-                                Select::make('category_id')
-                                    ->label('Kategori')
-                                    ->hiddenLabel()
-                                    ->relationship('category', 'name', fn ($query) => $query->where('is_active', true)->orderBy('name'))
-                                    ->searchable()
-                                    ->preload()
-                                    ->live()
-                                    ->afterStateUpdated(fn (callable $set) => $set('sub_category', null))
-                                    ->required(),
-
-                                Select::make('sub_category')
-                                    ->label('Sub Kategori')
-                                    ->hiddenLabel()
-                                    ->placeholder(fn (\Filament\Schemas\Components\Utilities\Get $get) => empty($get('category_id')) ? 'Pilih Kategori...' : 'Pilih / ketik')
-                                    ->options(function (\Filament\Schemas\Components\Utilities\Get $get) {
-                                        $categoryId = $get('category_id');
-
-                                        if (blank($categoryId)) {
-                                            $current = $get('sub_category');
-                                            return $current ? [$current => $current] : [];
-                                        }
-
-                                        $options = Product::where('category_id', $categoryId)
-                                            ->whereNotNull('sub_category')
-                                            ->where('sub_category', '!=', '')
-                                            ->distinct()
-                                            ->orderBy('sub_category')
-                                            ->pluck('sub_category', 'sub_category')
-                                            ->toArray();
-                                            
-                                        $current = $get('sub_category');
-                                        if ($current && !isset($options[$current])) {
-                                            $options[$current] = $current;
-                                        }
-                                        
-                                        return $options;
-                                    })
-                                    ->searchable()
-                                    ->createOptionForm([
-                                        TextInput::make('sub_category')
-                                            ->label('Sub Kategori Baru')
-                                            ->required(),
-                                    ])
-                                    ->createOptionUsing(fn (array $data) => $data['sub_category']),
-
+                                // Kolom 3: Satuan
                                 TextInput::make('unit_of_measure')
                                     ->label('Satuan')
                                     ->hiddenLabel()
                                     ->required()
-                                    ->default('pcs'),
+                                    ->default('pcs')
+                                    ->placeholder('pcs'),
 
+                                // Kolom 4: Modal DPP (HPP Pokok)
                                 TextInput::make('cost_price')
-                                    ->label('Harga Modal (HPP)')
+                                    ->label('Harga Modal (DPP)')
                                     ->hiddenLabel()
                                     ->required()
                                     ->rupiah()
@@ -312,18 +464,21 @@ class ListingProdukForm
                                         $taxRate = \App\Services\RetailIntelligenceService::getActiveTaxRate();
                                         $taxed_cost = $isTaxable ? round($cost * (1 + ($taxRate / 100)), 2) : $cost;
                                         $set('cost_price_tax', str_replace('.', ',', (string)$taxed_cost));
-                                        foreach([1, 2, 3] as $i) {
-                                            $harga_jual_state = $get("harga_jual_{$i}");
-                                            $price = (float) str_replace(',', '.', str_replace('.', '', (string)$harga_jual_state));
-                                            if ($taxed_cost > 0 && $price > 0) {
-                                                $new_margin = round((($price - $taxed_cost) / $taxed_cost) * 100, 2);
-                                                $set("margin_gol_{$i}", str_replace('.', ',', (string)$new_margin));
-                                            }
+
+                                        $currentJual = (float) str_replace(',', '.', str_replace('.', '', (string) $get('harga_jual_1')));
+                                        if ($currentJual <= 0 && $taxed_cost > 0) {
+                                            $autoJual = ceil(($taxed_cost * 1.10) / 100) * 100;
+                                            $set('harga_jual_1', $autoJual);
+                                            $set('selling_price', $autoJual);
+                                            $new_margin = round((($autoJual - $taxed_cost) / $taxed_cost) * 100, 2);
+                                            $set('margin_gol_1', $new_margin);
+                                        } elseif ($taxed_cost > 0 && $currentJual > 0) {
+                                            $new_margin = round((($currentJual - $taxed_cost) / $taxed_cost) * 100, 2);
+                                            $set('margin_gol_1', $new_margin);
                                         }
-                                        $price1 = (float) str_replace(',', '.', str_replace('.', '', (string) $get('harga_jual_1')));
-                                        $set('selling_price', $price1);
                                     }),
 
+                                // Kolom 5: HPP + PPN (11%)
                                 TextInput::make('cost_price_tax')
                                     ->label('Harga Beli + PPN')
                                     ->hiddenLabel()
@@ -332,17 +487,24 @@ class ListingProdukForm
                                     ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                         $taxed_cost = (float) str_replace(',', '.', str_replace('.', '', (string)$state));
                                         if ($taxed_cost > 0) {
-                                            foreach([1, 2, 3] as $i) {
-                                                $harga_jual_state = $get("harga_jual_{$i}");
-                                                $price = (float) str_replace(',', '.', str_replace('.', '', (string)$harga_jual_state));
-                                                if ($price > 0) {
-                                                    $new_margin = round((($price - $taxed_cost) / $taxed_cost) * 100, 2);
-                                                    $set("margin_gol_{$i}", str_replace('.', ',', (string)$new_margin));
-                                                }
+                                            $dpp = round($taxed_cost / 1.11, 2);
+                                            $set('cost_price', str_replace('.', ',', (string)$dpp));
+
+                                            $currentJual = (float) str_replace(',', '.', str_replace('.', '', (string) $get('harga_jual_1')));
+                                            if ($currentJual <= 0) {
+                                                $autoJual = ceil(($taxed_cost * 1.10) / 100) * 100;
+                                                $set('harga_jual_1', $autoJual);
+                                                $set('selling_price', $autoJual);
+                                                $new_margin = round((($autoJual - $taxed_cost) / $taxed_cost) * 100, 2);
+                                                $set('margin_gol_1', $new_margin);
+                                            } else {
+                                                $new_margin = round((($currentJual - $taxed_cost) / $taxed_cost) * 100, 2);
+                                                $set('margin_gol_1', $new_margin);
                                             }
                                         }
                                     }),
 
+                                // Kolom 6: Harga Jual (Eceran)
                                 TextInput::make('harga_jual_1')
                                     ->label('Harga Jual')
                                     ->hiddenLabel()
@@ -354,7 +516,7 @@ class ListingProdukForm
                                         $harga = (float) str_replace(',', '.', str_replace('.', '', (string)$state));
                                         if ($hpp > 0) {
                                             $new_margin = $harga > 0 ? round((($harga - $hpp) / $hpp) * 100, 2) : 0;
-                                            $set("margin_gol_1", str_replace('.', ',', (string)$new_margin));
+                                            $set('margin_gol_1', $new_margin);
                                         }
                                         $set('selling_price', $harga);
                                     }),
