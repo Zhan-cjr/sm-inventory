@@ -25,7 +25,10 @@ class ProductExporter extends Exporter
             ExportColumn::make('image_path'),
             ExportColumn::make('category.name'),
             ExportColumn::make('sub_category'),
-            ExportColumn::make('supplier.name'),
+            ExportColumn::make('supplier.name')
+                ->label('Supplier'),
+            ExportColumn::make('supplierDivision.name')
+                ->label('Sub-Divisi Supplier'),
             ExportColumn::make('cost_price'),
             ExportColumn::make('cost_price_tax'),
             ExportColumn::make('selling_price'),

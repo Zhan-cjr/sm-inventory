@@ -1951,7 +1951,7 @@ class ReportPrintController extends Controller
         // Table Columns
         $columns = [
             'ID', 'Organisasi', 'SKU', 'Barcode', 'Nama Produk', 'Kategori', 'Sub Kategori', 
-            'Supplier', 'Harga Pokok', 'Harga Pokok (+Pajak)', 'Harga Jual', 
+            'Supplier', 'Sub-Divisi', 'Harga Pokok', 'Harga Pokok (+Pajak)', 'Harga Jual', 
             'Margin Gol 1 (%)', 'Harga Jual 1', 'Qty Min Gol 1',
             'Margin Gol 2 (%)', 'Harga Jual 2', 'Qty Min Gol 2',
             'Margin Gol 3 (%)', 'Harga Jual 3', 'Qty Min Gol 3',
@@ -1973,6 +1973,7 @@ class ReportPrintController extends Controller
         $query = \Illuminate\Support\Facades\DB::table('products as p')
             ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
             ->leftJoin('suppliers as s', 's.id', '=', 'p.supplier_id')
+            ->leftJoin('supplier_divisions as sd', 'sd.id', '=', 'p.supplier_division_id')
             ->leftJoin('organizations as o', 'o.id', '=', 'p.organization_id');
 
         // Apply TernaryFilter for is_active
@@ -2037,6 +2038,7 @@ class ReportPrintController extends Controller
             'c.name as category_name',
             'p.sub_category',
             's.name as supplier_name',
+            'sd.name as division_name',
             'p.cost_price',
             'p.cost_price_tax',
             'p.selling_price',
@@ -2083,6 +2085,7 @@ class ReportPrintController extends Controller
                 \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->category_name ?? ''), $dataStyle),
                 \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->sub_category ?? ''), $dataStyle),
                 \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->supplier_name ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->division_name ?? ''), $dataStyle),
                 // Numeric values
                 \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->cost_price ?? 0), $dataStyle),
                 \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->cost_price_tax ?? 0), $dataStyle),
