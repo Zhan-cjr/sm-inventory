@@ -590,46 +590,83 @@ class TransactionController extends Controller
 
         return DB::transaction(function () use ($ppob, $validated, $user, $refundAmount, $branchId, $request) {
             $shift = null;
-            if ($validated['refund_method'] === 'CASH') {
-                $terminalId = $validated['terminal_id'] ?? $request->header('X-Terminal-Id');
-                
-                // Cari shift OPEN milik kasir saat ini di cabang ini
-                $shiftQuery = \App\Models\Shift::where('branch_id', $user->branch_id)
-                    ->where('user_id', $user->id)
-                    ->where('status', 'OPEN');
-                if ($terminalId) {
-                    $shiftQuery->where('terminal_id', $terminalId);
-                }
-                $shift = $shiftQuery->latest()->first();
+            $terminalId = $validated['terminal_id'] ?? $request->header('X-Terminal-Id');
+            
+            // Cari shift OPEN milik kasir saat ini di cabang ini
+            $shiftQuery = \App\Models\Shift::where('branch_id', $user->branch_id)
+                ->where('user_id', $user->id)
+                ->where('status', 'OPEN');
+            if ($terminalId) {
+                $shiftQuery->where('terminal_id', $terminalId);
+            }
+            $shift = $shiftQuery->latest()->first();
 
-                // Fallback: jika kasir berganti tapi terminal sama
-                if (!$shift && $terminalId) {
-                    $shift = \App\Models\Shift::where('branch_id', $user->branch_id)
-                        ->where('terminal_id', $terminalId)
-                        ->where('status', 'OPEN')
-                        ->latest()
-                        ->first();
-                }
+            // Fallback: jika kasir berganti tapi terminal sama
+            if (!$shift && $terminalId) {
+                $shift = \App\Models\Shift::where('branch_id', $user->branch_id)
+                    ->where('terminal_id', $terminalId)
+                    ->where('status', 'OPEN')
+                    ->latest()
+                    ->first();
+            }
 
-                // Catat CashMovement (CASH_OUT) pada shift aktif agar uang laci seimbang
-                if ($shift) {
-                    \App\Models\CashMovement::create([
-                        'shift_id' => $shift->id,
-                        'user_id' => $user->id,
-                        'terminal_id' => $shift->terminal_id,
-                        'type' => 'CASH_OUT',
-                        'amount' => $refundAmount,
-                        'description' => "Refund PPOB Gagal: Struk #{$ppob->transaction?->receipt_number} ({$ppob->customer_no})" . ($validated['notes'] ? " - " . $validated['notes'] : ''),
-                    ]);
+            $origTx = $ppob->transaction;
+            $refundMethod = strtoupper($validated['refund_method'] ?? 'CASH');
 
-                    $shift->total_cash_out += $refundAmount;
-                    $shift->save();
-                }
+            // 1. Terbitkan Transaksi Retur / Refund Penjualan agar tercatat resmi di Laporan Penjualan Per Kassa & EOD
+            $returnReceiptNumber = 'RET-' . ($origTx?->receipt_number ?? 'PPOB-' . date('ymdHis'));
+            $existingRetTx = \App\Models\Transaction::where('receipt_number', $returnReceiptNumber)->first();
+
+            if (!$existingRetTx) {
+                $returnTx = \App\Models\Transaction::create([
+                    'organization_id' => $origTx?->organization_id ?? $user->organization_id,
+                    'branch_id' => $branchId,
+                    'terminal_id' => $shift?->terminal_id ?? $origTx?->terminal_id,
+                    'shift_id' => $shift?->id ?? $origTx?->shift_id,
+                    'transaction_type' => 'RETURN',
+                    'transaction_date' => now(),
+                    'cashier_id' => $user->id,
+                    'customer_id' => $origTx?->customer_id,
+                    'total_amount' => -$refundAmount,
+                    'discount_amount' => 0,
+                    'manual_discount' => 0,
+                    'promo_discount' => 0,
+                    'final_amount' => -$refundAmount,
+                    'payment_method' => $refundMethod,
+                    'received_amount' => -$refundAmount,
+                    'change_amount' => 0,
+                    'payment_details' => [
+                        [
+                            'label' => $refundMethod === 'CASH' ? 'Tunai' : $refundMethod,
+                            'amount' => -$refundAmount,
+                            'method' => $refundMethod,
+                            'bankId' => null,
+                        ]
+                    ],
+                    'receipt_number' => $returnReceiptNumber,
+                    'sync_status' => 'SYNCED',
+                ]);
+
+                $origItem = $origTx?->items?->first();
+                \App\Models\TransactionItem::create([
+                    'transaction_id' => $returnTx->id,
+                    'original_transaction_id' => $origTx?->id,
+                    'product_id' => $origItem?->product_id,
+                    'quantity' => -1,
+                    'unit_price' => $refundAmount,
+                    'discount_per_item' => 0,
+                ]);
+            }
+
+            // 2. Jika refund tunai dan ada shift aktif, update total_cash_returns agar seimbang di EOD
+            if ($shift && $refundMethod === 'CASH') {
+                $shift->total_cash_returns = ($shift->total_cash_returns ?? 0) + $refundAmount;
+                $shift->save();
             }
 
             $ppob->update([
                 'refund_status' => 'REFUNDED',
-                'refund_method' => $validated['refund_method'],
+                'refund_method' => $refundMethod,
                 'refund_amount' => $refundAmount,
                 'refunded_by' => $user->id,
                 'refunded_at' => now(),
@@ -641,9 +678,9 @@ class TransactionController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pengembalian dana PPOB berhasil diproses.',
+                'message' => 'Pengembalian dana PPOB berhasil diproses dan tercatat sebagai Retur Penjualan.',
                 'data' => $ppob->fresh(),
-                'cash_movement_recorded' => $shift !== null,
+                'return_transaction_recorded' => true,
             ]);
         });
     }
