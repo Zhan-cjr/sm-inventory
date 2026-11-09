@@ -48,6 +48,10 @@ class ReportPrintController extends Controller
             default => abort(404, 'Tipe laporan tidak ditemukan'),
         };
 
+        if ($response instanceof \Symfony\Component\HttpFoundation\Response) {
+            return $response;
+        }
+
         if ($request->has('export') && in_array($request->export, ['xls', 'xlsx'])) {
             $filename = 'laporan-' . $type . '-' . date('Ymd_His') . '.xlsx';
             return app(\App\Services\ReportExportService::class)->export($response, $filename);
@@ -1869,38 +1873,6 @@ class ReportPrintController extends Controller
 
     private function printProduk($filters)
     {
-        $query = \App\Models\Product::query()->with(['category', 'supplier', 'organization', 'stocks.branch']);
-
-        // Apply TernaryFilter for is_active
-        if (isset($filters['is_active']['value']) && $filters['is_active']['value'] !== '') {
-            // ternary filter returns '1' or '0' string, or 1 / 0 int
-            $query->where('is_active', $filters['is_active']['value']);
-        } elseif (isset($filters['is_active']['isActive']) && $filters['is_active']['isActive'] !== '') {
-            $query->where('is_active', $filters['is_active']['isActive']);
-        }
-
-        // Apply Supplier & Sub Division Filter
-        $supplierId = $filters['supplier']['supplier_id'] ?? $filters['supplier_id']['value'] ?? null;
-        if (!empty($supplierId)) {
-            $query->where('supplier_id', $supplierId);
-        }
-
-        $divisionId = $filters['supplier']['supplier_division_id'] ?? $filters['supplier_division_id']['value'] ?? null;
-        if (!empty($divisionId)) {
-            $query->where('supplier_division_id', $divisionId);
-        }
-
-        // Apply Category & Sub Category Filter
-        $categoryId = $filters['category']['category_id'] ?? $filters['category_id']['value'] ?? null;
-        if (!empty($categoryId)) {
-            $query->where('category_id', $categoryId);
-        }
-
-        $subCategory = $filters['category']['sub_category'] ?? $filters['sub_category']['value'] ?? null;
-        if (!empty($subCategory)) {
-            $query->where('sub_category', $subCategory);
-        }
-
         $user = \Illuminate\Support\Facades\Auth::user();
         $targetBranchId = null;
 
@@ -1910,107 +1882,250 @@ class ReportPrintController extends Controller
             $targetBranchId = $filters['branch']['value'];
         }
 
-        // Apply SelectFilter for branch
-        if ($targetBranchId) {
-            $query->whereHas('stocks', function ($q) use ($targetBranchId) {
-                $q->where('branch_id', $targetBranchId);
-            });
-        }
-
-        // Apply global search if present
         $search = request()->query('tableSearchQuery') ?? request()->query('search');
-        if (!empty($search)) {
-            $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $search);
-            $query->where(function ($q) use ($escaped) {
-                $q->where('products.barcode', 'like', "%{$escaped}%")
-                  ->orWhere('products.sku', 'like', "%{$escaped}%")
-                  ->orWhere('products.name', 'like', "%{$escaped}%");
-            });
-        }
 
-        $products = $query->get();
+        return $this->exportProdukStream($filters, $targetBranchId, $search);
+    }
 
-        $branchesToDisplay = [];
+    private function exportProdukStream($filters, $targetBranchId, $search)
+    {
+        @set_time_limit(300);
+
+        $filename = 'laporan-produk-' . date('Ymd_His') . '.xlsx';
+        $tempPath = tempnam(sys_get_temp_dir(), 'rpt_prod_') . '.xlsx';
+
+        $options = new \OpenSpout\Writer\XLSX\Options();
+        $writer = new \OpenSpout\Writer\XLSX\Writer($options);
+        $writer->openToFile($tempPath);
+
+        // Header styles
+        $storeStyle = (new \OpenSpout\Common\Entity\Style\Style())->setFontBold()->setFontSize(13);
+        $branchStyle = (new \OpenSpout\Common\Entity\Style\Style())->setFontBold()->setFontSize(11);
+        $addressStyle = (new \OpenSpout\Common\Entity\Style\Style())->setFontSize(9);
+        $titleStyle = (new \OpenSpout\Common\Entity\Style\Style())->setFontBold()->setFontSize(12);
+        $periodStyle = (new \OpenSpout\Common\Entity\Style\Style())->setFontItalic()->setFontSize(10);
+
+        $headerStyle = (new \OpenSpout\Common\Entity\Style\Style())
+            ->setFontBold()
+            ->setFontSize(10)
+            ->setFontColor(\OpenSpout\Common\Entity\Style\Color::WHITE)
+            ->setBackgroundColor('1E293B');
+
+        $dataStyle = (new \OpenSpout\Common\Entity\Style\Style())->setFontSize(10);
+
+        // Header info
+        $org = \App\Models\Organization::first();
+        $orgName = $org ? strtoupper($org->name) : 'SM INVENTORY';
+        $orgAddress = $org ? $org->address : '';
+
+        $branchModel = null;
         if ($targetBranchId) {
-            $branch = \App\Models\Branch::find($targetBranchId);
-            if ($branch) {
-                $branchesToDisplay[] = $branch;
-            }
+            $branchModel = \App\Models\Branch::find($targetBranchId);
+        }
+        $branchName = $branchModel ? strtoupper($branchModel->name) : '';
+        $headerAddress = $branchModel ? $branchModel->address : $orgAddress;
+
+        // 1. Header Information
+        $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([$orgName], $storeStyle));
+        if (!empty($branchName)) {
+            $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([$branchName], $branchStyle));
+        }
+        if (!empty($headerAddress)) {
+            $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([$headerAddress], $addressStyle));
+        }
+        $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([]));
+
+        // 2. Report Title & Period
+        $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues(['DATA PRODUK'], $titleStyle));
+        $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues(['Periode : Semua Waktu'], $periodStyle));
+        $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([]));
+
+        // Branches to display
+        $branchesToDisplay = [];
+        if ($targetBranchId && $branchModel) {
+            $branchesToDisplay[] = $branchModel;
         } else {
-            $branchesToDisplay = \App\Models\Branch::all();
+            $branchesToDisplay = \App\Models\Branch::orderBy('name')->get();
         }
 
+        // Table Columns
         $columns = [
             'ID', 'Organisasi', 'SKU', 'Barcode', 'Nama Produk', 'Kategori', 'Sub Kategori', 
             'Supplier', 'Harga Pokok', 'Harga Pokok (+Pajak)', 'Harga Jual', 
-            'Margin Gol 1', 'Harga Jual 1', 'Qty Min Gol 1',
-            'Margin Gol 2', 'Harga Jual 2', 'Qty Min Gol 2',
-            'Margin Gol 3', 'Harga Jual 3', 'Qty Min Gol 3',
+            'Margin Gol 1 (%)', 'Harga Jual 1', 'Qty Min Gol 1',
+            'Margin Gol 2 (%)', 'Harga Jual 2', 'Qty Min Gol 2',
+            'Margin Gol 3 (%)', 'Harga Jual 3', 'Qty Min Gol 3',
             'Bisa Pajak?', 'Satuan', 'Titik Pesan Ulang', 'Qty Pesan Ulang', 'Waktu Tunggu (Hari)',
             'Aktif?', 'E-Commerce Aktif?', 'Kategori E-Commerce', 'Tipe Produk', 'PPOB SKU', 'Berat (Gram)'
         ];
 
-        foreach ($branchesToDisplay as $branch) {
-            $columns[] = 'QOH (' . $branch->name . ')';
+        foreach ($branchesToDisplay as $b) {
+            $columns[] = 'QOH (' . $b->name . ')';
         }
 
-        $rows = [];
-        foreach($products as $p) {
-            $row = [
-                $p->id,
-                $p->organization->name ?? '',
-                $p->sku,
-                $p->barcode,
-                $p->name,
-                $p->category->name ?? '',
-                $p->sub_category,
-                $p->supplier->name ?? '',
-                $p->cost_price,
-                $p->cost_price_tax,
-                $p->selling_price,
-                $p->margin_gol_1,
-                $p->harga_jual_1,
-                $p->qty_min_gol_1,
-                $p->margin_gol_2,
-                $p->harga_jual_2,
-                $p->qty_min_gol_2,
-                $p->margin_gol_3,
-                $p->harga_jual_3,
-                $p->qty_min_gol_3,
-                $p->is_taxable ? 'Ya' : 'Tidak',
-                $p->unit_of_measure,
-                $p->reorder_point,
-                $p->reorder_qty,
-                $p->lead_time_days,
-                $p->is_active ? 'Ya' : 'Tidak',
-                $p->is_ecommerce_active ? 'Ya' : 'Tidak',
-                $p->ecommerce_category,
-                $p->product_type,
-                $p->ppob_sku,
-                $p->weight_in_grams,
+        $headerCells = [];
+        foreach ($columns as $col) {
+            $headerCells[] = \OpenSpout\Common\Entity\Cell::fromValue($col, $headerStyle);
+        }
+        $writer->addRow(new \OpenSpout\Common\Entity\Row($headerCells));
+
+        // Build Optimized DB Query
+        $query = \Illuminate\Support\Facades\DB::table('products as p')
+            ->leftJoin('categories as c', 'c.id', '=', 'p.category_id')
+            ->leftJoin('suppliers as s', 's.id', '=', 'p.supplier_id')
+            ->leftJoin('organizations as o', 'o.id', '=', 'p.organization_id');
+
+        // Apply TernaryFilter for is_active
+        if (isset($filters['is_active']['value']) && $filters['is_active']['value'] !== '') {
+            $query->where('p.is_active', $filters['is_active']['value']);
+        } elseif (isset($filters['is_active']['isActive']) && $filters['is_active']['isActive'] !== '') {
+            $query->where('p.is_active', $filters['is_active']['isActive']);
+        }
+
+        // Apply Supplier & Sub Division Filter
+        $supplierId = $filters['supplier']['supplier_id'] ?? $filters['supplier_id']['value'] ?? null;
+        if (!empty($supplierId)) {
+            $query->where('p.supplier_id', $supplierId);
+        }
+
+        $divisionId = $filters['supplier']['supplier_division_id'] ?? $filters['supplier_division_id']['value'] ?? null;
+        if (!empty($divisionId)) {
+            if ($divisionId === 'unassigned') {
+                $query->whereNull('p.supplier_division_id');
+            } else {
+                $query->where('p.supplier_division_id', $divisionId);
+            }
+        }
+
+        // Apply Category & Sub Category Filter
+        $categoryId = $filters['category']['category_id'] ?? $filters['category_id']['value'] ?? null;
+        if (!empty($categoryId)) {
+            $query->where('p.category_id', $categoryId);
+        }
+
+        $subCategory = $filters['category']['sub_category'] ?? $filters['sub_category']['value'] ?? null;
+        if (!empty($subCategory)) {
+            $query->where('p.sub_category', $subCategory);
+        }
+
+        // Apply SelectFilter for branch
+        if ($targetBranchId) {
+            $query->whereExists(function ($sub) use ($targetBranchId) {
+                $sub->select(\Illuminate\Support\Facades\DB::raw(1))
+                    ->from('stocks')
+                    ->whereColumn('stocks.product_id', 'p.id')
+                    ->where('stocks.branch_id', $targetBranchId);
+            });
+        }
+
+        // Apply global search if present
+        if (!empty($search)) {
+            $escaped = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+            $query->where(function ($q) use ($escaped) {
+                $q->where('p.barcode', 'like', "%{$escaped}%")
+                  ->orWhere('p.sku', 'like', "%{$escaped}%")
+                  ->orWhere('p.name', 'like', "%{$escaped}%");
+            });
+        }
+
+        $selects = [
+            'p.id',
+            'o.name as org_name',
+            'p.sku',
+            'p.barcode',
+            'p.name as product_name',
+            'c.name as category_name',
+            'p.sub_category',
+            's.name as supplier_name',
+            'p.cost_price',
+            'p.cost_price_tax',
+            'p.selling_price',
+            'p.margin_gol_1',
+            'p.harga_jual_1',
+            'p.qty_min_gol_1',
+            'p.margin_gol_2',
+            'p.harga_jual_2',
+            'p.qty_min_gol_2',
+            'p.margin_gol_3',
+            'p.harga_jual_3',
+            'p.qty_min_gol_3',
+            'p.is_taxable',
+            'p.unit_of_measure',
+            'p.reorder_point',
+            'p.reorder_qty',
+            'p.lead_time_days',
+            'p.is_active',
+            'p.is_ecommerce_active',
+            'p.ecommerce_category',
+            'p.product_type',
+            'p.ppob_sku',
+            'p.weight_in_grams',
+        ];
+
+        foreach ($branchesToDisplay as $idx => $b) {
+            $alias = "stk_{$idx}";
+            $query->leftJoin("stocks as {$alias}", function ($j) use ($alias, $b) {
+                $j->on("{$alias}.product_id", '=', 'p.id')->where("{$alias}.branch_id", '=', $b->id);
+            });
+            $selects[] = "{$alias}.quantity_on_hand as qoh_{$idx}";
+        }
+
+        $query->select($selects);
+
+        // Stream rows directly
+        foreach ($query->orderBy('p.name')->cursor() as $row) {
+            $cells = [
+                \OpenSpout\Common\Entity\Cell::fromValue((string) $row->id, $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->org_name ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->sku ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->barcode ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->product_name ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->category_name ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->sub_category ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->supplier_name ?? ''), $dataStyle),
+                // Numeric values
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->cost_price ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->cost_price_tax ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->selling_price ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->margin_gol_1 ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->harga_jual_1 ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((int) ($row->qty_min_gol_1 ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->margin_gol_2 ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->harga_jual_2 ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((int) ($row->qty_min_gol_2 ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->margin_gol_3 ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->harga_jual_3 ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((int) ($row->qty_min_gol_3 ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue($row->is_taxable ? 'Ya' : 'Tidak', $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->unit_of_measure ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((int) ($row->reorder_point ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((int) ($row->reorder_qty ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((int) ($row->lead_time_days ?? 0), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue($row->is_active ? 'Ya' : 'Tidak', $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue($row->is_ecommerce_active ? 'Ya' : 'Tidak', $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->ecommerce_category ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->product_type ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((string) ($row->ppob_sku ?? ''), $dataStyle),
+                \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->weight_in_grams ?? 0), $dataStyle),
             ];
 
-            foreach ($branchesToDisplay as $branch) {
-                $stock = $p->stocks->firstWhere('branch_id', $branch->id);
-                $row[] = $stock ? $stock->quantity_on_hand : 0;
+            foreach ($branchesToDisplay as $idx => $b) {
+                $f = "qoh_{$idx}";
+                $cells[] = \OpenSpout\Common\Entity\Cell::fromValue((float) ($row->$f ?? 0), $dataStyle);
             }
-            $rows[] = $row;
+
+            $writer->addRow(new \OpenSpout\Common\Entity\Row($cells));
         }
 
-        if (request()->query('format') === 'excel') {
-            return $this->exportCsv('Data Produk', $columns, $rows);
-        }
+        $writer->close();
 
-        if (request()->query('export') === 'xls') {
-            return view('print.reports.generic', [
-                'title' => 'Data Produk', 
-                'period' => 'Semua Waktu', 
-                'columns' => $columns, 
-                'rows' => $rows
-            ]);
-        }
+        $headers = [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'max-age=0',
+        ];
 
-        abort(404, 'Gunakan format excel untuk menu ini.');
+        return response()->download($tempPath, $filename, $headers)->deleteFileAfterSend(true);
     }
 
     private function exportExcelHtml($title, $period, $columns, $rows)

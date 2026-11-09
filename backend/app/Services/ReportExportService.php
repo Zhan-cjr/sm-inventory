@@ -120,8 +120,10 @@ class ReportExportService
         // 3. Table Columns
         $columns = $data['columns'] ?? [];
         $headerCells = [];
+        $columnNames = [];
         foreach ($columns as $col) {
             $cleanCol = trim(strip_tags(html_entity_decode((string)$col, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+            $columnNames[] = $cleanCol;
             $headerCells[] = Cell::fromValue($cleanCol, $headerStyle);
         }
         if (!empty($headerCells)) {
@@ -142,9 +144,12 @@ class ReportExportService
             $currentStyle = $isTotal ? $totalStyle : $dataStyle;
             $cells = [];
 
+            $colIdx = 0;
             foreach ($row as $cellValue) {
-                $cleanVal = trim(strip_tags(html_entity_decode((string)$cellValue, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
-                $cells[] = Cell::fromValue($cleanVal, $currentStyle);
+                $colName = $columnNames[$colIdx] ?? '';
+                $val = $this->parseCellValue($cellValue, $colName);
+                $cells[] = Cell::fromValue($val, $currentStyle);
+                $colIdx++;
             }
 
             $writer->addRow(new Row($cells));
@@ -237,6 +242,8 @@ class ReportExportService
             $rows = $table->getElementsByTagName('tr');
             if ($rows->length === 0) continue;
 
+            $columnNames = [];
+
             foreach ($rows as $tr) {
                 $cells = [];
                 $isHeaderRow = false;
@@ -246,6 +253,7 @@ class ReportExportService
                               str_contains($tr->getAttribute('class'), 'total') ||
                               str_contains($tr->getAttribute('bgcolor'), '#e2e8f0');
 
+                $colIdx = 0;
                 foreach ($tr->childNodes as $node) {
                     if (!($node instanceof DOMElement)) continue;
                     $nodeName = strtolower($node->nodeName);
@@ -255,16 +263,26 @@ class ReportExportService
                         $isHeaderRow = true;
                     }
 
-                    $val = trim(preg_replace('/\s+/', ' ', $node->textContent));
+                    $rawText = trim(preg_replace('/\s+/', ' ', $node->textContent));
                     $colspan = (int) $node->getAttribute('colspan');
                     if ($colspan < 1) $colspan = 1;
 
-                    $cellStyle = $isHeaderRow ? $headerStyle : ($isTotalRow ? $totalStyle : $dataStyle);
+                    if ($isHeaderRow) {
+                        $columnNames[$colIdx] = $rawText;
+                        $val = $rawText;
+                        $cellStyle = $headerStyle;
+                    } else {
+                        $colName = $columnNames[$colIdx] ?? '';
+                        $val = $this->parseCellValue($rawText, $colName);
+                        $cellStyle = $isTotalRow ? $totalStyle : $dataStyle;
+                    }
 
                     $cells[] = Cell::fromValue($val, $cellStyle);
                     for ($c = 1; $c < $colspan; $c++) {
                         $cells[] = Cell::fromValue('', $cellStyle);
+                        $colIdx++;
                     }
+                    $colIdx++;
                 }
 
                 if (!empty($cells)) {
@@ -274,5 +292,77 @@ class ReportExportService
 
             $writer->addRow(Row::fromValues([]));
         }
+    }
+
+    public function parseCellValue(mixed $value, string $columnName = ''): mixed
+    {
+        if (is_int($value) || is_float($value)) {
+            return $value;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if ($value === null) {
+            return '';
+        }
+
+        $clean = trim(strip_tags(html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+
+        if ($clean === '' || $clean === '-') {
+            return $clean;
+        }
+
+        $colLower = strtolower($columnName);
+
+        // Keep identifiers as string: barcode, sku, phone/wa, nik, account/rek, id, code/kode, invoice/nota/faktur/struk
+        if (preg_match('/(barcode|sku|telepon|phone|hp|wa|nik|rekening|rek|id|kode|code|invoice|faktur|nota|struk)/i', $colLower)) {
+            return $clean;
+        }
+
+        // If string has leading zero (e.g., '08123', '0123') and is not just '0' or '0.xx' or '0,xx'
+        if (preg_match('/^0\d+/', $clean)) {
+            return $clean;
+        }
+
+        // Check date/time formats like 2026-11-09 or 09/11/2026 or 08:30:00
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $clean) || preg_match('/^\d{2}\/\d{2}\/\d{4}/', $clean) || preg_match('/^\d{2}:\d{2}/', $clean)) {
+            return $clean;
+        }
+
+        // Currency: "Rp 150.000", "Rp. 1.500.000,50", "Rp -50.000"
+        $stripped = preg_replace('/^[Rr][Pp]\.?\s*/u', '', $clean);
+        $stripped = trim($stripped);
+
+        // Accounting parentheses negative format: (15.000) -> -15000
+        $isNegative = false;
+        if (preg_match('/^\((.+)\)$/', $stripped, $matches)) {
+            $isNegative = true;
+            $stripped = trim($matches[1]);
+        }
+
+        // Indonesian thousand separator: 1.500.000 or 1.500.000,50 or 15.000
+        if (preg_match('/^-?\d{1,3}(\.\d{3})+(,\d+)?$/', $stripped)) {
+            $normalized = str_replace('.', '', $stripped);
+            $normalized = str_replace(',', '.', $normalized);
+            $num = str_contains($normalized, '.') ? (float) $normalized : (int) $normalized;
+            return $isNegative ? -$num : $num;
+        }
+
+        // English thousand separator: 1,500,000 or 1,500,000.50 or 15,000
+        if (preg_match('/^-?\d{1,3}(,\d{3})+(\.\d+)?$/', $stripped)) {
+            $normalized = str_replace(',', '', $stripped);
+            $num = str_contains($normalized, '.') ? (float) $normalized : (int) $normalized;
+            return $isNegative ? -$num : $num;
+        }
+
+        // Plain decimal or integer: 15000, 15000.50, -500
+        if (preg_match('/^-?\d+(\.\d+)?$/', $stripped)) {
+            $num = str_contains($stripped, '.') ? (float) $stripped : (int) $stripped;
+            return $isNegative ? -$num : $num;
+        }
+
+        return $clean;
     }
 }
