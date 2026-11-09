@@ -171,8 +171,20 @@ class ProductsRelationManager extends RelationManager
                     ->label('Sub Divisi')
                     ->options(function ($livewire) {
                         $currentSupplierId = $livewire->getOwnerRecord()->id;
-                        return \App\Models\SupplierDivision::where('supplier_id', $currentSupplierId)
-                            ->pluck('name', 'id');
+                        $divisions = \App\Models\SupplierDivision::where('supplier_id', $currentSupplierId)
+                            ->pluck('name', 'id')
+                            ->toArray();
+                        return ['unassigned' => '⚠️ [Tanpa Sub-Divisi]'] + $divisions;
+                    })
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data) {
+                        if (empty($data['value'])) {
+                            return;
+                        }
+                        if ($data['value'] === 'unassigned') {
+                            $query->whereNull('supplier_division_id');
+                        } else {
+                            $query->where('supplier_division_id', $data['value']);
+                        }
                     }),
             ])
             ->headerActions([

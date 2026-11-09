@@ -56,6 +56,18 @@ class DivisionsRelationManager extends RelationManager
     {
         return $table
             ->recordAction('view_products')
+            ->description(function (RelationManager $livewire) {
+                $supplier = $livewire->getOwnerRecord();
+                $count = \App\Models\Product::where('supplier_id', $supplier->id)->whereNull('supplier_division_id')->count();
+                if ($count > 0) {
+                    return new \Illuminate\Support\HtmlString(
+                        "<div style='display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.65rem; border-radius: 0.5rem; background: #fffbeb; border: 1px solid #fde68a; color: #b45309; font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem;'>
+                            <span>⚠️ Terdapat <strong>{$count} barang</strong> dari supplier ini yang belum memiliki sub-divisi. Klik tombol <strong>'Barang Tanpa Sub-Divisi'</strong> di atas untuk melihat atau mengalokasikannya.</span>
+                        </div>"
+                    );
+                }
+                return null;
+            })
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nama Divisi')
@@ -88,6 +100,33 @@ class DivisionsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
+                Action::make('unassigned_products')
+                    ->label(function (RelationManager $livewire) {
+                        $supplier = $livewire->getOwnerRecord();
+                        $count = \App\Models\Product::where('supplier_id', $supplier->id)->whereNull('supplier_division_id')->count();
+                        return "Barang Tanpa Sub-Divisi ({$count})";
+                    })
+                    ->icon('heroicon-o-archive-box')
+                    ->color(function (RelationManager $livewire) {
+                        $supplier = $livewire->getOwnerRecord();
+                        $count = \App\Models\Product::where('supplier_id', $supplier->id)->whereNull('supplier_division_id')->count();
+                        return $count > 0 ? 'warning' : 'gray';
+                    })
+                    ->badge(function (RelationManager $livewire) {
+                        $supplier = $livewire->getOwnerRecord();
+                        $count = \App\Models\Product::where('supplier_id', $supplier->id)->whereNull('supplier_division_id')->count();
+                        return $count > 0 ? (string) $count : null;
+                    })
+                    ->badgeColor('warning')
+                    ->modalWidth('7xl')
+                    ->modalHeading(fn (RelationManager $livewire) => "Daftar Barang Tanpa Sub-Divisi: " . $livewire->getOwnerRecord()->name)
+                    ->modalDescription("Barang-barang yang terikat ke supplier ini tetapi belum memiliki sub-divisi.")
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup')
+                    ->modalContent(fn (RelationManager $livewire) => view('filament.suppliers.unassigned-products-modal', [
+                        'supplier' => $livewire->getOwnerRecord(),
+                    ])),
+
                 CreateAction::make()
                     ->label('Tambah Sub-Divisi')
                     ->modalHeading('Tambah Sub-Divisi Supplier')

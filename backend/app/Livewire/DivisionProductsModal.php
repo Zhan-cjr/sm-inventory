@@ -11,7 +11,9 @@ use Illuminate\Support\Facades\DB;
 
 class DivisionProductsModal extends Component
 {
-    public $divisionId;
+    public $divisionId = null;
+    public $supplierId = null;
+    public $isUnassigned = false;
     public $search = '';
     public $selectedProducts = [];
     public $selectAll = false;
@@ -26,27 +28,38 @@ class DivisionProductsModal extends Component
     public $targetSupplierId = '';
     public $targetDivisionId = '';
 
-    public function mount($divisionId)
+    public function mount($divisionId = null, $supplierId = null, $isUnassigned = false)
     {
         $this->divisionId = $divisionId;
+        $this->supplierId = $supplierId;
+        $this->isUnassigned = (bool) $isUnassigned || ($divisionId === 'unassigned') || (!$divisionId && $supplierId);
+
+        if (!$this->isUnassigned && $divisionId) {
+            $division = SupplierDivision::find($divisionId);
+            if ($division) {
+                $this->supplierId = $division->supplier_id;
+            }
+        }
     }
 
     public function updatedSelectAll($val)
     {
         if ($val) {
-            $division = SupplierDivision::find($this->divisionId);
-            if ($division) {
+            if ($this->isUnassigned) {
+                $query = Product::where('supplier_id', $this->supplierId)->whereNull('supplier_division_id');
+            } else {
                 $query = Product::where('supplier_division_id', $this->divisionId);
-                if (!empty($this->search)) {
-                    $s = '%' . trim($this->search) . '%';
-                    $query->where(function ($q) use ($s) {
-                        $q->where('name', 'like', $s)
-                          ->orWhere('barcode', 'like', $s)
-                          ->orWhere('sku', 'like', $s);
-                    });
-                }
-                $this->selectedProducts = $query->pluck('id')->map(fn($id) => (string) $id)->toArray();
             }
+
+            if (!empty($this->search)) {
+                $s = '%' . trim($this->search) . '%';
+                $query->where(function ($q) use ($s) {
+                    $q->where('name', 'like', $s)
+                      ->orWhere('barcode', 'like', $s)
+                      ->orWhere('sku', 'like', $s);
+                });
+            }
+            $this->selectedProducts = $query->pluck('id')->map(fn($id) => (string) $id)->toArray();
         } else {
             $this->selectedProducts = [];
         }
@@ -73,18 +86,29 @@ class DivisionProductsModal extends Component
 
         DB::beginTransaction();
         try {
+            $targetDivId = $this->isUnassigned ? null : $this->divisionId;
+
             Product::whereIn('id', $this->addSelectedProducts)
-                ->update(['supplier_division_id' => $this->divisionId]);
+                ->update([
+                    'supplier_id' => $this->supplierId,
+                    'supplier_division_id' => $targetDivId,
+                ]);
 
             Stock::whereIn('product_id', $this->addSelectedProducts)
-                ->update(['supplier_division_id' => $this->divisionId]);
+                ->update([
+                    'supplier_id' => $this->supplierId,
+                    'supplier_division_id' => $targetDivId,
+                ]);
 
             DB::commit();
 
             $count = count($this->addSelectedProducts);
             $this->addSelectedProducts = [];
             $this->showAddModal = false;
-            session()->flash('success', "{$count} barang berhasil ditambahkan ke sub-divisi ini.");
+            $msg = $this->isUnassigned
+                ? "{$count} barang berhasil dipindahkan ke status Tanpa Sub-Divisi."
+                : "{$count} barang berhasil ditambahkan ke sub-divisi ini.";
+            session()->flash('success', $msg);
         } catch (\Exception $e) {
             DB::rollBack();
             session()->flash('error', 'Gagal menambahkan barang: ' . $e->getMessage());
@@ -102,8 +126,13 @@ class DivisionProductsModal extends Component
             return;
         }
 
-        $division = SupplierDivision::find($this->divisionId);
-        $this->targetSupplierId = $division ? $division->supplier_id : '';
+        if ($this->isUnassigned) {
+            $this->targetSupplierId = (string) $this->supplierId;
+        } else {
+            $division = SupplierDivision::find($this->divisionId);
+            $this->targetSupplierId = $division ? (string) $division->supplier_id : '';
+        }
+
         $this->targetDivisionId = '';
         $this->showMoveModal = true;
     }
@@ -169,10 +198,20 @@ class DivisionProductsModal extends Component
 
     public function render()
     {
-        $division = SupplierDivision::with(['supplier', 'branch', 'creator'])->findOrFail($this->divisionId);
+        if ($this->isUnassigned) {
+            $supplier = Supplier::findOrFail($this->supplierId);
+            $division = null;
 
-        $query = Product::where('supplier_division_id', $this->divisionId)
-            ->with(['category', 'stocks']);
+            $query = Product::where('supplier_id', $this->supplierId)
+                ->whereNull('supplier_division_id')
+                ->with(['category', 'stocks']);
+        } else {
+            $division = SupplierDivision::with(['supplier', 'branch', 'creator'])->findOrFail($this->divisionId);
+            $supplier = $division->supplier;
+
+            $query = Product::where('supplier_division_id', $this->divisionId)
+                ->with(['category', 'stocks']);
+        }
 
         if (!empty($this->search)) {
             $s = '%' . trim($this->search) . '%';
@@ -187,13 +226,18 @@ class DivisionProductsModal extends Component
 
         // Candidates for Add Modal
         $addCandidates = collect();
-        if ($this->showAddModal) {
-            $addQuery = Product::where('supplier_id', $division->supplier_id)
-                ->where(function ($q) {
+        if ($this->showAddModal && $supplier) {
+            $addQuery = Product::where('supplier_id', $supplier->id)
+                ->with(['category', 'supplierDivision']);
+
+            if ($this->isUnassigned) {
+                $addQuery->whereNotNull('supplier_division_id');
+            } else {
+                $addQuery->where(function ($q) {
                     $q->whereNull('supplier_division_id')
                       ->orWhere('supplier_division_id', '!=', $this->divisionId);
-                })
-                ->with(['category', 'supplierDivision']);
+                });
+            }
 
             if (!empty($this->addSearch)) {
                 $s = '%' . trim($this->addSearch) . '%';
@@ -219,10 +263,12 @@ class DivisionProductsModal extends Component
 
         return view('livewire.division-products-modal', [
             'division' => $division,
+            'supplier' => $supplier,
             'products' => $products,
             'addCandidates' => $addCandidates,
             'targetDivisions' => $targetDivisions,
             'allSuppliers' => $allSuppliers,
+            'isUnassigned' => $this->isUnassigned,
         ]);
     }
 }

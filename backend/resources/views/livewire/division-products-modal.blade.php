@@ -333,28 +333,41 @@
     {{-- Info Card Sub Divisi --}}
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 0.75rem 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem;" class="dark:bg-slate-900 dark:border-slate-800">
         <div>
-            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">Sub-Divisi</div>
-            <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a;" class="dark:text-slate-100">
-                {{ $division->name }}
-            </div>
-            <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
-                Supplier: <strong style="color: #334155;" class="dark:text-slate-300">{{ $division->supplier?->name ?? '-' }}</strong>
-                @if($division->branch)
-                    <span style="margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: #eff6ff; color: #2563eb; font-weight: 600; font-size: 11px;">
-                        Cabang: {{ $division->branch->name }}
+            @if($isUnassigned)
+                <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #b45309; font-weight: 700;">Status Divisi</div>
+                <div style="font-size: 1.1rem; font-weight: 800; color: #b45309;" class="dark:text-amber-400">
+                    Tanpa Sub-Divisi (Belum Terpetakan)
+                </div>
+                <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
+                    Supplier: <strong style="color: #334155;" class="dark:text-slate-300">{{ $supplier?->name ?? '-' }}</strong>
+                    <span style="margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: #fef3c7; color: #92400e; font-weight: 600; font-size: 11px;">
+                        ⚠️ Perlu Dialokasikan ke Sub-Divisi
                     </span>
-                @else
-                    <span style="margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: #f1f5f9; color: #475569; font-weight: 600; font-size: 11px;">
-                        Lingkup: Pusat (Semua Cabang)
-                    </span>
-                @endif
-            </div>
+                </div>
+            @else
+                <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">Sub-Divisi</div>
+                <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a;" class="dark:text-slate-100">
+                    {{ $division?->name }}
+                </div>
+                <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
+                    Supplier: <strong style="color: #334155;" class="dark:text-slate-300">{{ $division?->supplier?->name ?? ($supplier?->name ?? '-') }}</strong>
+                    @if($division?->branch)
+                        <span style="margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: #eff6ff; color: #2563eb; font-weight: 600; font-size: 11px;">
+                            Cabang: {{ $division->branch->name }}
+                        </span>
+                    @else
+                        <span style="margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: #f1f5f9; color: #475569; font-weight: 600; font-size: 11px;">
+                            Lingkup: Pusat (Semua Cabang)
+                        </span>
+                    @endif
+                </div>
+            @endif
         </div>
 
         <div style="display: flex; align-items: center; gap: 0.65rem;">
             <div style="text-align: right;">
                 <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Barang</div>
-                <div style="font-size: 1.35rem; font-weight: 900; color: #4f46e5; font-family: ui-monospace, monospace;">
+                <div style="font-size: 1.35rem; font-weight: 900; color: {{ $isUnassigned ? '#d97706' : '#4f46e5' }}; font-family: ui-monospace, monospace;">
                     {{ $products->count() }}
                 </div>
             </div>
@@ -374,15 +387,17 @@
         </div>
 
         <div class="div-actions-group">
-            {{-- Tombol Tambah Barang --}}
-            <button 
-                type="button" 
-                wire:click="openAddModal" 
-                class="div-btn-primary"
-            >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
-                + Tambah Barang ke Sub-Divisi
-            </button>
+            @if(!$isUnassigned)
+                {{-- Tombol Tambah Barang --}}
+                <button 
+                    type="button" 
+                    wire:click="openAddModal" 
+                    class="div-btn-primary"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                    + Tambah Barang ke Sub-Divisi
+                </button>
+            @endif
 
             {{-- Tombol Pindah Supplier / Sub Divisi --}}
             @if(count($selectedProducts) > 0)
@@ -392,7 +407,7 @@
                     class="div-btn-move"
                 >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                    ⇄ Pindah Supplier / Sub-Divisi ({{ count($selectedProducts) }})
+                    {{ $isUnassigned ? '⇄ Petakan ke Sub-Divisi' : '⇄ Pindah Supplier / Sub-Divisi' }} ({{ count($selectedProducts) }})
                 </button>
             @endif
         </div>
@@ -492,33 +507,45 @@
                                     <button 
                                         type="button" 
                                         wire:click="openMoveModal('{{ $prod->id }}')" 
-                                        title="Pindah Supplier / Sub-Divisi"
+                                        title="{{ $isUnassigned ? 'Alokasikan ke Sub-Divisi' : 'Pindah Supplier / Sub-Divisi' }}"
                                         style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; border: 1px solid #fde68a; background: #fffbeb; color: #d97706; cursor: pointer;"
                                     >
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                                     </button>
 
-                                    {{-- Tombol Lepas dari Sub-Divisi --}}
-                                    <button 
-                                        type="button" 
-                                        wire:confirm="Lepaskan barang ini dari sub-divisi {{ $division->name }}?"
-                                        wire:click="detachProduct('{{ $prod->id }}')" 
-                                        title="Lepas dari Sub-Divisi ini"
-                                        style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #64748b; cursor: pointer;"
-                                    >
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                    </button>
+                                    @if(!$isUnassigned)
+                                        {{-- Tombol Lepas dari Sub-Divisi --}}
+                                        <button 
+                                            type="button" 
+                                            wire:confirm="Lepaskan barang ini dari sub-divisi {{ $division?->name }}?"
+                                            wire:click="detachProduct('{{ $prod->id }}')" 
+                                            title="Lepas dari Sub-Divisi ini"
+                                            style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #64748b; cursor: pointer;"
+                                        >
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                        </button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
                     @empty
-                        <tr>
-                            <td colspan="8" style="padding: 2.5rem; text-align: center; color: #94a3b8;">
-                                <svg style="width: 38px !important; height: 38px !important; margin: 0 auto 8px auto; display: block; color: #cbd5e1;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
-                                <div style="font-weight: 700; font-size: 0.875rem; color: #475569;">Belum Ada Barang di Sub-Divisi Ini</div>
-                                <div style="font-size: 0.75rem; margin-top: 4px;">Klik tombol <strong>"+ Tambah Barang ke Sub-Divisi"</strong> di atas untuk memasukkan produk.</div>
-                            </td>
-                        </tr>
+                        @if($isUnassigned)
+                            <tr>
+                                <td colspan="8" style="padding: 2.5rem; text-align: center; color: #94a3b8;">
+                                    <svg style="width: 38px !important; height: 38px !important; margin: 0 auto 8px auto; display: block; color: #10b981;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <div style="font-weight: 700; font-size: 0.875rem; color: #059669;">Semua Barang Sudah Terpetakan!</div>
+                                    <div style="font-size: 0.75rem; margin-top: 4px; color: #64748b;">Tidak ada barang dari supplier ini yang berstatus tanpa sub-divisi.</div>
+                                </td>
+                            </tr>
+                        @else
+                            <tr>
+                                <td colspan="8" style="padding: 2.5rem; text-align: center; color: #94a3b8;">
+                                    <svg style="width: 38px !important; height: 38px !important; margin: 0 auto 8px auto; display: block; color: #cbd5e1;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                                    <div style="font-weight: 700; font-size: 0.875rem; color: #475569;">Belum Ada Barang di Sub-Divisi Ini</div>
+                                    <div style="font-size: 0.75rem; margin-top: 4px;">Klik tombol <strong>"+ Tambah Barang ke Sub-Divisi"</strong> di atas untuk memasukkan produk.</div>
+                                </td>
+                            </tr>
+                        @endif
                     @endforelse
                 </tbody>
             </table>
@@ -532,7 +559,7 @@
                 <div class="div-modal-header">
                     <div style="font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
-                        Tambah Barang ke Sub-Divisi: {{ $division->name }}
+                        {{ $isUnassigned ? 'Tarik Barang ke Status Tanpa Sub-Divisi' : 'Tambah Barang ke Sub-Divisi: ' . ($division?->name ?? '') }}
                     </div>
                     <button type="button" wire:click="closeAddModal" style="background: none; border: none; color: #ffffff; cursor: pointer; font-size: 1.25rem;">&times;</button>
                 </div>
@@ -542,7 +569,7 @@
                         <input 
                             type="text" 
                             wire:model.live.debounce.300ms="addSearch" 
-                            placeholder="Cari barang supplier {{ $division->supplier?->name }}..." 
+                            placeholder="Cari barang supplier {{ $supplier?->name }}..." 
                             class="div-search-input"
                             style="padding-left: 0.85rem;"
                         >
@@ -617,26 +644,26 @@
                 <div class="div-modal-header" style="background: #b45309;">
                     <div style="font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                        Pindah Supplier / Sub-Divisi ({{ count($selectedProducts) }} Barang)
+                        {{ $isUnassigned ? 'Alokasikan ke Sub-Divisi' : 'Pindah Supplier / Sub-Divisi' }} ({{ count($selectedProducts) }} Barang)
                     </div>
                     <button type="button" wire:click="closeMoveModal" style="background: none; border: none; color: #ffffff; cursor: pointer; font-size: 1.25rem;">&times;</button>
                 </div>
 
                 <div class="div-modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
                     <p style="font-size: 0.8125rem; color: #64748b;">
-                        Pilih supplier dan sub-divisi tujuan. Produk yang dipilih akan otomatis diperbarui kepemilikan supplier dan sub-divisinya.
+                        {{ $isUnassigned ? 'Pilih sub-divisi di bawah ini untuk menempatkan barang-barang yang dipilih.' : 'Pilih supplier dan sub-divisi tujuan. Produk yang dipilih akan otomatis diperbarui kepemilikan supplier dan sub-divisinya.' }}
                     </p>
 
                     <div>
                         <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 0.35rem;" class="dark:text-slate-300">
-                            Supplier Tujuan:
+                            Supplier:
                         </label>
                         <select 
                             wire:model.live="targetSupplierId" 
                             style="width: 100%; padding: 0.5rem 0.75rem; font-size: 0.8125rem; border-radius: 0.5rem; border: 1px solid #cbd5e1; background: #ffffff;"
                             class="dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100"
                         >
-                            <option value="">-- Pilih Supplier Tujuan --</option>
+                            <option value="">-- Pilih Supplier --</option>
                             @foreach ($allSuppliers as $s)
                                 <option value="{{ $s->id }}">{{ $s->name }} ({{ $s->code }})</option>
                             @endforeach
@@ -645,7 +672,7 @@
 
                     <div>
                         <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 0.35rem;" class="dark:text-slate-300">
-                            Sub-Divisi Tujuan (Opsional):
+                            Sub-Divisi Tujuan:
                         </label>
                         <select 
                             wire:model="targetDivisionId" 
@@ -665,7 +692,7 @@
                         Batal
                     </button>
                     <button type="button" wire:click="executeMove" class="div-btn-primary" style="background: #b45309; border-color: #b45309; padding: 0.45rem 1rem;">
-                        Konfirmasi Pindah
+                        {{ $isUnassigned ? 'Simpan ke Sub-Divisi' : 'Konfirmasi Pindah' }}
                     </button>
                 </div>
             </div>
