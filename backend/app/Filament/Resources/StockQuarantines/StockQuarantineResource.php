@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockQuarantines;
 
+use App\Filament\Filters\DateFilterHelper;
 use App\Filament\Resources\StockQuarantines\Pages\ListStockQuarantines;
 use App\Filament\Resources\StockQuarantines\Pages\CreateStockQuarantine;
 use App\Models\Stock;
@@ -103,6 +104,7 @@ class StockQuarantineResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                DateFilterHelper::make('created_at'),
                 SelectFilter::make('branch_id')
                     ->label('Cabang')
                     ->relationship('branch', 'name')
