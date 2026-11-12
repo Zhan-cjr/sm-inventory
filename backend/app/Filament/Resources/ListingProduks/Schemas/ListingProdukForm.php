@@ -110,9 +110,19 @@ class ListingProdukForm
                             ])
                             ->openable()
                             ->downloadable()
-                            ->previewable()
+                            ->previewable(false)
+                            ->live()
                             ->columnSpanFull()
                             ->helperText('File bukti fisik formulir pengajuan/registrasi dari supplier. Tersimpan permanen untuk arsip & kroscek di kemudian hari.'),
+
+                        Placeholder::make('document_preview_box')
+                            ->label('Pratinjau Dokumen Fisik Terlampir')
+                            ->visible(fn (callable $get) => !empty($get('document_path')))
+                            ->columnSpanFull()
+                            ->content(function (callable $get) {
+                                $path = $get('document_path');
+                                return view('filament.listing-produks.document-preview', ['path' => $path]);
+                            }),
                     ]),
 
                 Section::make('Masa Uji Coba & Kuota Cabang Pilot')
