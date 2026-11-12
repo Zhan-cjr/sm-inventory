@@ -47,7 +47,7 @@ class ListingProduksTable
                         $names = $record->products->pluck('name')->join(', ');
                         return $count . ' Produk: ' . Str::limit($names, 35);
                     })
-                    ->tooltip(fn (ProductListing $record) => $record->products->map(fn ($p) => "• {$p->sku} - {$p->name}")->join("\n"))
+                    ->tooltip(fn (ProductListing $record) => $record->products->map(fn ($p) => ($p->is_existing_listing ? '✓ [Sudah Ada] ' : '✨ [Baru] ') . "{$p->sku} - {$p->name}")->join("\n"))
                     ->badge()
                     ->color('primary'),
 
@@ -68,7 +68,7 @@ class ListingProduksTable
                     ->label('Status Listing')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'TRIAL' => 'Uji Coba (Trial)',
+                        'TRIAL' => 'Pantauan Listing (Trial)',
                         'PASSED' => 'Lolos / Rollout',
                         'DELISTED' => 'Dihentikan',
                         default => $state,

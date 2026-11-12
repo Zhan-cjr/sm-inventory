@@ -41,6 +41,46 @@ class CreateListingProduk extends CreateRecord
         return $data;
     }
 
+    protected function handleRecordCreation(array $data): \Illuminate\Database\Eloquent\Model
+    {
+        // 1. Buat record parent ProductListing
+        $record = parent::handleRecordCreation($data);
+
+        // 2. Hubungkan produk yang barcodenya sudah terdaftar di database sebelum saveRelationships() berjalan
+        // Langkah ini mencegah Filament melempar error duplikasi barcode UNIQUE di MySQL
+        $rawProducts = $this->form->getRawState()['products'] ?? $data['products'] ?? [];
+        $orgId = $record->organization_id;
+
+        foreach ($rawProducts as $item) {
+            $barcode = trim($item['barcode'] ?? '');
+            $id = $item['id'] ?? null;
+
+            $existing = null;
+            if (!empty($id)) {
+                $existing = \App\Models\Product::find($id);
+            } elseif (!empty($barcode)) {
+                $existing = \App\Models\Product::where('organization_id', $orgId)
+                    ->where(function ($q) use ($barcode) {
+                        $q->where('barcode', $barcode)
+                          ->orWhere('sku', $barcode)
+                          ->orWhereJsonContains('metadata->additional_barcodes', $barcode);
+                    })
+                    ->first();
+            }
+
+            if ($existing) {
+                $meta = $existing->metadata ?? [];
+                $meta['is_existing_listing'] = true;
+                $existing->metadata = $meta;
+                $existing->product_listing_id = $record->id;
+                $existing->listing_status = 'TRIAL';
+                $existing->saveQuietly();
+            }
+        }
+
+        return $record;
+    }
+
     protected function afterCreate(): void
     {
         $record = $this->record;

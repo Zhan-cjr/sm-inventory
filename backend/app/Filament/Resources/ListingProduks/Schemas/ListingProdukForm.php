@@ -8,8 +8,12 @@ use App\Models\Organization;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\SupplierDivision;
+use App\Services\ProductListingParserService;
+use App\Services\RetailIntelligenceService;
+use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -18,11 +22,13 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class ListingProdukForm
 {
@@ -129,6 +135,89 @@ class ListingProdukForm
 
                 Section::make('Daftar Produk yang Diajukan')
                     ->description('Daftarkan satu atau beberapa produk yang masuk dalam perjanjian listing ini. Kategori massal akan otomatis digunakan jika baris produk dikosongkan.')
+                    ->headerActions([
+                        Action::make('upload_document')
+                            ->label('Upload Dokumen Listing')
+                            ->icon('heroicon-o-arrow-up-tray')
+                            ->color('primary')
+                            ->modalHeading('Upload Dokumen Registrasi Listing Produk')
+                            ->modalDescription('Unggah formulir registrasi produk atau pengajuan supplier (Foto/Scan JPG, PNG, PDF, atau File Excel XLSX/CSV). Sistem otomatis mendeteksi barcode, nama barang, harga satuan (DPP), menghitung harga jual dengan persentase margin (default 10%), dan membuat SKU baru.')
+                            ->modalSubmitActionLabel('Proses & Masukkan ke Tabel')
+                            ->modalWidth('xl')
+                            ->form([
+                                FileUpload::make('document_file')
+                                    ->label('File Formulir / Dokumen Listing')
+                                    ->acceptedFileTypes([
+                                        'image/jpeg', 'image/png', 'image/webp', 'image/jpg',
+                                        'application/pdf',
+                                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                        'application/vnd.ms-excel',
+                                        'text/csv',
+                                    ])
+                                    ->disk('local')
+                                    ->directory('listing-documents-temp')
+                                    ->required()
+                                    ->helperText('Format: Foto Formulir (JPG/PNG), Scan PDF, atau Spreadsheet Excel/CSV.'),
+
+                                TextInput::make('default_margin')
+                                    ->label('Persentase Margin Default (%)')
+                                    ->numeric()
+                                    ->default(10)
+                                    ->suffix('%')
+                                    ->required()
+                                    ->helperText('Harga jual otomatis dihitung: Modal DPP + PPN 11% + Margin ini. Default: 10%. Masih bisa diedit di tabel.'),
+
+                                Toggle::make('append_mode')
+                                    ->label('Tambahkan ke baris produk yang sudah ada (tidak menimpa)')
+                                    ->default(false),
+                            ])
+                            ->action(function (array $data, callable $set, callable $get) {
+                                $filePath = Storage::disk('local')->path($data['document_file']);
+                                $margin = (float) ($data['default_margin'] ?? 10);
+                                $orgId = $get('organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
+
+                                $parser = app(ProductListingParserService::class);
+                                try {
+                                    $result = $parser->parseDocument($filePath, $margin, $orgId);
+                                } catch (\Throwable $e) {
+                                    Notification::make()
+                                        ->title('Gagal Membaca Dokumen')
+                                        ->body($e->getMessage())
+                                        ->danger()
+                                        ->send();
+                                    return;
+                                } finally {
+                                    @unlink($filePath);
+                                }
+
+                                if (empty($result['items'])) {
+                                    Notification::make()
+                                        ->title('Tidak Ada Produk Ditemukan')
+                                        ->body('Sistem tidak menemukan baris tabel produk pada dokumen yang diunggah.')
+                                        ->warning()
+                                        ->send();
+                                    return;
+                                }
+
+                                // Yang dipakai difokuskan pada daftar barangnya saja
+                                $newItems = $result['items'];
+                                if (!empty($data['append_mode'])) {
+                                    $current = $get('products') ?? [];
+                                    $combined = array_merge($current, $newItems);
+                                    $set('products', $combined);
+                                } else {
+                                    $set('products', $newItems);
+                                }
+
+                                $summary = $result['summary'];
+                                Notification::make()
+                                    ->title('Dokumen Listing Berhasil Diproses')
+                                    ->body("Total {$summary['total_items']} produk dimuat. {$summary['new_items_count']} produk baru (SKU dibuat otomatis) dan {$summary['existing_items_count']} produk lama (status beralih ke pantauan listing).")
+                                    ->success()
+                                    ->duration(8000)
+                                    ->send();
+                            }),
+                    ])
                     ->columnSpanFull()
                     ->schema([
                         // 1. Header Pemilihan Kategori & Sub Kategori Massal
@@ -150,7 +239,7 @@ class ListingProdukForm
 
                                 Select::make('default_sub_category')
                                     ->label('Sub Kategori Default (Massal)')
-                                    ->placeholder('Pilih / Ketik Sub Kategori...')
+                                    ->placeholder('Pilih / Cari Sub Kategori...')
                                     ->options(function (callable $get) {
                                         $catId = $get('default_category_id');
                                         if (blank($catId)) return [];
@@ -163,10 +252,11 @@ class ListingProdukForm
                                             ->toArray();
                                     })
                                     ->searchable()
+                                    ->preload()
                                     ->createOptionForm([
                                         TextInput::make('sub_category')->label('Sub Kategori Baru')->required(),
                                     ])
-                                    ->createOptionUsing(fn (array $data) => $data['sub_category'])
+                                    ->createOptionUsing(fn (array $data) => strtoupper(trim($data['sub_category'])))
                                     ->live()
                                     ->dehydrated(false)
                                     ->default(function ($record) {
@@ -304,23 +394,39 @@ class ListingProdukForm
                                     $data['sub_category'] = $defaultSubCat;
                                 }
 
-                                // Pencegahan Tabrakan SKU Otomatis
-                                $prefixSku = 'SKU-' . date('dmy');
-                                $sku = trim($data['sku'] ?? '');
-
-                                if (empty($sku) || Product::where('sku', $sku)->where('organization_id', $orgId)->exists()) {
-                                    $lastSkuRecord = Product::where('sku', 'like', $prefixSku . '%')
-                                        ->where('organization_id', $orgId)
-                                        ->orderBy('sku', 'desc')
+                                // Pencegahan Tabrakan / Penanganan Barcode Sudah Ada
+                                $barcode = trim($data['barcode'] ?? '');
+                                if (!empty($barcode)) {
+                                    $existing = Product::where('organization_id', $orgId)
+                                        ->where(function ($q) use ($barcode) {
+                                            $q->where('barcode', $barcode)
+                                              ->orWhere('sku', $barcode)
+                                              ->orWhereJsonContains('metadata->additional_barcodes', $barcode);
+                                        })
                                         ->first();
-                                    $lastNum = $lastSkuRecord ? (int) substr($lastSkuRecord->sku, -4) : 0;
 
-                                    do {
-                                        $lastNum++;
-                                        $candidateSku = $prefixSku . str_pad($lastNum, 4, '0', STR_PAD_LEFT);
-                                    } while (Product::where('sku', $candidateSku)->where('organization_id', $orgId)->exists());
+                                    if ($existing) {
+                                        // Barcode ditemukan: jangan error! Update status & data produk lama
+                                        $existing->update([
+                                            'listing_status' => 'TRIAL',
+                                            'trial_start_date' => $data['trial_start_date'] ?? $existing->trial_start_date,
+                                            'trial_end_date' => $data['trial_end_date'] ?? $existing->trial_end_date,
+                                            'allowed_branch_ids' => $data['allowed_branch_ids'] ?? $existing->allowed_branch_ids,
+                                            'cost_price' => $data['cost_price'] ?? $existing->cost_price,
+                                            'cost_price_tax' => $data['cost_price_tax'] ?? $existing->cost_price_tax,
+                                            'margin_gol_1' => $data['margin_gol_1'] ?? $existing->margin_gol_1,
+                                            'harga_jual_1' => $data['harga_jual_1'] ?? $existing->harga_jual_1,
+                                            'selling_price' => $data['selling_price'] ?? $existing->selling_price,
+                                        ]);
 
-                                    $data['sku'] = $candidateSku;
+                                        $data['id'] = $existing->id;
+                                        $data['sku'] = $existing->sku;
+                                    }
+                                }
+
+                                // Jika barcode baru dan SKU belum ada: otomatis buat SKU baru
+                                if (empty($data['sku'])) {
+                                    $data['sku'] = Product::generateNextSku($orgId);
                                 }
 
                                 // Pencegahan Barcode Kosong
@@ -369,19 +475,7 @@ class ListingProdukForm
                                         ->exists();
 
                                     if ($conflict) {
-                                        $prefixSku = 'SKU-' . date('dmy');
-                                        $lastSkuRecord = Product::where('sku', 'like', $prefixSku . '%')
-                                            ->where('organization_id', $orgId)
-                                            ->orderBy('sku', 'desc')
-                                            ->first();
-                                        $lastNum = $lastSkuRecord ? (int) substr($lastSkuRecord->sku, -4) : 0;
-
-                                        do {
-                                            $lastNum++;
-                                            $candidateSku = $prefixSku . str_pad($lastNum, 4, '0', STR_PAD_LEFT);
-                                        } while (Product::where('sku', $candidateSku)->where('organization_id', $orgId)->exists());
-
-                                        $data['sku'] = $candidateSku;
+                                        $data['sku'] = Product::generateNextSku($orgId);
                                     }
                                 }
 
@@ -393,16 +487,50 @@ class ListingProdukForm
                             ->minItems(1)
                             ->compact()
                             ->table([
-                                TableColumn::make('Produk & Identitas')->width('320px')->markAsRequired(),
+                                TableColumn::make('Produk & Identitas')->width('280px')->markAsRequired(),
                                 TableColumn::make('Kategori (Beda)')->width('210px'),
-                                TableColumn::make('Satuan')->width('75px')->markAsRequired(),
-                                TableColumn::make('Modal (DPP)')->width('125px')->markAsRequired(),
-                                TableColumn::make('HPP + PPN (11%)')->width('125px'),
-                                TableColumn::make('Harga Jual')->width('125px')->markAsRequired(),
+                                TableColumn::make('Satuan')->width('65px')->markAsRequired(),
+                                TableColumn::make('Modal (DPP)')->width('115px')->markAsRequired(),
+                                TableColumn::make('HPP + PPN (11%)')->width('115px'),
+                                TableColumn::make('Margin (%)')->width('90px')->markAsRequired(),
+                                TableColumn::make('Harga Jual')->width('120px')->markAsRequired(),
                             ])
                             ->schema([
                                 // Kolom 1: Produk & Identitas (Nama Produk + Barcode/SKU)
                                 Group::make([
+                                    Placeholder::make('badge_status_barang')
+                                        ->hiddenLabel()
+                                        ->content(function (callable $get) {
+                                            $isExisting = (bool) $get('is_existing');
+                                            $id = $get('id');
+
+                                            if (!$isExisting && !empty($id)) {
+                                                $product = Product::find($id);
+                                                if ($product) {
+                                                    $isExisting = $product->is_existing_listing;
+                                                }
+                                            }
+
+                                            if ($isExisting) {
+                                                return new \Illuminate\Support\HtmlString(
+                                                    '<div class="flex items-center gap-1.5 mb-1.5" style="display:flex; align-items:center; gap:6px; margin-bottom: 5px;">' .
+                                                    '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-700 shadow-sm" style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:0.68rem; font-weight:700; background-color:#dcfce7; color:#15803d; border:1px solid #86efac;">' .
+                                                    '<svg class="w-3 h-3 text-emerald-600 dark:text-emerald-400" style="width:11px; height:11px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>' .
+                                                    'PRODUK SUDAH ADA (Pantauan Listing)' .
+                                                    '</span>' .
+                                                    '</div>'
+                                                );
+                                            }
+
+                                            return new \Illuminate\Support\HtmlString(
+                                                '<div class="flex items-center gap-1.5 mb-1.5" style="display:flex; align-items:center; gap:6px; margin-bottom: 5px;">' .
+                                                '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-700 shadow-sm" style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:0.68rem; font-weight:700; background-color:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe;">' .
+                                                '✨ BARANG BARU (SKU Baru)' .
+                                                '</span>' .
+                                                '</div>'
+                                            );
+                                        }),
+
                                     TextInput::make('name')
                                         ->label('Nama Produk')
                                         ->hiddenLabel()
@@ -414,7 +542,66 @@ class ListingProdukForm
                                             ->hiddenLabel()
                                             ->nullable()
                                             ->placeholder('Barcode / Scan')
-                                            ->extraAttributes(['style' => 'font-family: monospace; font-size: 0.75rem;']),
+                                            ->extraAttributes(['style' => 'font-family: monospace; font-size: 0.75rem;'])
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                                $barcode = trim((string) $state);
+                                                if (empty($barcode)) {
+                                                    $set('id', null);
+                                                    $set('is_existing', false);
+                                                    return;
+                                                }
+
+                                                $orgId = $get('organization_id') ?? $get('../../organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
+
+                                                $existing = Product::where('organization_id', $orgId)
+                                                    ->where(function ($q) use ($barcode) {
+                                                        $q->where('barcode', $barcode)
+                                                          ->orWhere('sku', $barcode)
+                                                          ->orWhereJsonContains('metadata->additional_barcodes', $barcode);
+                                                    })
+                                                    ->first();
+
+                                                if ($existing) {
+                                                    $set('id', $existing->id);
+                                                    $set('is_existing', true);
+                                                    if (blank($get('name'))) {
+                                                        $set('name', $existing->name);
+                                                    }
+                                                    $set('sku', $existing->sku);
+                                                    if (!empty($existing->unit_of_measure)) {
+                                                        $set('unit_of_measure', $existing->unit_of_measure);
+                                                    }
+                                                    if (!empty($existing->category_id) && blank($get('category_id'))) {
+                                                        $set('category_id', $existing->category_id);
+                                                    }
+                                                    if (!empty($existing->sub_category) && blank($get('sub_category'))) {
+                                                        $set('sub_category', $existing->sub_category);
+                                                    }
+
+                                                    $currentCost = (float) str_replace(',', '.', str_replace('.', '', (string) $get('cost_price')));
+                                                    if ($currentCost <= 0 && $existing->cost_price > 0) {
+                                                        $set('cost_price', $existing->cost_price);
+                                                        $set('cost_price_tax', $existing->cost_price_tax);
+                                                        $set('margin_gol_1', $existing->margin_gol_1 ?? 10);
+                                                        $set('harga_jual_1', $existing->harga_jual_1 ?? $existing->selling_price);
+                                                        $set('selling_price', $existing->harga_jual_1 ?? $existing->selling_price);
+                                                    }
+
+                                                    Notification::make()
+                                                        ->title('Barcode Terdaftar di Database')
+                                                        ->body("Barcode '{$barcode}' adalah '{$existing->name}'. Produk akan dimasukkan ke dalam pantauan listing tanpa membuat duplikasi.")
+                                                        ->info()
+                                                        ->send();
+                                                } else {
+                                                    $set('id', null);
+                                                    $set('is_existing', false);
+                                                    if (blank($get('sku'))) {
+                                                        $newSku = Product::generateNextSku($orgId);
+                                                        $set('sku', $newSku);
+                                                    }
+                                                }
+                                            }),
                                         TextInput::make('sku')
                                             ->label('SKU')
                                             ->hiddenLabel()
@@ -437,11 +624,41 @@ class ListingProdukForm
                                         ->live()
                                         ->afterStateUpdated(fn (callable $set) => $set('sub_category', null)),
 
-                                    TextInput::make('sub_category')
+                                    Select::make('sub_category')
                                         ->label('Sub Kategori')
                                         ->hiddenLabel()
+                                        ->placeholder(fn (callable $get) => empty($get('category_id') ?: $get('../../default_category_id')) ? 'Pilih Kategori...' : 'Pilih / Cari Sub Kategori...')
+                                        ->options(function (callable $get) {
+                                            $catId = $get('category_id') ?: $get('../../default_category_id');
+                                            if (blank($catId)) {
+                                                $current = $get('sub_category');
+                                                return $current ? [$current => $current] : [];
+                                            }
+
+                                            $options = Product::where('category_id', $catId)
+                                                ->whereNotNull('sub_category')
+                                                ->where('sub_category', '!=', '')
+                                                ->distinct()
+                                                ->orderBy('sub_category')
+                                                ->pluck('sub_category', 'sub_category')
+                                                ->toArray();
+
+                                            $current = $get('sub_category');
+                                            if (!empty($current) && !isset($options[$current])) {
+                                                $options[$current] = $current;
+                                            }
+
+                                            return $options;
+                                        })
+                                        ->searchable()
+                                        ->preload()
                                         ->nullable()
-                                        ->placeholder('Ikuti Sub Kategori Massal'),
+                                        ->createOptionForm([
+                                            TextInput::make('sub_category')
+                                                ->label('Sub Kategori Baru')
+                                                ->required(),
+                                        ])
+                                        ->createOptionUsing(fn (array $data) => strtoupper(trim($data['sub_category']))),
                                 ]),
 
                                 // Kolom 3: Satuan
@@ -462,20 +679,20 @@ class ListingProdukForm
                                     ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                         $cost = (float) str_replace(',', '.', str_replace('.', '', (string)$state));
                                         $isTaxable = (bool) ($get('is_taxable') ?? true);
-                                        $taxRate = \App\Services\RetailIntelligenceService::getActiveTaxRate();
+                                        $taxRate = RetailIntelligenceService::getActiveTaxRate();
                                         $taxed_cost = $isTaxable ? round($cost * (1 + ($taxRate / 100)), 2) : $cost;
                                         $set('cost_price_tax', str_replace('.', ',', (string)$taxed_cost));
 
-                                        $currentJual = (float) str_replace(',', '.', str_replace('.', '', (string) $get('harga_jual_1')));
-                                        if ($currentJual <= 0 && $taxed_cost > 0) {
-                                            $autoJual = ceil(($taxed_cost * 1.10) / 100) * 100;
+                                        $margin = (float) str_replace(',', '.', str_replace('.', '', (string) $get('margin_gol_1')));
+                                        if ($margin <= 0) {
+                                            $margin = 10;
+                                            $set('margin_gol_1', 10);
+                                        }
+
+                                        if ($taxed_cost > 0) {
+                                            $autoJual = ceil(($taxed_cost * (1 + ($margin / 100))) / 100) * 100;
                                             $set('harga_jual_1', $autoJual);
                                             $set('selling_price', $autoJual);
-                                            $new_margin = round((($autoJual - $taxed_cost) / $taxed_cost) * 100, 2);
-                                            $set('margin_gol_1', $new_margin);
-                                        } elseif ($taxed_cost > 0 && $currentJual > 0) {
-                                            $new_margin = round((($currentJual - $taxed_cost) / $taxed_cost) * 100, 2);
-                                            $set('margin_gol_1', $new_margin);
                                         }
                                     }),
 
@@ -488,24 +705,49 @@ class ListingProdukForm
                                     ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
                                         $taxed_cost = (float) str_replace(',', '.', str_replace('.', '', (string)$state));
                                         if ($taxed_cost > 0) {
-                                            $dpp = round($taxed_cost / 1.11, 2);
+                                            $taxRate = RetailIntelligenceService::getActiveTaxRate();
+                                            $dpp = round($taxed_cost / (1 + ($taxRate / 100)), 2);
                                             $set('cost_price', str_replace('.', ',', (string)$dpp));
 
-                                            $currentJual = (float) str_replace(',', '.', str_replace('.', '', (string) $get('harga_jual_1')));
-                                            if ($currentJual <= 0) {
-                                                $autoJual = ceil(($taxed_cost * 1.10) / 100) * 100;
-                                                $set('harga_jual_1', $autoJual);
-                                                $set('selling_price', $autoJual);
-                                                $new_margin = round((($autoJual - $taxed_cost) / $taxed_cost) * 100, 2);
-                                                $set('margin_gol_1', $new_margin);
-                                            } else {
-                                                $new_margin = round((($currentJual - $taxed_cost) / $taxed_cost) * 100, 2);
-                                                $set('margin_gol_1', $new_margin);
+                                            $margin = (float) str_replace(',', '.', str_replace('.', '', (string) $get('margin_gol_1')));
+                                            if ($margin <= 0) {
+                                                $margin = 10;
+                                                $set('margin_gol_1', 10);
                                             }
+
+                                            $autoJual = ceil(($taxed_cost * (1 + ($margin / 100))) / 100) * 100;
+                                            $set('harga_jual_1', $autoJual);
+                                            $set('selling_price', $autoJual);
                                         }
                                     }),
 
-                                // Kolom 6: Harga Jual (Eceran)
+                                // Kolom 6: Margin (%) - Default 10%
+                                TextInput::make('margin_gol_1')
+                                    ->label('Margin (%)')
+                                    ->hiddenLabel()
+                                    ->numeric()
+                                    ->default(10)
+                                    ->suffix('%')
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function (\Filament\Schemas\Components\Utilities\Set $set, \Filament\Schemas\Components\Utilities\Get $get, $state) {
+                                        $hpp = (float) str_replace(',', '.', str_replace('.', '', (string)$get('cost_price_tax')));
+                                        if ($hpp <= 0) {
+                                            $cost = (float) str_replace(',', '.', str_replace('.', '', (string)$get('cost_price')));
+                                            $isTaxable = (bool) ($get('is_taxable') ?? true);
+                                            $taxRate = RetailIntelligenceService::getActiveTaxRate();
+                                            $hpp = $isTaxable ? round($cost * (1 + ($taxRate / 100)), 2) : $cost;
+                                            $set('cost_price_tax', str_replace('.', ',', (string)$hpp));
+                                        }
+
+                                        $margin = (float) str_replace(',', '.', str_replace('.', '', (string)$state));
+                                        if ($hpp > 0) {
+                                            $autoJual = ceil(($hpp * (1 + ($margin / 100))) / 100) * 100;
+                                            $set('harga_jual_1', $autoJual);
+                                            $set('selling_price', $autoJual);
+                                        }
+                                    }),
+
+                                // Kolom 7: Harga Jual (Eceran)
                                 TextInput::make('harga_jual_1')
                                     ->label('Harga Jual')
                                     ->hiddenLabel()
@@ -522,7 +764,8 @@ class ListingProdukForm
                                         $set('selling_price', $harga);
                                     }),
 
-                                Hidden::make('margin_gol_1')->default(0),
+                                Hidden::make('id')->nullable(),
+                                Hidden::make('is_existing')->default(false),
                                 Hidden::make('qty_min_gol_1')->default(1),
                                 Hidden::make('selling_price')->default(0),
                                 Hidden::make('is_taxable')->default(true),

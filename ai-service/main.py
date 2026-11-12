@@ -39,6 +39,7 @@ def ask_ai(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 from invoice_scanner import scan_invoice
+from listing_scanner import scan_listing_document
 import shutil
 import os
 from fastapi import UploadFile, File, Form
@@ -57,6 +58,27 @@ async def api_scan_invoice(
         result = scan_invoice(temp_file_path, supplier_id)
         
         # Cleanup
+        try:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+        except Exception as e:
+            print(f"Warning: Failed to cleanup {temp_file_path}: {e}")
+            
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/ai/scan-listing")
+async def api_scan_listing(
+    file: UploadFile = File(...)
+):
+    try:
+        temp_file_path = f"temp_{file.filename}"
+        with open(temp_file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        result = scan_listing_document(temp_file_path)
+        
         try:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)

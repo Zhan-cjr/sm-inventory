@@ -48,6 +48,42 @@ class EditListingProduk extends EditRecord
         return $data;
     }
 
+    protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
+    {
+        // Hubungkan produk yang barcodenya sudah terdaftar di database sebelum saveRelationships() berjalan
+        $rawProducts = $this->form->getRawState()['products'] ?? $data['products'] ?? [];
+        $orgId = $record->organization_id;
+
+        foreach ($rawProducts as $item) {
+            $barcode = trim($item['barcode'] ?? '');
+            $id = $item['id'] ?? null;
+
+            $existing = null;
+            if (!empty($id)) {
+                $existing = \App\Models\Product::find($id);
+            } elseif (!empty($barcode)) {
+                $existing = \App\Models\Product::where('organization_id', $orgId)
+                    ->where(function ($q) use ($barcode) {
+                        $q->where('barcode', $barcode)
+                          ->orWhere('sku', $barcode)
+                          ->orWhereJsonContains('metadata->additional_barcodes', $barcode);
+                    })
+                    ->first();
+            }
+
+            if ($existing && $existing->product_listing_id !== $record->id) {
+                $meta = $existing->metadata ?? [];
+                $meta['is_existing_listing'] = true;
+                $existing->metadata = $meta;
+                $existing->product_listing_id = $record->id;
+                $existing->listing_status = 'TRIAL';
+                $existing->saveQuietly();
+            }
+        }
+
+        return parent::handleRecordUpdate($record, $data);
+    }
+
     protected function afterSave(): void
     {
         $record = $this->record;

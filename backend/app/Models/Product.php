@@ -347,4 +347,51 @@ class Product extends Model
     {
         return $query->where('listing_status', 'DELISTED');
     }
+
+    /**
+     * Check if product was an existing master product prior to being added to a listing.
+     */
+    public function getIsExistingListingAttribute(): bool
+    {
+        if (isset($this->metadata['is_existing_listing'])) {
+            return (bool) $this->metadata['is_existing_listing'];
+        }
+
+        if ($this->productListing && $this->created_at && $this->productListing->created_at) {
+            return $this->created_at->lt($this->productListing->created_at->subMinutes(2));
+        }
+
+        return false;
+    }
+
+    /**
+     * Generate next sequential SKU for the given organization in format SKU-DDMMYYxxxx.
+     */
+    public static function generateNextSku(?string $organizationId = null, array $reservedSkus = []): string
+    {
+        $orgId = $organizationId ?? \Illuminate\Support\Facades\Auth::user()?->organization_id
+            ?? \App\Models\Organization::first()?->id;
+
+        $prefixSku = 'SKU-' . date('dmy');
+
+        $query = static::where('sku', 'like', $prefixSku . '%');
+        if ($orgId) {
+            $query->where('organization_id', $orgId);
+        }
+
+        $lastSkuRecord = $query->orderBy('sku', 'desc')->first();
+        $lastNum = $lastSkuRecord ? (int) substr($lastSkuRecord->sku, -4) : 0;
+
+        do {
+            $lastNum++;
+            $candidateSku = $prefixSku . str_pad($lastNum, 4, '0', STR_PAD_LEFT);
+        } while (
+            in_array($candidateSku, $reservedSkus) ||
+            static::where('sku', $candidateSku)
+                ->when($orgId, fn ($q) => $q->where('organization_id', $orgId))
+                ->exists()
+        );
+
+        return $candidateSku;
+    }
 }

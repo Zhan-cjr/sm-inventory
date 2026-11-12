@@ -186,7 +186,7 @@ class ProductsTable
                     ->label('Listing')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'TRIAL' => 'Uji Coba',
+                        'TRIAL' => 'Pantauan Listing',
                         'PASSED' => 'Lolos Listing',
                         'DELISTED' => 'Delisted',
                         default => 'Reguler',
