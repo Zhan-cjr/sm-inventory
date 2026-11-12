@@ -95,6 +95,24 @@ class ListingProdukForm
                             ->default(true)
                             ->visible(fn (callable $get) => ((float) str_replace(',', '.', str_replace('.', '', (string)$get('listing_fee')))) > 0)
                             ->dehydrated(false),
+
+                        FileUpload::make('document_path')
+                            ->label('Berkas / Foto Formulir Listing (Bukti Dokumen Fisik)')
+                            ->disk('public')
+                            ->directory('listing-documents')
+                            ->visibility('public')
+                            ->acceptedFileTypes([
+                                'image/jpeg', 'image/png', 'image/webp', 'image/jpg',
+                                'application/pdf',
+                                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                'application/vnd.ms-excel',
+                                'text/csv',
+                            ])
+                            ->openable()
+                            ->downloadable()
+                            ->previewable()
+                            ->columnSpanFull()
+                            ->helperText('File bukti fisik formulir pengajuan/registrasi dari supplier. Tersimpan permanen untuk arsip & kroscek di kemudian hari.'),
                     ]),
 
                 Section::make('Masa Uji Coba & Kuota Cabang Pilot')
@@ -154,10 +172,11 @@ class ListingProdukForm
                                         'application/vnd.ms-excel',
                                         'text/csv',
                                     ])
-                                    ->disk('local')
-                                    ->directory('listing-documents-temp')
+                                    ->disk('public')
+                                    ->directory('listing-documents')
+                                    ->visibility('public')
                                     ->required()
-                                    ->helperText('Format: Foto Formulir (JPG/PNG), Scan PDF, atau Spreadsheet Excel/CSV.'),
+                                    ->helperText('Format: Foto Formulir (JPG/PNG), Scan PDF, atau Spreadsheet Excel/CSV. File otomatis tersimpan permanen sebagai bukti dokumen.'),
 
                                 TextInput::make('default_margin')
                                     ->label('Persentase Margin Default (%)')
@@ -172,7 +191,8 @@ class ListingProdukForm
                                     ->default(false),
                             ])
                             ->action(function (array $data, callable $set, callable $get) {
-                                $filePath = Storage::disk('local')->path($data['document_file']);
+                                $relativePath = $data['document_file'];
+                                $filePath = Storage::disk('public')->path($relativePath);
                                 $margin = (float) ($data['default_margin'] ?? 10);
                                 $orgId = $get('organization_id') ?? Auth::user()?->organization_id ?? Organization::first()?->id;
 
@@ -186,8 +206,6 @@ class ListingProdukForm
                                         ->danger()
                                         ->send();
                                     return;
-                                } finally {
-                                    @unlink($filePath);
                                 }
 
                                 if (empty($result['items'])) {
@@ -198,6 +216,9 @@ class ListingProdukForm
                                         ->send();
                                     return;
                                 }
+
+                                // Simpan file sebagai berkas lampiran resmi di form
+                                $set('document_path', $relativePath);
 
                                 // Yang dipakai difokuskan pada daftar barangnya saja
                                 $newItems = $result['items'];
@@ -211,8 +232,8 @@ class ListingProdukForm
 
                                 $summary = $result['summary'];
                                 Notification::make()
-                                    ->title('Dokumen Listing Berhasil Diproses')
-                                    ->body("Total {$summary['total_items']} produk dimuat. {$summary['new_items_count']} produk baru (SKU dibuat otomatis) dan {$summary['existing_items_count']} produk lama (status beralih ke pantauan listing).")
+                                    ->title('Dokumen Listing Berhasil Diproses & Disimpan')
+                                    ->body("Total {$summary['total_items']} produk dimuat. Berkas formulir telah disimpan dan dilampirkan untuk kroscek di masa mendatang.")
                                     ->success()
                                     ->duration(8000)
                                     ->send();

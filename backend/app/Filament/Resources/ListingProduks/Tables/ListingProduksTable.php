@@ -12,6 +12,7 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -126,8 +127,31 @@ class ListingProduksTable
                     })
                     ->badge()
                     ->color('info'),
+
+                IconColumn::make('document_path')
+                    ->label('Berkas')
+                    ->state(fn (ProductListing $record) => !empty($record->document_path))
+                    ->boolean()
+                    ->trueIcon('heroicon-o-document-check')
+                    ->falseIcon('heroicon-o-minus')
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->tooltip(fn (ProductListing $record) => !empty($record->document_path) ? 'Berkas tersimpan: ' . basename($record->document_path) : 'Tidak ada berkas dokumen'),
             ])
             ->recordActions([
+                Action::make('view_document')
+                    ->label('Lihat Dokumen')
+                    ->icon('heroicon-o-document-magnifying-glass')
+                    ->color('primary')
+                    ->visible(fn (ProductListing $record) => !empty($record->document_path))
+                    ->modalHeading(fn (ProductListing $record) => "Dokumen Formulir Listing: {$record->listing_number}")
+                    ->modalWidth('4xl')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup')
+                    ->modalContent(fn (ProductListing $record) => view('filament.listing-produks.document-preview', [
+                        'path' => $record->document_path,
+                        'record' => $record,
+                    ])),
                 Action::make('view_evaluation')
                     ->label('Evaluasi Performa')
                     ->icon('heroicon-o-chart-bar-square')

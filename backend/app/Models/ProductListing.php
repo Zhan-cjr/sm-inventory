@@ -27,8 +27,14 @@ class ProductListing extends Model
         'allowed_branch_ids',
         'status',
         'notes',
+        'document_path',
         'created_by',
     ];
+
+    public function getDocumentUrlAttribute(): ?string
+    {
+        return $this->document_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->document_path) : null;
+    }
 
     protected $casts = [
         'listing_fee' => 'decimal:2',

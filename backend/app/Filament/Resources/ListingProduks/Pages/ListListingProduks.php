@@ -49,10 +49,11 @@ class ListListingProduks extends ListRecords
                             'application/vnd.ms-excel',
                             'text/csv',
                         ])
-                        ->disk('local')
-                        ->directory('listing-documents-temp')
+                        ->disk('public')
+                        ->directory('listing-documents')
+                        ->visibility('public')
                         ->required()
-                        ->helperText('Format: Foto Formulir (JPG/PNG), File PDF, atau Spreadsheet Excel/CSV.'),
+                        ->helperText('Format: Foto Formulir (JPG/PNG), File PDF, atau Spreadsheet Excel/CSV. File akan tersimpan permanen sebagai bukti dokumen.'),
 
                     Select::make('supplier_id')
                         ->label('Supplier')
@@ -114,7 +115,8 @@ class ListListingProduks extends ListRecords
                         ->helperText('Pilih cabang-cabang yang berhak memesan dan memajang produk selama masa uji coba.'),
                 ])
                 ->action(function (array $data, \Livewire\Component $livewire) {
-                    $filePath = Storage::disk('local')->path($data['document_file']);
+                    $relativePath = $data['document_file'];
+                    $filePath = Storage::disk('public')->path($relativePath);
                     $margin = (float) ($data['default_margin'] ?? 10);
                     $orgId = Auth::user()?->organization_id ?? Organization::first()?->id;
 
@@ -128,8 +130,6 @@ class ListListingProduks extends ListRecords
                             ->danger()
                             ->send();
                         return;
-                    } finally {
-                        @unlink($filePath);
                     }
 
                     if (empty($result['items'])) {
@@ -172,6 +172,7 @@ class ListListingProduks extends ListRecords
                         'allowed_branch_ids' => $branchIds,
                         'status' => 'TRIAL',
                         'notes' => $result['notes'] ?? 'Dibuat otomatis dari Upload Dokumen Listing.',
+                        'document_path' => $relativePath,
                         'created_by' => Auth::id(),
                     ]);
 
