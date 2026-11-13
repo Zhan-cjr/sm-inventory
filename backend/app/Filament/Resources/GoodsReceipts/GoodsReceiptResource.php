@@ -5,6 +5,7 @@ namespace App\Filament\Resources\GoodsReceipts;
 use App\Filament\Resources\GoodsReceipts\Pages\CreateGoodsReceipt;
 use App\Filament\Resources\GoodsReceipts\Pages\EditGoodsReceipt;
 use App\Filament\Resources\GoodsReceipts\Pages\ListGoodsReceipts;
+use App\Filament\Resources\GoodsReceipts\Pages\ViewGoodsReceipt;
 use App\Filament\Resources\GoodsReceipts\Schemas\GoodsReceiptForm;
 use App\Filament\Resources\GoodsReceipts\Tables\GoodsReceiptsTable;
 use App\Models\GoodsReceipt;
@@ -54,6 +55,7 @@ class GoodsReceiptResource extends Resource
         return [
             'index' => ListGoodsReceipts::route('/'),
             'create' => CreateGoodsReceipt::route('/create'),
+            'view' => ViewGoodsReceipt::route('/{record}'),
             'edit' => EditGoodsReceipt::route('/{record}/edit'),
         ];
     }

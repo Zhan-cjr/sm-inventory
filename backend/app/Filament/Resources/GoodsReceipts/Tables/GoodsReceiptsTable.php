@@ -5,6 +5,7 @@ namespace App\Filament\Resources\GoodsReceipts\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use App\Filament\Filters\DateFilterHelper;
@@ -101,6 +102,7 @@ class GoodsReceiptsTable
                     ->url(fn (\App\Models\GoodsReceipt $record) => route('print.document', ['type' => 'receipt', 'ids' => [$record->id]]))
                     ->openUrlInNewTab()
                     ->visible(fn (\App\Models\GoodsReceipt $record) => strtoupper((string) $record->status) !== 'DRAFT'),
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->bulkActions([

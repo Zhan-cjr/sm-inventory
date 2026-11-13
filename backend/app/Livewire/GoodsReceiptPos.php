@@ -56,6 +56,7 @@ class GoodsReceiptPos extends Component
 
     public $searchResults = [];
     public $goodsReceipt;
+    public bool $readOnly = false;
 
     public $only_latest_po = false;
     public $gr_requires_po = false;
@@ -67,8 +68,9 @@ class GoodsReceiptPos extends Component
         return $user ? $user->hasCustomAuthorization('BYPASS_GR_PO_REQUIRED') : false;
     }
 
-    public function mount($goodsReceipt = null)
+    public function mount($goodsReceipt = null, bool $readOnly = false)
     {
+        $this->readOnly = $readOnly;
         $this->taxRate = (float) \App\Services\RetailIntelligenceService::getActiveTaxRate();
 
         if ($goodsReceipt) {
@@ -148,6 +150,7 @@ class GoodsReceiptPos extends Component
                 }
 
                 $this->cart[] = [
+                    'id' => $item->id,
                     'product_id' => $item->product_id,
                     'sku' => $item->product ? $item->product->sku : '',
                     'barcode' => $item->product ? $item->product->barcode : '',
@@ -1085,6 +1088,10 @@ class GoodsReceiptPos extends Component
 
     public function save()
     {
+        if ($this->readOnly) {
+            return;
+        }
+
         $this->calculateTotals();
 
         $this->validate([
@@ -1151,7 +1158,8 @@ class GoodsReceiptPos extends Component
         }
 
         $gr = null;
-        DB::transaction(function () use (&$gr, $imagePaths) {
+        $noChanges = false;
+        DB::transaction(function () use (&$gr, &$noChanges, $imagePaths) {
             $data = [
                 'purchase_order_id' => $this->purchase_order_id,
                 'supplier_id' => $this->supplier_id,
@@ -1176,24 +1184,10 @@ class GoodsReceiptPos extends Component
                 'notes' => $this->notes,
             ];
 
-            if ($this->goodsReceipt) {
-                // Warning: Re-calculating stock for update is complex. 
-                // For simplicity, we only allow creating new GR for now or handle update carefully.
-                $this->goodsReceipt->update($data);
-                
-                // Fetch the items collection and delete individually to trigger Eloquent Observers (Stock deduction)
-                foreach ($this->goodsReceipt->items as $oldItem) {
-                    $oldItem->delete();
-                }
-
-                $gr = $this->goodsReceipt;
-            } else {
-                $gr = GoodsReceipt::create($data);
-            }
-
             $taxRate = (float) ($this->taxRate ?? \App\Services\RetailIntelligenceService::getActiveTaxRate());
             $taxMultiplier = 1 + ($taxRate / 100);
 
+            $preparedItems = [];
             foreach ($this->cart as $item) {
                 $qty = (float) $item['qty_received'];
                 $itemSubtotal = (float) $item['subtotal'];
@@ -1221,105 +1215,154 @@ class GoodsReceiptPos extends Component
                     $costPriceTax = $netPrice;
                 }
 
-                GoodsReceiptItem::create([
-                    'goods_receipt_id' => $gr->id,
-                    'product_id' => $item['product_id'],
-                    'quantity_ordered' => $item['qty_ordered'],
-                    'quantity_received' => $item['qty_received'],
-                    'unit_price' => $itemUnitPriceDpp,
-                    'discount_1' => $item['discount_1'] ?? 0,
-                    'discount_1_type' => $item['discount_1_type'] ?? 'percent',
-                    'discount_2' => $item['discount_2'] ?? 0,
-                    'discount_2_type' => $item['discount_2_type'] ?? 'percent',
-                    'discount_3' => $item['discount_3'] ?? 0,
-                    'discount_3_type' => $item['discount_3_type'] ?? 'percent',
-                    'subtotal' => $itemSubtotalDpp
-                ]);
-
-                $product = Product::find($item['product_id']);
-                $isTaxable = (bool) ($item['is_taxable'] ?? ($product?->is_taxable ?? true));
-                $costBasisMargin = $costPriceTax > 0 ? $costPriceTax : $netPrice;
-
-                // 1. Selalu update Produk Global (Master Data) agar harga global tetap up-to-date
-                if ($product) {
-                    $updateData = [
-                        'cost_price' => $netPrice,
-                        'cost_price_tax' => $costPriceTax,
-                    ];
-                    if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
-                        $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
-                        $updateData['harga_jual_2'] = $item['harga_jual_2'] ?? $product->harga_jual_2;
-                        $updateData['harga_jual_3'] = $item['harga_jual_3'] ?? $product->harga_jual_3;
-                        
-                        foreach([1, 2, 3] as $i) {
-                            $hj = (float) $updateData["harga_jual_{$i}"];
-                            if ($hj > 0 && $costBasisMargin > 0) {
-                                $updateData["margin_gol_{$i}"] = round((($hj - $costBasisMargin) / $costBasisMargin) * 100, 2);
-                            } else {
-                                $updateData["margin_gol_{$i}"] = (float) ($item["margin_gol_{$i}"] ?? 0);
-                            }
-                        }
-                        $updateData['selling_price'] = $updateData['harga_jual_1'];
-                    }
-                    $product->update($updateData);
-                }
-
-                // 2. Jika cabang dipilih, update juga harga spesifik cabang tersebut
-                if (!empty($this->branch_id)) {
-                    $stock = Stock::where('product_id', $item['product_id'])->where('branch_id', $this->branch_id)->first();
-                    if ($stock) {
-                        $updateData = [
-                            'cost_price' => $netPrice,
-                            'cost_price_tax' => $costPriceTax,
-                        ];
-                        if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
-                            $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $stock->harga_jual_1;
-                            $updateData['harga_jual_2'] = $item['harga_jual_2'] ?? $stock->harga_jual_2;
-                            $updateData['harga_jual_3'] = $item['harga_jual_3'] ?? $stock->harga_jual_3;
-                            
-                            foreach([1, 2, 3] as $i) {
-                                $hj = (float) $updateData["harga_jual_{$i}"];
-                                if ($hj > 0 && $costBasisMargin > 0) {
-                                    $updateData["margin_gol_{$i}"] = round((($hj - $costBasisMargin) / $costBasisMargin) * 100, 2);
-                                } else {
-                                    $updateData["margin_gol_{$i}"] = (float) ($item["margin_gol_{$i}"] ?? 0);
-                                }
-                            }
-                            $updateData['selling_price'] = $updateData['harga_jual_1'];
-                        }
-                        $stock->update($updateData);
-                    }
-                }
+                $preparedItems[] = [
+                    'id' => $item['id'] ?? null,
+                    'cart_item' => $item,
+                    'net_price' => $netPrice,
+                    'cost_price_tax' => $costPriceTax,
+                    'payload' => [
+                        'product_id' => $item['product_id'],
+                        'quantity_ordered' => $item['qty_ordered'],
+                        'quantity_received' => $item['qty_received'],
+                        'unit_price' => $itemUnitPriceDpp,
+                        'discount_1' => $item['discount_1'] ?? 0,
+                        'discount_1_type' => $item['discount_1_type'] ?? 'percent',
+                        'discount_2' => $item['discount_2'] ?? 0,
+                        'discount_2_type' => $item['discount_2_type'] ?? 'percent',
+                        'discount_3' => $item['discount_3'] ?? 0,
+                        'discount_3_type' => $item['discount_3_type'] ?? 'percent',
+                        'subtotal' => $itemSubtotalDpp,
+                    ],
+                ];
             }
 
-            // Update PO Status if all items received
-            if ($this->purchase_order_id) {
-                $po = PurchaseOrder::with('items')->find($this->purchase_order_id);
-                $allReceived = true;
-                foreach ($po->items as $poItem) {
-                    // Update quantity_received for each po item based on this receipt
-                    $cartItem = collect($this->cart)->firstWhere('product_id', $poItem->product_id);
-                    if ($cartItem) {
-                        $poItem->quantity_received += $cartItem['qty_received'];
-                        $poItem->save();
-                    }
+            if ($this->goodsReceipt) {
+                $oldItems = $this->goodsReceipt->items()->get()->keyBy('id');
+                $branchChanged = (string) $this->goodsReceipt->branch_id !== (string) $this->branch_id;
+                $taxChanged = (bool) $this->goodsReceipt->include_tax !== (bool) $data['include_tax']
+                    || (string) ($this->goodsReceipt->tax_type ?? '') !== (string) $data['tax_type'];
+                $headerChanged = $this->hasHeaderChanges($this->goodsReceipt, $data);
+                $financialHeaderChanged = $this->hasFinancialHeaderChanges($this->goodsReceipt, $data);
 
-                    if ($poItem->quantity_received < $poItem->quantity_ordered) {
-                        $allReceived = false;
-                    }
-                }
-                
-                if ($allReceived) {
-                    $po->update(['status' => 'RECEIVED']);
+                $incomingIds = collect($preparedItems)->pluck('id')->filter()->all();
+                $deletedItems = $oldItems->filter(fn ($old) => !in_array($old->id, $incomingIds));
+
+                $toCreate = [];
+                $toUpdate = [];
+                $unchanged = [];
+                $anyItemMutated = $branchChanged || $deletedItems->isNotEmpty();
+
+                if ($branchChanged) {
+                    $deletedItems = $oldItems;
+                    $toCreate = $preparedItems;
                 } else {
-                    $po->update(['status' => 'PARTIALLY_RECEIVED']); // Or keep it APPROVED, but PARTIALLY_RECEIVED is better if it exists. Let's just use PARTIAL if possible, but the requirement only cares if ALL are received.
-                }
-            }
+                    foreach ($preparedItems as $entry) {
+                        $itemId = $entry['id'];
+                        $oldItem = $itemId ? $oldItems->get($itemId) : null;
 
-            // Panggil AccountingService untuk mencatat Jurnal
-            $accountingService = new \App\Services\AccountingService();
-            $accountingService->recordGoodsReceiptJournal($gr);
+                        if (!$oldItem) {
+                            $toCreate[] = $entry;
+                            $anyItemMutated = true;
+                        } elseif ((string) $oldItem->product_id !== (string) $entry['payload']['product_id']) {
+                            $deletedItems->put($oldItem->id, $oldItem);
+                            $toCreate[] = $entry;
+                            $anyItemMutated = true;
+                        } elseif ($this->hasItemChanged($oldItem, $entry['payload'])) {
+                            $toUpdate[] = ['model' => $oldItem, 'entry' => $entry];
+                            $anyItemMutated = true;
+                        } else {
+                            $unchanged[] = $entry;
+                        }
+                    }
+                }
+
+                $anyPriceChanged = false;
+                foreach ($preparedItems as $entry) {
+                    if ($this->wouldProductOrStockPricesChange($entry)) {
+                        $anyPriceChanged = true;
+                        break;
+                    }
+                }
+
+                if (!$headerChanged && !$anyItemMutated && !$anyPriceChanged) {
+                    $noChanges = true;
+                    return;
+                }
+
+                if ($headerChanged) {
+                    $this->goodsReceipt->update($data);
+                }
+                $gr = $this->goodsReceipt;
+
+                foreach ($deletedItems as $oldItem) {
+                    $oldItem->delete();
+                }
+
+                foreach ($toUpdate as $pair) {
+                    $pair['model']->update($pair['entry']['payload']);
+                }
+
+                foreach ($toCreate as $entry) {
+                    GoodsReceiptItem::create(array_merge(
+                        ['goods_receipt_id' => $gr->id],
+                        $entry['payload']
+                    ));
+                }
+
+                // Jika model pajak header berubah namun item tidak berubah, perbarui cost_price StockBatch tanpa menyentuh qty stok
+                if ($taxChanged && !$branchChanged && !empty($unchanged)) {
+                    foreach ($unchanged as $entry) {
+                        $product = Product::find($entry['payload']['product_id']);
+                        $isTaxable = (bool) ($entry['cart_item']['is_taxable'] ?? ($product?->is_taxable ?? true));
+                        $finalCostPrice = ($gr->include_tax && $isTaxable)
+                            ? round(((float) $entry['payload']['subtotal'] / max(1, (float) $entry['payload']['quantity_received'])) * $taxMultiplier, 2)
+                            : ($entry['payload']['quantity_received'] > 0 ? round((float) $entry['payload']['subtotal'] / (float) $entry['payload']['quantity_received'], 4) : (float) $entry['payload']['unit_price']);
+
+                        \App\Models\StockBatch::where('reference_doc_type', 'GOODS_RECEIPT')
+                            ->where('reference_doc_id', $gr->id)
+                            ->where('product_id', $entry['payload']['product_id'])
+                            ->update(['cost_price' => $finalCostPrice]);
+                    }
+                }
+
+                foreach ($preparedItems as $entry) {
+                    $this->syncProductAndStockPrices($entry);
+                }
+
+                if ($this->purchase_order_id && $anyItemMutated) {
+                    $this->syncPurchaseOrderReceivedQuantities($this->purchase_order_id);
+                }
+
+                if ($financialHeaderChanged || $anyItemMutated) {
+                    $accountingService = new \App\Services\AccountingService();
+                    $accountingService->recordGoodsReceiptJournal($gr);
+                }
+            } else {
+                $gr = GoodsReceipt::create($data);
+
+                foreach ($preparedItems as $entry) {
+                    GoodsReceiptItem::create(array_merge(
+                        ['goods_receipt_id' => $gr->id],
+                        $entry['payload']
+                    ));
+                    $this->syncProductAndStockPrices($entry);
+                }
+
+                // Update PO Status if all items received
+                if ($this->purchase_order_id) {
+                    $this->syncPurchaseOrderReceivedQuantities($this->purchase_order_id);
+                }
+
+                // Panggil AccountingService untuk mencatat Jurnal
+                $accountingService = new \App\Services\AccountingService();
+                $accountingService->recordGoodsReceiptJournal($gr);
+            }
         });
+
+        if ($noChanges) {
+            Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+            return redirect()->to(route('filament.admin.resources.goods-receipts.index'));
+        }
 
         Notification::make()->title('Penerimaan Barang berhasil disimpan dan stok telah diupdate.')->success()->send();
 
@@ -1333,6 +1376,219 @@ class GoodsReceiptPos extends Component
         }
         
         return redirect()->to(route('filament.admin.resources.goods-receipts.index'));
+    }
+
+    private function hasHeaderChanges(GoodsReceipt $gr, array $data): bool
+    {
+        $fields = [
+            'purchase_order_id', 'supplier_id', 'supplier_division_id', 'branch_id',
+            'receipt_number', 'faktur_supplier', 'discount_subtotal_type', 'tax_type',
+            'status', 'payment_method', 'payment_status', 'notes',
+        ];
+
+        foreach ($fields as $field) {
+            if ((string) ($gr->{$field} ?? '') !== (string) ($data[$field] ?? '')) {
+                return true;
+            }
+        }
+
+        $oldReceiptDate = $gr->receipt_date ? $gr->receipt_date->format('Y-m-d') : '';
+        $oldDueDate = $gr->due_date ? $gr->due_date->format('Y-m-d') : '';
+        if ($oldReceiptDate !== (string) ($data['receipt_date'] ?? '') || $oldDueDate !== (string) ($data['due_date'] ?? '')) {
+            return true;
+        }
+
+        if ((bool) $gr->include_tax !== (bool) $data['include_tax']) {
+            return true;
+        }
+
+        foreach (['total_amount', 'discount_subtotal', 'tax_amount', 'paid_amount'] as $numField) {
+            if (abs((float) $gr->{$numField} - (float) $data[$numField]) > 0.01) {
+                return true;
+            }
+        }
+
+        $oldImages = is_array($gr->faktur_image) ? $gr->faktur_image : ($gr->faktur_image ? [$gr->faktur_image] : []);
+        $newImages = is_array($data['faktur_image']) ? $data['faktur_image'] : ($data['faktur_image'] ? [$data['faktur_image']] : []);
+        if ($oldImages !== $newImages) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function hasFinancialHeaderChanges(GoodsReceipt $gr, array $data): bool
+    {
+        foreach (['supplier_id', 'branch_id', 'receipt_number', 'tax_type', 'payment_method', 'status'] as $field) {
+            if ((string) ($gr->{$field} ?? '') !== (string) ($data[$field] ?? '')) {
+                return true;
+            }
+        }
+
+        $oldReceiptDate = $gr->receipt_date ? $gr->receipt_date->format('Y-m-d') : '';
+        if ($oldReceiptDate !== (string) ($data['receipt_date'] ?? '')) {
+            return true;
+        }
+
+        if ((bool) $gr->include_tax !== (bool) $data['include_tax']) {
+            return true;
+        }
+
+        foreach (['total_amount', 'discount_subtotal', 'tax_amount', 'paid_amount'] as $numField) {
+            if (abs((float) $gr->{$numField} - (float) $data[$numField]) > 0.01) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasItemChanged(GoodsReceiptItem $oldItem, array $payload): bool
+    {
+        if ((int) $oldItem->quantity_ordered !== (int) $payload['quantity_ordered']
+            || (int) $oldItem->quantity_received !== (int) $payload['quantity_received']) {
+            return true;
+        }
+
+        if (abs((float) $oldItem->unit_price - round((float) $payload['unit_price'], 2)) > 0.01
+            || abs((float) $oldItem->subtotal - round((float) $payload['subtotal'], 2)) > 0.01) {
+            return true;
+        }
+
+        foreach ([1, 2, 3] as $i) {
+            if (abs((float) ($oldItem->{"discount_{$i}"} ?? 0) - (float) ($payload["discount_{$i}"] ?? 0)) > 0.01) {
+                return true;
+            }
+            if ((string) ($oldItem->{"discount_{$i}_type"} ?? 'percent') !== (string) ($payload["discount_{$i}_type"] ?? 'percent')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function wouldProductOrStockPricesChange(array $entry): bool
+    {
+        if (!auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
+            return false;
+        }
+
+        $item = $entry['cart_item'];
+        $product = Product::find($item['product_id']);
+        $stock = !empty($this->branch_id)
+            ? Stock::where('product_id', $item['product_id'])->where('branch_id', $this->branch_id)->first()
+            : null;
+
+        foreach ([1, 2, 3] as $i) {
+            $newHj = (float) ($item["harga_jual_{$i}"] ?? 0);
+            if ($product && abs((float) ($product->{"harga_jual_{$i}"} ?? 0) - $newHj) > 0.01) {
+                return true;
+            }
+            if ($stock && abs((float) ($stock->{"harga_jual_{$i}"} ?? 0) - $newHj) > 0.01) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function syncProductAndStockPrices(array $entry): void
+    {
+        $item = $entry['cart_item'];
+        $netPrice = $entry['net_price'];
+        $costPriceTax = $entry['cost_price_tax'];
+        $costBasisMargin = $costPriceTax > 0 ? $costPriceTax : $netPrice;
+
+        $product = Product::find($item['product_id']);
+
+        // 1. Selalu update Produk Global (Master Data) agar harga global tetap up-to-date
+        if ($product) {
+            $updateData = [
+                'cost_price' => $netPrice,
+                'cost_price_tax' => $costPriceTax,
+            ];
+            if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
+                $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $product->harga_jual_1;
+                $updateData['harga_jual_2'] = $item['harga_jual_2'] ?? $product->harga_jual_2;
+                $updateData['harga_jual_3'] = $item['harga_jual_3'] ?? $product->harga_jual_3;
+
+                foreach ([1, 2, 3] as $i) {
+                    $hj = (float) $updateData["harga_jual_{$i}"];
+                    if ($hj > 0 && $costBasisMargin > 0) {
+                        $updateData["margin_gol_{$i}"] = round((($hj - $costBasisMargin) / $costBasisMargin) * 100, 2);
+                    } else {
+                        $updateData["margin_gol_{$i}"] = (float) ($item["margin_gol_{$i}"] ?? 0);
+                    }
+                }
+                $updateData['selling_price'] = $updateData['harga_jual_1'];
+            }
+            $product->update($updateData);
+        }
+
+        // 2. Jika cabang dipilih, update juga harga spesifik cabang tersebut
+        if (!empty($this->branch_id)) {
+            $stock = Stock::where('product_id', $item['product_id'])->where('branch_id', $this->branch_id)->first();
+            if ($stock) {
+                $updateData = [
+                    'cost_price' => $netPrice,
+                    'cost_price_tax' => $costPriceTax,
+                ];
+                if (auth()->user()->hasCustomAuthorization('UPDATE_SELLING_PRICE')) {
+                    $updateData['harga_jual_1'] = $item['harga_jual_1'] ?? $stock->harga_jual_1;
+                    $updateData['harga_jual_2'] = $item['harga_jual_2'] ?? $stock->harga_jual_2;
+                    $updateData['harga_jual_3'] = $item['harga_jual_3'] ?? $stock->harga_jual_3;
+
+                    foreach ([1, 2, 3] as $i) {
+                        $hj = (float) $updateData["harga_jual_{$i}"];
+                        if ($hj > 0 && $costBasisMargin > 0) {
+                            $updateData["margin_gol_{$i}"] = round((($hj - $costBasisMargin) / $costBasisMargin) * 100, 2);
+                        } else {
+                            $updateData["margin_gol_{$i}"] = (float) ($item["margin_gol_{$i}"] ?? 0);
+                        }
+                    }
+                    $updateData['selling_price'] = $updateData['harga_jual_1'];
+                }
+                $stock->update($updateData);
+            }
+        }
+    }
+
+    private function syncPurchaseOrderReceivedQuantities(string $purchaseOrderId): void
+    {
+        $po = PurchaseOrder::with('items')->find($purchaseOrderId);
+        if (!$po) {
+            return;
+        }
+
+        $allReceived = true;
+        $anyReceived = false;
+
+        foreach ($po->items as $poItem) {
+            $totalReceived = (float) GoodsReceiptItem::whereHas('goodsReceipt', function ($q) use ($purchaseOrderId) {
+                $q->where('purchase_order_id', $purchaseOrderId)
+                  ->where('status', '!=', 'CANCELLED');
+            })
+            ->where('product_id', $poItem->product_id)
+            ->sum('quantity_received');
+
+            $poItem->quantity_received = $totalReceived;
+            $poItem->save();
+
+            if ($totalReceived < $poItem->quantity_ordered) {
+                $allReceived = false;
+            }
+            if ($totalReceived > 0) {
+                $anyReceived = true;
+            }
+        }
+
+        if ($allReceived && $po->items->count() > 0) {
+            $po->update(['status' => 'RECEIVED']);
+        } elseif ($anyReceived) {
+            $po->update(['status' => 'PARTIALLY_RECEIVED']);
+        } else {
+            $po->update(['status' => 'APPROVED']);
+        }
     }
 
     public function render()
