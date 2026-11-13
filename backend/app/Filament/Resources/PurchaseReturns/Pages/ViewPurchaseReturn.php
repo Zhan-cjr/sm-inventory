@@ -9,6 +9,7 @@ use Filament\Resources\Pages\ViewRecord;
 class ViewPurchaseReturn extends ViewRecord
 {
     protected static string $resource = PurchaseReturnResource::class;
+    protected string $view = 'filament.resources.purchase-return.pages.pos-view';
 
     protected function getHeaderActions(): array
     {

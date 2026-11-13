@@ -34,9 +34,11 @@ class StockAdjustmentPos extends Component
 
     public $searchResults = [];
     public $stockAdjustment;
+    public bool $readOnly = false;
 
-    public function mount($stockAdjustment = null)
+    public function mount($stockAdjustment = null, bool $readOnly = false)
     {
+        $this->readOnly = $readOnly;
         if ($stockAdjustment) {
             $this->stockAdjustment = $stockAdjustment;
             
@@ -56,6 +58,7 @@ class StockAdjustmentPos extends Component
                 if (!$item->product) continue;
 
                 $this->cart[] = [
+                    'id' => $item->id,
                     'product_id' => $item->product_id,
                     'sku' => $item->product->sku,
                     'barcode' => $item->product->barcode,
@@ -310,6 +313,10 @@ class StockAdjustmentPos extends Component
 
     public function save()
     {
+        if ($this->readOnly) {
+            return;
+        }
+
         $this->validate([
             'branch_id' => 'required',
             'adjustment_reason_id' => 'required',
@@ -357,18 +364,66 @@ class StockAdjustmentPos extends Component
         ];
 
         $isEditing = !empty($this->stockAdjustment);
+        $noChanges = false;
 
         if ($isEditing) {
             $adj = $this->stockAdjustment;
+            $wasCompleted = in_array(strtoupper($adj->status ?? ''), ['COMPLETED', 'APPROVED']);
+            $branchChanged = (string) $adj->branch_id !== (string) $this->branch_id;
+            $completionStateChanged = $wasCompleted !== (!$needsApproval);
+            $headerChanged = $this->hasHeaderChanges($adj, $data);
 
-            // Revert stok dari item-item lama jika dokumen sebelumnya sudah diterapkan (COMPLETED / APPROVED)
-            if (in_array(strtoupper($adj->status ?? ''), ['COMPLETED', 'APPROVED'])) {
-                $oldItems = StockAdjustmentItem::where('stock_adjustment_id', $adj->id)->get();
-                foreach ($oldItems as $oldItem) {
+            $oldItems = StockAdjustmentItem::where('stock_adjustment_id', $adj->id)->get()->keyBy('id');
+            $incomingIds = collect($this->cart)->pluck('id')->filter()->all();
+            $deletedItems = $oldItems->filter(fn ($old) => !in_array($old->id, $incomingIds));
+
+            $toCreate = [];
+            $toUpdate = [];
+            $anyItemMutated = $branchChanged || $completionStateChanged || $deletedItems->isNotEmpty();
+
+            if ($branchChanged || $completionStateChanged) {
+                $deletedItems = $oldItems;
+                foreach ($this->cart as $item) {
+                    $toCreate[] = $this->buildAdjustmentItemPayload($item);
+                }
+            } else {
+                foreach ($this->cart as $item) {
+                    $payload = $this->buildAdjustmentItemPayload($item);
+                    $itemId = $item['id'] ?? null;
+                    $oldItem = $itemId ? $oldItems->get($itemId) : null;
+
+                    if (!$oldItem) {
+                        $toCreate[] = $payload;
+                        $anyItemMutated = true;
+                    } elseif ((string) $oldItem->product_id !== (string) $payload['product_id']) {
+                        $deletedItems->put($oldItem->id, $oldItem);
+                        $toCreate[] = $payload;
+                        $anyItemMutated = true;
+                    } elseif ($this->hasItemChanged($oldItem, $payload)) {
+                        $toUpdate[] = ['model' => $oldItem, 'payload' => $payload];
+                        $anyItemMutated = true;
+                    }
+                }
+            }
+
+            if (!$headerChanged && !$anyItemMutated) {
+                Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+                return redirect()->to(route('filament.admin.resources.stock-adjustments.index'));
+            }
+
+            $oldBranchId = $adj->branch_id;
+            if ($headerChanged) {
+                $adj->update($data);
+            }
+
+            $logType = strtoupper($this->reason_type) === 'PLUS' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
+            $reasonName = $adj->adjustmentReason?->name ?? 'Koreksi Stok';
+
+            foreach ($deletedItems as $oldItem) {
+                if ($wasCompleted) {
                     $oldStock = \App\Models\Stock::where('product_id', $oldItem->product_id)
-                        ->where('branch_id', $adj->branch_id)
+                        ->where('branch_id', $oldBranchId)
                         ->first();
-                    
                     if ($oldStock) {
                         $delta = (float) $oldItem->new_quantity - (float) $oldItem->previous_quantity;
                         if ($delta != 0) {
@@ -382,51 +437,99 @@ class StockAdjustmentPos extends Component
                         }
                     }
                 }
+                $oldItem->delete();
             }
 
-            $adj->update($data);
-            $adj->items()->delete();
+            foreach ($toUpdate as $pair) {
+                $oldItem = $pair['model'];
+                $payload = $pair['payload'];
+
+                if ($wasCompleted && !$needsApproval) {
+                    $oldDelta = (float) $oldItem->new_quantity - (float) $oldItem->previous_quantity;
+                    $newDelta = (float) $payload['new_quantity'] - (float) $payload['previous_quantity'];
+                    $diffDelta = $newDelta - $oldDelta;
+
+                    if (abs($diffDelta) > 0.0001) {
+                        $stockRec = \App\Models\Stock::firstOrCreate(
+                            ['product_id' => $payload['product_id'], 'branch_id' => $this->branch_id],
+                            ['quantity_on_hand' => 0]
+                        );
+                        $stockRec->log_type = $diffDelta > 0 ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
+                        $stockRec->reason_code = $reasonName;
+                        $stockRec->reference_doc_type = 'STOCK_ADJUSTMENT';
+                        $stockRec->reference_doc_id = $adj->adjustment_number;
+                        $stockRec->notes = "Penyesuaian Koreksi Stok: {$adj->adjustment_number}" . ($adj->notes ? " - {$adj->notes}" : '');
+                        $stockRec->quantity_on_hand = (float) $stockRec->quantity_on_hand + $diffDelta;
+                        $stockRec->save();
+                    }
+                }
+
+                $oldItem->update($payload);
+            }
+
+            foreach ($toCreate as $payload) {
+                StockAdjustmentItem::create(array_merge(['stock_adjustment_id' => $adj->id], $payload));
+
+                if (!$needsApproval) {
+                    $stockRec = \App\Models\Stock::firstOrCreate(
+                        ['product_id' => $payload['product_id'], 'branch_id' => $this->branch_id],
+                        ['quantity_on_hand' => 0]
+                    );
+                    $stockRec->log_type = $logType;
+                    $stockRec->reason_code = $reasonName;
+                    $stockRec->reference_doc_type = 'STOCK_ADJUSTMENT';
+                    $stockRec->reference_doc_id = $adj->adjustment_number;
+                    $stockRec->notes = "Koreksi Stok: {$adj->adjustment_number}" . ($adj->notes ? " - {$adj->notes}" : '');
+                    $stockRec->quantity_on_hand = $payload['new_quantity'];
+                    $stockRec->save();
+                }
+            }
+
+            if (!$needsApproval && ($anyItemMutated || $headerChanged)) {
+                $accountingService = new \App\Services\AccountingService();
+                $accountingService->recordStockAdjustmentJournal($adj);
+            }
         } else {
             $adj = StockAdjustment::create($data);
-        }
 
-        foreach ($this->cart as $item) {
-            StockAdjustmentItem::create([
-                'stock_adjustment_id' => $adj->id,
-                'product_id' => $item['product_id'],
-                'previous_quantity' => $item['stock'],
-                'adjustment_quantity' => $item['qty'],
-                'new_quantity' => $item['new_qty'],
-                'unit_cost' => $item['unit_cost'],
-                'total_cost' => $item['subtotal']
-            ]);
-            
-            // Execute stock adjustment to actual stock ONLY IF it does not need approval
-            if (!$needsApproval) {
-                $stockRec = \App\Models\Stock::firstOrCreate([
+            foreach ($this->cart as $item) {
+                StockAdjustmentItem::create([
+                    'stock_adjustment_id' => $adj->id,
                     'product_id' => $item['product_id'],
-                    'branch_id' => $this->branch_id
-                ], [
-                    'quantity_on_hand' => 0
+                    'previous_quantity' => $item['stock'],
+                    'adjustment_quantity' => $item['qty'],
+                    'new_quantity' => $item['new_qty'],
+                    'unit_cost' => $item['unit_cost'],
+                    'total_cost' => $item['subtotal']
                 ]);
+                
+                // Execute stock adjustment to actual stock ONLY IF it does not need approval
+                if (!$needsApproval) {
+                    $stockRec = \App\Models\Stock::firstOrCreate([
+                        'product_id' => $item['product_id'],
+                        'branch_id' => $this->branch_id
+                    ], [
+                        'quantity_on_hand' => 0
+                    ]);
 
-                $logType = strtoupper($this->reason_type) === 'PLUS' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
-                $reasonName = $adj->adjustmentReason?->name ?? 'Koreksi Stok';
+                    $logType = strtoupper($this->reason_type) === 'PLUS' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
+                    $reasonName = $adj->adjustmentReason?->name ?? 'Koreksi Stok';
 
-                $stockRec->log_type = $logType;
-                $stockRec->reason_code = $reasonName;
-                $stockRec->reference_doc_type = 'STOCK_ADJUSTMENT';
-                $stockRec->reference_doc_id = $adj->adjustment_number;
-                $stockRec->notes = "Koreksi Stok: {$adj->adjustment_number}" . ($adj->notes ? " - {$adj->notes}" : '');
-                $stockRec->quantity_on_hand = $item['new_qty'];
-                $stockRec->save();
+                    $stockRec->log_type = $logType;
+                    $stockRec->reason_code = $reasonName;
+                    $stockRec->reference_doc_type = 'STOCK_ADJUSTMENT';
+                    $stockRec->reference_doc_id = $adj->adjustment_number;
+                    $stockRec->notes = "Koreksi Stok: {$adj->adjustment_number}" . ($adj->notes ? " - {$adj->notes}" : '');
+                    $stockRec->quantity_on_hand = $item['new_qty'];
+                    $stockRec->save();
+                }
             }
-        }
 
-        if (!$needsApproval) {
-            // MENCATAT JURNAL PENYESUAIAN STOK
-            $accountingService = new \App\Services\AccountingService();
-            $accountingService->recordStockAdjustmentJournal($adj);
+            if (!$needsApproval) {
+                // MENCATAT JURNAL PENYESUAIAN STOK
+                $accountingService = new \App\Services\AccountingService();
+                $accountingService->recordStockAdjustmentJournal($adj);
+            }
         }
 
         if ($needsApproval) {
@@ -446,6 +549,51 @@ class StockAdjustmentPos extends Component
         }
         
         return redirect()->to(route('filament.admin.resources.stock-adjustments.index'));
+    }
+
+    private function buildAdjustmentItemPayload(array $item): array
+    {
+        return [
+            'product_id' => $item['product_id'],
+            'previous_quantity' => $item['stock'],
+            'adjustment_quantity' => $item['qty'],
+            'new_quantity' => $item['new_qty'],
+            'unit_cost' => $item['unit_cost'],
+            'total_cost' => $item['subtotal'],
+        ];
+    }
+
+    private function hasHeaderChanges(StockAdjustment $adj, array $data): bool
+    {
+        foreach (['branch_id', 'adjustment_number', 'adjustment_reason_id', 'notes', 'status'] as $field) {
+            if ((string) ($adj->{$field} ?? '') !== (string) ($data[$field] ?? '')) {
+                return true;
+            }
+        }
+
+        $oldDate = $adj->adjustment_date instanceof \Carbon\CarbonInterface
+            ? $adj->adjustment_date->format('Y-m-d')
+            : (string) ($adj->adjustment_date ?? '');
+        if ($oldDate !== (string) ($data['adjustment_date'] ?? '')) {
+            return true;
+        }
+
+        if (abs((float) ($adj->total_value ?? 0) - (float) ($data['total_value'] ?? 0)) > 0.01) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function hasItemChanged(StockAdjustmentItem $oldItem, array $payload): bool
+    {
+        foreach (['previous_quantity', 'adjustment_quantity', 'new_quantity', 'unit_cost', 'total_cost'] as $field) {
+            if (abs((float) ($oldItem->{$field} ?? 0) - (float) ($payload[$field] ?? 0)) > 0.01) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function render()

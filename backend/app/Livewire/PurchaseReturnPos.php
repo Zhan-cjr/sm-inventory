@@ -44,9 +44,11 @@ class PurchaseReturnPos extends Component
     public $grandTotal = 0;
 
     public $purchaseReturn;
+    public bool $readOnly = false;
 
-    public function mount($purchaseReturn = null)
+    public function mount($purchaseReturn = null, bool $readOnly = false)
     {
+        $this->readOnly = $readOnly;
         if ($purchaseReturn) {
             $this->purchaseReturn = $purchaseReturn;
             // Mode Edit
@@ -76,6 +78,7 @@ class PurchaseReturnPos extends Component
                 $maxQty = $remainingInBatch + (float) $item->quantity;
 
                 $this->cart[] = [
+                    'id' => $item->id,
                     'product_id' => $item->product_id,
                     'barcode' => $item->product->barcode,
                     'name' => $item->product->name,
@@ -518,6 +521,10 @@ class PurchaseReturnPos extends Component
 
     public function save()
     {
+        if ($this->readOnly) {
+            return;
+        }
+
         $this->validate([
             'supplier_id' => 'required',
             'branch_id' => 'required',
@@ -535,7 +542,8 @@ class PurchaseReturnPos extends Component
             return;
         }
 
-        DB::transaction(function () use ($validCart, &$pr) {
+        $noChanges = false;
+        DB::transaction(function () use ($validCart, &$pr, &$noChanges) {
             // Ambil GR pertama jika ada untuk backward compatibility di header (atau null jika multi-GR)
             $firstGrId = $validCart->firstWhere('goods_receipt_id', '!=', null)['goods_receipt_id'] ?? null;
 
@@ -555,65 +563,140 @@ class PurchaseReturnPos extends Component
 
             if ($this->purchaseReturn) {
                 $pr = $this->purchaseReturn;
-                
-                // Revert old items' stock
-                foreach ($pr->items as $oldItem) {
-                    if ($oldItem->stock_batch_id) {
-                        $batch = StockBatch::find($oldItem->stock_batch_id);
-                        if ($batch) {
-                            $batch->increment('remaining_quantity', $oldItem->quantity);
+                unset($data['created_by'], $data['organization_id']);
+
+                $branchChanged = (string) $pr->branch_id !== (string) $this->branch_id;
+                $headerChanged = $this->hasHeaderChanges($pr, $data);
+                $financialChanged = $this->hasFinancialChanges($pr, $data);
+
+                $oldItems = $pr->items()->get()->keyBy('id');
+                $incomingIds = collect($validCart)->pluck('id')->filter()->all();
+                $deletedItems = $oldItems->filter(fn ($old) => !in_array($old->id, $incomingIds));
+
+                $toCreate = [];
+                $toUpdate = [];
+                $anyItemMutated = $branchChanged || $deletedItems->isNotEmpty();
+
+                if ($branchChanged) {
+                    $deletedItems = $oldItems;
+                    $toCreate = $validCart;
+                } else {
+                    foreach ($validCart as $item) {
+                        $payload = $this->buildReturnItemPayload($item);
+                        $itemId = $item['id'] ?? null;
+                        $oldItem = $itemId ? $oldItems->get($itemId) : null;
+
+                        if (!$oldItem) {
+                            $toCreate[] = $item;
+                            $anyItemMutated = true;
+                        } elseif ((string) $oldItem->product_id !== (string) $payload['product_id']
+                            || (string) ($oldItem->stock_batch_id ?? '') !== (string) ($payload['stock_batch_id'] ?? '')
+                            || (string) ($oldItem->goods_receipt_id ?? '') !== (string) ($payload['goods_receipt_id'] ?? '')) {
+                            $deletedItems->put($oldItem->id, $oldItem);
+                            $toCreate[] = $item;
+                            $anyItemMutated = true;
+                        } elseif ($this->hasItemChanged($oldItem, $payload)) {
+                            $toUpdate[] = ['model' => $oldItem, 'item' => $item, 'payload' => $payload];
+                            $anyItemMutated = true;
                         }
-                    } elseif ($oldItem->goods_receipt_id) {
-                        $batch = StockBatch::where('reference_doc_type', 'GOODS_RECEIPT')
-                            ->where('reference_doc_id', $oldItem->goods_receipt_id)
-                            ->where('product_id', $oldItem->product_id)
+                    }
+                }
+
+                if (!$headerChanged && !$anyItemMutated) {
+                    $noChanges = true;
+                    return;
+                }
+
+                $oldBranchId = $pr->branch_id;
+
+                foreach ($deletedItems as $oldItem) {
+                    $this->revertReturnItemStock($pr, $oldItem, $oldBranchId);
+                    $oldItem->delete();
+                }
+
+                if ($headerChanged) {
+                    $pr->update($data);
+                }
+
+                foreach ($toUpdate as $pair) {
+                    $oldItem = $pair['model'];
+                    $payload = $pair['payload'];
+
+                    $diffQty = (float) $payload['quantity'] - (float) $oldItem->quantity;
+                    if (abs($diffQty) > 0.0001) {
+                        if (!empty($oldItem->stock_batch_id)) {
+                            $batch = StockBatch::find($oldItem->stock_batch_id);
+                            if ($batch) {
+                                $diffQty > 0
+                                    ? $batch->decrement('remaining_quantity', $diffQty)
+                                    : $batch->increment('remaining_quantity', abs($diffQty));
+                            }
+                        } elseif (!empty($oldItem->goods_receipt_id)) {
+                            $batch = StockBatch::where('reference_doc_type', 'GOODS_RECEIPT')
+                                ->where('reference_doc_id', $oldItem->goods_receipt_id)
+                                ->where('product_id', $oldItem->product_id)
+                                ->first();
+                            if ($batch) {
+                                $diffQty > 0
+                                    ? $batch->decrement('remaining_quantity', $diffQty)
+                                    : $batch->increment('remaining_quantity', abs($diffQty));
+                            }
+                        }
+
+                        $stock = Stock::where('product_id', $oldItem->product_id)
+                            ->where('branch_id', $this->branch_id)
                             ->first();
-                        if ($batch) {
-                            $batch->increment('remaining_quantity', $oldItem->quantity);
+
+                        if ($stock) {
+                            if ($diffQty > 0) {
+                                $stock->log_type = 'RETURN';
+                                $stock->reason_code = 'PURCHASE_RETURN';
+                                $stock->reference_doc_type = 'PURCHASE_RETURN';
+                                $stock->reference_doc_id = $pr->return_number ?: $pr->id;
+                                $stock->notes = 'Penyesuaian Tambah Retur ' . $pr->return_number;
+                                $stock->decrement('quantity_on_hand', $diffQty);
+                            } else {
+                                $stock->log_type = 'ADJUSTMENT';
+                                $stock->reason_code = 'RETURN_EDIT_REVERT';
+                                $stock->reference_doc_type = 'PURCHASE_RETURN';
+                                $stock->reference_doc_id = $pr->return_number ?: $pr->id;
+                                $stock->notes = 'Penyesuaian Kurang Retur ' . $pr->return_number;
+                                $stock->increment('quantity_on_hand', abs($diffQty));
+                            }
                         }
                     }
 
-                    $stock = Stock::where('product_id', $oldItem->product_id)
-                        ->where('branch_id', $pr->branch_id)
-                        ->first();
-                        
-                    if ($stock) {
-                        $stock->log_type = 'ADJUSTMENT';
-                        $stock->reason_code = 'RETURN_EDIT_REVERT';
-                        $stock->reference_doc_type = 'PURCHASE_RETURN';
-                        $stock->reference_doc_id = $pr->return_number ?: $pr->id;
-                        $stock->notes = 'Revert sebelum Edit Retur ' . $pr->return_number;
-                        
-                        $stock->increment('quantity_on_hand', $oldItem->quantity);
-                    }
+                    $oldItem->update($payload);
                 }
-                
-                // Delete old items
-                $pr->items()->delete();
-                
-                // Delete old journal entry
-                \App\Models\JournalEntry::where('journalable_id', $pr->id)
-                    ->where('journalable_type', PurchaseReturn::class)
-                    ->delete();
-                
-                // Update PR header
-                $pr->update($data);
-                
-                \App\Models\SupplierDeduction::updateOrCreate(
-                    [
-                        'deduction_type' => 'PURCHASE_RETURN',
-                        'reference_id' => $pr->id,
-                    ],
-                    [
-                        'supplier_id' => $this->supplier_id,
-                        'branch_id' => $this->branch_id,
-                        'amount' => $this->grandTotal,
-                        'notes' => 'Otomatis dari Retur Pembelian ' . $pr->return_number,
-                    ]
-                );
+
+                foreach ($toCreate as $item) {
+                    $this->createReturnItemAndDeductStock($pr, $item);
+                }
+
+                if ($financialChanged || $anyItemMutated) {
+                    \App\Models\JournalEntry::where('journalable_id', $pr->id)
+                        ->where('journalable_type', PurchaseReturn::class)
+                        ->delete();
+
+                    \App\Models\SupplierDeduction::updateOrCreate(
+                        [
+                            'deduction_type' => 'PURCHASE_RETURN',
+                            'reference_id' => $pr->id,
+                        ],
+                        [
+                            'supplier_id' => $this->supplier_id,
+                            'branch_id' => $this->branch_id,
+                            'amount' => $this->grandTotal,
+                            'notes' => 'Otomatis dari Retur Pembelian ' . $pr->return_number,
+                        ]
+                    );
+
+                    $accountingService = new \App\Services\AccountingService();
+                    $accountingService->recordPurchaseReturnJournal($pr);
+                }
             } else {
                 $pr = PurchaseReturn::create($data);
-                
+
                 \App\Models\SupplierDeduction::create([
                     'supplier_id' => $this->supplier_id,
                     'branch_id' => $this->branch_id,
@@ -624,80 +707,21 @@ class PurchaseReturnPos extends Component
                     'status' => 'OPEN',
                     'notes' => 'Otomatis dari Retur Pembelian ' . $pr->return_number,
                 ]);
-            }
 
-            foreach ($validCart as $item) {
-                PurchaseReturnItem::create([
-                    'purchase_return_id' => $pr->id,
-                    'product_id' => $item['product_id'],
-                    'goods_receipt_id' => $item['goods_receipt_id'] ?? null,
-                    'stock_batch_id' => $item['stock_batch_id'] ?? null,
-                    'quantity' => $item['qty_returned'],
-                    'unit_price' => $item['unit_price'],
-                    'subtotal' => $item['subtotal'],
-                    'reason' => $item['reason'] ?? '',
-                ]);
-
-                // 1. Kurangi StockBatch jika berasal dari batch GR
-                if (!empty($item['stock_batch_id'])) {
-                    $batch = StockBatch::find($item['stock_batch_id']);
-                    if ($batch) {
-                        $batch->decrement('remaining_quantity', $item['qty_returned']);
-                    }
-                } elseif (!empty($item['goods_receipt_id'])) {
-                    $batch = StockBatch::where('reference_doc_type', 'GOODS_RECEIPT')
-                        ->where('reference_doc_id', $item['goods_receipt_id'])
-                        ->where('product_id', $item['product_id'])
-                        ->first();
-                    if ($batch) {
-                        $batch->decrement('remaining_quantity', $item['qty_returned']);
-                    }
+                foreach ($validCart as $item) {
+                    $this->createReturnItemAndDeductStock($pr, $item);
                 }
 
-                // 2. Kurangi Stok Utama Cabang (Prioritas potong dari Stok Karantina BS terlebih dahulu)
-                $stock = Stock::where('product_id', $item['product_id'])
-                    ->where('branch_id', $this->branch_id)
-                    ->first();
-                    
-                if ($stock) {
-                    $qtyReturned = (float)$item['qty_returned'];
-                    $damaged = (float)($stock->quantity_damaged ?? 0);
-                    $cutFromDamaged = min($qtyReturned, $damaged);
-                    $cutFromSalable = $qtyReturned - $cutFromDamaged;
-
-                    if ($cutFromDamaged > 0) {
-                        $stock->decrement('quantity_damaged', $cutFromDamaged);
-
-                        // Catat mutasi resmi di riwayat karantina
-                        StockQuarantineMovement::create([
-                            'organization_id' => $stock->branch->organization_id ?? null,
-                            'branch_id' => $stock->branch_id,
-                            'product_id' => $stock->product_id,
-                            'movement_type' => 'PURCHASE_RETURN',
-                            'quantity' => $cutFromDamaged,
-                            'reason' => 'RETUR_KE_SUPPLIER',
-                            'reference_doc_type' => 'PURCHASE_RETURN',
-                            'reference_doc_id' => $pr->id,
-                            'notes' => 'Retur Pembelian ' . $pr->return_number,
-                            'created_by' => auth()->id(),
-                        ]);
-                    }
-
-                    $stock->log_type = 'RETURN';
-                    $stock->reason_code = 'PURCHASE_RETURN';
-                    $stock->reference_doc_type = 'PURCHASE_RETURN';
-                    $stock->reference_doc_id = $pr->return_number ?: $pr->id;
-                    $detailNote = $cutFromDamaged > 0 ? " ({$cutFromDamaged} pcs dari BS, {$cutFromSalable} pcs dari Layak Jual)" : "";
-                    $stock->notes = 'Retur Pembelian ' . $pr->return_number . (!empty($item['gr_number']) ? ' (Ref: ' . $item['gr_number'] . ')' : '') . $detailNote;
-                    
-                    $stock->decrement('quantity_on_hand', $qtyReturned);
-                }
+                // Panggil AccountingService untuk mencatat Jurnal Retur
+                $accountingService = new \App\Services\AccountingService();
+                $accountingService->recordPurchaseReturnJournal($pr);
             }
-
-            // Panggil AccountingService untuk mencatat Jurnal Retur
-            $accountingService = new \App\Services\AccountingService();
-            $accountingService->recordPurchaseReturnJournal($pr);
         });
+
+        if ($noChanges) {
+            Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+            return redirect()->to(route('filament.admin.resources.purchase-returns.index'));
+        }
 
         Notification::make()->title('Retur Pembelian berhasil disimpan.')->success()->send();
         
@@ -711,6 +735,170 @@ class PurchaseReturnPos extends Component
         }
         
         return redirect()->to(route('filament.admin.resources.purchase-returns.index'));
+    }
+
+    private function buildReturnItemPayload(array $item): array
+    {
+        return [
+            'product_id' => $item['product_id'],
+            'goods_receipt_id' => $item['goods_receipt_id'] ?? null,
+            'stock_batch_id' => $item['stock_batch_id'] ?? null,
+            'quantity' => $item['qty_returned'],
+            'unit_price' => $item['unit_price'],
+            'subtotal' => $item['subtotal'],
+            'reason' => $item['reason'] ?? '',
+        ];
+    }
+
+    private function revertReturnItemStock(PurchaseReturn $pr, PurchaseReturnItem $oldItem, string $branchId): void
+    {
+        if ($oldItem->stock_batch_id) {
+            $batch = StockBatch::find($oldItem->stock_batch_id);
+            if ($batch) {
+                $batch->increment('remaining_quantity', $oldItem->quantity);
+            }
+        } elseif ($oldItem->goods_receipt_id) {
+            $batch = StockBatch::where('reference_doc_type', 'GOODS_RECEIPT')
+                ->where('reference_doc_id', $oldItem->goods_receipt_id)
+                ->where('product_id', $oldItem->product_id)
+                ->first();
+            if ($batch) {
+                $batch->increment('remaining_quantity', $oldItem->quantity);
+            }
+        }
+
+        $stock = Stock::where('product_id', $oldItem->product_id)
+            ->where('branch_id', $branchId)
+            ->first();
+
+        if ($stock) {
+            $stock->log_type = 'ADJUSTMENT';
+            $stock->reason_code = 'RETURN_EDIT_REVERT';
+            $stock->reference_doc_type = 'PURCHASE_RETURN';
+            $stock->reference_doc_id = $pr->return_number ?: $pr->id;
+            $stock->notes = 'Revert sebelum Edit Retur ' . $pr->return_number;
+
+            $stock->increment('quantity_on_hand', $oldItem->quantity);
+        }
+    }
+
+    private function createReturnItemAndDeductStock(PurchaseReturn $pr, array $item): void
+    {
+        PurchaseReturnItem::create(array_merge(
+            ['purchase_return_id' => $pr->id],
+            $this->buildReturnItemPayload($item)
+        ));
+
+        if (!empty($item['stock_batch_id'])) {
+            $batch = StockBatch::find($item['stock_batch_id']);
+            if ($batch) {
+                $batch->decrement('remaining_quantity', $item['qty_returned']);
+            }
+        } elseif (!empty($item['goods_receipt_id'])) {
+            $batch = StockBatch::where('reference_doc_type', 'GOODS_RECEIPT')
+                ->where('reference_doc_id', $item['goods_receipt_id'])
+                ->where('product_id', $item['product_id'])
+                ->first();
+            if ($batch) {
+                $batch->decrement('remaining_quantity', $item['qty_returned']);
+            }
+        }
+
+        $stock = Stock::where('product_id', $item['product_id'])
+            ->where('branch_id', $this->branch_id)
+            ->first();
+
+        if ($stock) {
+            $qtyReturned = (float) $item['qty_returned'];
+            $damaged = (float) ($stock->quantity_damaged ?? 0);
+            $cutFromDamaged = min($qtyReturned, $damaged);
+            $cutFromSalable = $qtyReturned - $cutFromDamaged;
+
+            if ($cutFromDamaged > 0) {
+                $stock->decrement('quantity_damaged', $cutFromDamaged);
+
+                StockQuarantineMovement::create([
+                    'organization_id' => $stock->branch->organization_id ?? null,
+                    'branch_id' => $stock->branch_id,
+                    'product_id' => $stock->product_id,
+                    'movement_type' => 'PURCHASE_RETURN',
+                    'quantity' => $cutFromDamaged,
+                    'reason' => 'RETUR_KE_SUPPLIER',
+                    'reference_doc_type' => 'PURCHASE_RETURN',
+                    'reference_doc_id' => $pr->id,
+                    'notes' => 'Retur Pembelian ' . $pr->return_number,
+                    'created_by' => auth()->id(),
+                ]);
+            }
+
+            $stock->log_type = 'RETURN';
+            $stock->reason_code = 'PURCHASE_RETURN';
+            $stock->reference_doc_type = 'PURCHASE_RETURN';
+            $stock->reference_doc_id = $pr->return_number ?: $pr->id;
+            $detailNote = $cutFromDamaged > 0 ? " ({$cutFromDamaged} pcs dari BS, {$cutFromSalable} pcs dari Layak Jual)" : "";
+            $stock->notes = 'Retur Pembelian ' . $pr->return_number . (!empty($item['gr_number']) ? ' (Ref: ' . $item['gr_number'] . ')' : '') . $detailNote;
+
+            $stock->decrement('quantity_on_hand', $qtyReturned);
+        }
+    }
+
+    private function hasHeaderChanges(PurchaseReturn $pr, array $data): bool
+    {
+        foreach (['branch_id', 'supplier_id', 'supplier_division_id', 'goods_receipt_id', 'return_number', 'status', 'notes'] as $field) {
+            if ((string) ($pr->{$field} ?? '') !== (string) ($data[$field] ?? '')) {
+                return true;
+            }
+        }
+
+        $oldDate = $pr->return_date instanceof \Carbon\CarbonInterface
+            ? $pr->return_date->format('Y-m-d')
+            : (string) ($pr->return_date ?? '');
+        if ($oldDate !== (string) ($data['return_date'] ?? '')) {
+            return true;
+        }
+
+        if (abs((float) ($pr->total_amount ?? 0) - (float) ($data['total_amount'] ?? 0)) > 0.01) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function hasFinancialChanges(PurchaseReturn $pr, array $data): bool
+    {
+        foreach (['branch_id', 'supplier_id', 'return_number'] as $field) {
+            if ((string) ($pr->{$field} ?? '') !== (string) ($data[$field] ?? '')) {
+                return true;
+            }
+        }
+
+        $oldDate = $pr->return_date instanceof \Carbon\CarbonInterface
+            ? $pr->return_date->format('Y-m-d')
+            : (string) ($pr->return_date ?? '');
+        if ($oldDate !== (string) ($data['return_date'] ?? '')) {
+            return true;
+        }
+
+        if (abs((float) ($pr->total_amount ?? 0) - (float) ($data['total_amount'] ?? 0)) > 0.01) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function hasItemChanged(PurchaseReturnItem $oldItem, array $payload): bool
+    {
+        foreach (['quantity', 'unit_price', 'subtotal'] as $field) {
+            if (abs((float) ($oldItem->{$field} ?? 0) - (float) ($payload[$field] ?? 0)) > 0.01) {
+                return true;
+            }
+        }
+
+        if ((string) ($oldItem->reason ?? '') !== (string) ($payload['reason'] ?? '')) {
+            return true;
+        }
+
+        return false;
     }
 
     public function render()

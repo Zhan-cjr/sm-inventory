@@ -6,6 +6,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use App\Filament\Filters\DateFilterHelper;
@@ -173,6 +174,7 @@ class PurchaseOrdersTable
                     ])
                     ->action(fn (\App\Models\PurchaseOrder $record, array $data) => $record->reject(auth()->id(), $data['notes'])),
 
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->bulkActions([

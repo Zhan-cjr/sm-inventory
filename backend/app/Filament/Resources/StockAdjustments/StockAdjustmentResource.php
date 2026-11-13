@@ -380,6 +380,7 @@ class StockAdjustmentResource extends Resource
         return [
             'index' => Pages\ListStockAdjustments::route('/'),
             'create' => Pages\CreateStockAdjustment::route('/create'),
+            'view' => Pages\ViewStockAdjustment::route('/{record}'),
             'edit' => Pages\EditStockAdjustment::route('/{record}/edit'),
         ];
     }

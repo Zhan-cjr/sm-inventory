@@ -84,6 +84,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     public $searchResults = [];
 
     public $purchaseOrder;
+    public bool $readOnly = false;
 
     // --- PROMO SUPPLIER IMPORT & PASTE ---
     public $showPromoModal = false;
@@ -119,8 +120,9 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         return $this->branchEarliestLiveDates[$branchId];
     }
 
-    public function mount($purchaseOrder = null)
+    public function mount($purchaseOrder = null, bool $readOnly = false)
     {
+        $this->readOnly = $readOnly;
         if ($purchaseOrder) {
             $this->purchaseOrder = $purchaseOrder;
             
@@ -155,6 +157,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                     $item->promo_note,
                     $item->sales_30d !== null ? (float)$item->sales_30d : null
                 );
+                $cartItem['id'] = $item->id;
                 $cartItem['over_order_reason'] = $item->over_order_reason;
                 $this->cart[] = $cartItem;
             }
@@ -684,6 +687,10 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
     public function save()
     {
+        if ($this->readOnly) {
+            return;
+        }
+
         $this->validate([
             'supplier_id' => 'required',
             'branch_id' => 'nullable',
@@ -824,31 +831,67 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         ];
 
         if ($this->purchaseOrder) {
-            $this->purchaseOrder->update($data);
-            $this->purchaseOrder->items()->delete();
+            unset($data['created_by']);
+            $headerChanged = $this->hasHeaderChanges($this->purchaseOrder, $data);
+            $oldItems = $this->purchaseOrder->items()->get()->keyBy('id');
+            $incomingIds = collect($this->cart)->pluck('id')->filter()->all();
+            $deletedItems = $oldItems->filter(fn ($old) => !in_array($old->id, $incomingIds));
+
+            $toCreate = [];
+            $toUpdate = [];
+            $anyItemMutated = $deletedItems->isNotEmpty();
+
+            foreach ($this->cart as $item) {
+                $payload = $this->buildPoItemPayload($item);
+                $itemId = $item['id'] ?? null;
+                $oldItem = $itemId ? $oldItems->get($itemId) : null;
+
+                if (!$oldItem) {
+                    $toCreate[] = $payload;
+                    $anyItemMutated = true;
+                } elseif ((string) $oldItem->product_id !== (string) $payload['product_id']) {
+                    $deletedItems->put($oldItem->id, $oldItem);
+                    $toCreate[] = $payload;
+                    $anyItemMutated = true;
+                } elseif ($this->hasItemChanged($oldItem, $payload)) {
+                    $toUpdate[] = ['model' => $oldItem, 'payload' => $payload];
+                    $anyItemMutated = true;
+                }
+            }
+
+            if (!$headerChanged && !$anyItemMutated) {
+                Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+                return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
+            }
+
+            if ($headerChanged) {
+                $this->purchaseOrder->update($data);
+            }
             $po = $this->purchaseOrder;
-            
+
+            foreach ($deletedItems as $oldItem) {
+                $oldItem->delete();
+            }
+
+            foreach ($toUpdate as $pair) {
+                $pair['model']->update($pair['payload']);
+            }
+
+            foreach ($toCreate as $payload) {
+                PurchaseOrderItem::create(array_merge(['purchase_order_id' => $po->id], $payload));
+            }
+
             // ALWAYS cancel old pending approvals because the document has been modified
             $po->cancelPendingApprovals();
         } else {
             $po = PurchaseOrder::create($data);
-        }
 
-        foreach ($this->cart as $item) {
-            PurchaseOrderItem::create([
-                'purchase_order_id' => $po->id,
-                'product_id' => $item['product_id'],
-                'quantity_suggested' => $item['qty_saran'] ?? 0,
-                'sales_30d' => $item['avg_bln'] ?? 0,
-                'quantity_ordered' => $item['qty'],
-                'unit_cost' => $item['unit_cost'],
-                'discount_1' => $item['discount_1'],
-                'discount_2' => $item['discount_2'],
-                'discount_3' => $item['discount_3'],
-                'subtotal' => $item['subtotal'],
-                'promo_note' => $item['promo_note'] ?? null,
-                'over_order_reason' => $item['over_order_reason'] ?? null,
-            ]);
+            foreach ($this->cart as $item) {
+                PurchaseOrderItem::create(array_merge(
+                    ['purchase_order_id' => $po->id],
+                    $this->buildPoItemPayload($item)
+                ));
+            }
         }
 
         if ($needsApproval) {
@@ -1495,6 +1538,64 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         } else {
             Notification::make()->title(implode(', ', $msg) . '.')->success()->send();
         }
+    }
+
+    private function buildPoItemPayload(array $item): array
+    {
+        return [
+            'product_id' => $item['product_id'],
+            'quantity_suggested' => $item['qty_saran'] ?? 0,
+            'sales_30d' => $item['avg_bln'] ?? 0,
+            'quantity_ordered' => $item['qty'],
+            'unit_cost' => $item['unit_cost'],
+            'discount_1' => $item['discount_1'],
+            'discount_2' => $item['discount_2'],
+            'discount_3' => $item['discount_3'],
+            'subtotal' => $item['subtotal'],
+            'promo_note' => $item['promo_note'] ?? null,
+            'over_order_reason' => $item['over_order_reason'] ?? null,
+        ];
+    }
+
+    private function hasHeaderChanges(PurchaseOrder $po, array $data): bool
+    {
+        foreach (['supplier_id', 'supplier_division_id', 'branch_id', 'po_number', 'faktur', 'status', 'notes', 'over_order_reason'] as $field) {
+            if ((string) ($po->{$field} ?? '') !== (string) ($data[$field] ?? '')) {
+                return true;
+            }
+        }
+
+        foreach (['po_date', 'expired_date'] as $dateField) {
+            $oldDate = $po->{$dateField} instanceof \Carbon\CarbonInterface
+                ? $po->{$dateField}->format('Y-m-d')
+                : (string) ($po->{$dateField} ?? '');
+            if ($oldDate !== (string) ($data[$dateField] ?? '')) {
+                return true;
+            }
+        }
+
+        if (abs((float) ($po->total_amount ?? 0) - (float) ($data['total_amount'] ?? 0)) > 0.01) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function hasItemChanged(PurchaseOrderItem $oldItem, array $payload): bool
+    {
+        foreach (['quantity_ordered', 'unit_cost', 'discount_1', 'discount_2', 'discount_3', 'subtotal'] as $field) {
+            if (abs((float) ($oldItem->{$field} ?? 0) - (float) ($payload[$field] ?? 0)) > 0.01) {
+                return true;
+            }
+        }
+
+        foreach (['promo_note', 'over_order_reason'] as $strField) {
+            if ((string) ($oldItem->{$strField} ?? '') !== (string) ($payload[$strField] ?? '')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function render()

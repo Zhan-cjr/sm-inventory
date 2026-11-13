@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StockTransfers\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Actions\Action;
@@ -74,6 +75,7 @@ class StockTransfersTable
                     ->color('info')
                     ->url(fn (\App\Models\StockTransfer $record) => route('print.document', ['type' => 'transfer', 'ids' => [$record->id]]))
                     ->openUrlInNewTab(),
+                ViewAction::make(),
                 EditAction::make(),
                 Action::make('Kirim')
                     ->icon('heroicon-o-truck')

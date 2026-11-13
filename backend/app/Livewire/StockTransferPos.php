@@ -33,9 +33,11 @@ class StockTransferPos extends Component
     public $searchResults = [];
 
     public $stockTransfer;
+    public bool $readOnly = false;
 
-    public function mount($stockTransfer = null)
+    public function mount($stockTransfer = null, bool $readOnly = false)
     {
+        $this->readOnly = $readOnly;
         if ($stockTransfer) {
             $this->stockTransfer = $stockTransfer;
             $this->reference_number = $stockTransfer->reference_number;
@@ -56,6 +58,7 @@ class StockTransferPos extends Component
                 }
 
                 $this->cart[] = [
+                    'id' => $item->id,
                     'product_id' => $item->product_id,
                     'sku' => $item->product->sku,
                     'barcode' => $item->product->barcode,
@@ -351,6 +354,10 @@ class StockTransferPos extends Component
 
     public function save()
     {
+        if ($this->readOnly) {
+            return;
+        }
+
         if ($this->stockTransfer && !in_array($this->stockTransfer->status, ['pending', 'rejected'])) {
             Notification::make()->title('Mutasi yang sudah dikirim atau diterima tidak dapat diubah isinya.')->danger()->send();
             return;
@@ -371,7 +378,8 @@ class StockTransferPos extends Component
         }
 
         $st = null;
-        DB::transaction(function () use (&$st) {
+        $noChanges = false;
+        DB::transaction(function () use (&$st, &$noChanges) {
             $data = [
                 'reference_number' => $this->reference_number,
                 'from_branch_id' => $this->from_branch_id,
@@ -384,26 +392,83 @@ class StockTransferPos extends Component
             ];
 
             if ($this->stockTransfer) {
-                // Jangan update created_by jika edit
                 unset($data['created_by']);
-                $this->stockTransfer->update($data);
-                $this->stockTransfer->items()->delete();
+                $headerChanged = $this->hasHeaderChanges($this->stockTransfer, $data);
+                $oldItems = $this->stockTransfer->items()->get()->keyBy('id');
+
+                $incomingIds = collect($this->cart)->pluck('id')->filter()->all();
+                $deletedItems = $oldItems->filter(fn ($old) => !in_array($old->id, $incomingIds));
+
+                $toCreate = [];
+                $toUpdate = [];
+                $anyItemMutated = $deletedItems->isNotEmpty();
+
+                foreach ($this->cart as $item) {
+                    $payload = [
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['qty_transfer'],
+                        'unit_price' => $item['unit_price'],
+                        'subtotal' => $item['subtotal'],
+                        'notes' => $item['notes'] ?? null,
+                    ];
+
+                    $itemId = $item['id'] ?? null;
+                    $oldItem = $itemId ? $oldItems->get($itemId) : null;
+
+                    if (!$oldItem) {
+                        $toCreate[] = $payload;
+                        $anyItemMutated = true;
+                    } elseif ((string) $oldItem->product_id !== (string) $payload['product_id']) {
+                        $deletedItems->put($oldItem->id, $oldItem);
+                        $toCreate[] = $payload;
+                        $anyItemMutated = true;
+                    } elseif ($this->hasItemChanged($oldItem, $payload)) {
+                        $toUpdate[] = ['model' => $oldItem, 'payload' => $payload];
+                        $anyItemMutated = true;
+                    }
+                }
+
+                if (!$headerChanged && !$anyItemMutated) {
+                    $noChanges = true;
+                    return;
+                }
+
+                if ($headerChanged) {
+                    $this->stockTransfer->update($data);
+                }
                 $st = $this->stockTransfer;
+
+                foreach ($deletedItems as $oldItem) {
+                    $oldItem->delete();
+                }
+
+                foreach ($toUpdate as $pair) {
+                    $pair['model']->update($pair['payload']);
+                }
+
+                foreach ($toCreate as $payload) {
+                    StockTransferItem::create(array_merge(['stock_transfer_id' => $st->id], $payload));
+                }
             } else {
                 $st = StockTransfer::create($data);
-            }
 
-            foreach ($this->cart as $item) {
-                StockTransferItem::create([
-                    'stock_transfer_id' => $st->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['qty_transfer'],
-                    'unit_price' => $item['unit_price'],
-                    'subtotal' => $item['subtotal'],
-                    'notes' => $item['notes']
-                ]);
+                foreach ($this->cart as $item) {
+                    StockTransferItem::create([
+                        'stock_transfer_id' => $st->id,
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['qty_transfer'],
+                        'unit_price' => $item['unit_price'],
+                        'subtotal' => $item['subtotal'],
+                        'notes' => $item['notes']
+                    ]);
+                }
             }
         });
+
+        if ($noChanges) {
+            Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+            return redirect()->to(route('filament.admin.resources.stock-transfers.index'));
+        }
 
         Notification::make()->title('Mutasi Stok berhasil disimpan.')->success()->send();
         
@@ -415,6 +480,44 @@ class StockTransferPos extends Component
         }
         
         return redirect()->to(route('filament.admin.resources.stock-transfers.index'));
+    }
+
+    private function hasHeaderChanges(StockTransfer $st, array $data): bool
+    {
+        foreach (['reference_number', 'from_branch_id', 'to_branch_id', 'status', 'notes'] as $field) {
+            if ((string) ($st->{$field} ?? '') !== (string) ($data[$field] ?? '')) {
+                return true;
+            }
+        }
+
+        $oldDate = $st->transfer_date instanceof \Carbon\CarbonInterface
+            ? $st->transfer_date->format('Y-m-d')
+            : (string) ($st->transfer_date ?? '');
+        if ($oldDate !== (string) ($data['transfer_date'] ?? '')) {
+            return true;
+        }
+
+        if (abs((float) ($st->total_amount ?? 0) - (float) ($data['total_amount'] ?? 0)) > 0.01) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function hasItemChanged(StockTransferItem $oldItem, array $payload): bool
+    {
+        if ((int) $oldItem->quantity !== (int) $payload['quantity']) {
+            return true;
+        }
+        if (abs((float) $oldItem->unit_price - (float) $payload['unit_price']) > 0.01
+            || abs((float) $oldItem->subtotal - (float) $payload['subtotal']) > 0.01) {
+            return true;
+        }
+        if ((string) ($oldItem->notes ?? '') !== (string) ($payload['notes'] ?? '')) {
+            return true;
+        }
+
+        return false;
     }
 
     public function render()

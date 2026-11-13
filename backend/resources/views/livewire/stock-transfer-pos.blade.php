@@ -30,6 +30,13 @@
         .dark .highlighted-item { background-color: #374151 !important; border-left: 4px solid #60a5fa !important; }
     </style>
 
+    @if($readOnly)
+        <div style="padding: 0.65rem 1rem; background-color: #eff6ff; border-bottom: 1px solid #bfdbfe; color: #1e40af; font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; justify-content: space-between;" class="dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-200"
+             x-data x-init="$nextTick(() => { $el.parentElement.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; }); })">
+            <span>Mode Lihat (Read-Only) &mdash; Data tidak dapat diubah di halaman ini. Klik tombol <strong>Edit</strong> di kanan atas jika perlu melakukan perubahan.</span>
+        </div>
+    @endif
+
     <!-- Top Section (Header) -->
     <div style="padding: 1rem; border-bottom: 1px solid #e5e7eb;" class="dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         <div class="grid-layout">
@@ -239,9 +246,11 @@
                         </td>
                         @endif
                         <td class="pos-grid-td" style="text-align: center;">
-                            <button wire:click="removeItem({{ $index }})" class="text-red-500 hover:text-red-700 transition-colors" title="Hapus Barang">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
-                            </button>
+                            @if(!$readOnly)
+                                <button wire:click="removeItem({{ $index }})" class="text-red-500 hover:text-red-700 transition-colors" title="Hapus Barang">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                                </button>
+                            @endif
                         </td>
                     </tr>
                 @empty
@@ -260,17 +269,21 @@
         
         <!-- Actions Button -->
         <div style="display: flex; gap: 0.5rem;">
-            <button wire:click="save" style="background-color: #2563eb; color: white; padding: 0.75rem 2rem; border-radius: 0.375rem; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-blue-700 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
-                SIMPAN MUTASI
-            </button>
+            @if(!$readOnly)
+                <button wire:click="save" style="background-color: #2563eb; color: white; padding: 0.75rem 2rem; border-radius: 0.375rem; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-blue-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
+                    SIMPAN MUTASI
+                </button>
+            @endif
             <a href="{{ route('filament.admin.resources.stock-transfers.index') }}" style="background-color: #fff; color: #374151; padding: 0.75rem 1.5rem; border-radius: 0.375rem; font-weight: 500; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
-                Batal
+                {{ $readOnly ? 'Kembali' : 'Batal' }}
             </a>
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 ml-4 cursor-pointer">
-                <input type="checkbox" wire:model="cetak_nota" class="rounded text-blue-600">
-                Cetak Nota setelah simpan
-            </label>
+            @if(!$readOnly)
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 ml-4 cursor-pointer">
+                    <input type="checkbox" wire:model="cetak_nota" class="rounded text-blue-600">
+                    Cetak Nota setelah simpan
+                </label>
+            @endif
         </div>
         
         <!-- Totals -->

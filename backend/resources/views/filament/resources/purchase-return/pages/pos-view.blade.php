@@ -1,6 +1,6 @@
 <x-filament-panels::page>
     @if(isset($record))
-        <livewire:purchase-return-pos :purchaseReturn="$record" />
+        <livewire:purchase-return-pos :purchaseReturn="$record" :readOnly="$this instanceof \Filament\Resources\Pages\ViewRecord" />
     @else
         <livewire:purchase-return-pos />
     @endif

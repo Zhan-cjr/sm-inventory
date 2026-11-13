@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StockTransfers;
 use App\Filament\Resources\StockTransfers\Pages\CreateStockTransfer;
 use App\Filament\Resources\StockTransfers\Pages\EditStockTransfer;
 use App\Filament\Resources\StockTransfers\Pages\ListStockTransfers;
+use App\Filament\Resources\StockTransfers\Pages\ViewStockTransfer;
 use App\Filament\Resources\StockTransfers\Schemas\StockTransferForm;
 use App\Filament\Resources\StockTransfers\Tables\StockTransfersTable;
 use App\Models\StockTransfer;
@@ -51,6 +52,7 @@ class StockTransferResource extends Resource
         return [
             'index' => ListStockTransfers::route('/'),
             'create' => CreateStockTransfer::route('/create'),
+            'view' => ViewStockTransfer::route('/{record}'),
             'edit' => EditStockTransfer::route('/{record}/edit'),
         ];
     }
