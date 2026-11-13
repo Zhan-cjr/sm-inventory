@@ -7,6 +7,7 @@ use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -118,8 +119,32 @@ class StockOpnameRackResource extends Resource
                         : 'Rak akan diaktifkan kembali dan dapat dipilih pada sesi stok opname baru.')
                     ->action(fn (StockOpnameRack $record) => $record->update(['is_active' => !$record->is_active])),
                 DeleteAction::make()
-                    ->hidden(fn (StockOpnameRack $record) => $record->rackSessions()->exists())
-                    ->modalDescription('Apakah Anda yakin ingin menghapus rak ini? Rak yang sudah memiliki riwayat opname tidak dapat dihapus, melainkan dinonaktifkan.'),
+                    ->modalHeading(fn (StockOpnameRack $record) => $record->rackSessions()->exists() ? 'Nonaktifkan Rak?' : 'Hapus Rak?')
+                    ->modalDescription(fn (StockOpnameRack $record) => $record->rackSessions()->exists()
+                        ? "Rak '{$record->rack_name}' tidak dapat dihapus permanen karena sudah memiliki riwayat sesi opname. Melanjutkan tindakan ini akan mengubah status rak menjadi Nonaktif agar data histori opname masa lalu tetap aman."
+                        : "Apakah Anda yakin ingin menghapus rak '{$record->rack_name}'?"
+                    )
+                    ->modalSubmitActionLabel(fn (StockOpnameRack $record) => $record->rackSessions()->exists() ? 'Ya, Nonaktifkan' : 'Hapus')
+                    ->action(function (DeleteAction $action, StockOpnameRack $record) {
+                        if ($record->rackSessions()->exists()) {
+                            $record->update(['is_active' => false]);
+
+                            Notification::make()
+                                ->warning()
+                                ->title('Rak Dinonaktifkan')
+                                ->body("Rak '{$record->rack_name}' tidak dapat dihapus karena sudah memiliki riwayat sesi opname. Status rak telah diubah menjadi nonaktif.")
+                                ->persistent()
+                                ->send();
+                            return;
+                        }
+
+                        $record->delete();
+
+                        Notification::make()
+                            ->success()
+                            ->title('Rak Berhasil Dihapus')
+                            ->send();
+                    }),
             ])
             ->toolbarActions([
                 \Filament\Actions\BulkActionGroup::make([
