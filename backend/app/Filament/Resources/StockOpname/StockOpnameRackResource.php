@@ -106,11 +106,45 @@ class StockOpnameRackResource extends Resource
             ])
             ->recordActions([
                 EditAction::make(),
-                DeleteAction::make(),
+                Action::make('toggle_status')
+                    ->label(fn (StockOpnameRack $record) => $record->is_active ? 'Nonaktifkan' : 'Aktifkan')
+                    ->icon(fn (StockOpnameRack $record) => $record->is_active ? 'heroicon-o-eye-slash' : 'heroicon-o-check-circle')
+                    ->color(fn (StockOpnameRack $record) => $record->is_active ? 'warning' : 'success')
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (StockOpnameRack $record) => $record->is_active ? 'Nonaktifkan Rak?' : 'Aktifkan Rak?')
+                    ->modalDescription(fn (StockOpnameRack $record) => $record->is_active
+                        ? 'Rak yang dinonaktifkan tidak akan muncul pada pilihan sesi stok opname baru, namun riwayat sesi sebelumnya tetap aman.'
+                        : 'Rak akan diaktifkan kembali dan dapat dipilih pada sesi stok opname baru.')
+                    ->action(fn (StockOpnameRack $record) => $record->update(['is_active' => !$record->is_active])),
+                DeleteAction::make()
+                    ->hidden(fn (StockOpnameRack $record) => $record->rackSessions()->exists())
+                    ->modalDescription('Apakah Anda yakin ingin menghapus rak ini? Rak yang sudah memiliki riwayat opname tidak dapat dihapus, melainkan dinonaktifkan.'),
             ])
             ->toolbarActions([
                 \Filament\Actions\BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $deleted = 0;
+                            $deactivated = 0;
+                            foreach ($records as $record) {
+                                if ($record->rackSessions()->exists()) {
+                                    $record->update(['is_active' => false]);
+                                    $deactivated++;
+                                } else {
+                                    $record->delete();
+                                    $deleted++;
+                                }
+                            }
+
+                            $msg = [];
+                            if ($deleted > 0) $msg[] = "{$deleted} rak berhasil dihapus";
+                            if ($deactivated > 0) $msg[] = "{$deactivated} rak dinonaktifkan (karena memiliki riwayat opname)";
+
+                            \Filament\Notifications\Notification::make()
+                                ->title(implode(', ', $msg))
+                                ->success()
+                                ->send();
+                        }),
                 ]),
             ]);
     }

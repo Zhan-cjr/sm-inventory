@@ -4,10 +4,23 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StockOpnameRack extends Model
 {
-    use HasUuids;
+    use HasUuids, SoftDeletes;
+
+    protected static function booted()
+    {
+        static::deleting(function ($rack) {
+            if ($rack->rackSessions()->exists()) {
+                // Jika rak sudah pernah dipakai di sesi opname, cegah penghapusan fisik, jadikan nonaktif
+                $rack->is_active = false;
+                $rack->saveQuietly();
+                return false;
+            }
+        });
+    }
 
     protected $fillable = [
         'branch_id', 'rack_code', 'rack_name', 'location_description', 'is_active',
