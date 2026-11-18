@@ -113,5 +113,17 @@ class AppServiceProvider extends ServiceProvider
         GoodsReceipt::observe(GoodsReceiptObserver::class);
         GoodsReceiptItem::observe(GoodsReceiptItemObserver::class);
         EcommerceOrder::observe(EcommerceOrderObserver::class);
+
+        \Filament\Actions\Imports\Models\Import::created(function ($import): void {
+            if ($import->user_id) {
+                try {
+                    \Illuminate\Support\Facades\Cache::forget(
+                        \App\Livewire\ImportProgressBar::idleCacheKey($import->user_id)
+                    );
+                } catch (\Throwable) {
+                    // Abaikan jika cache sementara tidak tersedia
+                }
+            }
+        });
     }
 }

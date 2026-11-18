@@ -126,56 +126,6 @@
             background: #374151;
             color: #ffffff;
         }
-
-        .ai-chat-window {
-            position: fixed; width: 380px; height: 500px; 
-            background-color: white; border-radius: 16px; 
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border: 1px solid #e5e7eb; 
-            display: flex; flex-direction: column; overflow: hidden; z-index: 9999;
-        }
-        .dark .ai-chat-window { background-color: #111827; border-color: #374151; }
-        .ai-chat-header {
-            background-color: var(--primary-600, #4f46e5); padding: 12px 16px; 
-            display: flex; align-items: center; justify-content: space-between; color: white;
-            user-select: none;
-        }
-        .ai-chat-body {
-            flex: 1; padding: 16px; overflow-y: auto; background-color: #f9fafb; 
-            display: flex; flex-direction: column; gap: 12px;
-        }
-        .dark .ai-chat-body { background-color: #1f2937; }
-        .ai-chat-bubble-user {
-            background-color: var(--primary-600, #4f46e5); color: white; 
-            padding: 10px 14px; border-radius: 16px; border-top-right-radius: 4px; 
-            align-self: flex-end; max-width: 85%; font-size: 14px; line-height: 1.4;
-        }
-        .ai-chat-bubble-ai {
-            background-color: white; color: #1f2937; 
-            padding: 10px 14px; border-radius: 16px; border-top-left-radius: 4px; 
-            align-self: flex-start; max-width: 90%; font-size: 14px; line-height: 1.4;
-            border: 1px solid #e5e7eb; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        }
-        .dark .ai-chat-bubble-ai { background-color: #374151; color: #f3f4f6; border-color: #4b5563; }
-        .ai-chat-input-area {
-            padding: 12px; background-color: white; border-top: 1px solid #e5e7eb; 
-            display: flex; gap: 8px;
-        }
-        .dark .ai-chat-input-area { background-color: #111827; border-color: #374151; }
-        .ai-chat-input {
-            flex: 1; border: 1px solid #d1d5db; border-radius: 9999px; padding: 8px 16px; 
-            font-size: 14px; outline: none; background: #f9fafb; color: #111827;
-        }
-        .dark .ai-chat-input { background: #374151; border-color: #4b5563; color: white; }
-        .ai-chat-input:focus { border-color: var(--primary-600, #4f46e5); }
-        .ai-chat-submit {
-            background-color: var(--primary-600, #4f46e5); color: white; 
-            border: none; border-radius: 9999px; width: 38px; height: 38px; 
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
-        }
-        .ai-chat-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-        .ai-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
-        .ai-table th, .ai-table td { border: 1px solid #e5e7eb; padding: 6px; text-align: left; }
-        .dark .ai-table th, .dark .ai-table td { border-color: #4b5563; }
     </style>
 
     <!-- Floating Draggable Button -->
@@ -234,6 +184,57 @@
 
     <!-- Chat Window Anchored to Button -->
     @if($isOpen)
+    <style>
+        .ai-chat-window {
+            position: fixed; width: 380px; height: 500px; 
+            background-color: white; border-radius: 16px; 
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); border: 1px solid #e5e7eb; 
+            display: flex; flex-direction: column; overflow: hidden; z-index: 9999;
+        }
+        .dark .ai-chat-window { background-color: #111827; border-color: #374151; }
+        .ai-chat-header {
+            background-color: var(--primary-600, #4f46e5); padding: 12px 16px; 
+            display: flex; align-items: center; justify-content: space-between; color: white;
+            user-select: none;
+        }
+        .ai-chat-body {
+            flex: 1; padding: 16px; overflow-y: auto; background-color: #f9fafb; 
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .dark .ai-chat-body { background-color: #1f2937; }
+        .ai-chat-bubble-user {
+            background-color: var(--primary-600, #4f46e5); color: white; 
+            padding: 10px 14px; border-radius: 16px; border-top-right-radius: 4px; 
+            align-self: flex-end; max-width: 85%; font-size: 14px; line-height: 1.4;
+        }
+        .ai-chat-bubble-ai {
+            background-color: white; color: #1f2937; 
+            padding: 10px 14px; border-radius: 16px; border-top-left-radius: 4px; 
+            align-self: flex-start; max-width: 90%; font-size: 14px; line-height: 1.4;
+            border: 1px solid #e5e7eb; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .dark .ai-chat-bubble-ai { background-color: #374151; color: #f3f4f6; border-color: #4b5563; }
+        .ai-chat-input-area {
+            padding: 12px; background-color: white; border-top: 1px solid #e5e7eb; 
+            display: flex; gap: 8px;
+        }
+        .dark .ai-chat-input-area { background-color: #111827; border-color: #374151; }
+        .ai-chat-input {
+            flex: 1; border: 1px solid #d1d5db; border-radius: 9999px; padding: 8px 16px; 
+            font-size: 14px; outline: none; background: #f9fafb; color: #111827;
+        }
+        .dark .ai-chat-input { background: #374151; border-color: #4b5563; color: white; }
+        .ai-chat-input:focus { border-color: var(--primary-600, #4f46e5); }
+        .ai-chat-submit {
+            background-color: var(--primary-600, #4f46e5); color: white; 
+            border: none; border-radius: 9999px; width: 38px; height: 38px; 
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .ai-chat-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ai-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+        .ai-table th, .ai-table td { border: 1px solid #e5e7eb; padding: 6px; text-align: left; }
+        .dark .ai-table th, .dark .ai-table td { border-color: #4b5563; }
+    </style>
     <div class="ai-chat-window" :style="windowStyle">
         
         <!-- Header -->
@@ -367,6 +368,11 @@
                             }, 2500);
                         }
                     } catch (e) {}
+                },
+
+                destroy() {
+                    if (this.teaserTimer) clearTimeout(this.teaserTimer);
+                    if (this.autoDismissTimer) clearTimeout(this.autoDismissTimer);
                 },
 
                 dismissTeaser(e) {

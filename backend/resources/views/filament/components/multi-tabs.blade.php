@@ -1,6 +1,8 @@
 <div x-data="filamentMultiTabs()"
      x-init="initTabs()"
      @popstate.window="handleNavigation()"
+     @hashchange.window="updateActiveTabUrl()"
+     @sm-url-changed.window="updateActiveTabUrl()"
      style="display: flex; flex-direction: row; align-items: center; width: 100%; max-width: 100%; box-sizing: border-box; position: -webkit-sticky; position: sticky; top: 4rem; z-index: 25; margin-top: 0;"
      class="filament-multi-tabs-wrapper border-b border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 transition-all shadow-xs">
     
@@ -75,12 +77,29 @@
 </div>
 
 <script>
+if (!window.__smHistoryUrlHooked) {
+    window.__smHistoryUrlHooked = true;
+    ['pushState', 'replaceState'].forEach(function (method) {
+        const original = history[method];
+        if (typeof original === 'function') {
+            history[method] = function () {
+                const result = original.apply(this, arguments);
+                window.dispatchEvent(new Event('sm-url-changed'));
+                return result;
+            };
+        }
+    });
+}
+
 function filamentMultiTabs() {
     return {
         tabs: [],
         closedPaths: {},
         storageKey: 'sm_filament_admin_tabs',
         manualTabSwitch: false,
+        _timers: [],
+        _onClick: null,
+        _onNavigated: null,
 
         isFormTab(path) {
             if (!path) return false;
@@ -132,16 +151,39 @@ function filamentMultiTabs() {
             return '/admin';
         },
 
+        schedule(fn, delay) {
+            const id = setTimeout(() => {
+                this._timers = this._timers.filter(t => t !== id);
+                fn();
+            }, delay);
+            this._timers.push(id);
+            return id;
+        },
+
+        destroy() {
+            this._timers.forEach(id => clearTimeout(id));
+            this._timers = [];
+
+            if (this._onClick) {
+                document.removeEventListener('click', this._onClick, true);
+                this._onClick = null;
+            }
+            if (this._onNavigated) {
+                document.removeEventListener('livewire:navigated', this._onNavigated);
+                this._onNavigated = null;
+            }
+        },
+
         initTabs() {
+            // Bersihkan listener lama jika komponen di-mount ulang saat SPA navigation
+            if (typeof window.__smMultiTabsCleanup === 'function') {
+                window.__smMultiTabsCleanup();
+            }
+
             this.loadTabsFromStorage();
-            
-            // Periodically sync URL query string changes
-            setInterval(() => {
-                this.updateActiveTabUrl();
-            }, 400);
 
             // Intercept Batal / Cancel clicks on forms to cleanly close the form tab and return to parent tab
-            document.addEventListener('click', (e) => {
+            this._onClick = (e) => {
                 const btn = e.target.closest('a, button');
                 if (!btn) return;
                 const text = (btn.innerText || btn.textContent || '').trim().toLowerCase();
@@ -173,28 +215,30 @@ function filamentMultiTabs() {
                         this.saveTabsToStorage();
                     }
                 }
-            }, true);
+            };
+            document.addEventListener('click', this._onClick, true);
 
-            // Refresh icons for all existing stored tabs after DOM renders
-            setTimeout(() => {
-                this.refreshAllTabIcons();
-                this.scrollToActiveTab();
-            }, 300);
-            setTimeout(() => this.refreshAllTabIcons(), 1000);
-
-            document.addEventListener('livewire:navigated', () => {
-                setTimeout(() => {
+            this._onNavigated = () => {
+                this.schedule(() => {
                     this.captureCurrentPage();
                     this.refreshAllTabIcons();
                     this.scrollToActiveTab();
                 }, 100);
-            });
+            };
+            document.addEventListener('livewire:navigated', this._onNavigated);
 
-            setTimeout(() => {
+            window.__smMultiTabsCleanup = () => this.destroy();
+
+            // Initial capture & icon refresh after DOM renders
+            this.schedule(() => {
                 this.captureCurrentPage();
+                this.refreshAllTabIcons();
                 this.scrollToActiveTab();
-            }, 300);
-            setTimeout(() => this.captureCurrentPage(), 700);
+            }, 250);
+            this.schedule(() => {
+                this.captureCurrentPage();
+                this.refreshAllTabIcons();
+            }, 800);
         },
 
         scrollTabs(amount) {

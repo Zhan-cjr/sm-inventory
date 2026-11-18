@@ -1,201 +1,5 @@
 <div>
     <style>
-        /* Backdrop & Panel */
-        .guide-drawer-backdrop {
-            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65);
-            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-            z-index: 99990;
-            transition: opacity 0.25s ease-out;
-        }
-        .guide-drawer-panel {
-            position: fixed; top: 0; right: 0; bottom: 0;
-            width: 100%; max-width: 680px;
-            background: #ffffff;
-            box-shadow: -15px 0 35px -5px rgba(0, 0, 0, 0.2);
-            z-index: 99999;
-            display: flex; flex-direction: column;
-            transform: translateX(100%);
-            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        .dark .guide-drawer-panel {
-            background: #0f172a;
-            color: #f1f5f9;
-            border-left: 1px solid #1e293b;
-        }
-        .guide-drawer-panel.is-open {
-            transform: translateX(0);
-        }
-
-        /* Typography & Markdown Prose Styling */
-        .guide-prose {
-            font-size: 14.5px;
-            line-height: 1.75;
-            color: #334155;
-        }
-        .dark .guide-prose {
-            color: #cbd5e1;
-        }
-        .guide-prose h1 {
-            font-size: 1.5rem;
-            font-weight: 800;
-            margin-top: 0;
-            margin-bottom: 1rem;
-            color: #0f172a;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 0.6rem;
-            letter-spacing: -0.02em;
-        }
-        .dark .guide-prose h1 {
-            color: #f8fafc;
-            border-color: #334155;
-        }
-        .guide-prose h2 {
-            font-size: 1.2rem;
-            font-weight: 700;
-            margin-top: 1.75rem;
-            margin-bottom: 0.65rem;
-            color: #065f46;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            letter-spacing: -0.01em;
-            border-left: 4px solid #10b981;
-            padding-left: 10px;
-        }
-        .dark .guide-prose h2 {
-            color: #34d399;
-            border-left-color: #059669;
-        }
-        .guide-prose h3 {
-            font-size: 1.05rem;
-            font-weight: 600;
-            margin-top: 1.25rem;
-            margin-bottom: 0.45rem;
-            color: #1e293b;
-        }
-        .dark .guide-prose h3 {
-            color: #e2e8f0;
-        }
-        .guide-prose p {
-            margin-top: 0.5rem;
-            margin-bottom: 0.85rem;
-        }
-        .guide-prose ul, .guide-prose ol {
-            margin-top: 0.5rem;
-            margin-bottom: 1rem;
-            padding-left: 1.35rem;
-        }
-        .guide-prose li {
-            margin-bottom: 0.45rem;
-        }
-
-        /* Callouts / Alerts */
-        .guide-prose blockquote {
-            border-left: 4px solid #10b981;
-            background: linear-gradient(to right, #ecfdf5, #f0fdf4);
-            padding: 12px 18px;
-            margin: 16px 0;
-            border-radius: 0 10px 10px 0;
-            font-size: 13.5px;
-            color: #065f46;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-        }
-        .dark .guide-prose blockquote {
-            background: linear-gradient(to right, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.05));
-            color: #a7f3d0;
-            border-left-color: #10b981;
-        }
-
-        /* Tables */
-        .guide-prose table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            margin: 18px 0;
-            font-size: 13px;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-        }
-        .dark .guide-prose table {
-            border-color: #334155;
-        }
-        .guide-prose table th {
-            background: #f8fafc;
-            color: #0f172a;
-            font-weight: 700;
-            text-align: left;
-            padding: 10px 14px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .dark .guide-prose table th {
-            background: #1e293b;
-            color: #f8fafc;
-            border-color: #334155;
-        }
-        .guide-prose table td {
-            padding: 9px 14px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: top;
-        }
-        .dark .guide-prose table td {
-            border-color: #1e293b;
-        }
-        .guide-prose table tr:last-child td {
-            border-bottom: none;
-        }
-        .guide-prose table tr:nth-child(even) td {
-            background: #fafbfc;
-        }
-        .dark .guide-prose table tr:nth-child(even) td {
-            background: rgba(30, 41, 59, 0.4);
-        }
-
-        /* Code & Keyboard */
-        .guide-prose code {
-            background: #f1f5f9;
-            color: #0f172a;
-            padding: 2px 7px;
-            border-radius: 5px;
-            font-size: 12.5px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            border: 1px solid #e2e8f0;
-        }
-        .dark .guide-prose code {
-            background: #1e293b;
-            color: #e2e8f0;
-            border-color: #334155;
-        }
-        .guide-prose kbd {
-            display: inline-block;
-            background: linear-gradient(to bottom, #ffffff, #f1f5f9);
-            color: #1e293b;
-            border: 1px solid #cbd5e1;
-            border-bottom: 2px solid #94a3b8;
-            padding: 2px 7px;
-            border-radius: 5px;
-            font-size: 11.5px;
-            font-weight: 700;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
-            font-family: inherit;
-        }
-        .dark .guide-prose kbd {
-            background: linear-gradient(to bottom, #334155, #1e293b);
-            color: #f8fafc;
-            border-color: #475569;
-            border-bottom-color: #0f172a;
-        }
-        .guide-prose hr {
-            border: 0;
-            border-top: 1px solid #e2e8f0;
-            margin: 24px 0;
-        }
-        .dark .guide-prose hr {
-            border-top-color: #334155;
-        }
-
         /* Tour Guide Spotlight Overlay Styles */
         .tour-overlay {
             position: fixed; inset: 0;
@@ -236,19 +40,215 @@
         }
     </style>
 
-    {{-- Listener shortcut keyboard F1 --}}
+    {{-- Listener shortcut keyboard F1 & Esc (hanya panggil Livewire saat drawer terbuka) --}}
     <div x-data="{}"
           @keydown.window.f1.prevent="$wire.isOpen ? $wire.close() : $wire.openGuide(null, window.location.pathname)"
-          @keydown.window.escape="$wire.close()">
+          @keydown.window.escape="if ($wire.isOpen) $wire.close()">
     </div>
 
-    @if($isOpen)
+    @if($isOpen && $guide)
+        <style>
+            /* Backdrop & Panel */
+            .guide-drawer-backdrop {
+                position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65);
+                z-index: 99990;
+                transition: opacity 0.2s ease-out;
+            }
+            .guide-drawer-panel {
+                position: fixed; top: 0; right: 0; bottom: 0;
+                width: 100%; max-width: 680px;
+                background: #ffffff;
+                box-shadow: -15px 0 35px -5px rgba(0, 0, 0, 0.2);
+                z-index: 99999;
+                display: flex; flex-direction: column;
+                font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                animation: smGuideSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            @keyframes smGuideSlideIn {
+                from { transform: translateX(32px); opacity: 0.7; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            .dark .guide-drawer-panel {
+                background: #0f172a;
+                color: #f1f5f9;
+                border-left: 1px solid #1e293b;
+            }
+
+            /* Typography & Markdown Prose Styling */
+            .guide-prose {
+                font-size: 14.5px;
+                line-height: 1.75;
+                color: #334155;
+            }
+            .dark .guide-prose {
+                color: #cbd5e1;
+            }
+            .guide-prose h1 {
+                font-size: 1.5rem;
+                font-weight: 800;
+                margin-top: 0;
+                margin-bottom: 1rem;
+                color: #0f172a;
+                border-bottom: 2px solid #e2e8f0;
+                padding-bottom: 0.6rem;
+                letter-spacing: -0.02em;
+            }
+            .dark .guide-prose h1 {
+                color: #f8fafc;
+                border-color: #334155;
+            }
+            .guide-prose h2 {
+                font-size: 1.2rem;
+                font-weight: 700;
+                margin-top: 1.75rem;
+                margin-bottom: 0.65rem;
+                color: #065f46;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                letter-spacing: -0.01em;
+                border-left: 4px solid #10b981;
+                padding-left: 10px;
+            }
+            .dark .guide-prose h2 {
+                color: #34d399;
+                border-left-color: #059669;
+            }
+            .guide-prose h3 {
+                font-size: 1.05rem;
+                font-weight: 600;
+                margin-top: 1.25rem;
+                margin-bottom: 0.45rem;
+                color: #1e293b;
+            }
+            .dark .guide-prose h3 {
+                color: #e2e8f0;
+            }
+            .guide-prose p {
+                margin-top: 0.5rem;
+                margin-bottom: 0.85rem;
+            }
+            .guide-prose ul, .guide-prose ol {
+                margin-top: 0.5rem;
+                margin-bottom: 1rem;
+                padding-left: 1.35rem;
+            }
+            .guide-prose li {
+                margin-bottom: 0.45rem;
+            }
+
+            /* Callouts / Alerts */
+            .guide-prose blockquote {
+                border-left: 4px solid #10b981;
+                background: linear-gradient(to right, #ecfdf5, #f0fdf4);
+                padding: 12px 18px;
+                margin: 16px 0;
+                border-radius: 0 10px 10px 0;
+                font-size: 13.5px;
+                color: #065f46;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            }
+            .dark .guide-prose blockquote {
+                background: linear-gradient(to right, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.05));
+                color: #a7f3d0;
+                border-left-color: #10b981;
+            }
+
+            /* Tables */
+            .guide-prose table {
+                width: 100%;
+                border-collapse: separate;
+                border-spacing: 0;
+                margin: 18px 0;
+                font-size: 13px;
+                border-radius: 10px;
+                overflow: hidden;
+                border: 1px solid #e2e8f0;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            }
+            .dark .guide-prose table {
+                border-color: #334155;
+            }
+            .guide-prose table th {
+                background: #f8fafc;
+                color: #0f172a;
+                font-weight: 700;
+                text-align: left;
+                padding: 10px 14px;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            .dark .guide-prose table th {
+                background: #1e293b;
+                color: #f8fafc;
+                border-color: #334155;
+            }
+            .guide-prose table td {
+                padding: 9px 14px;
+                border-bottom: 1px solid #f1f5f9;
+                vertical-align: top;
+            }
+            .dark .guide-prose table td {
+                border-color: #1e293b;
+            }
+            .guide-prose table tr:last-child td {
+                border-bottom: none;
+            }
+            .guide-prose table tr:nth-child(even) td {
+                background: #fafbfc;
+            }
+            .dark .guide-prose table tr:nth-child(even) td {
+                background: rgba(30, 41, 59, 0.4);
+            }
+
+            /* Code & Keyboard */
+            .guide-prose code {
+                background: #f1f5f9;
+                color: #0f172a;
+                padding: 2px 7px;
+                border-radius: 5px;
+                font-size: 12.5px;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                border: 1px solid #e2e8f0;
+            }
+            .dark .guide-prose code {
+                background: #1e293b;
+                color: #e2e8f0;
+                border-color: #334155;
+            }
+            .guide-prose kbd {
+                display: inline-block;
+                background: linear-gradient(to bottom, #ffffff, #f1f5f9);
+                color: #1e293b;
+                border: 1px solid #cbd5e1;
+                border-bottom: 2px solid #94a3b8;
+                padding: 2px 7px;
+                border-radius: 5px;
+                font-size: 11.5px;
+                font-weight: 700;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+                font-family: inherit;
+            }
+            .dark .guide-prose kbd {
+                background: linear-gradient(to bottom, #334155, #1e293b);
+                color: #f8fafc;
+                border-color: #475569;
+                border-bottom-color: #0f172a;
+            }
+            .guide-prose hr {
+                border: 0;
+                border-top: 1px solid #e2e8f0;
+                margin: 24px 0;
+            }
+            .dark .guide-prose hr {
+                border-top-color: #334155;
+            }
+        </style>
+
         {{-- Backdrop --}}
         <div class="guide-drawer-backdrop" wire:click="close"></div>
-    @endif
 
-    {{-- Sliding Panel --}}
-    <div class="guide-drawer-panel {{ $isOpen ? 'is-open' : '' }}" role="dialog" aria-modal="true" id="user-guide-drawer-container">
+        {{-- Sliding Panel --}}
+        <div class="guide-drawer-panel is-open" role="dialog" aria-modal="true" id="user-guide-drawer-container">
         
         {{-- Header Panel Modern --}}
         <div style="padding: 18px 24px; border-bottom: 1px solid #e2e8f0; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);" class="dark:border-slate-800 dark:bg-slate-900/80">
@@ -388,7 +388,8 @@
                 Tutup
             </button>
         </div>
-    </div>
+        </div>
+    @endif
 
     {{-- Interactive Guided Tour Container (DOM) --}}
     <div id="tour-spotlight-layer" style="display: none;">

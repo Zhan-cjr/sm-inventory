@@ -14,7 +14,7 @@ class UserGuideDrawer extends Component
 
     public function mount()
     {
-        $this->activeMenu = UserGuideService::detectMenuFromUrl();
+        // Menu aktif dideteksi secara lazy saat drawer benar-benar dibuka
     }
 
     #[On('open-user-guide')]
@@ -52,6 +52,14 @@ class UserGuideDrawer extends Component
 
     public function render()
     {
+        if (! $this->isOpen) {
+            return view('livewire.user-guide-drawer', [
+                'guide' => null,
+                'groupedMenus' => [],
+                'allRegistry' => [],
+            ]);
+        }
+
         $registry = UserGuideService::getMenuRegistry();
         $guide = UserGuideService::getGuideContent($this->activeMenu);
 

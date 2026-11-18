@@ -47,6 +47,7 @@ class AdminPanelProvider extends PanelProvider
             ->maxContentWidth(\Filament\Support\Enums\Width::Full)
             ->spa()
             ->databaseNotifications()
+            ->databaseNotificationsPolling(null)
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->navigationGroups([
                 'FILE',
@@ -84,7 +85,7 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 'panels::body.end',
-                fn (): string => \Illuminate\Support\Facades\Blade::render('@livewire("import-progress-bar")@auth @livewire("chat-ai-widget") @livewire("user-guide-drawer") @endauth'),
+                fn (): string => \Illuminate\Support\Facades\Blade::render('@auth @livewire("import-progress-bar") @livewire("chat-ai-widget") @livewire("user-guide-drawer") @endauth'),
             )
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\Filament\Clusters')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')

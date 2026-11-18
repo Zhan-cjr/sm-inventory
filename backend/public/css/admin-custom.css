@@ -91,12 +91,17 @@
     --gray-950: #09090b !important;
 }
 
+html {
+    font-size: 92%;
+}
+
 body {
-    zoom: 92%;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
     background-color: #f8fafc !important;
     color: #0f172a !important;
     letter-spacing: -0.01em !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .dark body {

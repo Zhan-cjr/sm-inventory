@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
@@ -289,12 +290,27 @@ class UserGuideService
 
         if (!File::exists($docPath)) {
             $markdown = "# " . $meta['title'] . "\n\nPanduan untuk menu ini sedang disusun.";
+            $html = Str::markdown($markdown);
         } else {
-            $markdown = File::get($docPath);
-        }
+            $mtime = File::lastModified($docPath);
+            $cacheKey = "user_guide:html:v1:{$key}:{$mtime}";
 
-        // Render markdown ke HTML
-        $html = Str::markdown($markdown);
+            try {
+                $cached = Cache::remember($cacheKey, 86400, function () use ($docPath) {
+                    $md = File::get($docPath);
+
+                    return [
+                        'raw_markdown' => $md,
+                        'html' => Str::markdown($md),
+                    ];
+                });
+                $markdown = $cached['raw_markdown'];
+                $html = $cached['html'];
+            } catch (\Throwable) {
+                $markdown = File::get($docPath);
+                $html = Str::markdown($markdown);
+            }
+        }
 
         return [
             'key' => $key,

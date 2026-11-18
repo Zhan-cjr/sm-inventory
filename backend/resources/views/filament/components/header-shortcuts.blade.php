@@ -1,6 +1,7 @@
 <div style="display: flex; align-items: center; gap: 6px; margin-left: 16px; margin-right: 16px; margin-top: auto; margin-bottom: auto;" class="hidden md:flex flex-wrap items-center">
     <!-- 1. Produk -->
     <a href="/admin/products" 
+       wire:navigate
        title="Data Produk / Barang"
        style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 8px; text-decoration: none; transition: all 0.15s ease;"
        class="{{ request()->is('admin/products*') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-600' }}">
@@ -12,6 +13,7 @@
 
     <!-- 2. Pesanan Pembelian -->
     <a href="/admin/purchase-orders" 
+       wire:navigate
        title="Pesanan Pembelian (PO)"
        style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 8px; text-decoration: none; transition: all 0.15s ease;"
        class="{{ request()->is('admin/purchase-orders*') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-600' }}">
@@ -23,6 +25,7 @@
 
     <!-- 3. Pengecekan Gudang -->
     <a href="/admin/warehouse-checks" 
+       wire:navigate
        title="Pengecekan Gudang / Stock Audit"
        style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 8px; text-decoration: none; transition: all 0.15s ease;"
        class="{{ request()->is('admin/warehouse-checks*') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-600' }}">
@@ -34,6 +37,7 @@
 
     <!-- 4. Penerimaan Barang -->
     <a href="/admin/goods-receipts" 
+       wire:navigate
        title="Penerimaan Barang (Goods Receipt)"
        style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 8px; text-decoration: none; transition: all 0.15s ease;"
        class="{{ request()->is('admin/goods-receipts*') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-600' }}">
@@ -45,6 +49,7 @@
 
     <!-- 5. Koreksi Stok -->
     <a href="/admin/stock-adjustments" 
+       wire:navigate
        title="Koreksi Stok / Stock Adjustment"
        style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 8px; text-decoration: none; transition: all 0.15s ease;"
        class="{{ request()->is('admin/stock-adjustments*') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-600' }}">
@@ -56,6 +61,7 @@
 
     <!-- 6. Stok Transfer -->
     <a href="/admin/stock-transfers" 
+       wire:navigate
        title="Stok Transfer Antar Gudang"
        style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; border-radius: 8px; text-decoration: none; transition: all 0.15s ease;"
        class="{{ request()->is('admin/stock-transfers*') ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-600' }}">
