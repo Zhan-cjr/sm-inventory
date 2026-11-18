@@ -64,19 +64,6 @@ class SyncController extends Controller
                         return; // return from DB::transaction closure, moving to next item
                     }
 
-                    $shiftId = $txData['shiftId'] ?? null;
-                    if (!$shiftId && !empty($txData['terminalId'])) {
-                        // Find any open shift on this terminal for this cashier
-                        $activeShift = \App\Models\Shift::where('terminal_id', $txData['terminalId'])
-                            ->where('user_id', $user->id)
-                            ->where('status', 'OPEN')
-                            ->first();
-                        
-                        if ($activeShift) {
-                            $shiftId = $activeShift->id;
-                        }
-                    }
-
                     $rawDate = $txData['transactionDate'] ?? $txData['transaction_date'] ?? $txData['createdAt'] ?? $txData['created_at'] ?? $txData['date'] ?? null;
                     if ($rawDate) {
                         try {
@@ -90,6 +77,31 @@ class SyncController extends Controller
                     } else {
                         $txDate = now()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s');
                         $createdAt = now()->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s');
+                    }
+
+                    $shiftId = $txData['shiftId'] ?? null;
+                    if (!$shiftId && !empty($txData['terminalId'])) {
+                        // 1. Find any open shift on this terminal for this cashier
+                        $activeShift = \App\Models\Shift::where('terminal_id', $txData['terminalId'])
+                            ->where('user_id', $user->id)
+                            ->where('status', 'OPEN')
+                            ->first();
+
+                        // 2. Fallback: find shift covering this offline transaction timestamp
+                        if (!$activeShift) {
+                            $activeShift = \App\Models\Shift::where('terminal_id', $txData['terminalId'])
+                                ->where('user_id', $user->id)
+                                ->where('start_time', '<=', $txDate)
+                                ->where(function ($q) use ($txDate) {
+                                    $q->whereNull('end_time')->orWhere('end_time', '>=', $txDate);
+                                })
+                                ->latest('start_time')
+                                ->first();
+                        }
+
+                        if ($activeShift) {
+                            $shiftId = $activeShift->id;
+                        }
                     }
 
                     $paymentMethod = $txData['paymentMethod'] ?? 'CASH';

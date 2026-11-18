@@ -162,12 +162,14 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 $this->cart[] = $cartItem;
             }
         } else {
-            $this->po_number = 'PO-' . date('YmdHis');
+            $this->po_number = 'AUTO-GENERATED';
             $this->po_date = date('Y-m-d');
             $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
 
             // Load draft if not editing existing PO
             $this->loadDraft();
+            // Ensure stale cached draft never restores an old po_number
+            $this->po_number = 'AUTO-GENERATED';
         }
 
         $this->calculateTotals();
@@ -228,6 +230,12 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
     public function updatedSupplierId($value)
     {
+        if ($this->purchaseOrder) {
+            $this->supplier_id = $this->purchaseOrder->supplier_id;
+            Notification::make()->title('Supplier tidak dapat diubah saat mengedit PO.')->warning()->send();
+            return;
+        }
+
         $this->supplier_division_id = null;
         $this->cart = [];
         $this->calculateTotals();
@@ -691,12 +699,15 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             return;
         }
 
-        $this->validate([
+        $rules = [
             'supplier_id' => 'required',
             'branch_id' => 'nullable',
             'po_date' => 'required|date',
-            'po_number' => 'required|unique:purchase_orders,po_number,' . ($this->purchaseOrder ? $this->purchaseOrder->id : 'NULL'),
-        ]);
+        ];
+        if ($this->purchaseOrder) {
+            $rules['po_number'] = 'required|unique:purchase_orders,po_number,' . $this->purchaseOrder->id;
+        }
+        $this->validate($rules);
 
         if (empty($this->cart)) {
             Notification::make()->title('Keranjang kosong!')->danger()->send();
@@ -832,6 +843,11 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
         if ($this->purchaseOrder) {
             unset($data['created_by']);
+            // Lock supplier, branch, and po_number on edit
+            $data['supplier_id'] = $this->purchaseOrder->supplier_id;
+            $data['branch_id'] = $this->purchaseOrder->branch_id;
+            $data['po_number'] = $this->purchaseOrder->po_number;
+
             $headerChanged = $this->hasHeaderChanges($this->purchaseOrder, $data);
             $oldItems = $this->purchaseOrder->items()->get()->keyBy('id');
             $incomingIds = collect($this->cart)->pluck('id')->filter()->all();
@@ -884,14 +900,21 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             // ALWAYS cancel old pending approvals because the document has been modified
             $po->cancelPendingApprovals();
         } else {
-            $po = PurchaseOrder::create($data);
+            $po = \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
+                $data['po_number'] = PurchaseOrder::generatePoNumber($data['branch_id'], $data['po_date']);
+                $this->po_number = $data['po_number'];
 
-            foreach ($this->cart as $item) {
-                PurchaseOrderItem::create(array_merge(
-                    ['purchase_order_id' => $po->id],
-                    $this->buildPoItemPayload($item)
-                ));
-            }
+                $createdPo = PurchaseOrder::create($data);
+
+                foreach ($this->cart as $item) {
+                    PurchaseOrderItem::create(array_merge(
+                        ['purchase_order_id' => $createdPo->id],
+                        $this->buildPoItemPayload($item)
+                    ));
+                }
+
+                return $createdPo;
+            });
         }
 
         if ($needsApproval) {
@@ -920,6 +943,12 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
     public function updatedBranchId($value)
     {
+        if ($this->purchaseOrder) {
+            $this->branch_id = $this->purchaseOrder->branch_id;
+            Notification::make()->title('Lokasi cabang tidak dapat diubah saat mengedit PO.')->warning()->send();
+            return;
+        }
+
         if (!empty($this->cart)) {
             foreach ($this->cart as $index => $item) {
                 $product = Product::find($item['product_id']);

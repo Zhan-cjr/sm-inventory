@@ -29,6 +29,8 @@ export const usePosPayment = ({
   appliedPromos,
   terminalInfo,
   activeShift,
+  setIsOpenShiftModalOpen,
+  syncOfflineShiftIfNeeded,
   branchCode,
   branchName,
   branchAddress,
@@ -164,6 +166,15 @@ export const usePosPayment = ({
   const processTransaction = async (method = paymentMethod, bankId = selectedBank?.id, overrideReceived = null, explicitItems = null) => {
     const currentItems = explicitItems || items;
     if (currentItems.length === 0) return;
+
+    if (!activeShift || (!activeShift.id && !activeShift.is_offline)) {
+      setAlertMsg({ text: 'Shift kasir belum dibuka. Silakan buka shift terlebih dahulu sebelum melakukan transaksi!', type: 'error', persist: true });
+      if (typeof setIsOpenShiftModalOpen === 'function') {
+        setIsOpenShiftModalOpen(true);
+      }
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const nowCorrected = new Date(Date.now() + serverOffset);
@@ -212,6 +223,11 @@ export const usePosPayment = ({
       const currentChange = currentReceived - currentFinalAmount;
       const actualPaymentMethod = finalPayments.length > 1 ? 'MULTI' : finalPayments[0].method;
 
+      let resolvedShiftId = activeShift?.id || null;
+      if (!resolvedShiftId && activeShift?.is_offline && isOnline && typeof syncOfflineShiftIfNeeded === 'function') {
+        resolvedShiftId = await syncOfflineShiftIfNeeded();
+      }
+
       const transaction = {
         items: currentItems,
         totalAmount: grossTotal,
@@ -225,7 +241,7 @@ export const usePosPayment = ({
         terminalId: terminalInfo?.id,
         terminalCode: terminalInfo?.code,
         customerId: selectedCustomer?.id,
-        shiftId: activeShift?.id,
+        shiftId: resolvedShiftId,
         receivedAmount: currentReceived,
         changeAmount: currentChange,
         appliedPromos,
@@ -276,7 +292,7 @@ export const usePosPayment = ({
             promo_discount: totalDiscount,
             final_amount: currentFinalAmount,
             customer_id: selectedCustomer?.id || null,
-            shift_id: activeShift?.id || null,
+            shift_id: resolvedShiftId,
             payments: finalPayments,
             bank_id: bankId,
             terminal_id: terminalInfo?.id || null,

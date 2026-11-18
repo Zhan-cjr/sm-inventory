@@ -129,7 +129,7 @@
                     <tr>
                         <td class="pos-label">Lokasi Cabang</td>
                         <td>
-                            <select class="pos-input" wire:model="branch_id" @if(auth()->user()->branch_id) disabled @endif>
+                            <select class="pos-input" wire:model="branch_id" @if(auth()->user()->branch_id || $purchaseOrder) disabled style="background-color: #e5e7eb; cursor: not-allowed;" @endif>
                                 <option value="">-- Pusat / Global (Semua Cabang) --</option>
                                 @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
@@ -262,9 +262,9 @@
                                     this.search = '';
                                 }
                             }" style="position: relative;">
-                                <button type="button" @click="open = !open" 
-                                        class="pos-input flex-between bg-white dark:bg-gray-800" 
-                                        style="display: flex; justify-content: space-between; align-items: center; width: 100%; cursor: pointer;">
+                                <button type="button" @if($purchaseOrder) disabled @else @click="open = !open" @endif
+                                        class="pos-input flex-between {{ $purchaseOrder ? '' : 'bg-white dark:bg-gray-800' }}" 
+                                        style="display: flex; justify-content: space-between; align-items: center; width: 100%; {{ $purchaseOrder ? 'background-color: #e5e7eb; cursor: not-allowed;' : 'cursor: pointer;' }}">
                                     <span>{{ $supplier_id ? (collect($suppliers)->firstWhere('id', $supplier_id)['code'] . ' - ' . collect($suppliers)->firstWhere('id', $supplier_id)['name']) : 'Pilih Supplier...' }}</span>
                                     <svg style="width: 1rem; height: 1rem; color: #9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                 </button>

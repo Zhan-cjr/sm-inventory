@@ -94,10 +94,26 @@ class TransactionController extends Controller
         ]);
 
         $user = $this->getUser();
+        $terminalId = $request->input('terminal_id') ?? $request->header('X-Terminal-Id') ?? null;
+        $resolvedShiftId = $request->input('shift_id') ?? null;
+        if (empty($resolvedShiftId)) {
+            $openShiftQuery = \App\Models\Shift::where('user_id', $user->id)
+                ->where('status', 'OPEN');
+            if (!empty($terminalId)) {
+                $openShiftQuery->where('terminal_id', $terminalId);
+            }
+            $resolvedShiftId = $openShiftQuery->latest('start_time')->value('id');
+        }
+        if (empty($resolvedShiftId)) {
+            return response()->json([
+                'message' => 'Tidak ada shift aktif (OPEN) untuk kasir/terminal ini. Harap buka shift terlebih dahulu.'
+            ], 422);
+        }
+
         $transaction = null;
 
         try {
-            DB::transaction(function () use ($validated, $user, $request, &$transaction) {
+            DB::transaction(function () use ($validated, $user, $request, $terminalId, $resolvedShiftId, &$transaction) {
                 $paymentMethod = $validated['payment_method'] ?? 'CASH';
                 $paymentDetails = null;
                 $requestPayments = $request->input('payments');
@@ -135,8 +151,7 @@ class TransactionController extends Controller
 
                 $receivedAmount = (float) ($request->input('received_amount') ?? $request->input('receivedAmount') ?? $validated['final_amount']);
                 $changeAmount = (float) ($request->input('change_amount') ?? $request->input('changeAmount') ?? 0);
-                $terminalId = $request->input('terminal_id') ?? $request->header('X-Terminal-Id') ?? null;
-                $shiftId = $request->input('shift_id') ?? null;
+                $shiftId = $resolvedShiftId;
                 $txType = $request->input('transaction_type', 'SALES');
 
                 $transaction = Transaction::create([

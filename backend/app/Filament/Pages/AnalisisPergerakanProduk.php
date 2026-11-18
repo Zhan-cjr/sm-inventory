@@ -166,11 +166,7 @@ class AnalisisPergerakanProduk extends Page
 
     protected function generateUniquePoNumber(int $seq = 0): string
     {
-        do {
-            $suffix = $seq > 0 ? sprintf('%02d', $seq) . '-' : '';
-            $num = 'PO-' . date('YmdHis') . '-' . $suffix . strtoupper(\Illuminate\Support\Str::random(4));
-        } while (PurchaseOrder::where('po_number', $num)->exists());
-        return $num;
+        return PurchaseOrder::generatePoNumber($this->branch_id);
     }
 
     public function exportExcel()

@@ -124,7 +124,7 @@ class PurchaseOrderController extends Controller
                     'branch_id' => $branchId,
                     'supplier_id' => $supplierId,
                     'supplier_division_id' => $divisionId,
-                    'po_number' => 'PO-' . date('YmdHis') . '-' . rand(100, 999),
+                    'po_number' => PurchaseOrder::generatePoNumber($branchId),
                     'po_date' => now(),
                     'expired_date' => $expiredDate,
                     'status' => $needsApproval ? 'pending_approval' : 'approved',

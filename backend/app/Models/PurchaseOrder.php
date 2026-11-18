@@ -107,4 +107,43 @@ public function goodsReceipts(): HasMany
 
         return max(0, $totalOrdered - $totalChecked);
     }
+
+    /**
+     * Generate a unique, collision-free PO number: PO-{BRANCH_CODE}-{YYMMDD}-{SEQ4}.
+     */
+    public static function generatePoNumber(?string $branchId = null, ?string $poDate = null): string
+    {
+        $branchCode = 'PST';
+        if (!empty($branchId)) {
+            $code = Branch::where('id', $branchId)->value('code');
+            if (!empty($code)) {
+                $branchCode = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $code));
+            }
+        }
+
+        $dateStr = $poDate ? \Carbon\Carbon::parse($poDate)->format('ymd') : now()->format('ymd');
+        $prefix = "PO-{$branchCode}-{$dateStr}-";
+
+        return \Illuminate\Support\Facades\Cache::lock("po_seq_{$branchCode}_{$dateStr}", 10)->block(5, function () use ($prefix) {
+            $lastPo = self::where('po_number', 'LIKE', $prefix . '%')
+                ->orderByRaw('CAST(SUBSTRING_INDEX(po_number, "-", -1) AS UNSIGNED) DESC')
+                ->value('po_number');
+
+            $nextSeq = 1;
+            if ($lastPo) {
+                $parts = explode('-', $lastPo);
+                $nextSeq = ((int) end($parts)) + 1;
+            }
+
+            do {
+                $candidate = $prefix . str_pad((string) $nextSeq, 4, '0', STR_PAD_LEFT);
+                $exists = self::where('po_number', $candidate)->exists();
+                if ($exists) {
+                    $nextSeq++;
+                }
+            } while ($exists);
+
+            return $candidate;
+        });
+    }
 }

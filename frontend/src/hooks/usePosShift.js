@@ -250,7 +250,7 @@ export const usePosShift = ({
     setLockScreenInfo(null);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     fetch(`/api/v1/shifts/active?terminal_id=${terminalId}`, {
       headers: { 'Authorization': `Bearer ${authToken}` },
@@ -334,12 +334,13 @@ export const usePosShift = ({
       .finally(() => setIsCheckingShift(false));
   }, [authToken, currentUserId, setAlertMsg, triggerOpenShiftModalOffline, user]);
 
-  // Sync offline active shift to server when back online
-  useEffect(() => {
-    if (navigator.onLine && activeShift && activeShift.is_offline && terminalInfo?.id && authToken) {
-      console.log('Detecting online state with offline active shift. Registering shift on server...');
+  const syncOfflineShiftIfNeeded = useCallback(async () => {
+    if (!navigator.onLine || !activeShift || !activeShift.is_offline || !terminalInfo?.id || !authToken) {
+      return activeShift?.id || null;
+    }
 
-      fetch('/api/v1/shifts/open', {
+    try {
+      const res = await fetch('/api/v1/shifts/open', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -350,26 +351,34 @@ export const usePosShift = ({
           shift_name: activeShift.shift_name,
           starting_cash: activeShift.starting_cash
         })
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.shift) {
-            console.log('Offline shift successfully registered on server:', data.shift);
-            setActiveShift(data.shift);
-            saveActiveShift(data.shift, currentUserId, terminalInfo?.id);
-            setAlertMsg({ text: `Shift offline Anda ("${activeShift.shift_name}") telah disinkronkan ke server secara otomatis!`, type: 'success' });
-            setTimeout(() => setAlertMsg(null), 5000);
-
-            if (typeof syncTransactions === 'function') {
-              syncTransactions();
-            }
-          } else {
-            console.error('Failed to register offline shift on server:', data.message);
-          }
-        })
-        .catch(err => console.error('Error registering offline shift:', err));
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.shift) {
+        setActiveShift(data.shift);
+        saveActiveShift(data.shift, currentUserId, terminalInfo?.id);
+        setAlertMsg({ text: `Shift offline Anda ("${activeShift.shift_name}") telah disinkronkan ke server secara otomatis!`, type: 'success' });
+        setTimeout(() => setAlertMsg(null), 5000);
+        if (typeof syncTransactions === 'function') {
+          syncTransactions();
+        }
+        return data.shift.id;
+      }
+      console.error('Failed to register offline shift on server:', data.message);
+    } catch (err) {
+      console.error('Error registering offline shift:', err);
     }
+    return null;
   }, [activeShift, terminalInfo?.id, authToken, currentUserId, setAlertMsg, syncTransactions]);
+
+  // Sync offline active shift to server when back online
+  useEffect(() => {
+    if (navigator.onLine && activeShift && activeShift.is_offline && terminalInfo?.id && authToken) {
+      syncOfflineShiftIfNeeded();
+    }
+    const handleOnline = () => syncOfflineShiftIfNeeded();
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [activeShift, terminalInfo?.id, authToken, syncOfflineShiftIfNeeded]);
 
   const handleOpenShift = () => {
     if (isProcessing) return;
@@ -645,6 +654,7 @@ export const usePosShift = ({
     eodReportData,
     setEodReportData,
     checkActiveShift,
+    syncOfflineShiftIfNeeded,
     handleOpenShift,
     handleCloseShift,
     handleCashMovement,

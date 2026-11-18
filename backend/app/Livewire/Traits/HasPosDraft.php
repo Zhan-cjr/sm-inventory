@@ -30,6 +30,7 @@ trait HasPosDraft
         
         $ignoredProperties = [
             'purchaseOrder', 'goodsReceipt', 'purchaseReturn', 'stockAdjustment',
+            'po_number',
             'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image',
             'scan_image', 'purchaseOrdersList', 'purchaseOrders',
             // Promo modal states & file uploads
@@ -112,6 +113,7 @@ trait HasPosDraft
         if ($draft && is_array($draft) && !empty($draft['cart'])) {
             $ignoredProperties = [
                 'purchaseOrder', 'goodsReceipt', 'purchaseReturn', 'stockAdjustment',
+                'po_number',
                 'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image',
                 'scan_image', 'purchaseOrdersList', 'purchaseOrders',
                 'promoFile', 'parsedPromoItems', 'excelSheets', 'excelColumns',
