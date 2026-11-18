@@ -594,9 +594,18 @@
                                 <span>{{ $product['total_count2'] }}</span>
                             </div>
                             <div class="fc-pill fc-pill-diff">
-                                <span class="fc-pill-label">Selisih</span>
+                                <span class="fc-pill-label">Selisih P1↔P2</span>
                                 <span>{{ $product['total_count2'] - $product['total_count1'] }}</span>
                             </div>
+                            @php
+                                $sysDiff = round($product['total_count2'] - $product['adjusted_system_qty'], 4);
+                            @endphp
+                            @if($sysDiff != 0)
+                                <div class="fc-pill" style="background: #fef3c7; color: #b45309; border: 1px solid #fcd34d;">
+                                    <span class="fc-pill-label">Selisih Sistem</span>
+                                    <span>{{ $sysDiff > 0 ? '+' : '' }}{{ $sysDiff }}</span>
+                                </div>
+                            @endif
                         </div>
                     </div>
 

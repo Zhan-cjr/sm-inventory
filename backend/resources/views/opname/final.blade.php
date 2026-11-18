@@ -346,6 +346,12 @@
                 @php
                     $isDone = ($item->status === 'FINAL_DONE');
                     $diff = ($item->count2_quantity ?? 0) - ($item->count1_quantity ?? 0);
+                    $prodSummary = $productSummaries[$item->product_id] ?? null;
+                    $adjustedSys = $prodSummary ? (float) $prodSummary['adjusted_system_qty'] : (float) $item->adjusted_system_quantity;
+                    $totalC2Prod = $prodSummary ? (float) $prodSummary['total_count2'] : (float) ($item->count2_quantity ?? 0);
+                    $sysDiff = round($totalC2Prod - $adjustedSys, 4);
+                    $hasCountDiff = round($diff, 4) != 0;
+                    $hasSysDiff = $sysDiff != 0;
                 @endphp
                 <div class="final-item-card {{ $isDone ? 'unlocked' : 'locked' }}"
                      id="item-card-{{ $item->id }}"
@@ -378,6 +384,18 @@
                     </div>
 
                     <!-- Comparison Info -->
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+                        @if($hasCountDiff)
+                            <span style="font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(239,68,68,.15); color: #fca5a5; border: 1px solid rgba(239,68,68,.3);">
+                                ⚠️ Selisih P1 ↔ P2
+                            </span>
+                        @endif
+                        @if($hasSysDiff)
+                            <span style="font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(245,158,11,.15); color: #fcd34d; border: 1px solid rgba(245,158,11,.3);">
+                                📊 Selisih dengan Sistem
+                            </span>
+                        @endif
+                    </div>
                     <div class="comparison-bar">
                         <div class="comp-pill">
                             <div class="comp-lbl">Penghitung 1</div>
@@ -389,7 +407,15 @@
                         </div>
                         <div class="comp-pill">
                             <div class="comp-lbl">Selisih P1↔P2</div>
-                            <div class="comp-val val-diff">{{ $diff > 0 ? '+' : '' }}{{ number_format($diff, 0) }}</div>
+                            <div class="comp-val val-diff" style="{{ !$hasCountDiff ? 'color: #94a3b8;' : '' }}">{{ $diff > 0 ? '+' : '' }}{{ number_format($diff, 0) }}</div>
+                        </div>
+                        <div class="comp-pill">
+                            <div class="comp-lbl">Stok Sistem</div>
+                            <div class="comp-val" style="color: #e2e8f0;">{{ number_format($adjustedSys, 0) }}</div>
+                        </div>
+                        <div class="comp-pill">
+                            <div class="comp-lbl">Selisih Sistem</div>
+                            <div class="comp-val" style="color: {{ $hasSysDiff ? '#fbbf24' : '#94a3b8' }};">{{ $sysDiff > 0 ? '+' : '' }}{{ number_format($sysDiff, 0) }}</div>
                         </div>
                     </div>
 

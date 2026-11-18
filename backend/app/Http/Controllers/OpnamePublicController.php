@@ -460,6 +460,11 @@ class OpnamePublicController extends Controller
             ->whereIn('status', ['DISCREPANCY', 'FINAL_DONE'])
             ->get();
 
+        StockOpnameItem::preloadDeltasAndPricesForItems($discrepancyItems);
+
+        // Hitung ringkasan per produk (total lintas rak & stok sistem disesuaikan)
+        $productSummaries = $session->getProductSummary()->keyBy('product_id');
+
         // Kelompokkan per rak
         $groupedByRack = $discrepancyItems->groupBy(function ($item) {
             return $item->rackSession?->rack?->rack_code ?? 'TANPA-RAK';
@@ -470,6 +475,7 @@ class OpnamePublicController extends Controller
             'sessionToken'     => $sessionToken,
             'discrepancyItems' => $discrepancyItems,
             'groupedByRack'    => $groupedByRack,
+            'productSummaries' => $productSummaries,
             'totalDiscrepancy' => $discrepancyItems->where('status', 'DISCREPANCY')->count(),
             'totalDone'        => $discrepancyItems->where('status', 'FINAL_DONE')->count(),
         ]);

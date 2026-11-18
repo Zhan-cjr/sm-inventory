@@ -70,40 +70,48 @@ class StockOpnameItem extends Model
     }
 
     /**
-     * Evaluasi apakah produk ini masih DISCREPANCY setelah mempertimbangkan semua rak.
-     * Jika total count1 == total count2 lintas rak, anggap tidak ada selisih.
+     * Evaluasi apakah produk ini masih DISCREPANCY setelah mempertimbangkan semua rak
+     * dan selisih terhadap stok sistem (termasuk mutasi selama sesi SO).
+     * - Jika total count1 != total count2 lintas rak -> DISCREPANCY.
+     * - Jika total count1 == total count2 lintas rak, tetapi total fisik != stok sistem -> DISCREPANCY.
+     * - Jika keduanya cocok (selisih = 0) -> COUNT2_DONE.
      */
     protected function evaluateCrossRackDiscrepancy(): void
     {
-        $siblingsC1 = StockOpnameItem::where('session_id', $this->session_id)
+        $siblings = StockOpnameItem::where('session_id', $this->session_id)
             ->where('product_id', $this->product_id)
-            ->whereNotNull('count1_quantity')
-            ->sum('count1_quantity');
+            ->get();
 
-        $siblingsC2 = StockOpnameItem::where('session_id', $this->session_id)
-            ->where('product_id', $this->product_id)
-            ->whereNotNull('count2_quantity')
-            ->sum('count2_quantity');
+        $siblingsCount = $siblings->count();
+        $doneCount = $siblings->whereIn('status', ['COUNT2_DONE', 'DISCREPANCY'])->count();
 
-        $siblingsCount = StockOpnameItem::where('session_id', $this->session_id)
-            ->where('product_id', $this->product_id)
-            ->count();
+        // Hanya evaluasi jika semua rak untuk produk ini sudah count2 (dan belum ada yang FINAL_DONE)
+        if ($siblingsCount > 0 && $siblingsCount === $doneCount) {
+            $siblingsC1 = (float) $siblings->whereNotNull('count1_quantity')->sum('count1_quantity');
+            $siblingsC2 = (float) $siblings->whereNotNull('count2_quantity')->sum('count2_quantity');
+            $crossRackDiff = round($siblingsC2 - $siblingsC1, 4);
 
-        $doneCount = StockOpnameItem::where('session_id', $this->session_id)
-            ->where('product_id', $this->product_id)
-            ->whereIn('status', ['COUNT2_DONE', 'DISCREPANCY'])
-            ->count();
+            // Reset cache delta agar selalu memakai mutasi terbaru saat count2 selesai
+            $cacheKey = $this->session_id . '_' . $this->product_id;
+            unset(static::$deltaCache[$cacheKey]);
+            $this->memoizedDelta = null;
 
-        // Hanya evaluasi jika semua rak untuk produk ini sudah count2
-        if ($siblingsCount === $doneCount) {
-            $crossRackDiff = $siblingsC2 - $siblingsC1;
+            $systemQty = (float) ($siblings->first()->system_quantity ?? 0);
+            $adjustedSystemQty = $systemQty + $this->delta_during_session;
+            $systemDiff = round($siblingsC2 - $adjustedSystemQty, 4);
 
-            if ($crossRackDiff == 0) {
-                // Tidak ada selisih lintas rak → ubah semua DISCREPANCY jadi COUNT2_DONE
+            if ($crossRackDiff == 0 && $systemDiff == 0) {
+                // Tidak ada selisih lintas rak maupun selisih sistem → ubah semua DISCREPANCY jadi COUNT2_DONE
                 StockOpnameItem::where('session_id', $this->session_id)
                     ->where('product_id', $this->product_id)
                     ->where('status', 'DISCREPANCY')
                     ->update(['status' => 'COUNT2_DONE', 'discrepancy_1_2' => 0]);
+            } elseif ($crossRackDiff == 0 && $systemDiff != 0) {
+                // Penghitung 1 & 2 sama, tetapi total fisik selisih dengan stok sistem → wajib Final Check
+                StockOpnameItem::where('session_id', $this->session_id)
+                    ->where('product_id', $this->product_id)
+                    ->where('status', 'COUNT2_DONE')
+                    ->update(['status' => 'DISCREPANCY']);
             }
         }
     }

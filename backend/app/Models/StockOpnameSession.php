@@ -230,4 +230,65 @@ class StockOpnameSession extends Model
             'minus' => $totalMinus > 0 ? $totalMinus : null,
         ];
     }
+
+    /**
+     * Evaluasi ulang seluruh item COUNT2_DONE terhadap stok sistem yang disesuaikan
+     * (mengantisipasi transaksi kasir/penerimaan yang terjadi setelah Count 2 disubmit).
+     */
+    public function evaluateSystemDiscrepancies(): void
+    {
+        $this->memoizedProductSummary = null;
+        $this->memoizedDiscrepancyNominals = null;
+
+        $itemsGrouped = $this->items()->get()->groupBy('product_id');
+        if ($itemsGrouped->isEmpty()) {
+            return;
+        }
+
+        $externalLogs = collect();
+        if ($this->branch_id) {
+            $start = $this->created_at;
+            $end = $this->completed_at ?? now();
+
+            $externalLogs = \App\Models\InventoryLog::where('branch_id', $this->branch_id)
+                ->whereBetween('created_at', [$start, $end])
+                ->where(function ($q) {
+                    $q->whereNull('reference_doc_type')
+                      ->orWhere('reference_doc_type', '!=', 'STOCK_OPNAME');
+                })
+                ->where(function ($q) {
+                    $q->whereNull('reason_code')
+                      ->orWhere('reason_code', '!=', 'STOCK_OPNAME');
+                })
+                ->whereIn('product_id', $itemsGrouped->keys()->filter())
+                ->get()
+                ->groupBy('product_id');
+        }
+
+        $itemIdsToFlag = [];
+        foreach ($itemsGrouped as $pid => $items) {
+            $allCount2Done = $items->every(fn ($i) => in_array($i->status, ['COUNT2_DONE', 'DISCREPANCY']));
+            if (!$allCount2Done) {
+                continue;
+            }
+
+            $totalC2 = (float) $items->whereNotNull('count2_quantity')->sum('count2_quantity');
+            $systemQty = (float) ($items->first()->system_quantity ?? 0);
+            $delta = (float) ($externalLogs->get($pid)?->sum('quantity_change') ?? 0);
+            $adjustedSystemQty = $systemQty + $delta;
+
+            if (round($totalC2 - $adjustedSystemQty, 4) != 0) {
+                foreach ($items as $item) {
+                    if ($item->status === 'COUNT2_DONE') {
+                        $itemIdsToFlag[] = $item->id;
+                    }
+                }
+            }
+        }
+
+        if (!empty($itemIdsToFlag)) {
+            StockOpnameItem::whereIn('id', $itemIdsToFlag)
+                ->update(['status' => 'DISCREPANCY']);
+        }
+    }
 }

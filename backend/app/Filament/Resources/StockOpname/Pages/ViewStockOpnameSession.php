@@ -46,7 +46,7 @@ class ViewStockOpnameSession extends ViewRecord
                 ->visible(fn () => in_array($record->status, ['COUNTING', 'CHECKING']))
                 ->requiresConfirmation()
                 ->modalHeading('Masuk ke tahap Final Check?')
-                ->modalDescription('Item yang selisih antara penghitung 1 dan 2 akan diverifikasi pada tahap ini.')
+                ->modalDescription('Item yang selisih antara penghitung 1 & 2 maupun selisih dengan stok sistem akan diverifikasi pada tahap ini.')
                 ->action(function () use ($record) {
                     $pendingCount1 = $record->rackSessions()->where('count1_status', 'PENDING')->count();
                     $pendingCount2 = $record->rackSessions()->where('count2_status', 'PENDING')->count();
@@ -56,6 +56,8 @@ class ViewStockOpnameSession extends ViewRecord
                             ->warning()->send();
                         return;
                     }
+
+                    $record->evaluateSystemDiscrepancies();
 
                     $discrepancies = $record->items()->where('status', 'DISCREPANCY')->count();
                     if ($discrepancies === 0) {
@@ -89,6 +91,8 @@ class ViewStockOpnameSession extends ViewRecord
                             ->danger()->send();
                         return;
                     }
+
+                    $record->evaluateSystemDiscrepancies();
 
                     $pendingFinal = $record->items()->where('status', 'DISCREPANCY')->count();
                     if ($pendingFinal > 0) {
