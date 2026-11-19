@@ -20,7 +20,7 @@ class RemindPendingPO extends Command
      */
     public function handle()
     {
-        $token = env('TELEGRAM_BOT_TOKEN');
+        $token = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
         if (!$token) {
             $this->error('TELEGRAM_BOT_TOKEN is not set in .env');
             return;
@@ -76,7 +76,7 @@ class RemindPendingPO extends Command
             $message .= "---------------------------\n";
         }
 
-        $baseUrl = env('FRONTEND_URL', request()->getSchemeAndHttpHost());
+        $baseUrl = config('services.frontend.url') ?? env('FRONTEND_URL', request()->getSchemeAndHttpHost());
         $link = rtrim($baseUrl, '/') . "/mobile/auth";
         $message .= "\nSegera proses persetujuan melalui sistem.\n";
         $message .= "Tautan: " . $link;

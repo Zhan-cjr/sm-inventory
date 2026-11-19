@@ -14,9 +14,11 @@ class DigiflazzService implements PpobProviderInterface
 
     public function __construct()
     {
-        $this->username = env('DIGIFLAZZ_USERNAME');
-        $mode = env('DIGIFLAZZ_MODE', 'development');
-        $this->apiKey = $mode === 'production' ? env('DIGIFLAZZ_PROD_KEY') : env('DIGIFLAZZ_DEV_KEY');
+        $this->username = config('services.digiflazz.username') ?? env('DIGIFLAZZ_USERNAME');
+        $mode = config('services.digiflazz.mode') ?? env('DIGIFLAZZ_MODE', 'development');
+        $this->apiKey = $mode === 'production' 
+            ? (config('services.digiflazz.prod_key') ?? env('DIGIFLAZZ_PROD_KEY')) 
+            : (config('services.digiflazz.dev_key') ?? env('DIGIFLAZZ_DEV_KEY'));
     }
 
     private function generateSign($command)

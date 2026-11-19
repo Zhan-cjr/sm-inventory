@@ -424,8 +424,8 @@ class EcommerceController extends Controller
 
     private function _configureMidtrans()
     {
-        Config::$serverKey = env('MIDTRANS_SERVER_KEY');
-        Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', false);
+        Config::$serverKey = config('services.midtrans.server_key') ?? env('MIDTRANS_SERVER_KEY');
+        Config::$isProduction = config('services.midtrans.is_production') ?? env('MIDTRANS_IS_PRODUCTION', false);
         Config::$isSanitized = true;
         Config::$is3ds = true;
     }
@@ -724,7 +724,7 @@ class EcommerceController extends Controller
             }
 
             // Send Telegram Notification
-            $token = env('TELEGRAM_BOT_TOKEN');
+            $token = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
             if ($token) {
                 $supervisors = \App\Models\User::where('is_active', true)
                     ->whereNotNull('telegram_chat_id')
@@ -749,7 +749,7 @@ class EcommerceController extends Controller
 
                 if ($supervisors->count() > 0) {
                     $branchName = $order->branch ? $order->branch->name : 'Pusat';
-                    $baseUrl = env('FRONTEND_URL', request()->getSchemeAndHttpHost());
+                    $baseUrl = config('services.frontend.url') ?? env('FRONTEND_URL', request()->getSchemeAndHttpHost());
                     $link = rtrim($baseUrl, '/') . "/mobile/ecommerce";
                     $totalFormatted = number_format($order->total_amount, 0, ',', '.');
                     
@@ -1221,7 +1221,7 @@ class EcommerceController extends Controller
             $grossAmount = $request->input('gross_amount');
 
             // Verify Signature
-            $serverKey = env('MIDTRANS_SERVER_KEY');
+            $serverKey = config('services.midtrans.server_key') ?? env('MIDTRANS_SERVER_KEY');
             $calculatedSignature = hash("sha512", $rawOrderId . $statusCode . $grossAmount . $serverKey);
 
             if ($calculatedSignature !== $signatureKey) {

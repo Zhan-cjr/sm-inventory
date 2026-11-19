@@ -27,7 +27,7 @@ trait HasApprovals
 
     protected function sendTelegramNotification($approval = null)
     {
-        $token = env('TELEGRAM_BOT_TOKEN');
+        $token = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
         if (!$token) return;
 
         $branchId = $this->branch_id ?? null;
@@ -226,7 +226,7 @@ trait HasApprovals
 
     protected function updateTelegramMessageStatus($approval, $action, $userId = null)
     {
-        $token = env('TELEGRAM_BOT_TOKEN');
+        $token = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
         if (!$token) return;
 
         $messages = $approval->telegram_messages;

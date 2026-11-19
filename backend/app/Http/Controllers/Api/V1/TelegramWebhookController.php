@@ -36,7 +36,7 @@ class TelegramWebhookController extends Controller
             // 1. Verify Authorization
             $user = User::where('telegram_chat_id', (string) $chatId)->where('is_active', true)->first();
             $branchId = null;
-            $botToken = env('TELEGRAM_BOT_TOKEN');
+            $botToken = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
 
             if (!$user) {
                 // Cek apakah chat berasal dari Grup yang terdaftar di Perusahaan
@@ -83,7 +83,7 @@ class TelegramWebhookController extends Controller
                 $chatHistoryForAi = $chatHistory;
                 $chatHistoryForAi[] = ['role' => 'user', 'content' => $messageText];
 
-                $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
+                $aiUrl = config('services.ai_service.url') ?? env('AI_SERVICE_URL', 'http://ai-service:8001');
                 $aiResponse = Http::timeout(60)->post($aiUrl . '/api/v1/ai/ask', [
                     'question' => $messageText,
                     'branch_id' => $branchId,
@@ -192,7 +192,7 @@ class TelegramWebhookController extends Controller
 
     private function handleCallbackQuery($callbackQuery)
     {
-        $botToken = env('TELEGRAM_BOT_TOKEN');
+        $botToken = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
         $callbackQueryId = $callbackQuery['id'];
         $data = $callbackQuery['data'] ?? '';
         $chatId = $callbackQuery['message']['chat']['id'];

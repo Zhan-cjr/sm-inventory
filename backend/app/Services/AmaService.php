@@ -14,9 +14,9 @@ class AmaService implements PpobProviderInterface
 
     public function __construct()
     {
-        $this->userId = env('AMA_USER_ID', '262711139');
-        $this->apiKey = env('AMA_PIN', '352ee5');
-        $this->baseUrl = rtrim(env('AMA_API_URL', 'https://202.43.189.122:13008/clientapi/v2/json'), '/');
+        $this->userId = config('services.ama.user_id') ?? env('AMA_USER_ID', '262711139');
+        $this->apiKey = config('services.ama.pin') ?? env('AMA_PIN', '352ee5');
+        $this->baseUrl = rtrim(config('services.ama.api_url') ?? env('AMA_API_URL', 'https://202.43.189.122:13008/clientapi/v2/json'), '/');
     }
 
     private function getHttpClient()

@@ -23,7 +23,7 @@ class SendDailyReport extends Command
     public function handle()
     {
         $today = Carbon::today();
-        $token = env('TELEGRAM_BOT_TOKEN');
+        $token = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
         
         if (!$token) {
             $this->error('TELEGRAM_BOT_TOKEN is not set in .env');

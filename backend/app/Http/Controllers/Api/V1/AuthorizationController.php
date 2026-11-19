@@ -34,7 +34,7 @@ class AuthorizationController extends Controller
         ]);
 
         // Send Telegram Notification
-        $token = env('TELEGRAM_BOT_TOKEN');
+        $token = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
         if ($token) {
             $supervisors = \App\Models\User::where('is_active', true)
                 ->whereNotNull('telegram_chat_id')
@@ -48,7 +48,7 @@ class AuthorizationController extends Controller
             $branchName = $user->branch ? $user->branch->name : 'Pusat';
             $actionLabel = str_replace('_', ' ', strtoupper($request->action));
             
-            $baseUrl = env('FRONTEND_URL', request()->getSchemeAndHttpHost());
+            $baseUrl = config('services.frontend.url') ?? env('FRONTEND_URL', request()->getSchemeAndHttpHost());
             $link = rtrim($baseUrl, '/') . "/mobile/auth";
             
             $message = "🔔 <b>Permintaan Otorisasi Baru</b>\n\n";
@@ -223,7 +223,7 @@ class AuthorizationController extends Controller
 
     protected function updateTelegramMessageStatus($authRequest, $action, $userName)
     {
-        $token = env('TELEGRAM_BOT_TOKEN');
+        $token = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
         if (!$token) return;
 
         $messages = $authRequest->telegram_messages;

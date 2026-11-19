@@ -337,7 +337,7 @@ PROMPT;
      */
     protected function callAiService(string $filePath): ?array
     {
-        $aiUrl = env('AI_SERVICE_URL', 'http://ai-service:8001');
+        $aiUrl = config('services.ai_service.url') ?? env('AI_SERVICE_URL', 'http://ai-service:8001');
         $endpoint = rtrim($aiUrl, '/') . '/api/v1/ai/scan-listing';
 
         $response = Http::timeout(60)

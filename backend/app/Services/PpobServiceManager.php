@@ -24,8 +24,8 @@ class PpobServiceManager
         if ($organization && is_array($organization->active_ppob_providers) && count($organization->active_ppob_providers) > 0) {
             $activeProviders = $organization->active_ppob_providers;
         } else {
-            // Fallback to .env if DB is not set
-            $activeProvidersStr = env('PPOB_ACTIVE_PROVIDERS', 'digiflazz');
+            // Fallback to config/.env if DB is not set
+            $activeProvidersStr = config('services.ppob.active_providers') ?? env('PPOB_ACTIVE_PROVIDERS', 'digiflazz');
             $activeProviders = array_map('trim', explode(',', strtolower($activeProvidersStr)));
         }
 

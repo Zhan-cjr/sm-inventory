@@ -91,7 +91,7 @@ class OpenDatabase extends Page
         }
 
         // Set ke session
-        $defaultDb = env('DB_DATABASE', 'hypermarket_pos');
+        $defaultDb = config('database.connections.mysql.database') ?? env('DB_DATABASE', 'hypermarket_pos');
         if ($this->selected_db === $defaultDb) {
             session()->forget('active_database');
         } else {

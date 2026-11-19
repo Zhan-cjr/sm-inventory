@@ -133,8 +133,8 @@ class EcommercePpobController extends Controller
             ]);
 
             // Setup Midtrans Snap
-            Config::$serverKey = env('MIDTRANS_SERVER_KEY');
-            Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', false);
+            Config::$serverKey = config('services.midtrans.server_key') ?? env('MIDTRANS_SERVER_KEY');
+            Config::$isProduction = config('services.midtrans.is_production') ?? env('MIDTRANS_IS_PRODUCTION', false);
             Config::$isSanitized = true;
             Config::$is3ds = true;
 

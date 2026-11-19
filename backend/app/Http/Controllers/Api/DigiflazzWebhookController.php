@@ -12,7 +12,7 @@ class DigiflazzWebhookController extends Controller
     public function handle(Request $request)
     {
         $payload = $request->all();
-        $secret = env('DIGIFLAZZ_WEBHOOK_SECRET'); 
+        $secret = config('services.digiflazz.webhook_secret') ?? env('DIGIFLAZZ_WEBHOOK_SECRET'); 
         
         $signature = $request->header('X-Hub-Signature');
         

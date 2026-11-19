@@ -12,7 +12,7 @@ class WhatsappService
         $org = \App\Models\Organization::first();
         
         $type = $org?->wa_gateway_type ?? 'fonnte';
-        $token = $org?->wa_gateway_token ?? env('FONNTE_TOKEN');
+        $token = $org?->wa_gateway_token ?? (config('services.fonnte.token') ?? env('FONNTE_TOKEN'));
         $domain = $org?->wa_gateway_domain;
 
         // Bersihkan nomor telepon (contoh: ubah 08xxx ke 62xxx atau biarkan jika sudah sesuai)
