@@ -547,9 +547,11 @@ class ProductForm
                             ->schema([
                                 Select::make('target_product_id')
                                     ->label('Produk Pecahan (Satuan Kecil)')
-                                    ->options(fn () => \App\Models\Product::pluck('name', 'id'))
-                                    ->required()
-                                    ->searchable(),
+                                    ->searchable()
+                                    ->searchPrompt('Ketik nama produk, SKU, atau scan Barcode...')
+                                    ->getSearchResultsUsing(fn (string $search): array => \App\Models\Product::searchForSelect($search))
+                                    ->getOptionLabelUsing(fn ($value): ?string => \App\Models\Product::getSelectOptionLabel($value))
+                                    ->required(),
                                 TextInput::make('conversion_qty')
                                     ->label('Hasil Pecahan (Qty)')
                                     ->helperText('Contoh: 1 Karung = 15 Curah, maka isi 15.')

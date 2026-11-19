@@ -7,41 +7,92 @@ const getApiBaseUrl = () => {
   }
   return '/api/company-profile';
 };
-export function useCompanyProfile() {
-  const [settings, setSettings] = useState<any>(null);
-  const [facilities, setFacilities] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [memberTiers, setMemberTiers] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const baseUrl = getApiBaseUrl();
-        const [settingsRes, facilitiesRes, branchesRes, tiersRes] = await Promise.all([
-          fetch(`${baseUrl}/settings`).catch(() => null),
-          fetch(`${baseUrl}/facilities`).catch(() => null),
-          fetch(`${baseUrl}/branches`).catch(() => null),
-          fetch(`${baseUrl}/member-tiers`).catch(() => null),
-        ]);
+interface CompanyProfilePayload {
+  settings: any;
+  facilities: any[];
+  branches: any[];
+  memberTiers: any[];
+}
 
-        if (settingsRes?.ok) setSettings(await settingsRes.json());
-        if (facilitiesRes?.ok) setFacilities(await facilitiesRes.json());
-        if (branchesRes?.ok) setBranches(await branchesRes.json());
-        if (tiersRes?.ok) {
-          const tiersData = await tiersRes.json();
-          if (Array.isArray(tiersData) && tiersData.length > 0) {
-            setMemberTiers(tiersData);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch company profile data from backend:', error);
-      } finally {
-        setIsLoading(false);
+// Module-level deduplication + 5-minute TTL cache so multiple components calling
+// useCompanyProfile() on the same page share a single set of 4 API requests instead of 16+.
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedPayload: CompanyProfilePayload | null = null;
+let cachedAt = 0;
+let inflightPromise: Promise<CompanyProfilePayload> | null = null;
+
+function loadCompanyProfileData(): Promise<CompanyProfilePayload> {
+  if (cachedPayload && Date.now() - cachedAt < CACHE_TTL_MS) {
+    return Promise.resolve(cachedPayload);
+  }
+  if (inflightPromise) {
+    return inflightPromise;
+  }
+
+  inflightPromise = (async () => {
+    const baseUrl = getApiBaseUrl();
+    const [settingsRes, facilitiesRes, branchesRes, tiersRes] = await Promise.all([
+      fetch(`${baseUrl}/settings`).catch(() => null),
+      fetch(`${baseUrl}/facilities`).catch(() => null),
+      fetch(`${baseUrl}/branches`).catch(() => null),
+      fetch(`${baseUrl}/member-tiers`).catch(() => null),
+    ]);
+
+    const payload: CompanyProfilePayload = {
+      settings: settingsRes?.ok ? await settingsRes.json() : null,
+      facilities: facilitiesRes?.ok ? await facilitiesRes.json() : [],
+      branches: branchesRes?.ok ? await branchesRes.json() : [],
+      memberTiers: [],
+    };
+
+    if (tiersRes?.ok) {
+      const tiersData = await tiersRes.json();
+      if (Array.isArray(tiersData) && tiersData.length > 0) {
+        payload.memberTiers = tiersData;
       }
     }
 
-    fetchData();
+    cachedPayload = payload;
+    cachedAt = Date.now();
+    return payload;
+  })().finally(() => {
+    inflightPromise = null;
+  });
+
+  return inflightPromise;
+}
+
+export function useCompanyProfile() {
+  const [settings, setSettings] = useState<any>(cachedPayload?.settings ?? null);
+  const [facilities, setFacilities] = useState<any[]>(cachedPayload?.facilities ?? []);
+  const [branches, setBranches] = useState<any[]>(cachedPayload?.branches ?? []);
+  const [memberTiers, setMemberTiers] = useState<any[]>(cachedPayload?.memberTiers ?? []);
+  const [isLoading, setIsLoading] = useState(!cachedPayload);
+
+  useEffect(() => {
+    let active = true;
+
+    loadCompanyProfileData()
+      .then((data) => {
+        if (!active) return;
+        setSettings(data.settings);
+        setFacilities(data.facilities);
+        setBranches(data.branches);
+        if (data.memberTiers.length > 0) {
+          setMemberTiers(data.memberTiers);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to fetch company profile data from backend:', error);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return { settings, facilities, branches, memberTiers, isLoading };

@@ -23,7 +23,8 @@ def suggest_dynamic_pricing(days_history=30):
     """
     conn = get_db_connection()
     try:
-        # Get sales data
+        # Get sales data (safe integer days_history)
+        days_int = max(1, min(365, int(days_history)))
         query_sales = f"""
             SELECT 
                 ti.product_id,
@@ -31,7 +32,7 @@ def suggest_dynamic_pricing(days_history=30):
                 SUM(ti.quantity) as sold_30d
             FROM transaction_items ti
             JOIN transactions t ON t.id = ti.transaction_id
-            WHERE t.transaction_date >= DATE_SUB(NOW(), INTERVAL {days_history} DAY)
+            WHERE t.transaction_date >= DATE_SUB(NOW(), INTERVAL {days_int} DAY)
               AND t.is_voided = 0
             GROUP BY ti.product_id, t.branch_id
         """
@@ -54,53 +55,47 @@ def suggest_dynamic_pricing(days_history=30):
             WHERE s.is_active = 1 AND p.is_active = 1
         """
         stocks_df = pd.read_sql(query_stocks, conn)
+        if stocks_df.empty:
+            return []
 
+        # Vectorized merge O(N + M) instead of O(N * M) iterrows
+        merged = stocks_df.merge(sales_df, on=['product_id', 'branch_id'], how='left')
+        merged['sold_30d'] = merged['sold_30d'].fillna(0.0).astype(float)
+        merged['quantity_on_hand'] = merged['quantity_on_hand'].fillna(0.0).astype(float)
+        merged['safety_stock'] = merged['safety_stock'].fillna(0.0).astype(float)
+        merged['cost_price'] = merged['cost_price'].fillna(0.0).astype(float)
+        merged['selling_price'] = merged['selling_price'].fillna(0.0).astype(float)
+
+        daily_velocity = merged['sold_30d'] / float(days_int)
+        overstock_threshold = (merged['safety_stock'] * 3.0).clip(lower=50.0)
+        mask = (merged['quantity_on_hand'] > overstock_threshold) & (daily_velocity < (merged['quantity_on_hand'] / 120.0))
+
+        candidates = merged.loc[mask]
         suggestions = []
 
-        for _, stock in stocks_df.iterrows():
-            prod_id = stock['product_id']
-            branch_id = stock['branch_id']
-            qty = float(stock['quantity_on_hand'])
-            safety_stock = float(stock['safety_stock']) if pd.notna(stock['safety_stock']) else 0
-            cost_price = float(stock['cost_price'])
-            selling_price = float(stock['selling_price'])
-            
-            # Find sales for this branch and product
-            sales_row = sales_df[(sales_df['product_id'] == prod_id) & (sales_df['branch_id'] == branch_id)]
-            sold_30d = float(sales_row['sold_30d'].iloc[0]) if not sales_row.empty else 0.0
-            
-            daily_velocity = sold_30d / days_history
-            
-            # Overstock Logic
-            overstock_threshold = max(safety_stock * 3, 50) # Fallback to 50 if safety_stock is 0
-            
-            if qty > overstock_threshold and daily_velocity < (qty / 120): # Will take > 120 days to sell
-                # Suggest Discount
-                # Strategy: max 30% discount, but never below cost_price
-                
-                # Try 20% discount first
-                discount_pct = 20
-                discount_amount = selling_price * (discount_pct / 100)
-                final_price = selling_price - discount_amount
-                
-                if final_price < cost_price:
-                    # Adjust to just 5% above cost if possible
-                    final_price = cost_price * 1.05
-                    discount_amount = selling_price - final_price
-                    if discount_amount <= 0:
-                        continue # Cannot discount
-                        
-                suggestions.append({
-                    "branch_id": stock['branch_id'],
-                    "product_id": stock['product_id'],
-                    "sku": stock['sku'],
-                    "product_name": stock['product_name'],
-                    "current_stock": qty,
-                    "sold_30d": sold_30d,
-                    "suggested_discount_amount": float(discount_amount),
-                    "original_price": selling_price,
-                    "final_price": float(final_price)
-                })
+        for row in candidates.itertuples(index=False):
+            cost_price = float(row.cost_price)
+            selling_price = float(row.selling_price)
+            discount_amount = selling_price * 0.20
+            final_price = selling_price - discount_amount
+
+            if final_price < cost_price:
+                final_price = cost_price * 1.05
+                discount_amount = selling_price - final_price
+                if discount_amount <= 0:
+                    continue
+
+            suggestions.append({
+                "branch_id": row.branch_id,
+                "product_id": row.product_id,
+                "sku": row.sku,
+                "product_name": row.product_name,
+                "current_stock": float(row.quantity_on_hand),
+                "sold_30d": float(row.sold_30d),
+                "suggested_discount_amount": float(discount_amount),
+                "original_price": selling_price,
+                "final_price": float(final_price)
+            })
 
         return suggestions
 

@@ -89,10 +89,10 @@ class ProductAssemblyForm
                         ->schema([
                             Select::make('child_product_id')
                                 ->label('Produk Komponen')
-                                ->options(fn () => Product::where('product_type', 'physical')
-                                    ->orderBy('name')
-                                    ->pluck('name', 'id'))
                                 ->searchable()
+                                ->searchPrompt('Ketik nama produk, SKU, atau scan Barcode...')
+                                ->getSearchResultsUsing(fn (string $search): array => Product::searchForSelect($search, 100, 'physical'))
+                                ->getOptionLabelUsing(fn ($value): ?string => Product::getSelectOptionLabel($value))
                                 ->required()
                                 ->live()
                                 ->afterStateUpdated(function (Set $set, Get $get, $state) {

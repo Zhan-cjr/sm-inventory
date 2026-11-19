@@ -394,4 +394,145 @@ class Product extends Model
 
         return $candidateSku;
     }
+
+    /**
+     * Format a product label consistently for Filament Select dropdowns.
+     */
+    public static function formatSelectLabel(self $product): string
+    {
+        $codes = array_filter([$product->sku, $product->barcode]);
+        $suffix = !empty($codes) ? ' [' . implode(' | ', $codes) . ']' : '';
+
+        return $product->name . $suffix;
+    }
+
+    /**
+     * Resolve a single option label for Filament Select::getOptionLabelUsing().
+     */
+    public static function getSelectOptionLabel($id): ?string
+    {
+        if (empty($id)) {
+            return null;
+        }
+
+        $product = static::select(['id', 'name', 'sku', 'barcode'])->find($id);
+
+        return $product ? static::formatSelectLabel($product) : null;
+    }
+
+    /**
+     * Resolve multiple option labels for Filament Select::getOptionLabelsUsing().
+     */
+    public static function getSelectOptionLabels(array $ids): array
+    {
+        $ids = array_values(array_filter($ids));
+        if (empty($ids)) {
+            return [];
+        }
+
+        return static::select(['id', 'name', 'sku', 'barcode'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->mapWithKeys(fn (self $p) => [$p->id => static::formatSelectLabel($p)])
+            ->all();
+    }
+
+    /**
+     * Hybrid AJAX search for Filament Select dropdowns (handles 29k+ SKUs):
+     * 1. Exact barcode / SKU / additional_barcode match -> returns ONLY exact match(es).
+     * 2. Meilisearch (matchingStrategy = 'all', prioritizing active products).
+     * 3. MySQL multi-word substring fallback if Meilisearch returns < 10 hits or fails.
+     */
+    public static function searchForSelect(string $search, int $limit = 100, ?string $productType = null): array
+    {
+        $search = trim($search);
+        if ($search === '') {
+            return [];
+        }
+
+        $columns = ['id', 'name', 'sku', 'barcode', 'is_active', 'product_type'];
+
+        // Layer 1: Exact barcode / SKU match (strict isolated result)
+        $exact = collect();
+        if (mb_strlen($search) >= 2) {
+            $exact = static::select($columns)
+                ->when($productType, fn ($q) => $q->where('product_type', $productType))
+                ->where(function ($q) use ($search) {
+                    $q->where('barcode', $search)
+                        ->orWhere('sku', $search);
+                })
+                ->get();
+
+            if ($exact->isEmpty() && !str_contains($search, ' ')) {
+                $exact = static::select($columns)
+                    ->when($productType, fn ($q) => $q->where('product_type', $productType))
+                    ->whereJsonContains('metadata->additional_barcodes', $search)
+                    ->get();
+            }
+        }
+
+        if ($exact->isNotEmpty()) {
+            return $exact
+                ->mapWithKeys(fn (self $p) => [$p->id => static::formatSelectLabel($p)])
+                ->all();
+        }
+
+        // Layer 2: Meilisearch (fast prefix + typo-tolerant, matchingStrategy = 'all')
+        $results = [];
+        try {
+            $scoutQuery = static::search($search, function ($meilisearch, string $query, array $options) use ($limit, $productType) {
+                $options['limit'] = $limit;
+                $options['matchingStrategy'] = 'all';
+                if ($productType) {
+                    $options['filter'] = 'product_type = "' . addslashes($productType) . '"';
+                }
+
+                return $meilisearch->search($query, $options);
+            });
+
+            $hits = $scoutQuery->query(fn ($q) => $q->select($columns))->get();
+
+            // Prioritize active products while preserving Meilisearch relevance order
+            $activeHits = $hits->filter(fn (self $p) => (bool) $p->is_active);
+            $inactiveHits = $hits->reject(fn (self $p) => (bool) $p->is_active);
+
+            foreach ($activeHits->concat($inactiveHits) as $p) {
+                $results[$p->id] = static::formatSelectLabel($p);
+            }
+        } catch (\Throwable $e) {
+            // Fall through cleanly to MySQL fallback
+        }
+
+        // Layer 3: MySQL multi-word substring fallback when Meilisearch has < 10 hits
+        // (covers mid-word / trailing-barcode searches and newly created unindexed products)
+        if (count($results) < 10) {
+            $tokens = array_values(array_filter(preg_split('/\s+/', $search) ?: []));
+            $remaining = max(1, $limit - count($results));
+
+            $fallbackQuery = static::select($columns)
+                ->when($productType, fn ($q) => $q->where('product_type', $productType))
+                ->when(!empty($results), fn ($q) => $q->whereNotIn('id', array_keys($results)));
+
+            foreach ($tokens as $token) {
+                $like = '%' . $token . '%';
+                $fallbackQuery->where(function ($q) use ($like) {
+                    $q->where('name', 'like', $like)
+                        ->orWhere('sku', 'like', $like)
+                        ->orWhere('barcode', 'like', $like);
+                });
+            }
+
+            $fallbackHits = $fallbackQuery
+                ->orderByDesc('is_active')
+                ->orderBy('name')
+                ->limit($remaining)
+                ->get();
+
+            foreach ($fallbackHits as $p) {
+                $results[$p->id] = static::formatSelectLabel($p);
+            }
+        }
+
+        return array_slice($results, 0, $limit, true);
+    }
 }

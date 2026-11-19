@@ -45,21 +45,36 @@ def run_market_basket_analysis():
         # Create a mapping for product_id to product_name to use later
         product_map = df[['product_id', 'product_name']].drop_duplicates().set_index('product_id')['product_name'].to_dict()
 
-        # Group by transaction_id and product_id
-        basket = (df.groupby(['transaction_id', 'product_id'])['quantity']
-                  .sum().unstack().reset_index().fillna(0)
-                  .set_index('transaction_id'))
-                  
-        # Convert quantities to booleans (True if > 0, else False)
-        # This handles NaN safely and mlxtend requires boolean dataframes
-        basket_sets = basket > 0
-        
-        # We need at least some transactions to find patterns
-        # Calculate dynamic min_support so retail stores with large catalog don't filter out valid pairs
-        total_tx = len(basket_sets)
-        min_support_val = max(3.0 / total_tx, 0.002)
+        # Pre-filter infrequent products BEFORE pivoting to avoid allocating a huge dense matrix (OOM risk)
+        total_tx = df['transaction_id'].nunique()
+        if total_tx < 3:
+            return []
 
-        frequent_itemsets = apriori(basket_sets, min_support=min_support_val, use_colnames=True)
+        min_support_val = max(3.0 / total_tx, 0.002)
+        min_tx_count = max(3, int(total_tx * min_support_val))
+
+        tx_per_product = df.groupby('product_id')['transaction_id'].nunique()
+        frequent_products = tx_per_product[tx_per_product >= min_tx_count].index
+        if len(frequent_products) < 2:
+            return []
+
+        df_filtered = df[df['product_id'].isin(frequent_products)]
+
+        # Group by transaction_id and product_id
+        basket_sets = (
+            df_filtered.groupby(['transaction_id', 'product_id'])['quantity']
+            .sum()
+            .unstack(fill_value=0)
+            .gt(0)
+        )
+
+        frequent_itemsets = apriori(
+            basket_sets,
+            min_support=min_support_val,
+            use_colnames=True,
+            low_memory=True,
+            max_len=2,
+        )
         
         if frequent_itemsets.empty:
             return []

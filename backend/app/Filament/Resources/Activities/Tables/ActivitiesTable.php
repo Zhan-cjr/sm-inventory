@@ -19,18 +19,25 @@ class ActivitiesTable
             ->defaultSort('created_at', 'desc')
             ->modifyQueryUsing(function (Builder $query) use ($userBranchId) {
                 if ($userBranchId) {
-                    $stockIds = \App\Models\Stock::where('branch_id', $userBranchId)->pluck('id');
-                    $txIds = \App\Models\Transaction::where('branch_id', $userBranchId)->pluck('id');
-
-                    $query->where(function ($q) use ($userBranchId, $stockIds, $txIds) {
+                    $query->where(function ($q) use ($userBranchId) {
                         $q->where('causer_id', auth()->id())
-                            ->orWhere(function ($subQ) use ($stockIds) {
+                            ->orWhere(function ($subQ) use ($userBranchId) {
                                 $subQ->where('subject_type', 'App\Models\Stock')
-                                    ->whereIn('subject_id', $stockIds);
+                                    ->whereExists(function ($exists) use ($userBranchId) {
+                                        $exists->selectRaw('1')
+                                            ->from('stocks')
+                                            ->whereColumn('stocks.id', 'activity_log.subject_id')
+                                            ->where('stocks.branch_id', $userBranchId);
+                                    });
                             })
-                            ->orWhere(function ($subQ) use ($txIds) {
+                            ->orWhere(function ($subQ) use ($userBranchId) {
                                 $subQ->where('subject_type', 'App\Models\Transaction')
-                                    ->whereIn('subject_id', $txIds);
+                                    ->whereExists(function ($exists) use ($userBranchId) {
+                                        $exists->selectRaw('1')
+                                            ->from('transactions')
+                                            ->whereColumn('transactions.id', 'activity_log.subject_id')
+                                            ->where('transactions.branch_id', $userBranchId);
+                                    });
                             });
                     });
                 }

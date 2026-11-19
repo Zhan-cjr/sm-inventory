@@ -42,52 +42,48 @@ from invoice_scanner import scan_invoice
 from listing_scanner import scan_listing_document
 import shutil
 import os
+import tempfile
+import uuid
 from fastapi import UploadFile, File, Form
 
 @app.post("/api/v1/ai/scan-invoice")
-async def api_scan_invoice(
+def api_scan_invoice(
     file: UploadFile = File(...),
     supplier_id: Optional[str] = Form(None)
 ):
+    safe_name = os.path.basename(file.filename or "upload")
+    temp_file_path = os.path.join(tempfile.gettempdir(), f"sm_inv_{uuid.uuid4().hex}_{safe_name}")
     try:
-        # Save temp file
-        temp_file_path = f"temp_{file.filename}"
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-            
-        result = scan_invoice(temp_file_path, supplier_id)
-        
-        # Cleanup
+        return scan_invoice(temp_file_path, supplier_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
         try:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
         except Exception as e:
             print(f"Warning: Failed to cleanup {temp_file_path}: {e}")
-            
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/ai/scan-listing")
-async def api_scan_listing(
+def api_scan_listing(
     file: UploadFile = File(...)
 ):
+    safe_name = os.path.basename(file.filename or "upload")
+    temp_file_path = os.path.join(tempfile.gettempdir(), f"sm_list_{uuid.uuid4().hex}_{safe_name}")
     try:
-        temp_file_path = f"temp_{file.filename}"
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-            
-        result = scan_listing_document(temp_file_path)
-        
+        return scan_listing_document(temp_file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
         try:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
         except Exception as e:
             print(f"Warning: Failed to cleanup {temp_file_path}: {e}")
-            
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/ai/train-market-basket")
 def train_market_basket():

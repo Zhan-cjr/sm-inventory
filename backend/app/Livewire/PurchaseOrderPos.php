@@ -139,6 +139,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             $this->overOrderReason = $purchaseOrder->over_order_reason ?? '';
 
             $items = \App\Models\PurchaseOrderItem::where('purchase_order_id', $purchaseOrder->id)->with('product')->get();
+            $this->prefetchCartMetrics($items->pluck('product_id')->all(), $this->branch_id);
             foreach ($items as $item) {
                 if (!$item->product) continue;
 
@@ -422,9 +423,18 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 'supplier_division_id' => $this->supplier_division_id,
             ]);
             
+            $suggestedIds = collect($suggestions)
+                ->filter(fn ($s) => ($s['suggested_qty'] ?? 0) > 0)
+                ->pluck('product_id')
+                ->unique()
+                ->values()
+                ->all();
+            $productsById = Product::whereIn('id', $suggestedIds)->get()->keyBy('id');
+            $this->prefetchCartMetrics($suggestedIds, $this->branch_id);
+
             foreach ($suggestions as $suggestion) {
                 if ($suggestion['suggested_qty'] > 0) {
-                    $product = Product::find($suggestion['product_id']);
+                    $product = $productsById[$suggestion['product_id']] ?? null;
                     if ($product) {
                         $this->addItemWithQty($product, $suggestion['suggested_qty'], null, $suggestion['suggested_qty']);
                         $addedCount++;
@@ -453,6 +463,8 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 })
                 ->with('product')
                 ->get();
+
+            $this->prefetchCartMetrics($branchStocks->pluck('product_id')->all(), $this->branch_id);
 
             foreach ($branchStocks as $stockRec) {
                 $product = $stockRec->product;
@@ -950,8 +962,11 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         if (!empty($this->cart)) {
+            $cartProductIds = array_column($this->cart, 'product_id');
+            $productsById = Product::whereIn('id', $cartProductIds)->get()->keyBy('id');
+            $this->prefetchCartMetrics($cartProductIds, $value);
             foreach ($this->cart as $index => $item) {
-                $product = Product::find($item['product_id']);
+                $product = $productsById[$item['product_id']] ?? null;
                 if ($product) {
                     $refreshed = $this->resolveCartItemData(
                         $product, 
@@ -1063,16 +1078,107 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         return $lastReturn;
     }
 
+    protected array $batchPrefetch = [];
+
+    /**
+     * Batch-prefetch stocks, live sales (7d/30d/90d), and monthly Excel history
+     * for a set of product IDs to eliminate N+1 queries during Saran Order / PO edit.
+     */
+    protected function prefetchCartMetrics(array $productIds, ?string $branchId): void
+    {
+        $productIds = array_values(array_unique(array_filter($productIds)));
+        if (empty($productIds) || !$branchId) {
+            $this->batchPrefetch = [];
+            return;
+        }
+
+        $refDate = $this->po_date ? Carbon::parse($this->po_date) : now();
+        $thirtyDaysAgo = $refDate->copy()->subDays(30);
+        $ninetyDaysAgo = $refDate->copy()->subDays(90);
+        $sevenDaysAgo = $refDate->copy()->subDays(7);
+        $earliestLive = $this->getBranchEarliestLiveDate($branchId);
+
+        $stocks = Stock::where('branch_id', $branchId)
+            ->whereIn('product_id', $productIds)
+            ->get()
+            ->keyBy('product_id');
+
+        $liveSales = [];
+        if ($earliestLive) {
+            $minStart = $earliestLive->lt($ninetyDaysAgo) ? $ninetyDaysAgo : $earliestLive;
+            foreach (array_chunk($productIds, 500) as $chunk) {
+                $rows = \Illuminate\Support\Facades\DB::table('transaction_items as ti')
+                    ->join('transactions as t', 't.id', '=', 'ti.transaction_id')
+                    ->where('t.branch_id', $branchId)
+                    ->whereIn('ti.product_id', $chunk)
+                    ->whereBetween('t.created_at', [$minStart, $refDate])
+                    ->groupBy('ti.product_id')
+                    ->selectRaw(
+                        'ti.product_id,
+                        SUM(CASE WHEN t.created_at BETWEEN ? AND ? THEN ti.quantity ELSE 0 END) as sales_7d,
+                        SUM(CASE WHEN t.created_at BETWEEN ? AND ? THEN ti.quantity ELSE 0 END) as sales_30d,
+                        SUM(CASE WHEN t.created_at BETWEEN ? AND ? THEN ti.quantity ELSE 0 END) as sales_90d,
+                        SUM(CASE WHEN t.created_at BETWEEN ? AND ? THEN ti.quantity ELSE 0 END) as sales_since_live',
+                        [
+                            $sevenDaysAgo, $refDate,
+                            $thirtyDaysAgo, $refDate,
+                            $ninetyDaysAgo, $refDate,
+                            $earliestLive, $refDate,
+                        ]
+                    )
+                    ->get();
+
+                foreach ($rows as $row) {
+                    $liveSales[$row->product_id] = [
+                        '7d' => (float) $row->sales_7d,
+                        '30d' => (float) $row->sales_30d,
+                        '90d' => (float) $row->sales_90d,
+                        'since_live' => (float) $row->sales_since_live,
+                    ];
+                }
+            }
+        }
+
+        $monthlyHistory = [];
+        if (!$earliestLive || $earliestLive->gt($ninetyDaysAgo)) {
+            foreach (array_chunk($productIds, 500) as $chunk) {
+                $histRows = ProductMonthlySalesHistory::where('branch_id', $branchId)
+                    ->whereIn('product_id', $chunk)
+                    ->orderByDesc('year')
+                    ->orderByDesc('month')
+                    ->get();
+
+                foreach ($histRows as $hr) {
+                    $monthlyHistory[$hr->product_id][] = $hr;
+                }
+            }
+        }
+
+        $this->batchPrefetch = [
+            'branch_id' => $branchId,
+            'product_ids' => array_flip($productIds),
+            'stocks' => $stocks,
+            'live_sales' => $liveSales,
+            'monthly_history' => $monthlyHistory,
+        ];
+    }
+
     public function resolveCartItemData($product, $branchId, $qty = 1, $qtySaran = 0, $customCost = null, $customDiscounts = null, $customSubtotal = null, $promoNote = null, $savedSales30d = null)
     {
+        $hasPrefetch = !empty($this->batchPrefetch)
+            && ($this->batchPrefetch['branch_id'] ?? null) === $branchId
+            && isset($this->batchPrefetch['product_ids'][$product->id]);
+
         $stock = null;
         $stockModel = null;
         $physicalStock = 0.0;
         $damagedStock = 0.0;
         if ($branchId) {
-            $stockModel = Stock::where('product_id', $product->id)
-                ->where('branch_id', $branchId)
-                ->first();
+            $stockModel = $hasPrefetch
+                ? ($this->batchPrefetch['stocks'][$product->id] ?? null)
+                : Stock::where('product_id', $product->id)
+                    ->where('branch_id', $branchId)
+                    ->first();
             $physicalStock = $stockModel ? (float)$stockModel->quantity_on_hand : 0;
             $damagedStock = $stockModel ? (float)($stockModel->quantity_damaged ?? 0) : 0;
             $stock = max(0, $physicalStock - $damagedStock);
@@ -1105,46 +1211,72 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
         if ($earliestLive && $earliestLive->lte($thirtyDaysAgo)) {
             // Kasus A: Cabang sudah aktif di SM Inventory >= 30 hari. 100% data live kasir!
-            $avgBln = (float)TransactionItem::where('product_id', $product->id)
-                ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$thirtyDaysAgo, $refDate]))
-                ->sum('quantity');
+            if ($hasPrefetch) {
+                $avgBln = (float) ($this->batchPrefetch['live_sales'][$product->id]['30d'] ?? 0);
+                $avgMinggu = (float) ($this->batchPrefetch['live_sales'][$product->id]['7d'] ?? 0);
+            } else {
+                $avgBln = (float)TransactionItem::where('product_id', $product->id)
+                    ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$thirtyDaysAgo, $refDate]))
+                    ->sum('quantity');
 
-            $avgMinggu = (float)TransactionItem::where('product_id', $product->id)
-                ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$sevenDaysAgo, $refDate]))
-                ->sum('quantity');
+                $avgMinggu = (float)TransactionItem::where('product_id', $product->id)
+                    ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$sevenDaysAgo, $refDate]))
+                    ->sum('quantity');
+            }
         } elseif ($earliestLive) {
             // Kasus B: Cabang aktif di SM Inventory < 30 hari. Sambungkan live + sisa proporsi histori Excel!
-            $liveSales = (float)TransactionItem::where('product_id', $product->id)
-                ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$earliestLive, $refDate]))
-                ->sum('quantity');
+            $liveSales = $hasPrefetch
+                ? (float) ($this->batchPrefetch['live_sales'][$product->id]['since_live'] ?? 0)
+                : (float)TransactionItem::where('product_id', $product->id)
+                    ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$earliestLive, $refDate]))
+                    ->sum('quantity');
 
             $preLiveCutoff = $earliestLive->copy()->startOfMonth();
             $histMonth = $refDate->copy()->subMonth();
             $histSales = 0.0;
-            if ($histMonth->lt($preLiveCutoff)) {
-                $histSales = (float)ProductMonthlySalesHistory::where('branch_id', $branchId)
-                    ->where('product_id', $product->id)
-                    ->where('year', $histMonth->year)
-                    ->where('month', $histMonth->month)
-                    ->sum('quantity_sold');
-            }
+            if ($hasPrefetch) {
+                $histList = $this->batchPrefetch['monthly_history'][$product->id] ?? [];
+                if ($histMonth->lt($preLiveCutoff)) {
+                    foreach ($histList as $hr) {
+                        if ((int) $hr->year === $histMonth->year && (int) $hr->month === $histMonth->month) {
+                            $histSales += (float) $hr->quantity_sold;
+                        }
+                    }
+                }
+                if ($histSales <= 0) {
+                    foreach ($histList as $hr) {
+                        if ((int) $hr->year < $preLiveCutoff->year || ((int) $hr->year === $preLiveCutoff->year && (int) $hr->month < $preLiveCutoff->month)) {
+                            $histSales = (float) $hr->quantity_sold;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                if ($histMonth->lt($preLiveCutoff)) {
+                    $histSales = (float)ProductMonthlySalesHistory::where('branch_id', $branchId)
+                        ->where('product_id', $product->id)
+                        ->where('year', $histMonth->year)
+                        ->where('month', $histMonth->month)
+                        ->sum('quantity_sold');
+                }
 
-            // Jika belum ada di bulan subMonth(), cari bulan histori terbaru sebelum live date
-            if ($histSales <= 0) {
-                $latestHist = ProductMonthlySalesHistory::where('branch_id', $branchId)
-                    ->where('product_id', $product->id)
-                    ->where(function ($q) use ($preLiveCutoff) {
-                        $q->where('year', '<', $preLiveCutoff->year)
-                          ->orWhere(function ($sq) use ($preLiveCutoff) {
-                              $sq->where('year', '=', $preLiveCutoff->year)
-                                ->where('month', '<', $preLiveCutoff->month);
-                          });
-                    })
-                    ->orderByDesc('year')
-                    ->orderByDesc('month')
-                    ->first();
-                if ($latestHist) {
-                    $histSales = (float)$latestHist->quantity_sold;
+                // Jika belum ada di bulan subMonth(), cari bulan histori terbaru sebelum live date
+                if ($histSales <= 0) {
+                    $latestHist = ProductMonthlySalesHistory::where('branch_id', $branchId)
+                        ->where('product_id', $product->id)
+                        ->where(function ($q) use ($preLiveCutoff) {
+                            $q->where('year', '<', $preLiveCutoff->year)
+                              ->orWhere(function ($sq) use ($preLiveCutoff) {
+                                  $sq->where('year', '=', $preLiveCutoff->year)
+                                    ->where('month', '<', $preLiveCutoff->month);
+                              });
+                        })
+                        ->orderByDesc('year')
+                        ->orderByDesc('month')
+                        ->first();
+                    if ($latestHist) {
+                        $histSales = (float)$latestHist->quantity_sold;
+                    }
                 }
             }
 
@@ -1171,19 +1303,23 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             // Jika cabang sudah live >= 7 hari, gunakan data kasir riil 7 hari terakhir.
             // Jika cabang live < 7 hari, pro-rata dari Sales 30 Hari dibagi 4.
             if ($earliestLive->lte($sevenDaysAgo)) {
-                $avgMinggu = (float)TransactionItem::where('product_id', $product->id)
-                    ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$sevenDaysAgo, $refDate]))
-                    ->sum('quantity');
+                $avgMinggu = $hasPrefetch
+                    ? (float) ($this->batchPrefetch['live_sales'][$product->id]['7d'] ?? 0)
+                    : (float)TransactionItem::where('product_id', $product->id)
+                        ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$sevenDaysAgo, $refDate]))
+                        ->sum('quantity');
             } else {
                 $avgMinggu = round($avgBln / 4, 1);
             }
         } else {
             // Kasus C: Cabang belum ada transaksi kasir sama sekali di SM Inventory. 100% dari histori Excel!
-            $latestHist = ProductMonthlySalesHistory::where('branch_id', $branchId)
-                ->where('product_id', $product->id)
-                ->orderByDesc('year')
-                ->orderByDesc('month')
-                ->first();
+            $latestHist = $hasPrefetch
+                ? ($this->batchPrefetch['monthly_history'][$product->id][0] ?? null)
+                : ProductMonthlySalesHistory::where('branch_id', $branchId)
+                    ->where('product_id', $product->id)
+                    ->orderByDesc('year')
+                    ->orderByDesc('month')
+                    ->first();
             if ($latestHist && (float)$latestHist->quantity_sold > 0) {
                 $avgBln = round((float)$latestHist->quantity_sold, 1);
                 $avgMinggu = round($avgBln / 4, 1);
@@ -1206,36 +1342,59 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         $sales90d = 0.0;
         if ($earliestLive && $earliestLive->lte($ninetyDaysAgo)) {
             // Cabang sudah aktif >= 90 hari di SM Inventory. 100% data live kasir!
-            $sales90d = (float)TransactionItem::where('product_id', $product->id)
-                ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$ninetyDaysAgo, $refDate]))
-                ->sum('quantity');
+            $sales90d = $hasPrefetch
+                ? (float) ($this->batchPrefetch['live_sales'][$product->id]['90d'] ?? 0)
+                : (float)TransactionItem::where('product_id', $product->id)
+                    ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$ninetyDaysAgo, $refDate]))
+                    ->sum('quantity');
         } elseif ($earliestLive) {
             // Cabang aktif < 90 hari. Sambungkan transaksi live + bulan sebelum migrasi yang masuk rentang 90 hari!
-            $live90d = (float)TransactionItem::where('product_id', $product->id)
-                ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$earliestLive, $refDate]))
-                ->sum('quantity');
+            $live90d = $hasPrefetch
+                ? (float) ($this->batchPrefetch['live_sales'][$product->id]['since_live'] ?? 0)
+                : (float)TransactionItem::where('product_id', $product->id)
+                    ->whereHas('transaction', fn($q) => $q->where('branch_id', $branchId)->whereBetween('created_at', [$earliestLive, $refDate]))
+                    ->sum('quantity');
 
             $preLiveCutoff = $earliestLive->copy()->startOfMonth();
             $hist90d = 0.0;
-            for ($i = 1; $i <= 3; $i++) {
-                $dt = $refDate->copy()->subMonths($i);
-                if ($dt->lt($preLiveCutoff)) {
-                    $hist90d += (float)ProductMonthlySalesHistory::where('branch_id', $branchId)
-                        ->where('product_id', $product->id)
-                        ->where('year', $dt->year)
-                        ->where('month', $dt->month)
-                        ->sum('quantity_sold');
+            if ($hasPrefetch) {
+                $histList = $this->batchPrefetch['monthly_history'][$product->id] ?? [];
+                for ($i = 1; $i <= 3; $i++) {
+                    $dt = $refDate->copy()->subMonths($i);
+                    if ($dt->lt($preLiveCutoff)) {
+                        foreach ($histList as $hr) {
+                            if ((int) $hr->year === $dt->year && (int) $hr->month === $dt->month) {
+                                $hist90d += (float) $hr->quantity_sold;
+                            }
+                        }
+                    }
+                }
+            } else {
+                for ($i = 1; $i <= 3; $i++) {
+                    $dt = $refDate->copy()->subMonths($i);
+                    if ($dt->lt($preLiveCutoff)) {
+                        $hist90d += (float)ProductMonthlySalesHistory::where('branch_id', $branchId)
+                            ->where('product_id', $product->id)
+                            ->where('year', $dt->year)
+                            ->where('month', $dt->month)
+                            ->sum('quantity_sold');
+                    }
                 }
             }
             $sales90d = round($live90d + $hist90d, 1);
         } else {
             // Cabang belum ada transaksi kasir. Ambil 3 bulan terakhir dari histori Excel!
-            $sales90d = (float)ProductMonthlySalesHistory::where('branch_id', $branchId)
-                ->where('product_id', $product->id)
-                ->orderByDesc('year')
-                ->orderByDesc('month')
-                ->take(3)
-                ->sum('quantity_sold');
+            if ($hasPrefetch) {
+                $histList = array_slice($this->batchPrefetch['monthly_history'][$product->id] ?? [], 0, 3);
+                $sales90d = array_sum(array_map(fn ($hr) => (float) $hr->quantity_sold, $histList));
+            } else {
+                $sales90d = (float)ProductMonthlySalesHistory::where('branch_id', $branchId)
+                    ->where('product_id', $product->id)
+                    ->orderByDesc('year')
+                    ->orderByDesc('month')
+                    ->take(3)
+                    ->sum('quantity_sold');
+            }
         }
 
         // Deteksi apakah stok habis karena retur:

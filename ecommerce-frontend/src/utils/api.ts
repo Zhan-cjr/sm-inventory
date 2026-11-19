@@ -18,6 +18,49 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
+// Deduplicate concurrent & short-lived GET requests to public catalog/settings endpoints
+// (prevents 4-6x /ecommerce/settings and 2x /ecommerce/products calls per homepage visit)
+const DEDUP_PATHS = ['/ecommerce/settings', '/ecommerce/products', '/ecommerce/branches'];
+const DEDUP_TTL_MS = 60 * 1000;
+const getResponseCache = new Map<string, { data: any; expiresAt: number }>();
+const inflightGets = new Map<string, Promise<any>>();
+
+const wrapDeduplicatedGet = (instance: typeof axios | typeof api) => {
+  const originalGet = instance.get.bind(instance);
+  instance.get = ((url: string, config?: any) => {
+    const shouldDedup = DEDUP_PATHS.some((p) => url === p || url.endsWith(p));
+    if (!shouldDedup) {
+      return originalGet(url, config);
+    }
+
+    const key = `${url}|${JSON.stringify(config?.params ?? {})}`;
+    const cached = getResponseCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return Promise.resolve(cached.data);
+    }
+
+    const inflight = inflightGets.get(key);
+    if (inflight) {
+      return inflight;
+    }
+
+    const req = originalGet(url, config)
+      .then((res) => {
+        getResponseCache.set(key, { data: res, expiresAt: Date.now() + DEDUP_TTL_MS });
+        return res;
+      })
+      .finally(() => {
+        inflightGets.delete(key);
+      });
+
+    inflightGets.set(key, req);
+    return req;
+  }) as any;
+};
+
+wrapDeduplicatedGet(axios);
+wrapDeduplicatedGet(api);
+
 /**
  * Converts absolute localhost/127.0.0.1 image URLs (HTTP or HTTPS)
  * into relative paths, ensuring they resolve via the active host.

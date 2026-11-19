@@ -138,7 +138,7 @@ class ArsipReturPenjualanResource extends Resource
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn ($query) => $query->where('payment_method', 'CASH')->orWhere('payment_method', 'cash')->sum('final_amount'))
+                            ->using(fn ($query) => (clone $query)->whereIn('payment_method', ['CASH', 'cash'])->sum('final_amount'))
                             ->money('IDR')
                     ),
                 Tables\Columns\TextColumn::make('card')
@@ -148,7 +148,7 @@ class ArsipReturPenjualanResource extends Resource
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn ($query) => $query->where('payment_method', 'CARD')->orWhere('payment_method', 'card')->sum('final_amount'))
+                            ->using(fn ($query) => (clone $query)->whereIn('payment_method', ['CARD', 'card'])->sum('final_amount'))
                             ->money('IDR')
                     ),
                 Tables\Columns\TextColumn::make('voucher')
@@ -202,7 +202,7 @@ class ArsipReturPenjualanResource extends Resource
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn ($query) => $query->where('payment_method', 'TRANSFER')->orWhere('payment_method', 'transfer')->sum('final_amount'))
+                            ->using(fn ($query) => (clone $query)->whereIn('payment_method', ['TRANSFER', 'transfer'])->sum('final_amount'))
                             ->money('IDR')
                     ),
                 Tables\Columns\TextColumn::make('compliment')

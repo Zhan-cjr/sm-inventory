@@ -142,14 +142,35 @@ class PromotionForm
                             ->label('Target (Produk/Kategori)')
                             ->multiple()
                             ->searchable()
+                            ->searchPrompt('Ketik nama produk/kategori, SKU, atau scan Barcode...')
                             ->visible(fn (callable $get) => !in_array($get('promo_type'), ['BUNDLING', 'PWP']) && in_array($get('applicable_to'), ['PRODUCT', 'CATEGORY']))
                             ->options(function (callable $get) {
+                                if ($get('applicable_to') === 'CATEGORY') {
+                                    return \App\Models\Category::pluck('name', 'id')->all();
+                                }
+                                return [];
+                            })
+                            ->getSearchResultsUsing(function (string $search, callable $get): array {
                                 $type = $get('applicable_to');
                                 if ($type === 'PRODUCT') {
-                                    return \App\Models\Product::pluck('name', 'id');
+                                    return \App\Models\Product::searchForSelect($search);
                                 }
                                 if ($type === 'CATEGORY') {
-                                    return \App\Models\Category::pluck('name', 'id');
+                                    return \App\Models\Category::where('name', 'like', '%' . trim($search) . '%')
+                                        ->orderBy('name')
+                                        ->limit(50)
+                                        ->pluck('name', 'id')
+                                        ->all();
+                                }
+                                return [];
+                            })
+                            ->getOptionLabelsUsing(function (array $values, callable $get): array {
+                                $type = $get('applicable_to');
+                                if ($type === 'PRODUCT') {
+                                    return \App\Models\Product::getSelectOptionLabels($values);
+                                }
+                                if ($type === 'CATEGORY') {
+                                    return \App\Models\Category::whereIn('id', $values)->pluck('name', 'id')->all();
                                 }
                                 return [];
                             }),
@@ -162,9 +183,10 @@ class PromotionForm
                         Grid::make(2)->schema([
                             Select::make('promo_config.pwp_trigger_product_id')
                                 ->label('1. Produk Pemicu / Margin Generator (Trigger Product)')
-                                ->options(\App\Models\Product::pluck('name', 'id'))
                                 ->searchable()
-                                ->preload()
+                                ->searchPrompt('Ketik nama produk, SKU, atau scan Barcode...')
+                                ->getSearchResultsUsing(fn (string $search): array => \App\Models\Product::searchForSelect($search))
+                                ->getOptionLabelUsing(fn ($value): ?string => \App\Models\Product::getSelectOptionLabel($value))
                                 ->required()
                                 ->live()
                                 ->helperText(function (callable $get) {
@@ -188,9 +210,10 @@ class PromotionForm
                         Grid::make(2)->schema([
                             Select::make('promo_config.pwp_reward_product_id')
                                 ->label('2. Produk Disubsidi / Tebus Murah (Reward Product)')
-                                ->options(\App\Models\Product::pluck('name', 'id'))
                                 ->searchable()
-                                ->preload()
+                                ->searchPrompt('Ketik nama produk, SKU, atau scan Barcode...')
+                                ->getSearchResultsUsing(fn (string $search): array => \App\Models\Product::searchForSelect($search))
+                                ->getOptionLabelUsing(fn ($value): ?string => \App\Models\Product::getSelectOptionLabel($value))
                                 ->required()
                                 ->live()
                                 ->helperText(function (callable $get) {
@@ -348,9 +371,10 @@ class PromotionForm
                             ->schema([
                                 Select::make('productId')
                                     ->label('Pilih Produk')
-                                    ->options(\App\Models\Product::pluck('name', 'id'))
                                     ->searchable()
-                                    ->preload()
+                                    ->searchPrompt('Ketik nama produk, SKU, atau scan Barcode...')
+                                    ->getSearchResultsUsing(fn (string $search): array => \App\Models\Product::searchForSelect($search))
+                                    ->getOptionLabelUsing(fn ($value): ?string => \App\Models\Product::getSelectOptionLabel($value))
                                     ->required(),
                                 TextInput::make('minQty')
                                     ->label('Jumlah Minimum yang Dibawa ke Kasir (Qty)')

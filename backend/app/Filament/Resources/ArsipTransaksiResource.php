@@ -38,6 +38,76 @@ class ArsipTransaksiResource extends Resource
 {
     use HasBranchScope;
 
+    private static array $multiSummaryCache = [];
+
+    /**
+     * Stream MULTI/POINT payment_details once per unique table query in O(1) RAM
+     * so the 5 payment summarizers don't load all transactions into PHP memory 5x.
+     */
+    private static function getMultiPaymentSummary($query): array
+    {
+        $cacheKey = md5($query->toSql() . '|' . json_encode($query->getBindings()));
+        if (isset(self::$multiSummaryCache[$cacheKey])) {
+            return self::$multiSummaryCache[$cacheKey];
+        }
+
+        $totals = [
+            'multi_cash' => 0.0,
+            'multi_card' => 0.0,
+            'multi_voucher' => 0.0,
+            'multi_point' => 0.0,
+            'points_deducted' => 0.0,
+        ];
+
+        $cursor = (clone $query)
+            ->whereNotNull('payment_details')
+            ->whereIn('payment_method', ['MULTI', 'multi', 'POINT', 'point'])
+            ->select(['payment_method', 'payment_details', 'change_amount'])
+            ->cursor();
+
+        foreach ($cursor as $record) {
+            $details = $record->payment_details;
+            if (is_string($details)) {
+                $details = json_decode($details, true);
+            }
+            if (!is_array($details)) {
+                continue;
+            }
+
+            $isMulti = strtoupper((string) $record->payment_method) === 'MULTI';
+            $cashInRow = 0.0;
+
+            foreach ($details as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $method = strtoupper((string) ($item['method'] ?? ''));
+                $amount = (float) ($item['amount'] ?? 0);
+
+                if ($method === 'POINT') {
+                    $totals['points_deducted'] += (float) ($item['points_deducted'] ?? 0);
+                    if ($isMulti) {
+                        $totals['multi_point'] += $amount;
+                    }
+                } elseif ($isMulti) {
+                    if ($method === 'CASH') {
+                        $cashInRow += $amount;
+                    } elseif ($method === 'CARD') {
+                        $totals['multi_card'] += $amount;
+                    } elseif ($method === 'VOUCHER') {
+                        $totals['multi_voucher'] += $amount;
+                    }
+                }
+            }
+
+            if ($isMulti && $cashInRow > 0) {
+                $totals['multi_cash'] += max(0.0, $cashInRow - (float) ($record->change_amount ?? 0));
+            }
+        }
+
+        return self::$multiSummaryCache[$cacheKey] = $totals;
+    }
+
     protected static ?string $model = Transaction::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-archive-box-arrow-down';
@@ -298,15 +368,7 @@ class ArsipTransaksiResource extends Resource
                             ->label('Total')
                             ->using(function ($query) {
                                 $cashOnly = (clone $query)->whereIn('payment_method', ['CASH', 'cash'])->sum('final_amount');
-                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details', 'change_amount']);
-                                $multiCash = $multiRecords->sum(function ($record) {
-                                    $details = $record->payment_details;
-                                    if (is_string($details)) $details = json_decode($details, true);
-                                    if (!is_array($details)) return 0;
-                                    $cashAmount = collect($details)->where('method', 'CASH')->sum('amount');
-                                    return $cashAmount > 0 ? max(0, $cashAmount - $record->change_amount) : 0;
-                                });
-                                return $cashOnly + $multiCash;
+                                return $cashOnly + self::getMultiPaymentSummary($query)['multi_cash'];
                             })
                             ->money('IDR')
                     ),
@@ -329,13 +391,7 @@ class ArsipTransaksiResource extends Resource
                             ->label('Total')
                             ->using(function ($query) {
                                 $cardOnly = (clone $query)->whereIn('payment_method', ['CARD', 'card'])->sum('final_amount');
-                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details']);
-                                $multiCard = $multiRecords->sum(function ($record) {
-                                    $details = $record->payment_details;
-                                    if (is_string($details)) $details = json_decode($details, true);
-                                    return is_array($details) ? collect($details)->where('method', 'CARD')->sum('amount') : 0;
-                                });
-                                return $cardOnly + $multiCard;
+                                return $cardOnly + self::getMultiPaymentSummary($query)['multi_card'];
                             })
                             ->money('IDR')
                     ),
@@ -358,13 +414,7 @@ class ArsipTransaksiResource extends Resource
                             ->label('Total')
                             ->using(function ($query) {
                                 $voucherOnly = (clone $query)->whereIn('payment_method', ['VOUCHER', 'voucher'])->sum('final_amount');
-                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details']);
-                                $multiVoucher = $multiRecords->sum(function ($record) {
-                                    $details = $record->payment_details;
-                                    if (is_string($details)) $details = json_decode($details, true);
-                                    return is_array($details) ? collect($details)->where('method', 'VOUCHER')->sum('amount') : 0;
-                                });
-                                return $voucherOnly + $multiVoucher;
+                                return $voucherOnly + self::getMultiPaymentSummary($query)['multi_voucher'];
                             })
                             ->money('IDR')
                     ),
@@ -375,7 +425,9 @@ class ArsipTransaksiResource extends Resource
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn ($query) => $query->where('transaction_type', '!=', 'RETURN')->orWhereNull('transaction_type')->sum('discount_amount'))
+                            ->using(fn ($query) => (clone $query)
+                                ->where(fn ($q) => $q->where('transaction_type', '!=', 'RETURN')->orWhereNull('transaction_type'))
+                                ->sum('discount_amount'))
                             ->money('IDR')
                     ),
                 Tables\Columns\TextColumn::make('retur')
@@ -433,13 +485,7 @@ class ArsipTransaksiResource extends Resource
                             ->label('Total')
                             ->using(function ($query) {
                                 $pointOnly = (clone $query)->whereIn('payment_method', ['POINT', 'point'])->sum('final_amount');
-                                $multiRecords = (clone $query)->whereIn('payment_method', ['MULTI', 'multi'])->get(['payment_details']);
-                                $multiPoint = $multiRecords->sum(function ($record) {
-                                    $details = $record->payment_details;
-                                    if (is_string($details)) $details = json_decode($details, true);
-                                    return is_array($details) ? collect($details)->where('method', 'POINT')->sum('amount') : 0;
-                                });
-                                return $pointOnly + $multiPoint;
+                                return $pointOnly + self::getMultiPaymentSummary($query)['multi_point'];
                             })
                             ->money('IDR')
                     ),
@@ -457,14 +503,7 @@ class ArsipTransaksiResource extends Resource
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(function ($query) {
-                                $records = $query->get(['payment_details']);
-                                return $records->sum(function ($record) {
-                                    $details = $record->payment_details;
-                                    if (is_string($details)) $details = json_decode($details, true);
-                                    return is_array($details) ? collect($details)->where('method', 'POINT')->sum('points_deducted') : 0;
-                                });
-                            })
+                            ->using(fn ($query) => self::getMultiPaymentSummary($query)['points_deducted'])
                     ),
                 Tables\Columns\TextColumn::make('transfer')
                     ->label('Transfer')
@@ -473,7 +512,7 @@ class ArsipTransaksiResource extends Resource
                     ->summarize(
                         Summarizer::make()
                             ->label('Total')
-                            ->using(fn ($query) => $query->where('payment_method', 'TRANSFER')->orWhere('payment_method', 'transfer')->sum('final_amount'))
+                            ->using(fn ($query) => (clone $query)->whereIn('payment_method', ['TRANSFER', 'transfer'])->sum('final_amount'))
                             ->money('IDR')
                     ),
                 Tables\Columns\TextColumn::make('compliment')

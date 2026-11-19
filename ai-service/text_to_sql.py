@@ -1,6 +1,7 @@
 import os
 import re
 import mysql.connector
+from mysql.connector import pooling
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -13,14 +14,22 @@ if api_key:
 model_name = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 model = genai.GenerativeModel(model_name)
 
+_db_pool = None
+
 def get_db_connection():
-    return mysql.connector.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        user=os.getenv("DB_USER", "root"),
-        password=os.getenv("DB_PASSWORD", ""),
-        database=os.getenv("DB_NAME", "sm_inventory"),
-        connection_timeout=10
-    )
+    global _db_pool
+    if _db_pool is None:
+        _db_pool = pooling.MySQLConnectionPool(
+            pool_name="sm_ai_pool",
+            pool_size=5,
+            pool_reset_session=True,
+            host=os.getenv("DB_HOST", "localhost"),
+            user=os.getenv("DB_USER", "root"),
+            password=os.getenv("DB_PASSWORD", ""),
+            database=os.getenv("DB_NAME", "sm_inventory"),
+            connection_timeout=10,
+        )
+    return _db_pool.get_connection()
 
 _cached_schema = None
 
@@ -136,32 +145,53 @@ INSTRUCTIONS:
         print(f"Generated SQL: {sql_query}")
 
         # Basic security & performance check
+        sql_query = sql_query.strip().rstrip(';').strip()
         if not sql_query.upper().startswith("SELECT"):
             return {"answer": "Maaf, kueri yang dihasilkan tidak valid (bukan SELECT)."}
-            
+
+        if ";" in sql_query or re.search(
+            r'\b(DROP|DELETE|UPDATE|INSERT|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE|INTO\s+OUTFILE|LOAD_FILE|SLEEP|BENCHMARK)\b',
+            sql_query,
+            re.IGNORECASE,
+        ):
+            return {"answer": "Maaf, kueri dibatalkan karena mengandung perintah yang tidak diizinkan."}
+
         # Hard restriction to ensure LLM included branch_id filter
         if branch_id:
-            import re
-            # Regex to ensure the specific branch_id is present explicitly tied to a column.
-            # This prevents bypasses like `1=1` which would match if branch_id was '1'.
-            pattern = rf"(?:branch_id|id)\s*=\s*['\"]?{branch_id}['\"]?"
+            pattern = rf"(?:branch_id|id)\s*=\s*['\"]?{re.escape(str(branch_id))}['\"]?"
             if not re.search(pattern, sql_query, re.IGNORECASE):
                 print(f"SECURITY ALERT: Strict branch filter for '{branch_id}' missing in SQL: {sql_query}")
                 return {"answer": "Maaf, kueri dibatalkan secara otomatis karena sistem mendeteksi pencarian data di luar batas izin cabang Anda."}
-            
-        # Prevent massive cross-joins from hanging the database
-        if "LIMIT" not in sql_query.upper():
+
+        # Prevent massive result sets from hanging the database (check trailing outer LIMIT)
+        if not re.search(r'\bLIMIT\s+\d+(?:\s*,\s*\d+|\s+OFFSET\s+\d+)?\s*$', sql_query, re.IGNORECASE):
             sql_query += " LIMIT 50"
-            
+
         print(f"Executing Safe SQL: {sql_query}", flush=True)
 
-        # 3. Execute SQL against database
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute(sql_query)
-        data = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        # 3. Execute SQL against database with 10s execution timeout and guaranteed cleanup
+        conn = None
+        cursor = None
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            try:
+                cursor.execute("SET SESSION max_execution_time = 10000")
+            except Exception:
+                pass
+            cursor.execute(sql_query)
+            data = cursor.fetchall()
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
         # 4. Ask Gemini to format the final answer
         data_str = str(data)

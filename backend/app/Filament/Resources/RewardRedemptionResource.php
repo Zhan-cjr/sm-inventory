@@ -43,8 +43,8 @@ class RewardRedemptionResource extends Resource
                     ->label('Pelanggan (Member)')
                     ->relationship('customer', 'name')
                     ->getOptionLabelFromRecordUsing(fn (Customer $record) => "{$record->name} ({$record->phone}) - {$record->points} Pts")
-                    ->searchable()
-                    ->preload()
+                    ->searchable(['name', 'phone'])
+                    ->searchPrompt('Ketik nama atau nomor HP member...')
                     ->required(),
                 Select::make('reward_id')
                     ->label('Hadiah')

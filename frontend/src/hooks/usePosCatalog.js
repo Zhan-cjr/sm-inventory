@@ -456,8 +456,8 @@ export const usePosCatalog = ({
 
     fetchCatalog();
     const catalogTimer = setInterval(() => {
-      if (navigator.onLine) fetchCatalog();
-    }, 60000); // 1 menit
+      if (navigator.onLine && !document.hidden) fetchCatalog();
+    }, 300000); // 5 menit (update stok & harga real-time sudah ditangani WebSocket Reverb)
 
     const loadTerminalsFromCache = () => {
       const cachedTerminals = localStorage.getItem('pos_cached_terminals');
