@@ -54,8 +54,14 @@ class SyncController extends Controller
 
         foreach ($validated['transactions'] as $txData) {
             try {
-                DB::transaction(function () use ($txData, $validated, $user, &$syncedIds, &$conflicts, &$ppobData) {
-                    $existing = Transaction::where('local_transaction_id', $txData['localId'])->lockForUpdate()->first();
+                $createdTx = null;
+                $pendingPpobItems = [];
+
+                DB::transaction(function () use ($txData, $validated, $user, &$syncedIds, &$createdTx, &$pendingPpobItems) {
+                    $existing = Transaction::where('organization_id', $user->organization_id)
+                        ->where('local_transaction_id', $txData['localId'])
+                        ->lockForUpdate()
+                        ->first();
 
                     if ($existing) {
                         if (!in_array($txData['localId'], $syncedIds)) {
@@ -182,7 +188,8 @@ class SyncController extends Controller
                         }
                     }
 
-                    foreach ($txData['items'] as $item) {
+                    $sortedItems = collect($txData['items'])->sortBy(fn ($i) => $i['productId'] ?? '')->values();
+                    foreach ($sortedItems as $item) {
                         $isService = isset($item['isService']) && $item['isService'] === true;
 
                         // Stock deduction is handled by TransactionItemObserver automatically
@@ -198,69 +205,76 @@ class SyncController extends Controller
                         ]);
 
                         if (!$isService && isset($item['productType']) && $item['productType'] === 'digital') {
-                            $product = \App\Models\Product::find($item['productId']);
-                            if ($product && !empty($product->ppob_sku)) {
-                                $customerNo = $item['customerNo'] ?? null;
-                                if ($customerNo) {
-                                    $refId = $tx->receipt_number;
-                                    $existingPpobCount = \App\Models\PpobTransaction::where('transaction_id', $tx->id)->count();
-                                    if ($existingPpobCount > 0) {
-                                        $refId .= '-' . ($existingPpobCount + 1);
-                                    }
-                                    
-                                    $user = auth()->user();
-                                    $additionalInfo = $user ? [$user->organization_id ?? 'Toko', $user->name] : [];
-                                    
-                                    try {
-                                        $ppobService = \App\Services\PpobServiceManager::make($product->ppob_provider);
-                                        $res = $ppobService->topup($product->ppob_sku, $customerNo, $refId, $additionalInfo);
-                                    } catch (\Exception $e) {
-                                        \Illuminate\Support\Facades\Log::error('PPOB Service Error: ' . $e->getMessage());
-                                        $res = ['data' => ['status' => 'Gagal', 'message' => $e->getMessage()]];
-                                    }
+                            $pendingPpobItems[] = $item;
+                        }
+                    }
 
-                                    $status = 'Pending';
-                                    if (isset($res['data']['status'])) {
-                                        $status = $res['data']['status'];
-                                    }
-                                    
-                                    $customerName = isset($res['data']) ? $this->extractCustomerName($res['data']) : null;
-                                    
-                                    \App\Models\PpobTransaction::create([
-                                        'transaction_id' => $tx->id,
-                                        'provider' => $product->ppob_provider ?? 'digiflazz',
-                                        'ref_id' => $refId,
-                                        'customer_no' => $customerNo,
-                                        'customer_name' => $customerName,
-                                        'buyer_sku_code' => $product->ppob_sku,
-                                        'price' => ($res['data']['price'] ?? 0) > 0 ? $res['data']['price'] : ($product->cost_price ?? 0),
-                                        'status' => $status,
-                                        'rc' => $res['data']['rc'] ?? null,
-                                        'sn' => $res['data']['sn'] ?? null,
-                                        'message' => $res['data']['message'] ?? null,
-                                        'raw_response' => json_encode($res),
-                                    ]);
-                                    
-                                    if (!isset($ppobData[$txData['localId']])) {
-                                        $ppobData[$txData['localId']] = [];
-                                    }
-                                    $ppobData[$txData['localId']][] = [
-                                        'productId' => $item['productId'],
-                                        'sn' => $res['data']['sn'] ?? null,
-                                        'status' => $status,
-                                        'message' => $res['data']['message'] ?? null,
-                                    ];
+                    $createdTx = $tx;
+                    $syncedIds[] = $txData['localId'];
+                }); // End of DB::transaction closure
+
+                // Post-commit: External PPOB HTTP calls & Accounting journal (never hold InnoDB row locks)
+                if ($createdTx) {
+                    foreach ($pendingPpobItems as $item) {
+                        $product = \App\Models\Product::find($item['productId']);
+                        if ($product && !empty($product->ppob_sku)) {
+                            $customerNo = $item['customerNo'] ?? null;
+                            if ($customerNo) {
+                                $refId = $createdTx->receipt_number;
+                                $existingPpobCount = \App\Models\PpobTransaction::where('transaction_id', $createdTx->id)->count();
+                                if ($existingPpobCount > 0) {
+                                    $refId .= '-' . ($existingPpobCount + 1);
                                 }
+
+                                $authUser = auth()->user();
+                                $additionalInfo = $authUser ? [$authUser->organization_id ?? 'Toko', $authUser->name] : [];
+
+                                try {
+                                    $ppobService = \App\Services\PpobServiceManager::make($product->ppob_provider);
+                                    $res = $ppobService->topup($product->ppob_sku, $customerNo, $refId, $additionalInfo);
+                                } catch (\Exception $e) {
+                                    \Illuminate\Support\Facades\Log::error('PPOB Service Error: ' . $e->getMessage());
+                                    $res = ['data' => ['status' => 'Gagal', 'message' => $e->getMessage()]];
+                                }
+
+                                $status = $res['data']['status'] ?? 'Pending';
+                                $customerName = isset($res['data']) ? $this->extractCustomerName($res['data']) : null;
+
+                                \App\Models\PpobTransaction::create([
+                                    'transaction_id' => $createdTx->id,
+                                    'provider' => $product->ppob_provider ?? 'digiflazz',
+                                    'ref_id' => $refId,
+                                    'customer_no' => $customerNo,
+                                    'customer_name' => $customerName,
+                                    'buyer_sku_code' => $product->ppob_sku,
+                                    'price' => ($res['data']['price'] ?? 0) > 0 ? $res['data']['price'] : ($product->cost_price ?? 0),
+                                    'status' => $status,
+                                    'rc' => $res['data']['rc'] ?? null,
+                                    'sn' => $res['data']['sn'] ?? null,
+                                    'message' => $res['data']['message'] ?? null,
+                                    'raw_response' => json_encode($res),
+                                ]);
+
+                                if (!isset($ppobData[$txData['localId']])) {
+                                    $ppobData[$txData['localId']] = [];
+                                }
+                                $ppobData[$txData['localId']][] = [
+                                    'productId' => $item['productId'],
+                                    'sn' => $res['data']['sn'] ?? null,
+                                    'status' => $status,
+                                    'message' => $res['data']['message'] ?? null,
+                                ];
                             }
                         }
                     }
 
-                    // Panggil AccountingService untuk catat Jurnal
-                    $accountingService = new \App\Services\AccountingService();
-                    $accountingService->recordTransactionJournal($tx);
-
-                    $syncedIds[] = $txData['localId'];
-                }); // End of DB::transaction closure
+                    try {
+                        $accountingService = new \App\Services\AccountingService();
+                        $accountingService->recordTransactionJournal($createdTx);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error('Post-commit Sync Accounting Error: ' . $e->getMessage());
+                    }
+                }
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error('Sync error for localId ' . $txData['localId'] . ': ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
                 $conflicts[] = [

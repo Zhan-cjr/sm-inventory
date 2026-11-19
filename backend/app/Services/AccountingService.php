@@ -9,46 +9,67 @@ use App\Models\Transaction;
 
 class AccountingService
 {
+    private static array $coaIdCache = [];
+
+    /**
+     * Resolve COA account IDs by code for an organization using request + 10-min Redis cache.
+     * Stores plain [code => id] array (Laravel 13 Cache safe).
+     */
+    private function getCoaAccountIds(?string $organizationId): array
+    {
+        if (!$organizationId) {
+            return [];
+        }
+
+        if (isset(self::$coaIdCache[$organizationId])) {
+            return self::$coaIdCache[$organizationId];
+        }
+
+        $cacheKey = 'accounting:coa_ids:v1:' . $organizationId;
+        $map = \Illuminate\Support\Facades\Cache::remember($cacheKey, 600, function () use ($organizationId) {
+            $defaults = [
+                '4120' => ['name' => 'Pendapatan Layanan (Service)', 'type' => 'revenue', 'description' => 'Pendapatan dari layanan/PPOB', 'is_active' => true],
+                '5130' => ['name' => 'Harga Pokok Layanan/PPOB', 'type' => 'expense', 'description' => 'Harga pokok untuk layanan atau produk digital PPOB', 'is_active' => true],
+                '1150' => ['name' => 'Saldo Deposit PPOB', 'type' => 'asset', 'description' => 'Saldo deposit pada provider PPOB (Digiflazz, dll)', 'is_active' => true],
+            ];
+
+            $existing = Account::where('organization_id', $organizationId)
+                ->whereIn('account_code', ['1110', '4110', '4130', '5110', '1140', '2120', '4120', '5130', '1150'])
+                ->pluck('id', 'account_code')
+                ->all();
+
+            foreach ($defaults as $code => $attrs) {
+                if (!isset($existing[$code])) {
+                    $acc = Account::firstOrCreate(
+                        ['organization_id' => $organizationId, 'account_code' => $code],
+                        $attrs
+                    );
+                    $existing[$code] = $acc->id;
+                }
+            }
+
+            return $existing;
+        });
+
+        return self::$coaIdCache[$organizationId] = $map;
+    }
+
     /**
      * Otomatis mencatat jurnal akuntansi saat transaksi selesai
      */
     public function recordTransactionJournal(Transaction $transaction)
     {
-        // 1. Dapatkan COA yang sesuai
-        $kasAccount = Account::where('organization_id', $transaction->organization_id)
-            ->where('account_code', '1110')->first();
-        $pendapatanAccount = Account::where('organization_id', $transaction->organization_id)
-            ->where('account_code', '4110')->first();
-        $diskonAccount = Account::where('organization_id', $transaction->organization_id)
-            ->where('account_code', '4130')->first();
-        $hppAccount = Account::where('organization_id', $transaction->organization_id)
-            ->where('account_code', '5110')->first();
-        $persediaanAccount = Account::where('organization_id', $transaction->organization_id)
-            ->where('account_code', '1140')->first();
-        $pajakAccount = Account::where('organization_id', $transaction->organization_id)
-            ->where('account_code', '2120')->first();
-            
-        // Akun-akun Enterprise untuk PPOB dan Layanan
-        $pendapatanLayananAccount = Account::firstOrCreate([
-            'organization_id' => $transaction->organization_id,
-            'account_code' => '4120'
-        ], [
-            'name' => 'Pendapatan Layanan (Service)', 'type' => 'revenue', 'description' => 'Pendapatan dari layanan/PPOB', 'is_active' => true
-        ]);
-        
-        $hppLayananAccount = Account::firstOrCreate([
-            'organization_id' => $transaction->organization_id,
-            'account_code' => '5130'
-        ], [
-            'name' => 'Harga Pokok Layanan/PPOB', 'type' => 'expense', 'description' => 'Harga pokok untuk layanan atau produk digital PPOB', 'is_active' => true
-        ]);
-        
-        $saldoPpobAccount = Account::firstOrCreate([
-            'organization_id' => $transaction->organization_id,
-            'account_code' => '1150'
-        ], [
-            'name' => 'Saldo Deposit PPOB', 'type' => 'asset', 'description' => 'Saldo deposit pada provider PPOB (Digiflazz, dll)', 'is_active' => true
-        ]);
+        // 1. Dapatkan COA yang sesuai (cached per org)
+        $coa = $this->getCoaAccountIds($transaction->organization_id);
+        $kasAccount = isset($coa['1110']) ? (object) ['id' => $coa['1110']] : null;
+        $pendapatanAccount = isset($coa['4110']) ? (object) ['id' => $coa['4110']] : null;
+        $diskonAccount = isset($coa['4130']) ? (object) ['id' => $coa['4130']] : null;
+        $hppAccount = isset($coa['5110']) ? (object) ['id' => $coa['5110']] : null;
+        $persediaanAccount = isset($coa['1140']) ? (object) ['id' => $coa['1140']] : null;
+        $pajakAccount = isset($coa['2120']) ? (object) ['id' => $coa['2120']] : null;
+        $pendapatanLayananAccount = isset($coa['4120']) ? (object) ['id' => $coa['4120']] : null;
+        $hppLayananAccount = isset($coa['5130']) ? (object) ['id' => $coa['5130']] : null;
+        $saldoPpobAccount = isset($coa['1150']) ? (object) ['id' => $coa['1150']] : null;
 
         // Jika akun penting tidak ada, lewati pencatatan jurnal
         if (!$kasAccount || !$pendapatanAccount) {
@@ -118,7 +139,7 @@ class AccountingService
         // 3. Koreksi rounding pada item terakhir & koreksi akhir PPN
 
         $org           = \App\Models\Organization::find($transaction->organization_id);
-        $taxRate       = $org->tax_rate ?? \App\Models\Organization::first()->id1;
+        $taxRate       = (float) ($org?->tax_rate ?? 11);
         $taxMultiplier = 1 + ($taxRate / 100);
         $totalDiscount = max(0, (float)$transaction->total_amount - (float)$transaction->final_amount);
 
@@ -588,7 +609,7 @@ class AccountingService
         }
 
         // Kalkulasi PPN Keluaran berdasarkan item
-        $taxRate = \App\Models\Organization::first()->tax_rate ?? \App\Models\Organization::first()->id1;
+        $taxRate = (float) (\App\Models\Organization::first()?->tax_rate ?? 11);
         $taxMultiplier = 1 + ($taxRate / 100);
         $taxAmount = 0;
         $revenueAmount = 0;

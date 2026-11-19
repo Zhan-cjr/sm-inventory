@@ -25,17 +25,20 @@ class StockTransferService
             $transfer->status = 'in_transit';
             $transfer->save();
 
-            foreach ($transfer->items as $item) {
-                $stock = Stock::firstOrCreate(
-                    [
+            foreach ($transfer->items->sortBy('product_id') as $item) {
+                $stock = Stock::where('branch_id', $transfer->from_branch_id)
+                    ->where('product_id', $item->product_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$stock) {
+                    $stock = Stock::create([
+                        'id' => Str::uuid()->toString(),
                         'branch_id' => $transfer->from_branch_id,
                         'product_id' => $item->product_id,
-                    ],
-                    [
-                        'id' => Str::uuid()->toString(),
                         'quantity_on_hand' => 0,
-                    ]
-                );
+                    ]);
+                }
 
                 if ($stock->quantity_on_hand < $item->quantity) {
                     throw new Exception("Stok tidak mencukupi untuk produk ID: {$item->product_id}");
@@ -79,17 +82,20 @@ class StockTransferService
             $transfer->save();
 
             if (!$isLegacyDestination) {
-                foreach ($transfer->items as $item) {
-                    $stock = Stock::firstOrCreate(
-                        [
+                foreach ($transfer->items->sortBy('product_id') as $item) {
+                    $stock = Stock::where('branch_id', $transfer->to_branch_id)
+                        ->where('product_id', $item->product_id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$stock) {
+                        $stock = Stock::create([
+                            'id' => Str::uuid()->toString(),
                             'branch_id' => $transfer->to_branch_id,
                             'product_id' => $item->product_id,
-                        ],
-                        [
-                            'id' => Str::uuid()->toString(),
                             'quantity_on_hand' => 0,
-                        ]
-                    );
+                        ]);
+                    }
 
                     $stock->quantity_on_hand += $item->quantity;
                     $stock->log_type = 'TRANSFER_IN';
@@ -102,10 +108,15 @@ class StockTransferService
                 }
             }
 
-            // Catat jurnal akuntansi (otomatis hanya JV-TF-OUT jika tujuan adalah cabang aplikasi lama)
-            app(\App\Services\AccountingService::class)->recordStockTransferJournal($transfer);
-
             DB::commit();
+
+            // Post-commit: Catat jurnal akuntansi di luar DB::transaction agar lock stok langsung dilepas
+            try {
+                app(\App\Services\AccountingService::class)->recordStockTransferJournal($transfer);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Post-commit StockTransfer Journal Error: ' . $e->getMessage());
+            }
+
             return true;
         } catch (Exception $e) {
             DB::rollBack();

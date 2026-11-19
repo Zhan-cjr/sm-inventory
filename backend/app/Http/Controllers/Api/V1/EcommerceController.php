@@ -1258,12 +1258,25 @@ class EcommerceController extends Controller
                     }
                 }
             } else if ($transaction == 'settlement') {
-                $order->update(['payment_status' => 'PAID']);
-                
-                // If it's a PPOB/DIGITAL order, automatically process it via Digiflazz
-                if ($order->delivery_method === 'DIGITAL') {
-                    $item = \App\Models\EcommerceOrderItem::where('ecommerce_order_id', $order->id)->first();
-                    if ($item) {
+                // Idempotency lock to prevent duplicate settlement / double PPOB topup on concurrent Midtrans retries
+                $lock = \Illuminate\Support\Facades\Cache::lock('midtrans_settlement_' . $order->id, 30);
+                if (!$lock->get()) {
+                    return response()->json(['status' => 'processing']);
+                }
+
+                try {
+                    $order->refresh();
+                    if ($order->payment_status === 'PAID') {
+                        return response()->json(['status' => 'already_processed']);
+                    }
+
+                    $order->update(['payment_status' => 'PAID']);
+
+                    // If it's a PPOB/DIGITAL order, automatically process it via Digiflazz (once only)
+                    if ($order->delivery_method === 'DIGITAL') {
+                        $alreadyToppedUp = \App\Models\PpobTransaction::where('ecommerce_order_id', $order->id)->exists();
+                        $item = !$alreadyToppedUp ? \App\Models\EcommerceOrderItem::where('ecommerce_order_id', $order->id)->first() : null;
+                        if ($item) {
                         $product = \App\Models\Product::find($item->product_id);
                         if ($product && $product->ppob_sku) {
                             try {
@@ -1368,6 +1381,9 @@ class EcommerceController extends Controller
                             }
                         }
                     }
+                }
+                } finally {
+                    $lock->release();
                 }
             } else if ($transaction == 'pending') {
                 if ($order->payment_status !== 'PAID' && $order->payment_status !== 'SUCCESS') {

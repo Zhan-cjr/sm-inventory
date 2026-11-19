@@ -80,7 +80,12 @@ class Product extends Model
                     ->where(function ($q) use ($primaryBarcode) {
                         $q->where('barcode', $primaryBarcode)
                           ->orWhere('sku', $primaryBarcode)
-                          ->orWhereJsonContains('metadata->additional_barcodes', $primaryBarcode);
+                          ->orWhereExists(function ($sub) use ($primaryBarcode) {
+                              $sub->selectRaw('1')
+                                  ->from('product_barcodes')
+                                  ->whereColumn('product_barcodes.product_id', 'products.id')
+                                  ->where('product_barcodes.barcode', $primaryBarcode);
+                          });
                     })->first();
 
                 if ($exists) {
@@ -118,7 +123,12 @@ class Product extends Model
                         ->where(function ($q) use ($code) {
                             $q->where('barcode', $code)
                               ->orWhere('sku', $code)
-                              ->orWhereJsonContains('metadata->additional_barcodes', $code);
+                              ->orWhereExists(function ($sub) use ($code) {
+                                  $sub->selectRaw('1')
+                                      ->from('product_barcodes')
+                                      ->whereColumn('product_barcodes.product_id', 'products.id')
+                                      ->where('product_barcodes.barcode', $code);
+                              });
                         })->first();
 
                     if ($exists) {
@@ -129,6 +139,11 @@ class Product extends Model
         });
 
         static::saved(function ($product) {
+            // Keep normalized product_barcodes table in sync with metadata->additional_barcodes
+            if ($product->wasRecentlyCreated || $product->wasChanged('metadata')) {
+                $product->syncNormalizedBarcodes();
+            }
+
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             foreach (\App\Models\Branch::pluck('id') as $branchId) {
                 \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
@@ -144,6 +159,7 @@ class Product extends Model
         });
 
         static::deleted(function ($product) {
+            \App\Models\ProductBarcode::where('product_id', $product->id)->delete();
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             foreach (\App\Models\Branch::pluck('id') as $branchId) {
                 \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);
@@ -395,6 +411,58 @@ class Product extends Model
         return $candidateSku;
     }
 
+    public function barcodes()
+    {
+        return $this->hasMany(ProductBarcode::class);
+    }
+
+    /**
+     * Sync metadata->additional_barcodes into the indexed product_barcodes table.
+     */
+    public function syncNormalizedBarcodes(): void
+    {
+        $metadata = $this->metadata;
+        $raw = (is_array($metadata) && !empty($metadata['additional_barcodes']))
+            ? $metadata['additional_barcodes']
+            : [];
+
+        $codes = is_array($raw)
+            ? $raw
+            : array_map('trim', explode(',', (string) $raw));
+
+        $clean = [];
+        $seen = [];
+        foreach ($codes as $code) {
+            $code = trim((string) $code);
+            if ($code === '' || mb_strlen($code) > 100) {
+                continue;
+            }
+            $lower = strtolower($code);
+            if (isset($seen[$lower])) {
+                continue;
+            }
+            $seen[$lower] = true;
+            $clean[] = $code;
+        }
+
+        ProductBarcode::where('product_id', $this->id)
+            ->when(!empty($clean), fn ($q) => $q->whereNotIn('barcode', $clean))
+            ->delete();
+
+        if (!empty($clean)) {
+            $now = now();
+            $rows = array_map(fn (string $code) => [
+                'product_id' => $this->id,
+                'organization_id' => $this->organization_id,
+                'barcode' => $code,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $clean);
+
+            \Illuminate\Support\Facades\DB::table('product_barcodes')->insertOrIgnore($rows);
+        }
+    }
+
     /**
      * Format a product label consistently for Filament Select dropdowns.
      */
@@ -466,7 +534,12 @@ class Product extends Model
             if ($exact->isEmpty() && !str_contains($search, ' ')) {
                 $exact = static::select($columns)
                     ->when($productType, fn ($q) => $q->where('product_type', $productType))
-                    ->whereJsonContains('metadata->additional_barcodes', $search)
+                    ->whereExists(function ($sub) use ($search) {
+                        $sub->selectRaw('1')
+                            ->from('product_barcodes')
+                            ->whereColumn('product_barcodes.product_id', 'products.id')
+                            ->where('product_barcodes.barcode', $search);
+                    })
                     ->get();
             }
         }

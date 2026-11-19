@@ -224,13 +224,14 @@ class TransactionController extends Controller
                     }
                 }
 
-                $productIds = collect($validated['items'])->pluck('product_id')->unique();
+                $sortedItems = collect($validated['items'])->sortBy('product_id')->values();
+                $productIds = $sortedItems->pluck('product_id')->unique();
                 $productsMap = \App\Models\Product::with(['assemblies', 'conversions'])
                     ->whereIn('id', $productIds)
                     ->get()
                     ->keyBy('id');
 
-                foreach ($validated['items'] as $item) {
+                foreach ($sortedItems as $item) {
                     $product = $productsMap->get($item['product_id']);
 
                     $txItem = TransactionItem::create([
@@ -334,12 +335,21 @@ class TransactionController extends Controller
                     }
                 }
 
-                // Panggil AccountingService untuk catat Jurnal
+            });
+
+            // Post-commit: Accounting journal & cache invalidation outside DB::transaction to keep stock row locks brief
+            try {
                 $accountingService = new \App\Services\AccountingService();
                 $accountingService->recordTransactionJournal($transaction);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Post-commit Accounting Error for TX ' . $transaction->id . ': ' . $e->getMessage());
+            }
 
+            try {
                 Cache::tags(['inventory', "branch:{$user->branch_id}"])->flush();
-            });
+            } catch (\Throwable $e) {
+                // Ignore if cache driver does not support tags
+            }
 
             // Broadcast the new transaction to the branch channel
             event(new \App\Events\TransactionCreated($transaction->branch_id, [
