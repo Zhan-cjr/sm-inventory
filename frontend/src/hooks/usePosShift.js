@@ -370,14 +370,27 @@ export const usePosShift = ({
     return null;
   }, [activeShift, terminalInfo?.id, authToken, currentUserId, setAlertMsg, syncTransactions]);
 
-  // Sync offline active shift to server when back online
+  // Sync offline active shift to server when back online (or when central server recovers from 530/5xx outage)
   useEffect(() => {
-    if (navigator.onLine && activeShift && activeShift.is_offline && terminalInfo?.id && authToken) {
-      syncOfflineShiftIfNeeded();
+    if (!activeShift || !activeShift.is_offline || !terminalInfo?.id || !authToken) {
+      return;
     }
+
     const handleOnline = () => syncOfflineShiftIfNeeded();
     window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+
+    // Periodic retry every 30s while shift is still offline, so recovery from central server outage
+    // (where branch Wi-Fi stayed up and 'online' event never fired) auto-syncs seamlessly.
+    const retryTimer = setInterval(() => {
+      if (navigator.onLine && !document.hidden) {
+        syncOfflineShiftIfNeeded();
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      clearInterval(retryTimer);
+    };
   }, [activeShift, terminalInfo?.id, authToken, syncOfflineShiftIfNeeded]);
 
   const handleOpenShift = () => {
@@ -423,8 +436,12 @@ export const usePosShift = ({
 
     setIsProcessing(true);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
     fetch('/api/v1/shifts/open', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
@@ -436,10 +453,14 @@ export const usePosShift = ({
       })
     })
       .then(async res => {
+        clearTimeout(timeoutId);
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
+          // HTTP 502-599 (including Cloudflare Tunnel 530, 521-526, Nginx 502/503/504)
+          // means the origin/central server is unreachable, NOT an intentional business rejection (4xx).
+          const isServerUnreachable = res.status >= 502 && res.status <= 599;
           throw {
-            isServerResponse: true,
+            isServerResponse: !isServerUnreachable,
             status: res.status,
             message: data?.message || `Gagal membuka shift (Error ${res.status})`
           };
@@ -460,6 +481,7 @@ export const usePosShift = ({
         }
       })
       .catch(err => {
+        clearTimeout(timeoutId);
         if (err.isServerResponse) {
           // Penolakan resmi dari server (422, 403, 400 dll):
           // JANGAN BUKA SHIFT OFFLINE DAN JANGAN TUTUP MODAL!
@@ -470,7 +492,7 @@ export const usePosShift = ({
           return;
         }
 
-        // Murni error jaringan / network failure
+        // Network failure, timeout, atau server pusat mati (Cloudflare 530 / 502 / 503 / 504)
         console.error('Failed to open shift online, falling back to offline:', err);
         const localShift = {
           id: null,
