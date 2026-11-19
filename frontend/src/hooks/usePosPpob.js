@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { initEcho } from '../utils/echo';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { initEcho, releaseEcho } from '../utils/echo';
 
 export const usePosPpob = ({ authToken, branchId, terminalInfo, setAlertMsg }) => {
   const [isPpobMenuOpen, setIsPpobMenuOpen] = useState(false);
@@ -46,6 +46,11 @@ export const usePosPpob = ({ authToken, branchId, terminalInfo, setAlertMsg }) =
     }
   }, [authToken, fetchPpobTransactions]);
 
+  const fetchPpobRef = useRef(fetchPpobTransactions);
+  fetchPpobRef.current = fetchPpobTransactions;
+  const setAlertMsgRef = useRef(setAlertMsg);
+  setAlertMsgRef.current = setAlertMsg;
+
   // Real-time WebSocket Listeners via Laravel Reverb
   useEffect(() => {
     if (!authToken || !branchId) return;
@@ -74,14 +79,14 @@ export const usePosPpob = ({ authToken, branchId, terminalInfo, setAlertMsg }) =
 
             // If not found in current list, refetch in background
             if (!found) {
-              fetchPpobTransactions(true);
+              fetchPpobRef.current(true);
             }
             return next;
           });
 
           // Show non-blocking alert if status changed to Gagal
           if (updatedPpob.status === 'Gagal' && updatedPpob.refund_status !== 'REFUNDED') {
-            setAlertMsg({
+            setAlertMsgRef.current({
               text: `⚠️ PPOB GAGAL: ${updatedPpob.buyer_sku_code} (${updatedPpob.customer_no}) ditolak operator. Silakan lakukan refund jika konsumen klaim.`,
               type: 'warning',
               persist: true
@@ -97,10 +102,11 @@ export const usePosPpob = ({ authToken, branchId, terminalInfo, setAlertMsg }) =
       if (echoInstance) {
         try {
           echoInstance.leave(`branch.${branchId}.ppob`);
+          releaseEcho(echoInstance);
         } catch (e) {}
       }
     };
-  }, [authToken, branchId, fetchPpobTransactions, setAlertMsg]);
+  }, [authToken, branchId]);
 
   // Background Auto-Polling Fallback: Every 45s if there is any pending PPOB
   useEffect(() => {

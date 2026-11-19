@@ -11,8 +11,6 @@ class Stock extends Model
 {
     use HasUuids, LogsActivity;
 
-    protected $touches = ['product'];
-
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -40,6 +38,12 @@ class Stock extends Model
             }
         });
 
+        static::created(function ($stock) {
+            if ($stock->product_id) {
+                $stock->product?->searchable();
+            }
+        });
+
         static::deleted(function ($stock) {
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             if ($stock->branch_id) {
@@ -49,6 +53,9 @@ class Stock extends Model
                 // Broadcast stock update (as 0)
                 $stock->quantity_on_hand = 0;
                 event(new \App\Events\StockUpdated($stock));
+            }
+            if ($stock->product_id) {
+                $stock->product?->searchable();
             }
         });
     }

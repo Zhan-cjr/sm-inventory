@@ -14,14 +14,16 @@ class ProductUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $product;
+    public array $productData;
 
     /**
      * Create a new event instance.
      */
     public function __construct($product)
     {
-        $this->product = $product;
+        $this->productData = $product instanceof \Illuminate\Database\Eloquent\Model
+            ? $product->toArray()
+            : (array) $product;
     }
 
     /**
@@ -40,7 +42,7 @@ class ProductUpdated implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-            'product' => $this->product->toArray(),
+            'product' => $this->productData,
         ];
     }
 

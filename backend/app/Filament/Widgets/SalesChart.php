@@ -11,6 +11,7 @@ class SalesChart extends ChartWidget
 {
     use InteractsWithPageFilters;
 
+    protected ?string $pollingInterval = null;
     protected ?string $heading = 'Tren Penjualan (7 Hari Terakhir)';
     protected static ?int $sort = 2;
 

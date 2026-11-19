@@ -15,6 +15,8 @@ class StatsOverview extends BaseWidget
 {
     use InteractsWithPageFilters;
 
+    protected ?string $pollingInterval = null;
+
     protected function getStats(): array
     {
         $today = now()->startOfDay();

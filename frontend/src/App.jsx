@@ -237,10 +237,17 @@ function App() {
         })
         .catch(err => {
           clearTimeout(timeoutId);
-          console.warn('Failed to refresh user profile:', err.message);
+          if (err.name !== 'AbortError') {
+            console.warn('Failed to refresh user profile:', err.message);
+          }
         });
+
+      return () => {
+        clearTimeout(timeoutId);
+        controller.abort();
+      };
     }
-  }, [token, user, deviceStatus, deviceInfo]);
+  }, [token, deviceStatus, deviceInfo?.branchId, deviceInfo?.branchName]);
 
   const handleLoginSuccess = (newToken, userData) => {
     // Strict Branch verification before setting session

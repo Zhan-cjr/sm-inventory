@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { initEcho } from '../utils/echo';
+import { useState, useEffect, useRef } from 'react';
+import { initEcho, releaseEcho } from '../utils/echo';
 import { idbCache } from '../utils/idbCache';
 import { DiscountEngine } from '../utils/DiscountEngine';
 
@@ -56,10 +56,23 @@ export const usePosCatalog = ({
     parseInt(localStorage.getItem('pos_server_offset') || '0', 10)
   );
 
+  const setItemsRef = useRef(setItems);
+  setItemsRef.current = setItems;
+  const idbPersistTimerRef = useRef(null);
+
   // --- Real-time WebSockets Integration (Laravel Reverb) ---
   useEffect(() => {
     if (branchId && authToken) {
       let echoInstance = null;
+      const scheduleIdbPersist = (productsSnapshot) => {
+        if (idbPersistTimerRef.current) {
+          clearTimeout(idbPersistTimerRef.current);
+        }
+        idbPersistTimerRef.current = setTimeout(() => {
+          idbCache.set('pos_cached_products', productsSnapshot).catch(() => {});
+        }, 2000);
+      };
+
       try {
         echoInstance = initEcho(authToken);
 
@@ -67,7 +80,7 @@ export const usePosCatalog = ({
         echoInstance
           .private(`branch.${branchId}.stock`)
           .listen('.stock.updated', (e) => {
-            console.log('[WebSockets] StockUpdated received:', e);
+            if (import.meta.env?.DEV) console.log('[WebSockets] StockUpdated received:', e);
             setDbProducts((prev) => {
               const updated = prev.map((p) => {
                 if (p.id === e.product_id) {
@@ -84,7 +97,7 @@ export const usePosCatalog = ({
                 return p;
               });
 
-              idbCache.set('pos_cached_products', updated).catch(() => {});
+              scheduleIdbPersist(updated);
               return updated;
             });
 
@@ -94,7 +107,7 @@ export const usePosCatalog = ({
               e.selling_price !== undefined &&
               parseFloat(e.selling_price) > 0
             ) {
-              setItems((prevItems) =>
+              setItemsRef.current((prevItems) =>
                 prevItems.map((item) => {
                   if (item.productId === e.product_id) {
                     return { ...item, unitPrice: parseFloat(e.selling_price) };
@@ -109,12 +122,12 @@ export const usePosCatalog = ({
         echoInstance
           .private(`branch.${branchId}.transactions`)
           .listen('.transaction.created', (e) => {
-            console.log('[WebSockets] TransactionCreated received from another terminal:', e);
+            if (import.meta.env?.DEV) console.log('[WebSockets] TransactionCreated received from another terminal:', e);
           });
 
         // Listen for Global Catalog Updates (e.g. price change)
         echoInstance.channel(`catalog`).listen('.product.updated', (e) => {
-          console.log('[WebSockets] ProductUpdated received (Price/Details change):', e);
+          if (import.meta.env?.DEV) console.log('[WebSockets] ProductUpdated received (Price/Details change):', e);
           if (e.product) {
             setDbProducts((prev) => {
               const updated = prev.map((p) => {
@@ -123,9 +136,25 @@ export const usePosCatalog = ({
                 }
                 return p;
               });
-              idbCache.set('pos_cached_products', updated).catch(() => {});
+              scheduleIdbPersist(updated);
               return updated;
             });
+
+            // Perbarui juga harga item di keranjang jika master produk diubah
+            if (
+              e.product.selling_price !== null &&
+              e.product.selling_price !== undefined &&
+              parseFloat(e.product.selling_price) > 0
+            ) {
+              setItemsRef.current((prevItems) =>
+                prevItems.map((item) => {
+                  if (item.productId === e.product.id) {
+                    return { ...item, unitPrice: parseFloat(e.product.selling_price) };
+                  }
+                  return item;
+                })
+              );
+            }
           }
         });
       } catch (err) {
@@ -133,15 +162,19 @@ export const usePosCatalog = ({
       }
 
       return () => {
+        if (idbPersistTimerRef.current) {
+          clearTimeout(idbPersistTimerRef.current);
+          idbPersistTimerRef.current = null;
+        }
         if (echoInstance) {
           echoInstance.leave(`branch.${branchId}.stock`);
           echoInstance.leave(`branch.${branchId}.transactions`);
           echoInstance.leave(`catalog`);
-          echoInstance.disconnect();
+          releaseEcho(echoInstance);
         }
       };
     }
-  }, [branchId, authToken, setItems]);
+  }, [branchId, authToken]);
 
   // --- Initial & Periodic Catalog Synchronization ---
   useEffect(() => {

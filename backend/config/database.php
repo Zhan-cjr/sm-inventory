@@ -60,7 +60,7 @@ return [
             'strict'         => true,
             'engine'         => null,
             'options'        => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::ATTR_PERSISTENT        => true,   // Persistent connections — lebih cepat
+                PDO::ATTR_PERSISTENT        => (bool) env('DB_PERSISTENT', false),
                 (defined('Pdo\Mysql::ATTR_INIT_COMMAND') ? Pdo\Mysql::ATTR_INIT_COMMAND : (defined('PDO::MYSQL_ATTR_INIT_COMMAND') ? PDO::MYSQL_ATTR_INIT_COMMAND : 1002)) => 'SET NAMES utf8mb4',
             ]) : [],
         ],

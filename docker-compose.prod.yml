@@ -42,6 +42,9 @@ services:
       REDIS_HOST: redis
       MEILISEARCH_HOST: http://meilisearch:7700
       AI_SERVICE_URL: http://ai-service:8001
+      PHP_FPM_MAX_CHILDREN: ${PHP_FPM_MAX_CHILDREN:-50}
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: ${PHP_OPCACHE_VALIDATE_TIMESTAMPS:-1}
+      PHP_OPCACHE_REVALIDATE_FREQ: ${PHP_OPCACHE_REVALIDATE_FREQ:-10}
     depends_on:
       redis:
         condition: service_started
@@ -72,7 +75,7 @@ services:
       dockerfile: Dockerfile.prod
     container_name: sm_queue_worker
     restart: unless-stopped
-    command: su -s /bin/bash www-data -c "php artisan queue:work --tries=3 --timeout=3600"
+    command: su -s /bin/bash www-data -c "php artisan queue:work --tries=3 --timeout=3600 --memory=256 --max-jobs=1000 --max-time=3600"
     volumes:
       - ./backend:/var/www/html
     env_file:
@@ -91,6 +94,7 @@ services:
       dockerfile: Dockerfile
     container_name: sm_ai_service
     restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --workers 4
     ports:
       - "8001:8001"
     volumes:

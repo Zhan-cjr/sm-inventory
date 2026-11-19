@@ -14,14 +14,22 @@ class StockUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $stock;
+    public $branchId;
+    public $productId;
+    public $quantityOnHand;
+    public $sellingPrice;
+    public $costPrice;
 
     /**
      * Create a new event instance.
      */
     public function __construct(\App\Models\Stock $stock)
     {
-        $this->stock = $stock;
+        $this->branchId = $stock->branch_id;
+        $this->productId = $stock->product_id;
+        $this->quantityOnHand = $stock->quantity_on_hand;
+        $this->sellingPrice = $stock->selling_price;
+        $this->costPrice = $stock->cost_price;
     }
 
     /**
@@ -32,7 +40,7 @@ class StockUpdated implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('branch.' . $this->stock->branch_id . '.stock'),
+            new PrivateChannel('branch.' . $this->branchId . '.stock'),
         ];
     }
 
@@ -42,10 +50,10 @@ class StockUpdated implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-            'product_id' => $this->stock->product_id,
-            'quantity_on_hand' => $this->stock->quantity_on_hand,
-            'selling_price' => $this->stock->selling_price,
-            'cost_price' => $this->stock->cost_price,
+            'product_id' => $this->productId,
+            'quantity_on_hand' => $this->quantityOnHand,
+            'selling_price' => $this->sellingPrice,
+            'cost_price' => $this->costPrice,
         ];
     }
 

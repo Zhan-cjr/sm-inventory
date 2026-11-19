@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { usePosShortcuts } from '../hooks/usePosShortcuts';
 import { usePosCatalog } from '../hooks/usePosCatalog';
@@ -127,11 +127,11 @@ export const POSTransaction = ({
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
   };
 
-  const handleSetItems = (updater) => {
+  const handleSetItems = useCallback((updater) => {
     if (typeof cartSetItemsRef.current === 'function') {
       cartSetItemsRef.current(updater);
     }
-  };
+  }, []);
 
   const [isSubtotalMode, setIsSubtotalMode] = useState(false);
 

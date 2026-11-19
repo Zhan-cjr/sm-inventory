@@ -62,25 +62,44 @@ class User extends Authenticatable implements FilamentUser
         return $this->can('akses_backend_admin') || $this->can('AksesBackendAdmin');
     }
 
+    protected ?array $memoizedCustomAuthorizations = null;
+    protected bool $customAuthorizationsRefreshed = false;
+
     public function hasCustomAuthorization(string $action): bool
     {
+        if ($this->memoizedCustomAuthorizations !== null) {
+            if (in_array($action, $this->memoizedCustomAuthorizations, true)) {
+                return true;
+            }
+            if ($this->customAuthorizationsRefreshed) {
+                return false;
+            }
+        }
+
         $auths = $this->custom_authorizations;
         if (is_string($auths)) {
             $auths = json_decode($auths, true) ?: [];
         }
-        if (is_array($auths) && in_array($action, $auths)) {
+        $auths = is_array($auths) ? $auths : [];
+        $this->memoizedCustomAuthorizations = $auths;
+
+        if (in_array($action, $auths, true)) {
             return true;
         }
 
-        // Cek langsung ke database jika data session belum direfresh
-        if ($this->exists && !empty($this->id)) {
+        // Cek langsung ke database maksimal 1x per request jika data session belum direfresh
+        if ($this->exists && !empty($this->id) && !$this->customAuthorizationsRefreshed) {
+            $this->customAuthorizationsRefreshed = true;
             $dbAuths = \Illuminate\Support\Facades\DB::table('users')->where('id', $this->id)->value('custom_authorizations');
             if ($dbAuths) {
                 if (is_string($dbAuths)) {
                     $dbAuths = json_decode($dbAuths, true) ?: [];
                 }
-                if (is_array($dbAuths) && in_array($action, $dbAuths)) {
-                    return true;
+                if (is_array($dbAuths)) {
+                    $this->memoizedCustomAuthorizations = $dbAuths;
+                    if (in_array($action, $dbAuths, true)) {
+                        return true;
+                    }
                 }
             }
         }
