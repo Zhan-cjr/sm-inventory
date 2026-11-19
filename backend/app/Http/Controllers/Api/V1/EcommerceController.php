@@ -249,7 +249,10 @@ class EcommerceController extends Controller
     public function getBranches()
     {
         $branches = \Illuminate\Support\Facades\Cache::remember('ecommerce_branches', 86400, function () {
-            return Branch::where('is_active', true)->get()->toArray();
+            return Branch::where('is_active', true)
+                ->where('is_legacy_system', false)
+                ->get()
+                ->toArray();
         });
         return response()->json($branches);
     }

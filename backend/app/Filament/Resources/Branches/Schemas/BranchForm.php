@@ -31,6 +31,10 @@ class BranchForm
                     ->searchable(),
                 Toggle::make('is_active')
                     ->required(),
+                Toggle::make('is_legacy_system')
+                    ->label('Cabang Aplikasi Lama (Legacy)')
+                    ->helperText('Aktifkan jika cabang masih memakai aplikasi lama. Tetap muncul sebagai tujuan Surat Jalan (Stock Transfer), tetapi tidak menambah stok/jurnal masuk di SM Inventory dan disembunyikan dari E-Commerce.')
+                    ->default(false),
                 TextInput::make('latitude')
                     ->numeric()
                     ->required()

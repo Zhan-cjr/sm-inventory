@@ -70,34 +70,39 @@ class StockTransferService
 
         DB::beginTransaction();
         try {
+            $transfer->loadMissing('toBranch', 'items');
+            $isLegacyDestination = (bool) ($transfer->toBranch?->is_legacy_system ?? false);
+
             $transfer->status = 'received';
             $transfer->received_date = now()->toDateString();
             $transfer->received_by = $userId;
             $transfer->save();
 
-            foreach ($transfer->items as $item) {
-                $stock = Stock::firstOrCreate(
-                    [
-                        'branch_id' => $transfer->to_branch_id,
-                        'product_id' => $item->product_id,
-                    ],
-                    [
-                        'id' => Str::uuid()->toString(),
-                        'quantity_on_hand' => 0,
-                    ]
-                );
+            if (!$isLegacyDestination) {
+                foreach ($transfer->items as $item) {
+                    $stock = Stock::firstOrCreate(
+                        [
+                            'branch_id' => $transfer->to_branch_id,
+                            'product_id' => $item->product_id,
+                        ],
+                        [
+                            'id' => Str::uuid()->toString(),
+                            'quantity_on_hand' => 0,
+                        ]
+                    );
 
-                $stock->quantity_on_hand += $item->quantity;
-                $stock->log_type = 'TRANSFER_IN';
-                $stock->reason_code = 'STOCK_TRANSFER';
-                $stock->reference_doc_type = 'STOCK_TRANSFER';
-                $stock->reference_doc_id = $transfer->transfer_number ?: $transfer->id;
-                $stock->recorded_by = $userId;
-                $stock->notes = "Transfer in from Branch ID: {$transfer->from_branch_id}";
-                $stock->save();
+                    $stock->quantity_on_hand += $item->quantity;
+                    $stock->log_type = 'TRANSFER_IN';
+                    $stock->reason_code = 'STOCK_TRANSFER';
+                    $stock->reference_doc_type = 'STOCK_TRANSFER';
+                    $stock->reference_doc_id = $transfer->transfer_number ?: $transfer->id;
+                    $stock->recorded_by = $userId;
+                    $stock->notes = "Transfer in from Branch ID: {$transfer->from_branch_id}";
+                    $stock->save();
+                }
             }
 
-            // Catat jurnal akuntansi
+            // Catat jurnal akuntansi (otomatis hanya JV-TF-OUT jika tujuan adalah cabang aplikasi lama)
             app(\App\Services\AccountingService::class)->recordStockTransferJournal($transfer);
 
             DB::commit();

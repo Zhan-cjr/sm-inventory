@@ -71,8 +71,10 @@ class StockTransfer extends Model
                 }
             }
 
-            if ($transfer->status === 'received') {
-                // 2. Tarik kembali/kurangi stok di cabang tujuan (karena status received sudah menambah tujuan)
+            $isLegacyDestination = (bool) ($transfer->toBranch?->is_legacy_system ?? false);
+
+            if ($transfer->status === 'received' && !$isLegacyDestination) {
+                // 2. Tarik kembali/kurangi stok di cabang tujuan (hanya untuk cabang SM Inventory)
                 foreach ($transfer->items as $item) {
                     $stockDest = \App\Models\Stock::firstOrCreate(
                         ['branch_id' => $transfer->to_branch_id, 'product_id' => $item->product_id],

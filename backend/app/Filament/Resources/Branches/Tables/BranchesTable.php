@@ -35,6 +35,11 @@ class BranchesTable
                     ->searchable(),
                 IconColumn::make('is_active')
                     ->boolean(),
+                TextColumn::make('is_legacy_system')
+                    ->label('Sistem')
+                    ->badge()
+                    ->formatStateUsing(fn ($state) => $state ? 'Aplikasi Lama' : 'SM Inventory')
+                    ->color(fn ($state) => $state ? 'warning' : 'success'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

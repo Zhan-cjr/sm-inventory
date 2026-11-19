@@ -970,6 +970,10 @@ class AccountingService
             return false;
         }
 
+        $transfer->loadMissing('fromBranch', 'toBranch', 'items.product');
+        $isLegacyDestination = (bool) ($transfer->toBranch?->is_legacy_system ?? false);
+        $destBranchLabel = $transfer->toBranch?->name ?? 'Cabang Tujuan';
+
         // ============================================
         // 1. Jurnal untuk Cabang Asal (Pengurang Stok)
         // ============================================
@@ -984,7 +988,7 @@ class AccountingService
                 'branch_id' => $transfer->from_branch_id,
                 'reference_number' => 'JV-TF-OUT-' . $transfer->reference_number,
                 'entry_date' => $transfer->received_date ?? now(),
-                'description' => 'Transfer Keluar Stok ke Cabang Tujuan: ' . $transfer->reference_number,
+                'description' => 'Transfer Keluar Stok ke ' . $destBranchLabel . ($isLegacyDestination ? ' (Aplikasi Lama)' : '') . ': ' . $transfer->reference_number,
                 'status' => 'posted',
                 'created_by' => $transfer->received_by ?? (auth()->check() ? auth()->id() : null),
                 'journalable_id' => $transfer->id,
@@ -1008,6 +1012,11 @@ class AccountingService
                 'debit' => 0,
                 'credit' => $totalValue,
             ]);
+        }
+
+        // Cabang aplikasi lama tidak dikelola stok/jurnal masuknya di SM Inventory
+        if ($isLegacyDestination) {
+            return true;
         }
 
         // ============================================

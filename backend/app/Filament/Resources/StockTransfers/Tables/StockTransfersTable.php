@@ -26,7 +26,9 @@ class StockTransfersTable
             ->columns([
                 TextColumn::make('reference_number')->searchable(),
                 TextColumn::make('fromBranch.name')->label('Dari Cabang'),
-                TextColumn::make('toBranch.name')->label('Ke Cabang'),
+                TextColumn::make('toBranch.name')
+                    ->label('Ke Cabang')
+                    ->description(fn ($record) => $record->toBranch?->is_legacy_system ? 'Aplikasi Lama (Surat Jalan)' : null),
                 TextColumn::make('transfer_date')->date(),
                 TextColumn::make('total_amount')
                     ->label('Nominal')
@@ -87,13 +89,50 @@ class StockTransfersTable
                         $service->markAsInTransit($record, \Illuminate\Support\Facades\Auth::id());
                     }),
                 Action::make('Terima')
+                    ->label(fn ($record) => $record->toBranch?->is_legacy_system ? 'Selesai (Legacy)' : 'Terima')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->requiresConfirmation()
+                    ->modalHeading(fn ($record) => $record->toBranch?->is_legacy_system
+                        ? 'Konfirmasi Surat Jalan Diterima (Cabang Aplikasi Lama)'
+                        : 'Konfirmasi Penerimaan Transfer Stok')
+                    ->modalDescription(fn ($record) => $record->toBranch?->is_legacy_system
+                        ? 'Cabang tujuan masih memakai aplikasi lama. Stok cabang tujuan TIDAK akan ditambah di SM Inventory dan sistem hanya mencatat jurnal keluar (JV-TF-OUT) pada cabang pengirim.'
+                        : 'Stok akan ditambahkan ke cabang tujuan dan jurnal transfer masuk/keluar akan dicatat.')
                     ->visible(fn ($record) => $record->status === 'in_transit')
                     ->action(function ($record) {
                         $service = new StockTransferService();
                         $service->markAsReceived($record, \Illuminate\Support\Facades\Auth::id());
+                    }),
+                Action::make('export_csv_items')
+                    ->label('CSV Item')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('gray')
+                    ->tooltip('Unduh daftar item Surat Jalan (CSV) untuk input di aplikasi lama')
+                    ->action(function (\App\Models\StockTransfer $record) {
+                        $record->loadMissing('items.product', 'fromBranch', 'toBranch');
+                        $filename = 'surat-jalan-' . preg_replace('/[^A-Za-z0-9\-_]/', '_', $record->reference_number) . '.csv';
+
+                        return response()->streamDownload(function () use ($record) {
+                            $out = fopen('php://output', 'w');
+                            fputcsv($out, ['No Referensi', 'Dari Cabang', 'Ke Cabang', 'Tanggal', 'SKU', 'Barcode', 'Nama Produk', 'Qty', 'HPP', 'Subtotal']);
+                            foreach ($record->items as $item) {
+                                $cost = (float) ($item->product?->cost_price ?? 0);
+                                fputcsv($out, [
+                                    $record->reference_number,
+                                    $record->fromBranch?->name ?? '',
+                                    $record->toBranch?->name ?? '',
+                                    $record->transfer_date,
+                                    $item->product?->sku ?? '',
+                                    $item->product?->barcode ?? '',
+                                    $item->product?->name ?? '',
+                                    $item->quantity,
+                                    $cost,
+                                    $item->quantity * $cost,
+                                ]);
+                            }
+                            fclose($out);
+                        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
                     }),
             ])
             ->bulkActions([
