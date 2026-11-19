@@ -36,6 +36,7 @@ services:
       - "8080:8080"
     volumes:
       - ./backend:/var/www/html
+      - ./backend/docker-entrypoint.prod.sh:/usr/local/bin/docker-entrypoint.sh:ro
     env_file:
       - ./backend/.env
     environment:
@@ -63,6 +64,7 @@ services:
       - "8085:8085"
     volumes:
       - ./backend:/var/www/html
+      - ./backend/docker-entrypoint.prod.sh:/usr/local/bin/docker-entrypoint.sh:ro
     env_file:
       - ./backend/.env
     depends_on:
@@ -78,6 +80,7 @@ services:
     command: su -s /bin/bash www-data -c "php artisan queue:work --tries=3 --timeout=3600 --memory=256 --max-jobs=1000 --max-time=3600"
     volumes:
       - ./backend:/var/www/html
+      - ./backend/docker-entrypoint.prod.sh:/usr/local/bin/docker-entrypoint.sh:ro
     env_file:
       - ./backend/.env
     environment:
