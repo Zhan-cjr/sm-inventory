@@ -22,18 +22,19 @@ class StatsOverview extends BaseWidget
         $today = now()->startOfDay();
         $branchId = auth()->user()->branch_id ?? $this->filters['branch_id'] ?? null;
         
-        $todayTransactions = Transaction::where('created_at', '>=', $today)
-            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get();
+        $todayQuery = Transaction::where('created_at', '>=', $today)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId));
 
-        $salesToday = (float) $todayTransactions->sum('final_amount');
-        $transCount = $todayTransactions->count();
+        $todayAgg = (clone $todayQuery)
+            ->selectRaw('COALESCE(SUM(final_amount), 0) as sales_today, COUNT(id) as trans_count')
+            ->first();
 
-        // Calculate Gross Profit & Margin
-        $cogsToday = 0;
-        foreach ($todayTransactions as $tx) {
-            $cogsToday += $tx->cogs;
-        }
+        $salesToday = (float) ($todayAgg->sales_today ?? 0);
+        $transCount = (int) ($todayAgg->trans_count ?? 0);
+
+        // Calculate Gross Profit & Margin (Batch SQL — 1 query)
+        $todayTxIds = (clone $todayQuery)->pluck('id')->all();
+        $cogsToday = Transaction::calculateTotalCogsForIds($todayTxIds);
 
         $grossProfitToday = max(0, $salesToday - $cogsToday);
         $profitMargin = $salesToday > 0 ? round(($grossProfitToday / $salesToday) * 100, 1) : 0;
@@ -44,19 +45,19 @@ class StatsOverview extends BaseWidget
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->count();
 
-        // Dead Stock Count (Stock > 0 but 0 sales in 60 days)
+        // Dead Stock Count (Stock > 0 but 0 sales in 60 days — menggunakan NOT EXISTS agar hemat RAM)
         $sixtyDaysAgo = Carbon::now()->subDays(60);
-        $recentActiveProductIds = DB::table('transaction_items')
-            ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
-            ->where('transactions.created_at', '>=', $sixtyDaysAgo)
-            ->when($branchId, fn($q) => $q->where('transactions.branch_id', $branchId))
-            ->pluck('transaction_items.product_id')
-            ->unique();
-
         $deadStockCount = Stock::where('is_active', true)
             ->where('quantity_on_hand', '>', 0)
-            ->whereNotIn('product_id', $recentActiveProductIds)
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->whereNotExists(function ($sub) use ($sixtyDaysAgo, $branchId) {
+                $sub->select(DB::raw(1))
+                    ->from('transaction_items')
+                    ->join('transactions', 'transaction_items.transaction_id', '=', 'transactions.id')
+                    ->whereColumn('transaction_items.product_id', 'stocks.product_id')
+                    ->where('transactions.created_at', '>=', $sixtyDaysAgo)
+                    ->when($branchId, fn($q) => $q->where('transactions.branch_id', $branchId));
+            })
             ->count();
 
         return [

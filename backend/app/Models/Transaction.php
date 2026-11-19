@@ -80,41 +80,63 @@ class Transaction extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    /**
+     * Hitung total COGS (HPP) untuk sekumpulan ID transaksi secara batch dalam 1 query SQL
+     * (menghilangkan N+1 pada Dashboard, StatsOverview, dan Laporan).
+     */
+    public static function calculateTotalCogsForIds(array $transactionIds): float
+    {
+        if (empty($transactionIds)) {
+            return 0.0;
+        }
+
+        $total = 0.0;
+
+        foreach (array_chunk(array_values(array_unique($transactionIds)), 1000) as $chunk) {
+            $batchSub = \Illuminate\Support\Facades\DB::table('stock_batch_deductions as sbd')
+                ->join('stock_batches as sb', 'sbd.stock_batch_id', '=', 'sb.id')
+                ->join('transaction_items as ti_sub', 'sbd.transaction_item_id', '=', 'ti_sub.id')
+                ->whereIn('ti_sub.transaction_id', $chunk)
+                ->groupBy('sbd.transaction_item_id')
+                ->selectRaw('sbd.transaction_item_id, SUM(sbd.quantity * sb.cost_price) as batch_cogs');
+
+            $chunkTotal = \Illuminate\Support\Facades\DB::table('transaction_items as ti')
+                ->join('transactions as t', 'ti.transaction_id', '=', 't.id')
+                ->leftJoinSub($batchSub, 'bd', function ($join) {
+                    $join->on('ti.id', '=', 'bd.transaction_item_id');
+                })
+                ->leftJoin('stocks as st', function ($join) {
+                    $join->on('st.product_id', '=', 'ti.product_id')
+                        ->on('st.branch_id', '=', 't.branch_id');
+                })
+                ->leftJoin('products as p', 'p.id', '=', 'ti.product_id')
+                ->whereIn('ti.transaction_id', $chunk)
+                ->whereNotNull('ti.product_id')
+                ->selectRaw('COALESCE(SUM(CASE
+                    WHEN COALESCE(bd.batch_cogs, 0) > 0 THEN bd.batch_cogs
+                    ELSE ti.quantity * (CASE
+                        WHEN COALESCE(st.cost_price_tax, 0) > 0 THEN st.cost_price_tax
+                        WHEN COALESCE(st.cost_price, 0) > 0 THEN st.cost_price
+                        WHEN COALESCE(p.cost_price_tax, 0) > 0 THEN p.cost_price_tax
+                        WHEN COALESCE(p.cost_price, 0) > 0 THEN p.cost_price
+                        ELSE 0
+                    END)
+                END), 0) as total_cogs')
+                ->value('total_cogs');
+
+            $total += (float) ($chunkTotal ?? 0);
+        }
+
+        return $total;
+    }
+
     public function getCogsAttribute()
     {
-        return $this->items->sum(function ($item) {
-            if (!$item->product_id) {
-                return 0;
-            }
+        if (empty($this->id)) {
+            return 0.0;
+        }
 
-            // 1. Cek stock_batch_deductions (FIFO Riil)
-            $batchCogs = \Illuminate\Support\Facades\DB::table('stock_batch_deductions')
-                ->join('stock_batches', 'stock_batch_deductions.stock_batch_id', '=', 'stock_batches.id')
-                ->where('stock_batch_deductions.transaction_item_id', $item->id)
-                ->sum(\Illuminate\Support\Facades\DB::raw('stock_batch_deductions.quantity * stock_batches.cost_price'));
-
-            if ($batchCogs > 0) {
-                return (float) $batchCogs;
-            }
-
-            // 2. Fallback seperti di Laporan HPP
-            $stock = \App\Models\Stock::where('product_id', $item->product_id)
-                ->where('branch_id', $this->branch_id)
-                ->first();
-
-            $stCostPriceTax = $stock ? $stock->cost_price_tax : 0;
-            $stCostPrice = $stock ? $stock->cost_price : 0;
-            $pCostPriceTax = $item->product ? $item->product->cost_price_tax : 0;
-            $pCostPrice = $item->product ? $item->product->cost_price : 0;
-            
-            // Prioritas: st.cost_price_tax > st.cost_price > p.cost_price_tax > p.cost_price
-            $fallbackPrice = $stCostPriceTax > 0 ? $stCostPriceTax : 
-                ($stCostPrice > 0 ? $stCostPrice : 
-                ($pCostPriceTax > 0 ? $pCostPriceTax : 
-                ($pCostPrice > 0 ? $pCostPrice : 0)));
-
-            return $item->quantity * (float) $fallbackPrice;
-        });
+        return static::calculateTotalCogsForIds([$this->id]);
     }
 
     public function getGrossProfitAttribute()

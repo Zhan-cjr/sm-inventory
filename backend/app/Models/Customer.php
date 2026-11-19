@@ -29,11 +29,13 @@ class Customer extends Model
 
     public function getTierDiscountPercentAttribute()
     {
-        $tier = \App\Models\MemberTier::where('organization_id', $this->organization_id)
-            ->where('name', $this->member_tier)
-            ->first();
+        if (empty($this->member_tier)) {
+            return 0;
+        }
 
-        return $tier ? (float) $tier->discount_percent : 0;
+        $map = \App\Models\MemberTier::getDiscountMap($this->organization_id);
+
+        return $map[strtoupper((string) $this->member_tier)] ?? 0;
     }
 
     protected static function boot()

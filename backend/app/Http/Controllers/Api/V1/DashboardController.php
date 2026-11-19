@@ -41,13 +41,13 @@ class DashboardController extends Controller
         $todaySales = (float) ($todayAgg->today_sales ?? 0);
         $todayCount = (int) ($todayAgg->today_count ?? 0);
 
-        // 2. Hitung COGS Hari Ini dari transaksi yang aktif
-        $todayTransactions = Transaction::where('branch_id', $branchId)
+        // 2. Hitung COGS Hari Ini secara batch (1 query SQL)
+        $todayTxIds = Transaction::where('branch_id', $branchId)
             ->whereBetween('transaction_date', [$todayStart, $todayEnd])
             ->where('is_voided', false)
-            ->with(['items.product'])
-            ->get();
-        $todayCogs = (float) $todayTransactions->sum('cogs');
+            ->pluck('id')
+            ->all();
+        $todayCogs = Transaction::calculateTotalCogsForIds($todayTxIds);
 
         $grossProfit = $todaySales - $todayCogs;
         $profitMargin = $todaySales > 0 ? ($grossProfit / $todaySales) * 100 : 0;

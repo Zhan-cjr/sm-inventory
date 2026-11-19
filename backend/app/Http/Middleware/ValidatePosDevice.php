@@ -46,8 +46,28 @@ class ValidatePosDevice
             ], 403);
         }
 
-        // 4. Query the device in the database
-        $device = PosDevice::where('device_uuid', $deviceUuid)->first();
+        // 4. Query the device (cached as plain array in Redis for 5 minutes — Laravel 13 safe; auto-invalidated on PosDevice save/delete)
+        $cacheKey = PosDevice::cacheKey($deviceUuid);
+        $device = null;
+        try {
+            $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+            if (is_array($cached) && !empty($cached['id'])) {
+                $device = (new PosDevice())->newFromBuilder($cached);
+            }
+        } catch (\Throwable) {
+            $device = null;
+        }
+
+        if (!$device) {
+            $device = PosDevice::where('device_uuid', $deviceUuid)->first();
+            if ($device) {
+                try {
+                    \Illuminate\Support\Facades\Cache::put($cacheKey, $device->getAttributes(), 300);
+                } catch (\Throwable) {
+                    // Abaikan jika cache sementara tidak tersedia
+                }
+            }
+        }
 
         if (!$device) {
             return response()->json([
