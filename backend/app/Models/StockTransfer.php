@@ -30,7 +30,7 @@ class StockTransfer extends Model
 
     public function toBranch()
     {
-        return $this->belongsTo(Branch::class, 'to_branch_id');
+        return $this->belongsTo(Branch::class, 'to_branch_id')->withoutGlobalScope('non_legacy');
     }
 
     public function creator()

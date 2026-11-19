@@ -11,6 +11,10 @@ class Branch extends Model
 
     protected static function booted()
     {
+        static::addGlobalScope('non_legacy', function (\Illuminate\Database\Eloquent\Builder $builder) {
+            $builder->where($builder->qualifyColumn('is_legacy_system'), false);
+        });
+
         static::saved(function ($branch) {
             \Illuminate\Support\Facades\Cache::forget('ecommerce_branches');
         });
@@ -18,6 +22,14 @@ class Branch extends Model
         static::deleted(function ($branch) {
             \Illuminate\Support\Facades\Cache::forget('ecommerce_branches');
         });
+    }
+
+    /**
+     * Include legacy-system branches (used in Master Cabang & Stock Transfer destination).
+     */
+    public static function withLegacy(): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::withoutGlobalScope('non_legacy');
     }
 
     protected $fillable = [

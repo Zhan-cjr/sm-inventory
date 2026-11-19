@@ -76,8 +76,8 @@
                         <td>
                             <select class="pos-input" wire:model="to_branch_id" style="border-color: #3b82f6;">
                                 <option value="">Pilih Cabang Tujuan...</option>
-                                @foreach($branches as $branch)
-                                    <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                @foreach($destinationBranches as $branch)
+                                    <option value="{{ $branch->id }}">{{ $branch->name }}@if($branch->is_legacy_system) (Aplikasi Lama)@endif</option>
                                 @endforeach
                             </select>
                         </td>

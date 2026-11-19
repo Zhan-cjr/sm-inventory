@@ -523,7 +523,8 @@ class StockTransferPos extends Component
     public function render()
     {
         return view('livewire.stock-transfer-pos', [
-            'branches' => Branch::all(),
+            'branches' => Branch::orderBy('name')->get(),
+            'destinationBranches' => Branch::withLegacy()->orderBy('is_legacy_system')->orderBy('name')->get(),
         ]);
     }
 }

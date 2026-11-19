@@ -27,7 +27,8 @@ class StockTransferForm
                     ->searchable()
                     ->preload(),
                 Select::make('to_branch_id')
-                    ->relationship('toBranch', 'name')
+                    ->relationship('toBranch', 'name', fn ($query) => $query->withoutGlobalScope('non_legacy'))
+                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->name . ($record->is_legacy_system ? ' (Aplikasi Lama)' : ''))
                     ->required()
                     ->searchable()
                     ->preload(),

@@ -50,7 +50,12 @@ class StockTransfersTable
                     ->form([
                         Select::make('branch_id')
                             ->label('Cabang')
-                            ->options(\App\Models\Branch::pluck('name', 'id'))
+                            ->options(fn () => \App\Models\Branch::withLegacy()
+                                ->orderBy('is_legacy_system')
+                                ->orderBy('name')
+                                ->get()
+                                ->mapWithKeys(fn ($b) => [$b->id => $b->name . ($b->is_legacy_system ? ' (Aplikasi Lama)' : '')])
+                                ->all())
                             ->hidden(fn () => Auth::user()->branch_id !== null)
                     ])
                     ->query(function (Builder $query, array $data): Builder {
@@ -67,7 +72,7 @@ class StockTransfersTable
                         if (!$data['branch_id']) {
                             return null;
                         }
-                        return 'Cabang: ' . \App\Models\Branch::find($data['branch_id'])?->name;
+                        return 'Cabang: ' . \App\Models\Branch::withLegacy()->find($data['branch_id'])?->name;
                     }),
             ])
             ->recordActions([
