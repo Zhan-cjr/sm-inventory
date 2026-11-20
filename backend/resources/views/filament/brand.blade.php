@@ -3,21 +3,8 @@
 @endphp
 
 @if($isLogin)
-    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; margin-bottom: 0.5rem;">
-        <img src="{{ asset('logo-sm-inventory.png') }}" alt="SM Inventory" style="width: 76px; height: 76px; border-radius: 16px; object-fit: contain; box-shadow: 0 8px 24px rgba(0,0,0,0.12);" />
-        <div style="display: flex; flex-direction: column; align-items: center; line-height: 1.2;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 22px; font-weight: 800; letter-spacing: -0.025em; color: currentColor;">
-                    SM Inventory
-                </span>
-                <span style="display: inline-flex; align-items: center; padding: 2px 7px; font-size: 11px; font-weight: 700; background-color: rgba(16, 185, 129, 0.15); color: #10b981; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.3); line-height: 1;">
-                    ERP
-                </span>
-            </div>
-            <span style="font-size: 12px; font-weight: 500; color: #64748b; margin-top: 4px;">
-                Sistem Manajemen Ritel Terintegrasi
-            </span>
-        </div>
+    <div style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;">
+        <img src="{{ asset('logo-sm-inventory.png') }}" alt="SM Inventory" style="height: 5rem; width: 5rem; border-radius: 16px; object-fit: contain; box-shadow: 0 8px 24px rgba(0,0,0,0.12); display: block;" />
     </div>
 @else
     <div style="display: inline-flex; align-items: center; gap: 10px; text-align: left; vertical-align: middle;">

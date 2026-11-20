@@ -40,6 +40,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->brandName('SM Inventory ERP')
             ->brandLogo(fn () => view('filament.brand'))
+            ->brandLogoHeight(fn () => request()->routeIs('filament.admin.auth.login') || request()->is('*/login') || request()->is('login') ? '5.5rem' : '2.5rem')
             ->favicon(asset('logo-sm-inventory.png'))
             ->font('Plus Jakarta Sans', 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap')
             ->sidebarCollapsibleOnDesktop()
