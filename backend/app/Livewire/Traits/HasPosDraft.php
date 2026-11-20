@@ -113,7 +113,10 @@ trait HasPosDraft
         if ($draft && is_array($draft) && !empty($draft['cart'])) {
             $ignoredProperties = [
                 'purchaseOrder', 'goodsReceipt', 'purchaseReturn', 'stockAdjustment',
-                'po_number',
+                'po_number', 'po_date',
+                'adjustment_number', 'adjustment_date',
+                'return_number', 'return_date',
+                'receipt_number', 'receipt_date',
                 'searchResults', 'visibleColumns', 'faktur_image', 'existing_faktur_image',
                 'scan_image', 'purchaseOrdersList', 'purchaseOrders',
                 'promoFile', 'parsedPromoItems', 'excelSheets', 'excelColumns',

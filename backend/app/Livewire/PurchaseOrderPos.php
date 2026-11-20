@@ -169,8 +169,9 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
             // Load draft if not editing existing PO
             $this->loadDraft();
-            // Ensure stale cached draft never restores an old po_number
+            // Ensure stale cached draft never restores an old po_number or stale date
             $this->po_number = 'AUTO-GENERATED';
+            $this->po_date = date('Y-m-d');
         }
 
         $this->calculateTotals();
@@ -855,10 +856,11 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
         if ($this->purchaseOrder) {
             unset($data['created_by']);
-            // Lock supplier, branch, and po_number on edit
+            // Lock supplier, branch, po_date, and po_number on edit
             $data['supplier_id'] = $this->purchaseOrder->supplier_id;
             $data['branch_id'] = $this->purchaseOrder->branch_id;
             $data['po_number'] = $this->purchaseOrder->po_number;
+            $data['po_date'] = $this->purchaseOrder->po_date;
 
             $headerChanged = $this->hasHeaderChanges($this->purchaseOrder, $data);
             $oldItems = $this->purchaseOrder->items()->get()->keyBy('id');
@@ -912,6 +914,10 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             // ALWAYS cancel old pending approvals because the document has been modified
             $po->cancelPendingApprovals();
         } else {
+            // New PO always enforces current server date to prevent stale client/draft dates
+            $data['po_date'] = now()->toDateString();
+            $this->po_date = $data['po_date'];
+
             $po = \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
                 $data['po_number'] = PurchaseOrder::generatePoNumber($data['branch_id'], $data['po_date']);
                 $this->po_number = $data['po_number'];
