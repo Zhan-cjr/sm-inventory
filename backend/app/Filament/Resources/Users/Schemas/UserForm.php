@@ -109,6 +109,7 @@ class UserForm
                                         'ACCESS_QUARANTINE_AUDIT' => 'Akses Menu Audit Karantina BS',
                                         'ACCESS_BI_AI' => 'Akses Menu BI & AI (Mobile)',
                                         'TOGGLE_SUPPLIER_GR_PO' => 'Ubah Wajib PO di Supplier',
+                                        'EDIT_SUPPLIER_CYCLE' => 'Ubah Siklus Kunjungan & Lead Time Supplier',
                                         'BYPASS_GR_PO_REQUIRED' => 'Bypass Wajib PO (Penerimaan Barang)',
                                         'QUICK_CREATE_PRODUCT' => 'Tambah Produk Cepat (Batch & Paste Teks)',
                                         'EDIT_PRODUCT_MASTER' => 'Ubah Data Master Produk',

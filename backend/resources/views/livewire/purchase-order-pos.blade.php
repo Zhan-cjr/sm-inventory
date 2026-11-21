@@ -315,6 +315,35 @@
                         <td class="pos-label">No Telp</td>
                         <td><div class="pos-input" style="background-color: transparent; border-color: transparent; padding-left: 0;">{{ $selectedSupplier ? $selectedSupplier->phone : '-' }}</div></td>
                     </tr>
+                    @if($supplier_id)
+                        @php
+                            $activeCycle = \App\Services\SuggestedOrderService::resolveInventoryCycle($supplier_id, $supplier_division_id, $branch_id);
+                            $cycleDays = (int)($activeCycle['target_days'] ?? 14);
+                            $cycleLead = (int)($activeCycle['lead_time'] ?? 3);
+                            $cycleDesc = match ($cycleDays) {
+                                7 => '7 Hari (1 Minggu)',
+                                14 => '14 Hari (2 Minggu)',
+                                21 => '21 Hari (3 Minggu)',
+                                30 => '30 Hari (1 Bulan)',
+                                default => "{$cycleDays} Hari",
+                            };
+                        @endphp
+                        <tr>
+                            <td class="pos-label">Siklus Order</td>
+                            <td>
+                                <div style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; padding: 0.25rem 0.6rem; border-radius: 0.375rem; background-color: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; font-size: 0.78rem; font-weight: 600;"
+                                     class="dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200"
+                                     title="Parameter ini dikunci sesuai pengaturan Master Supplier ({{ $activeCycle['source_label'] ?? 'Default Supplier' }})">
+                                    <span>📅 Cover Stok: {{ $cycleDesc }}</span>
+                                    <span style="color: #93c5fd;">|</span>
+                                    <span>🚚 Lead Time: {{ $cycleLead }} Hari</span>
+                                    <span style="font-size: 0.68rem; padding: 1px 6px; border-radius: 9999px; background-color: #dbeafe; color: #1d4ed8;" class="dark:bg-blue-900 dark:text-blue-200">
+                                        {{ $activeCycle['source_label'] ?? 'Default Supplier' }}
+                                    </span>
+                                </div>
+                            </td>
+                        </tr>
+                    @endif
                 </table>
             </div>
 

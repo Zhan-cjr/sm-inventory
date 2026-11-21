@@ -144,6 +144,10 @@ class Product extends Model
                 $product->syncNormalizedBarcodes();
             }
 
+            if ($product->wasChanged(['supplier_id', 'supplier_division_id']) && $product->supplier_id) {
+                \App\Services\SuggestedOrderService::syncBranchStocksCycle($product->supplier_id, $product->supplier_division_id);
+            }
+
             \Illuminate\Support\Facades\Cache::forget('ecommerce_products_all');
             foreach (\App\Models\Branch::pluck('id') as $branchId) {
                 \Illuminate\Support\Facades\Cache::forget('ecommerce_products_' . $branchId);

@@ -24,6 +24,13 @@ class Stock extends Model
         static::creating(function ($stock) {
             if ($stock->product_id) {
                 $stock->syncDefaultPricesFromProduct();
+                $stock->syncCycleFromSupplier();
+            }
+        });
+
+        static::updating(function ($stock) {
+            if ($stock->isDirty(['supplier_id', 'supplier_division_id', 'product_id', 'branch_id'])) {
+                $stock->syncCycleFromSupplier();
             }
         });
 
@@ -349,6 +356,29 @@ class Stock extends Model
             $this->margin_gol_3 = $this->margin_gol_3 ?? $product->margin_gol_3;
             $this->harga_jual_3 = $this->harga_jual_3 ?? $product->harga_jual_3;
             $this->qty_min_gol_3 = $this->qty_min_gol_3 ?? $product->qty_min_gol_3;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Sinkronisasi Lead Time & Target Inventori (desired_inventory_days)
+     * agar selalu mengacu ke pengaturan Supplier / Sub-Divisi / Cabang.
+     */
+    public function syncCycleFromSupplier(?Product $product = null): self
+    {
+        $product = $product ?? ($this->relationLoaded('product') ? $this->product : ($this->product_id ? Product::find($this->product_id) : null));
+        $effectiveSupplierId = $this->supplier_id ?: ($product->supplier_id ?? null);
+        $effectiveDivisionId = $this->supplier_id ? $this->supplier_division_id : ($product->supplier_division_id ?? null);
+
+        if ($effectiveSupplierId) {
+            $cycle = \App\Services\SuggestedOrderService::resolveInventoryCycle(
+                $effectiveSupplierId,
+                $effectiveDivisionId,
+                $this->branch_id
+            );
+            $this->lead_time = $cycle['lead_time'];
+            $this->desired_inventory_days = $cycle['target_days'];
         }
 
         return $this;

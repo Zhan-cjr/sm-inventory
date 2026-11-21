@@ -44,6 +44,7 @@ class SupplierResource extends Resource
     {
         return [
             RelationManagers\DivisionsRelationManager::class,
+            RelationManagers\BranchSettingsRelationManager::class,
             RelationManagers\ProductsRelationManager::class,
         ];
     }

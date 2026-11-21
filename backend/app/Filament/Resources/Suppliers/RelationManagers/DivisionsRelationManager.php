@@ -45,6 +45,24 @@ class DivisionsRelationManager extends RelationManager
                     ->label('Email Divisi')
                     ->email()
                     ->maxLength(255),
+                Forms\Components\TextInput::make('inventory_days')
+                    ->label('Target Inventori / Siklus Kunjungan (Hari)')
+                    ->numeric()
+                    ->minValue(1)
+                    ->maxValue(180)
+                    ->placeholder(fn (RelationManager $livewire) => 'Ikut Default Supplier (' . ($livewire->getOwnerRecord()?->default_inventory_days ?? 14) . ' Hari)')
+                    ->suffix('Hari')
+                    ->disabled(fn() => ! auth()->user()?->hasCustomAuthorization('EDIT_SUPPLIER_CYCLE'))
+                    ->helperText('Kosongkan jika sama dengan siklus supplier utama. Isi (misal: 7, 14, 21, 30) jika sub-divisi ini berbeda jadwal kunjungannya.'),
+                Forms\Components\TextInput::make('lead_time_days')
+                    ->label('Lead Time Pengiriman (Hari)')
+                    ->numeric()
+                    ->minValue(1)
+                    ->maxValue(90)
+                    ->placeholder(fn (RelationManager $livewire) => 'Ikut Default Supplier (' . ($livewire->getOwnerRecord()?->default_lead_time_days ?? 3) . ' Hari)')
+                    ->suffix('Hari')
+                    ->disabled(fn() => ! auth()->user()?->hasCustomAuthorization('EDIT_SUPPLIER_CYCLE'))
+                    ->helperText('Kosongkan jika sama dengan waktu pengiriman supplier utama.'),
                 Forms\Components\Textarea::make('notes')
                     ->label('Catatan Operasional')
                     ->placeholder('Misal: Jadwal kunjungan, ketentuan khusus divisi')
@@ -85,6 +103,29 @@ class DivisionsRelationManager extends RelationManager
                     ->placeholder('Pusat (Semua)')
                     ->badge()
                     ->color('gray'),
+                Tables\Columns\TextColumn::make('inventory_days')
+                    ->label('Siklus Order')
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($state) {
+                            return "{$state} Hari";
+                        }
+                        $def = $record->supplier?->default_inventory_days ?? 14;
+                        return "Ikut Supplier ({$def} Hr)";
+                    })
+                    ->badge()
+                    ->color(fn ($state) => $state ? 'success' : 'gray'),
+                Tables\Columns\TextColumn::make('lead_time_days')
+                    ->label('Lead Time')
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($state) {
+                            return "{$state} Hari";
+                        }
+                        $def = $record->supplier?->default_lead_time_days ?? 3;
+                        return "Ikut Supplier ({$def} Hr)";
+                    })
+                    ->badge()
+                    ->color(fn ($state) => $state ? 'warning' : 'gray')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('contact_person')
                     ->label('Kontak Person / Sales')
                     ->searchable(),

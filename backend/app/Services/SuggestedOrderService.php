@@ -20,9 +20,232 @@ class SuggestedOrderService
     protected array $branchSales90DaysCache = [];
     protected array $branchOnOrderCache = [];
     protected array $branchWmaSalesCache = [];
+    protected static array $cycleLookupCache = [];
+    protected static ?array $preloadedCycleData = null;
+
+    public static function clearCycleCache(): void
+    {
+        self::$cycleLookupCache = [];
+        self::$preloadedCycleData = null;
+    }
+
+    protected static function ensureCycleDataLoaded(): void
+    {
+        if (self::$preloadedCycleData !== null) {
+            return;
+        }
+
+        try {
+            $suppliers = DB::table('suppliers')
+                ->select('id', 'default_lead_time_days', 'default_inventory_days')
+                ->get()
+                ->keyBy('id')
+                ->toArray();
+
+            $divisions = DB::table('supplier_divisions')
+                ->select('id', 'supplier_id', 'lead_time_days', 'inventory_days')
+                ->get()
+                ->keyBy('id')
+                ->toArray();
+
+            $branchSettings = [];
+            if (\Illuminate\Support\Facades\Schema::hasTable('supplier_branch_settings')) {
+                $rows = DB::table('supplier_branch_settings')
+                    ->select('supplier_id', 'supplier_division_id', 'branch_id', 'lead_time_days', 'inventory_days', 'notes')
+                    ->get();
+                foreach ($rows as $row) {
+                    $divKey = $row->supplier_division_id ?: '_ALL_';
+                    $branchSettings[$row->supplier_id][$row->branch_id][$divKey] = $row;
+                }
+            }
+
+            self::$preloadedCycleData = [
+                'suppliers' => $suppliers,
+                'divisions' => $divisions,
+                'branch_settings' => $branchSettings,
+            ];
+        } catch (\Throwable $e) {
+            self::$preloadedCycleData = [
+                'suppliers' => [],
+                'divisions' => [],
+                'branch_settings' => [],
+            ];
+        }
+    }
+
+    /**
+     * Resolusi berjenjang Target Inventori (Siklus Kunjungan Sales) & Lead Time:
+     * 1. Pengaturan Cabang + Sub-Divisi Spesifik (supplier_branch_settings)
+     * 2. Pengaturan Cabang Umum untuk Supplier (supplier_branch_settings dengan supplier_division_id = NULL)
+     * 3. Pengaturan Sub-Divisi Default (supplier_divisions)
+     * 4. Pengaturan Default Supplier Utama (suppliers)
+     * 5. Fallback Sistem (Lead Time = 3 hari, Target Inventori = 14 hari)
+     */
+    public static function resolveInventoryCycle(?string $supplierId, ?string $divisionId = null, ?string $branchId = null): array
+    {
+        if (!$supplierId) {
+            return [
+                'lead_time' => 3,
+                'target_days' => 14,
+                'source' => 'default_system',
+                'source_label' => 'Default Sistem',
+                'notes' => null,
+            ];
+        }
+
+        $cacheKey = "{$supplierId}|" . ($divisionId ?: '') . "|" . ($branchId ?: '');
+        if (isset(self::$cycleLookupCache[$cacheKey])) {
+            return self::$cycleLookupCache[$cacheKey];
+        }
+
+        self::ensureCycleDataLoaded();
+
+        $suppliers = self::$preloadedCycleData['suppliers'] ?? [];
+        $divisions = self::$preloadedCycleData['divisions'] ?? [];
+        $branchSettings = self::$preloadedCycleData['branch_settings'] ?? [];
+
+        $sup = $suppliers[$supplierId] ?? null;
+        $div = ($divisionId && isset($divisions[$divisionId])) ? $divisions[$divisionId] : null;
+
+        $branchDivSetting = ($branchId && $divisionId)
+            ? ($branchSettings[$supplierId][$branchId][$divisionId] ?? null)
+            : null;
+        $branchGeneralSetting = $branchId
+            ? ($branchSettings[$supplierId][$branchId]['_ALL_'] ?? null)
+            : null;
+
+        $targetDays = null;
+        $source = 'default_system';
+        $sourceLabel = 'Default Supplier';
+        $notes = null;
+
+        if ($branchDivSetting && (int)($branchDivSetting->inventory_days ?? 0) > 0) {
+            $targetDays = (int)$branchDivSetting->inventory_days;
+            $source = 'branch_division';
+            $sourceLabel = 'Khusus Cabang & Sub-Divisi';
+            $notes = $branchDivSetting->notes ?? null;
+        } elseif ($branchGeneralSetting && (int)($branchGeneralSetting->inventory_days ?? 0) > 0) {
+            $targetDays = (int)$branchGeneralSetting->inventory_days;
+            $source = 'branch_supplier';
+            $sourceLabel = 'Khusus Cabang';
+            $notes = $branchGeneralSetting->notes ?? null;
+        } elseif ($div && (int)($div->inventory_days ?? 0) > 0) {
+            $targetDays = (int)$div->inventory_days;
+            $source = 'division';
+            $sourceLabel = 'Sub-Divisi Supplier';
+        } elseif ($sup && (int)($sup->default_inventory_days ?? 0) > 0) {
+            $targetDays = (int)$sup->default_inventory_days;
+            $source = 'supplier';
+            $sourceLabel = 'Default Supplier';
+        } else {
+            $targetDays = 14;
+        }
+
+        $leadTime = null;
+        if ($branchDivSetting && (int)($branchDivSetting->lead_time_days ?? 0) > 0) {
+            $leadTime = (int)$branchDivSetting->lead_time_days;
+        } elseif ($branchGeneralSetting && (int)($branchGeneralSetting->lead_time_days ?? 0) > 0) {
+            $leadTime = (int)$branchGeneralSetting->lead_time_days;
+        } elseif ($div && (int)($div->lead_time_days ?? 0) > 0) {
+            $leadTime = (int)$div->lead_time_days;
+        } elseif ($sup && (int)($sup->default_lead_time_days ?? 0) > 0) {
+            $leadTime = (int)$sup->default_lead_time_days;
+        } else {
+            $leadTime = 3;
+        }
+
+        return self::$cycleLookupCache[$cacheKey] = [
+            'lead_time' => $leadTime,
+            'target_days' => $targetDays,
+            'source' => $source,
+            'source_label' => $sourceLabel,
+            'notes' => $notes,
+        ];
+    }
+
+    /**
+     * Sinkronkan kolom lead_time & desired_inventory_days di tabel stocks (Stok Cabang)
+     * agar selalu mengacu pada settingan Supplier / Sub-Divisi / Cabang terbaru.
+     */
+    public static function syncBranchStocksCycle(string $supplierId, ?string $divisionId = null, ?string $branchId = null): void
+    {
+        self::clearCycleCache();
+
+        try {
+            $query = DB::table('stocks')
+                ->leftJoin('products', 'stocks.product_id', '=', 'products.id')
+                ->select(
+                    'stocks.id',
+                    'stocks.branch_id',
+                    DB::raw('COALESCE(stocks.supplier_id, products.supplier_id) as eff_supplier_id'),
+                    DB::raw('CASE WHEN stocks.supplier_id IS NOT NULL THEN stocks.supplier_division_id ELSE products.supplier_division_id END as eff_division_id')
+                )
+                ->where(function ($q) use ($supplierId) {
+                    $q->where('stocks.supplier_id', $supplierId)
+                      ->orWhere(function ($sq) use ($supplierId) {
+                          $sq->whereNull('stocks.supplier_id')
+                             ->where('products.supplier_id', $supplierId);
+                      });
+                });
+
+            if ($branchId) {
+                $query->where('stocks.branch_id', $branchId);
+            }
+
+            if ($divisionId) {
+                $query->where(function ($q) use ($divisionId) {
+                    $q->where('stocks.supplier_division_id', $divisionId)
+                      ->orWhere(function ($sq) use ($divisionId) {
+                          $sq->whereNull('stocks.supplier_id')
+                             ->where('products.supplier_division_id', $divisionId);
+                      });
+                });
+            }
+
+            $rows = $query->get();
+            if ($rows->isEmpty()) {
+                return;
+            }
+
+            // Kelompokkan berdasarkan pasangan (lead_time, target_days) agar hanya perlu sedikit bulk UPDATE query
+            $groupedIds = [];
+            $affectedBranches = [];
+            foreach ($rows as $row) {
+                $cycle = self::resolveInventoryCycle($row->eff_supplier_id, $row->eff_division_id, $row->branch_id);
+                $key = $cycle['lead_time'] . '_' . $cycle['target_days'];
+                $groupedIds[$key]['lead_time'] = $cycle['lead_time'];
+                $groupedIds[$key]['target_days'] = $cycle['target_days'];
+                $groupedIds[$key]['ids'][] = $row->id;
+                if ($row->branch_id) {
+                    $affectedBranches[$row->branch_id] = true;
+                }
+            }
+
+            foreach ($groupedIds as $group) {
+                foreach (array_chunk($group['ids'], 500) as $idChunk) {
+                    DB::table('stocks')
+                        ->whereIn('id', $idChunk)
+                        ->update([
+                            'lead_time' => $group['lead_time'],
+                            'desired_inventory_days' => $group['target_days'],
+                        ]);
+                }
+            }
+
+            foreach (array_keys($affectedBranches) as $bId) {
+                Cache::forget("suggested_orders_ai_{$bId}");
+                Cache::forget("restock_needed_stock_ids_{$bId}");
+            }
+            Cache::forget("suggested_orders_ai_all");
+            Cache::forget("restock_needed_stock_ids_all");
+        } catch (\Throwable $e) {
+            Log::warning("Gagal sinkronisasi siklus stok cabang untuk supplier {$supplierId}: " . $e->getMessage());
+        }
+    }
 
     public function clearCache(?string $branchId = null): void
     {
+        self::clearCycleCache();
         $this->aiCache = [];
         $this->stockCalculationCache = [];
         $this->branchSales30DaysCache = [];
@@ -482,8 +705,14 @@ class SuggestedOrderService
         $sales90Days = $prodWma ? (float)$prodWma['total_90d'] : 0.0;
         $wmaMonthly = $prodWma ? (float)$prodWma['wma_monthly'] : 0.0;
 
-        $leadTime = (int)($stock->lead_time > 0 ? $stock->lead_time : ($stock->product->lead_time_days ?? 3));
-        $targetDays = (int)($stock->desired_inventory_days > 0 ? $stock->desired_inventory_days : 14);
+        if ($effectiveSupplierId) {
+            $cycle = self::resolveInventoryCycle($effectiveSupplierId, $effectiveDivisionId, $stock->branch_id);
+            $leadTime = (int)$cycle['lead_time'];
+            $targetDays = (int)$cycle['target_days'];
+        } else {
+            $leadTime = (int)($stock->lead_time > 0 ? $stock->lead_time : ($stock->product->lead_time_days ?? 3));
+            $targetDays = (int)($stock->desired_inventory_days > 0 ? $stock->desired_inventory_days : 14);
+        }
 
         $safetyStock = (float)ceil($ads * max(2, $leadTime));
         $reorderPoint = (float)max(0, ceil(($ads * $leadTime) + $safetyStock));

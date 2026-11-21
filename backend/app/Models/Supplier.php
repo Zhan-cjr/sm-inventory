@@ -13,13 +13,17 @@ class Supplier extends Model
 
     protected $fillable = [
         'organization_id', 'code', 'name', 'npwp', 'contact_person', 
-        'phone', 'email', 'address', 'is_active', 'default_due_days', 'default_po_expired_days', 'payment_method', 'is_consignment', 'gr_requires_po'
+        'phone', 'email', 'address', 'is_active', 'default_due_days', 'default_po_expired_days',
+        'default_lead_time_days', 'default_inventory_days',
+        'payment_method', 'is_consignment', 'gr_requires_po'
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'is_consignment' => 'boolean',
         'gr_requires_po' => 'boolean',
+        'default_lead_time_days' => 'integer',
+        'default_inventory_days' => 'integer',
     ];
 
     protected static function booted(): void
@@ -39,6 +43,12 @@ class Supplier extends Model
                 }
 
                 $supplier->code = "SUP-{$dateCode}{$nextSequence}";
+            }
+        });
+
+        static::saved(function (Supplier $supplier) {
+            if ($supplier->wasChanged(['default_lead_time_days', 'default_inventory_days'])) {
+                \App\Services\SuggestedOrderService::syncBranchStocksCycle($supplier->id);
             }
         });
 
@@ -68,5 +78,10 @@ class Supplier extends Model
     public function branchStocks(): HasMany
     {
         return $this->hasMany(Stock::class);
+    }
+
+    public function branchSettings(): HasMany
+    {
+        return $this->hasMany(SupplierBranchSetting::class);
     }
 }

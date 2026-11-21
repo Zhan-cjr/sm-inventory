@@ -247,11 +247,22 @@ class StocksRelationManager extends RelationManager
                     ->disabled($cannotEditStock),
                 TextInput::make('lead_time')
                     ->label('Lead Time (Hari)')
-                    ->helperText('Waktu pengiriman dari supplier')
+                    ->helperText('Otomatis mengacu ke pengaturan Lead Time pada Master Supplier')
                     ->numeric()
                     ->default(3)
                     ->suffix('Hari')
-                    ->disabled($cannotEditStock),
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->formatStateUsing(function ($state, $record, RelationManager $livewire) {
+                        $product = $record?->product ?? $livewire->getOwnerRecord();
+                        $effSup = $record?->supplier_id ?: ($product?->supplier_id ?? null);
+                        $effDiv = $record?->supplier_id ? $record->supplier_division_id : ($product?->supplier_division_id ?? null);
+                        if ($effSup) {
+                            $cycle = \App\Services\SuggestedOrderService::resolveInventoryCycle($effSup, $effDiv, $record?->branch_id);
+                            return $cycle['lead_time'];
+                        }
+                        return $state ?: 3;
+                    }),
                 TextInput::make('safety_stock')
                     ->label('Safety Stock')
                     ->helperText('Stok cadangan minimum')
@@ -260,11 +271,22 @@ class StocksRelationManager extends RelationManager
                     ->disabled($cannotEditStock),
                 TextInput::make('desired_inventory_days')
                     ->label('Target Inventori (Hari)')
-                    ->helperText('Berapa hari stok yang ingin dipertahankan')
+                    ->helperText('Otomatis mengacu ke pengaturan Siklus Kunjungan pada Master Supplier')
                     ->numeric()
                     ->default(14)
                     ->suffix('Hari')
-                    ->disabled($cannotEditStock),
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->formatStateUsing(function ($state, $record, RelationManager $livewire) {
+                        $product = $record?->product ?? $livewire->getOwnerRecord();
+                        $effSup = $record?->supplier_id ?: ($product?->supplier_id ?? null);
+                        $effDiv = $record?->supplier_id ? $record->supplier_division_id : ($product?->supplier_division_id ?? null);
+                        if ($effSup) {
+                            $cycle = \App\Services\SuggestedOrderService::resolveInventoryCycle($effSup, $effDiv, $record?->branch_id);
+                            return $cycle['target_days'];
+                        }
+                        return $state ?: 14;
+                    }),
                 \Filament\Forms\Components\Toggle::make('is_active')
                     ->label('Aktif di Cabang Ini')
                     ->default(true)
@@ -328,10 +350,26 @@ class StocksRelationManager extends RelationManager
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('lead_time')
                     ->label('Lead Time')
+                    ->state(function ($record) {
+                        $effSup = $record->supplier_id ?: ($record->product?->supplier_id ?? null);
+                        $effDiv = $record->supplier_id ? $record->supplier_division_id : ($record->product?->supplier_division_id ?? null);
+                        if ($effSup) {
+                            return \App\Services\SuggestedOrderService::resolveInventoryCycle($effSup, $effDiv, $record->branch_id)['lead_time'];
+                        }
+                        return $record->lead_time ?: 3;
+                    })
                     ->suffix(' Hr')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('desired_inventory_days')
                     ->label('Target Days')
+                    ->state(function ($record) {
+                        $effSup = $record->supplier_id ?: ($record->product?->supplier_id ?? null);
+                        $effDiv = $record->supplier_id ? $record->supplier_division_id : ($record->product?->supplier_division_id ?? null);
+                        if ($effSup) {
+                            return \App\Services\SuggestedOrderService::resolveInventoryCycle($effSup, $effDiv, $record->branch_id)['target_days'];
+                        }
+                        return $record->desired_inventory_days ?: 14;
+                    })
                     ->suffix(' Hr')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')

@@ -65,6 +65,26 @@ class SupplierForm
                     ->numeric()
                     ->default(0)
                     ->helperText('0 = Tidak ada expired. Di atas 0 = Otomatis set expired PO berdasarkan Approval Date + jumlah hari ini.'),
+                TextInput::make('default_inventory_days')
+                    ->label('Target Inventori / Siklus Kunjungan Default (Hari)')
+                    ->required()
+                    ->numeric()
+                    ->minValue(1)
+                    ->maxValue(180)
+                    ->default(14)
+                    ->suffix('Hari')
+                    ->disabled(fn() => ! auth()->user()?->hasCustomAuthorization('EDIT_SUPPLIER_CYCLE'))
+                    ->helperText('Siklus kedatangan sales default (7 = Mingguan, 14 = 2 Mingguan, 21 = 3 Mingguan, 30 = Bulanan). Menentukan jumlah hari cover stok pada Saran Order.'),
+                TextInput::make('default_lead_time_days')
+                    ->label('Lead Time Pengiriman Default (Hari)')
+                    ->required()
+                    ->numeric()
+                    ->minValue(1)
+                    ->maxValue(90)
+                    ->default(3)
+                    ->suffix('Hari')
+                    ->disabled(fn() => ! auth()->user()?->hasCustomAuthorization('EDIT_SUPPLIER_CYCLE'))
+                    ->helperText('Rata-rata waktu tunggu pengiriman barang sejak PO dibuat hingga barang tiba.'),
                 Select::make('payment_method')
                     ->label('Cara Pembayaran Default')
                     ->options([

@@ -19,8 +19,15 @@ class SupplierDivision extends Model
         'contact_person',
         'phone',
         'email',
+        'lead_time_days',
+        'inventory_days',
         'notes',
         'created_by',
+    ];
+
+    protected $casts = [
+        'lead_time_days' => 'integer',
+        'inventory_days' => 'integer',
     ];
 
     protected static function booted()
@@ -29,6 +36,12 @@ class SupplierDivision extends Model
             if (Auth::check()) {
                 $division->created_by ??= Auth::id();
                 $division->branch_id ??= Auth::user()->branch_id;
+            }
+        });
+
+        static::saved(function ($division) {
+            if ($division->wasChanged(['lead_time_days', 'inventory_days'])) {
+                \App\Services\SuggestedOrderService::syncBranchStocksCycle($division->supplier_id, $division->id);
             }
         });
 

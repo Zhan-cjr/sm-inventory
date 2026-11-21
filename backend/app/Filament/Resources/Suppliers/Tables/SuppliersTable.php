@@ -37,6 +37,25 @@ class SuppliersTable
                     ->searchable(),
                 TextColumn::make('phone')
                     ->searchable(),
+                TextColumn::make('default_inventory_days')
+                    ->label('Siklus Order')
+                    ->formatStateUsing(fn ($state) => match ((int) ($state ?: 14)) {
+                        7 => '7 Hr (1 Mg)',
+                        14 => '14 Hr (2 Mg)',
+                        21 => '21 Hr (3 Mg)',
+                        30 => '30 Hr (1 Bln)',
+                        default => ($state ?: 14) . ' Hari',
+                    })
+                    ->badge()
+                    ->color('info')
+                    ->sortable(),
+                TextColumn::make('default_lead_time_days')
+                    ->label('Lead Time')
+                    ->formatStateUsing(fn ($state) => ($state ?: 3) . ' Hari')
+                    ->badge()
+                    ->color('gray')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('email')
                     ->label('Email address')
                     ->searchable(),
