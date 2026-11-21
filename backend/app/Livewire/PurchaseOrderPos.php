@@ -55,6 +55,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     public $discount_subtotal = 0;
     public $discount_subtotal_type = 'nominal'; // 'percent' or 'nominal'
     public $grandTotal = 0;
+    public $lastSaranMethod = null; // 'minmax' atau 'sales'
 
     public $showZeroQtyModal = false;
     public $zeroQtyProductNames = '';
@@ -239,6 +240,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         $this->supplier_division_id = null;
+        $this->lastSaranMethod = null;
         $this->cart = [];
         $this->calculateTotals();
         
@@ -248,6 +250,11 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         } else {
             $this->expired_date = null;
         }
+    }
+
+    public function updatedSupplierDivisionId($value)
+    {
+        $this->lastSaranMethod = null;
     }
 
     public function updatedPoDate($value)
@@ -418,6 +425,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         $addedCount = 0;
 
         if ($method === 'sales') {
+            $this->lastSaranMethod = 'sales';
             $service = app(\App\Services\SuggestedOrderService::class);
             $suggestions = $service->calculateForBranch($this->branch_id, [
                 'supplier_id' => $this->supplier_id,
@@ -443,6 +451,8 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
                 }
             }
         } else {
+            $this->lastSaranMethod = 'minmax';
+
             // Min-Max Method: Query items registered in stocks for THIS branch with effective supplier
             $branchStocks = \App\Models\Stock::where('branch_id', $this->branch_id)
                 ->where('is_active', true)
@@ -467,20 +477,48 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
 
             $this->prefetchCartMetrics($branchStocks->pluck('product_id')->all(), $this->branch_id);
 
+            // Ambil data penjualan 30 hari & PO sedang jalan untuk kalkulasi Ambang Toleransi Siklus (Opsi A)
+            $suggestedService = app(\App\Services\SuggestedOrderService::class);
+            $sales30Days = $suggestedService->getBranchSales30Days($this->branch_id);
+            $onOrderMap = $suggestedService->getBranchOnOrderQuantities($this->branch_id);
+
+            // Dapatkan default siklus jika di record stok cabang belum terspesifikasi
+            $activeCycle = \App\Services\SuggestedOrderService::resolveInventoryCycle($this->supplier_id, $this->supplier_division_id, $this->branch_id);
+            $defaultCycleDays = (int)($activeCycle['target_days'] ?? 14);
+
             foreach ($branchStocks as $stockRec) {
                 $product = $stockRec->product;
                 if (!$product) continue;
 
-                // Min-Max menggunakan Stok Layak Jual (Total Fisik dikurangi Barang Rusak BS)
+                // Stok Layak Jual (Total Fisik dikurangi Barang Rusak BS)
                 $currentStock = max(0, (float)($stockRec->quantity_on_hand ?? 0) - (float)($stockRec->quantity_damaged ?? 0));
+                $onOrderQty = (float)($onOrderMap[$product->id] ?? 0);
+                $effectiveStock = $currentStock + $onOrderQty;
+
                 $minQty = (float)($stockRec->min_qty ?? 0);
                 $maxQty = (float)($stockRec->max_qty ?? 0);
 
                 $suggestedQty = 0;
 
                 if ($minQty > 0 && $maxQty > 0) {
-                    if ($currentStock < $minQty) {
-                        $suggestedQty = max(1, $maxQty - $currentStock);
+                    // Opsi A (Ambang Toleransi Siklus Kunjungan):
+                    // Siklus order cabang/supplier (misal 7, 14, 21, 30 hari)
+                    $cycleDays = (int)($stockRec->desired_inventory_days ?: $defaultCycleDays);
+                    if ($cycleDays <= 0) $cycleDays = 14;
+
+                    // Laju penjualan harian (ADU)
+                    $prodSales30 = (float)($sales30Days[$product->id] ?? 0);
+                    $dailySales = $prodSales30 > 0 ? ($prodSales30 / 30) : 0;
+                    $cycleSales = ceil($dailySales * $cycleDays);
+
+                    // Ambang Batas Order = Min + Estimasi Penjualan Selama 1 Siklus Kunjungan
+                    // Dibatasi maksimal setinggi Max Stok agar tidak melebihi kapasitas
+                    $orderThreshold = max($minQty, min($maxQty, $minQty + $cycleSales));
+
+                    // Jika stok efektif (stok fisik + PO jalan) di bawah ambang batas siklus,
+                    // maka barang diprediksi akan habis sebelum jadwal kunjungan sales berikutnya.
+                    if ($effectiveStock < $orderThreshold) {
+                        $suggestedQty = max(1, (int)ceil($maxQty - $effectiveStock));
                     }
                 }
 
@@ -492,7 +530,7 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         }
 
         if ($addedCount > 0) {
-            $methodName = $method === 'sales' ? 'Trend Penjualan Cerdas (WMA 3 Bulan & On-Order)' : 'Batas Stok Min-Max';
+            $methodName = $method === 'sales' ? 'Trend Penjualan Cerdas (WMA 3 Bulan & On-Order)' : 'Batas Stok Min-Max (Ambang Toleransi Siklus)';
             Notification::make()->title("{$addedCount} barang berhasil ditambahkan berdasarkan {$methodName}.")->success()->send();
         } else {
             Notification::make()->title("Tidak ada barang yang perlu diorder untuk supplier ini.")->info()->send();

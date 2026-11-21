@@ -202,10 +202,10 @@
                                             <div style="flex-grow: 1;">
                                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                                     <span style="font-weight: 700; font-size: 0.85rem; color: #0f172a;" class="dark:text-gray-100 group-hover:text-blue-700">Batas Stok Min/Max</span>
-                                                    <span style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px; background-color: #dbeafe; color: #1e40af;">Rutin Cabang</span>
+                                                    <span style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px; background-color: #dbeafe; color: #1e40af;">Ambang Siklus</span>
                                                 </div>
                                                 <div style="font-size: 0.75rem; color: #475569; margin-top: 3px; line-height: 1.35;" class="dark:text-gray-300">
-                                                    Order saat stok &lt; min. Mengisi kembali hingga plafon max cabang.
+                                                    Order saat stok &lt; ambang batas siklus (Min + Penjualan Siklus). Mengisi kembali hingga plafon max cabang.
                                                 </div>
                                             </div>
                                         </div>
@@ -329,7 +329,7 @@
                             };
                         @endphp
                         <tr>
-                            <td class="pos-label">Siklus Order</td>
+                            <td class="pos-label" style="vertical-align: top; padding-top: 0.6rem;">Siklus Order</td>
                             <td>
                                 <div style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; padding: 0.25rem 0.6rem; border-radius: 0.375rem; background-color: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; font-size: 0.78rem; font-weight: 600;"
                                      class="dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200"
@@ -341,6 +341,34 @@
                                         {{ $activeCycle['source_label'] ?? 'Default Supplier' }}
                                     </span>
                                 </div>
+
+                                {{-- Penjelasan Alur Perhitungan Metode Saran Order --}}
+                                @if($lastSaranMethod === 'minmax')
+                                    <div style="margin-top: 0.45rem; padding: 0.5rem 0.65rem; border-radius: 0.375rem; background-color: #f0fdf4; border: 1px solid #bbf7d0; font-size: 0.73rem; color: #166534; line-height: 1.45;" class="dark:bg-green-950/40 dark:border-green-800 dark:text-green-200">
+                                        <div style="font-weight: 700; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+                                            <span>🛡️ Metode Aktif: Batas Stok Min/Max (Ambang Toleransi Siklus)</span>
+                                        </div>
+                                        <div>
+                                            <strong>Alur Perhitungan:</strong> Sistem memeriksa stok fisik + PO jalan terhadap <strong>Ambang Batas Order</strong> (<code>Min Stok + Penjualan {{ $cycleDesc }}</code>). Jika stok di bawah ambang batas (diprediksi habis sebelum sales berkunjung lagi), sistem menyarankan order hingga mengisi penuh ke <strong>Plafon Max Stok</strong> cabang.
+                                        </div>
+                                    </div>
+                                @elseif($lastSaranMethod === 'sales')
+                                    <div style="margin-top: 0.45rem; padding: 0.5rem 0.65rem; border-radius: 0.375rem; background-color: #eff6ff; border: 1px solid #bfdbfe; font-size: 0.73rem; color: #1e40af; line-height: 1.45;" class="dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200">
+                                        <div style="font-weight: 700; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+                                            <span>📈 Metode Aktif: Trend Penjualan Cerdas (WMA 3 Bulan + PO Jalan)</span>
+                                        </div>
+                                        <div>
+                                            <strong>Alur Perhitungan:</strong> Sistem menganalisa laju penjualan 3 bulan dengan pembobotan tren terkini (3:2:1) untuk memproyeksikan kebutuhan selama <strong>Cover Stok {{ $cycleDesc }} + Lead Time {{ $cycleLead }} Hari</strong>, lalu dikurangi sisa stok fisik saat ini dan PO yang sedang jalan.
+                                        </div>
+                                    </div>
+                                @else
+                                    <div style="margin-top: 0.35rem; font-size: 0.72rem; color: #64748b; line-height: 1.4;" class="dark:text-gray-400">
+                                        <span style="font-weight: 600; color: #475569;" class="dark:text-gray-300">💡 Alur Saran Order:</span>
+                                        Gunakan tombol <strong style="color: #2563eb;">Saran Order</strong> untuk mengisi otomatis:
+                                        <span style="display: inline-block; margin-left: 3px;">• <strong>Min/Max</strong>: Order saat stok di bawah ambang siklus (Min + Laju Penjualan Siklus) untuk mengisi hingga batas Max.</span>
+                                        <span style="display: inline-block; margin-left: 3px;">• <strong>Trend Cerdas (WMA)</strong>: Mengisi kebutuhan riil tren penjualan 3 bulan dikurangi stok fisik &amp; PO jalan.</span>
+                                    </div>
+                                @endif
                             </td>
                         </tr>
                     @endif
