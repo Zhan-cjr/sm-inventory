@@ -178,53 +178,53 @@
                                  x-transition:leave="transition ease-in duration-100"
                                  x-transition:leave-start="opacity-100 transform scale-100"
                                  x-transition:leave-end="opacity-0 transform scale-95"
-                                 style="position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; border-radius: 0.65rem; width: 19.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1); overflow: hidden;" 
-                                 class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                 style="position: absolute; right: 0; top: calc(100% + 6px); z-index: 100; border-radius: 0.75rem; width: 21rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15); overflow: hidden; background-color: #ffffff !important; border: 1px solid #cbd5e1;" 
+                                 class="pos-dropdown-bg dark:bg-gray-800 dark:border-gray-700">
                                 
-                                <div style="padding: 0.65rem 0.85rem; background-color: #f8fafc;" class="dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700">
-                                    <div style="font-size: 0.68rem; font-weight: 700; color: #64748b; letter-spacing: 0.05em; text-transform: uppercase;">
+                                <div style="padding: 0.75rem 1rem; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;" class="dark:bg-gray-900 dark:border-gray-700">
+                                    <div style="font-size: 0.72rem; font-weight: 800; color: #1e293b; letter-spacing: 0.05em; text-transform: uppercase;" class="dark:text-gray-200">
                                         Pilih Metode Saran Restock
                                     </div>
-                                    <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 1px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;" class="dark:text-gray-400">
                                         Otomatis mengisi keranjang sesuai parameter cabang
                                     </div>
                                 </div>
 
-                                <div style="padding: 0.45rem;">
+                                <div style="padding: 0.6rem; background-color: #ffffff;" class="pos-dropdown-bg dark:bg-gray-800">
                                     {{-- Opsi 1: Min-Max --}}
-                                    <button wire:click="applySaranOrder('minmax')" @click="openSaran = false" 
-                                            class="w-full text-left p-2.5 rounded-lg transition-all group hover:bg-blue-50 dark:hover:bg-gray-700/80">
-                                        <div style="display: flex; align-items: flex-start; gap: 0.65rem;">
-                                            <div style="padding: 0.4rem; border-radius: 0.45rem; background-color: #eff6ff; color: #2563eb; flex-shrink: 0;" class="group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                                    <button type="button" wire:click="applySaranOrder('minmax')" @click="openSaran = false" 
+                                            style="background-color: #ffffff; border: 1px solid #e2e8f0; margin-bottom: 0.5rem;"
+                                            class="w-full text-left p-3 rounded-lg transition-all group hover:bg-blue-50 hover:border-blue-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">
+                                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                                            <div style="padding: 0.45rem; border-radius: 0.5rem; background-color: #eff6ff; color: #2563eb; flex-shrink: 0;" class="group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                                             </div>
                                             <div style="flex-grow: 1;">
                                                 <div style="display: flex; align-items: center; justify-content: space-between;">
-                                                    <span style="font-weight: 700; font-size: 0.82rem; color: #1e293b;" class="dark:text-gray-100 group-hover:text-blue-700">Batas Stok Min/Max</span>
-                                                    <span style="font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 9999px; background-color: #dbeafe; color: #1e40af;">Rutin Cabang</span>
+                                                    <span style="font-weight: 700; font-size: 0.85rem; color: #0f172a;" class="dark:text-gray-100 group-hover:text-blue-700">Batas Stok Min/Max</span>
+                                                    <span style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px; background-color: #dbeafe; color: #1e40af;">Rutin Cabang</span>
                                                 </div>
-                                                <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px; line-height: 1.3;">
+                                                <div style="font-size: 0.75rem; color: #475569; margin-top: 3px; line-height: 1.35;" class="dark:text-gray-300">
                                                     Order saat stok &lt; min. Mengisi kembali hingga plafon max cabang.
                                                 </div>
                                             </div>
                                         </div>
                                     </button>
 
-                                    <div style="height: 1px; background: #f1f5f9; margin: 0.35rem 0.4rem;" class="dark:bg-gray-700"></div>
-
                                     {{-- Opsi 2: Trend Penjualan WMA Cerdas --}}
-                                    <button wire:click="applySaranOrder('sales')" @click="openSaran = false" 
-                                            class="w-full text-left p-2.5 rounded-lg transition-all group hover:bg-emerald-50 dark:hover:bg-gray-700/80">
-                                        <div style="display: flex; align-items: flex-start; gap: 0.65rem;">
-                                            <div style="padding: 0.4rem; border-radius: 0.45rem; background-color: #ecfdf5; color: #059669; flex-shrink: 0;" class="group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                    <button type="button" wire:click="applySaranOrder('sales')" @click="openSaran = false" 
+                                            style="background-color: #ffffff; border: 1px solid #e2e8f0;"
+                                            class="w-full text-left p-3 rounded-lg transition-all group hover:bg-emerald-50 hover:border-emerald-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">
+                                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                                            <div style="padding: 0.45rem; border-radius: 0.5rem; background-color: #ecfdf5; color: #059669; flex-shrink: 0;" class="group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                                             </div>
                                             <div style="flex-grow: 1;">
                                                 <div style="display: flex; align-items: center; justify-content: space-between;">
-                                                    <span style="font-weight: 700; font-size: 0.82rem; color: #1e293b;" class="dark:text-gray-100 group-hover:text-emerald-700">Trend Penjualan Cerdas</span>
-                                                    <span style="font-size: 0.6rem; font-weight: 700; padding: 1px 6px; border-radius: 9999px; background-color: #d1fae5; color: #065f46;">WMA + PO Jalan</span>
+                                                    <span style="font-weight: 700; font-size: 0.85rem; color: #0f172a;" class="dark:text-gray-100 group-hover:text-emerald-700">Trend Penjualan Cerdas</span>
+                                                    <span style="font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 9999px; background-color: #d1fae5; color: #065f46;">WMA + PO Jalan</span>
                                                 </div>
-                                                <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px; line-height: 1.3;">
+                                                <div style="font-size: 0.75rem; color: #475569; margin-top: 3px; line-height: 1.35;" class="dark:text-gray-300">
                                                     Analisa bobot 3 bulan + lead time dikurangi kuantitas PO yang masih di jalan.
                                                 </div>
                                             </div>
