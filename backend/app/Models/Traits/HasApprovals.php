@@ -236,13 +236,28 @@ trait HasApprovals
         if ($userId) {
             $user = \App\Models\User::find($userId);
             if ($user) $userName = $user->name;
+        } elseif (!empty($approval->notes) && preg_match('/oleh\s+(.+)$/i', $approval->notes, $matches)) {
+            $userName = trim($matches[1]);
         }
+
+        $safeUserName = htmlspecialchars($userName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $approvalNotes = $approval->notes;
+        $safeNotes = !empty($approvalNotes) ? htmlspecialchars(trim($approvalNotes), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') : null;
+
+        $isViaTelegram = !empty($approvalNotes) && str_contains($approvalNotes, 'dari Telegram');
+        $channel = $isViaTelegram ? "(via Telegram)" : "(via Sistem)";
 
         $statusText = "";
         if ($action === 'approve') {
-            $statusText = "✅ <b>Disetujui</b> oleh {$userName} (via Sistem)";
+            $statusText = "✅ <b>Disetujui</b> oleh {$safeUserName} {$channel}";
+            if ($safeNotes && !$isViaTelegram) {
+                $statusText .= "\n📝 <b>Catatan Approval:</b>\n<i>{$safeNotes}</i>";
+            }
         } elseif ($action === 'reject') {
-            $statusText = "❌ <b>Ditolak</b> oleh {$userName} (via Sistem)";
+            $statusText = "❌ <b>Ditolak</b> oleh {$safeUserName} {$channel}";
+            if ($safeNotes && !$isViaTelegram) {
+                $statusText .= "\n📝 <b>Catatan Penolakan:</b>\n<i>{$safeNotes}</i>";
+            }
         } elseif ($action === 'cancel') {
             $statusText = "🚫 <b>Persetujuan dibatalkan</b> karena dokumen telah diubah.";
         }
@@ -289,8 +304,8 @@ trait HasApprovals
                 $reasonText = null;
                 if ($modelClass === 'PurchaseOrder' && !empty($this->over_order_reason)) {
                     $reasonText = $this->over_order_reason;
-                } elseif ($approval && !empty($approval->notes)) {
-                    $reasonText = $approval->notes;
+                } elseif (!empty($this->notes)) {
+                    $reasonText = $this->notes;
                 }
 
                 $baseText = "📄 <b>Permintaan Persetujuan Dokumen</b>\n\n";

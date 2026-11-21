@@ -94,7 +94,11 @@ class PurchaseOrdersTable
                             : '-';
                     })
                     ->limit(50)
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->tooltip(function (TextColumn $column): ?string {
+                        $state = $column->getState();
+                        return ($state && strlen($state) > 50) ? $state : null;
+                    })
+                    ->toggleable(),
                 TextColumn::make('over_order_reason')
                     ->label('Alasan Over-Order')
                     ->limit(50)
