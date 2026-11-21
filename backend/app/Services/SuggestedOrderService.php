@@ -238,6 +238,9 @@ class SuggestedOrderService
             }
             Cache::forget("suggested_orders_ai_all");
             Cache::forget("restock_needed_stock_ids_all");
+
+            // Otomatis picu kalkulasi ulang Min-Max Dinamis & Safety Stock untuk produk supplier ini
+            app(\App\Services\DynamicMinMaxService::class)->recalculateForSupplier($supplierId, $divisionId, $branchId);
         } catch (\Throwable $e) {
             Log::warning("Gagal sinkronisasi siklus stok cabang untuk supplier {$supplierId}: " . $e->getMessage());
         }

@@ -16,14 +16,22 @@ class DynamicMinMaxService
     const MAX_MIN_DAYS = 20;     // Plafon atas untuk min (maks 20 hari ADS)
 
     /**
-     * Calculate and update Min-Max dynamically for all products in a branch, or a specific product.
+     * Calculate and update Min-Max dynamically for all products in a branch, or a specific product/supplier.
      *
      * @param string $branchId
      * @param string|null $productId
      * @param int $monthsCount Number of months to evaluate (default 12)
+     * @param string|null $supplierId
+     * @param string|null $supplierDivisionId
      * @return array Summary of recalculation
      */
-    public function recalculateForBranch(string $branchId, ?string $productId = null, int $monthsCount = 12): array
+    public function recalculateForBranch(
+        string $branchId, 
+        ?string $productId = null, 
+        int $monthsCount = 12,
+        ?string $supplierId = null,
+        ?string $supplierDivisionId = null
+    ): array
     {
         $branch = Branch::find($branchId);
         if (!$branch) {
@@ -102,9 +110,27 @@ class DynamicMinMaxService
         }
 
         // 4. Query stocks to update
-        $stocksQuery = Stock::where('branch_id', $branchId);
+        $stocksQuery = Stock::where('stocks.branch_id', $branchId)->with(['product']);
         if ($productId) {
-            $stocksQuery->where('product_id', $productId);
+            $stocksQuery->where('stocks.product_id', $productId);
+        }
+        if ($supplierId) {
+            $stocksQuery->where(function ($q) use ($supplierId, $supplierDivisionId) {
+                $q->where(function ($sq) use ($supplierId, $supplierDivisionId) {
+                    $sq->where('stocks.supplier_id', $supplierId);
+                    if ($supplierDivisionId) {
+                        $sq->where('stocks.supplier_division_id', $supplierDivisionId);
+                    }
+                })->orWhere(function ($sq) use ($supplierId, $supplierDivisionId) {
+                    $sq->whereNull('stocks.supplier_id')
+                       ->whereHas('product', function ($pq) use ($supplierId, $supplierDivisionId) {
+                           $pq->where('supplier_id', $supplierId);
+                           if ($supplierDivisionId) {
+                               $pq->where('supplier_division_id', $supplierDivisionId);
+                           }
+                       });
+                });
+            });
         }
         $stocks = $stocksQuery->get();
 
@@ -121,9 +147,18 @@ class DynamicMinMaxService
                 $salesSeries[] = $productMonthlySales[$pId][$idx] ?? 0.0;
             }
 
-            // Lead time & Target Inventory Days
-            $leadTimeDays = $stock->lead_time > 0 ? (int)$stock->lead_time : self::DEFAULT_LEAD_TIME_DAYS;
-            $targetDays = $stock->desired_inventory_days > 0 ? (int)$stock->desired_inventory_days : 14;
+            // Lead time & Target Inventory Days mengacu ke hierarki Supplier / Sub-Divisi / Cabang
+            $effSup = $stock->supplier_id ?: ($stock->product?->supplier_id ?? null);
+            $effDiv = $stock->supplier_id ? $stock->supplier_division_id : ($stock->product?->supplier_division_id ?? null);
+
+            if ($effSup) {
+                $cycle = SuggestedOrderService::resolveInventoryCycle($effSup, $effDiv, $branchId);
+                $leadTimeDays = (int)$cycle['lead_time'];
+                $targetDays = (int)$cycle['target_days'];
+            } else {
+                $leadTimeDays = $stock->lead_time > 0 ? (int)$stock->lead_time : self::DEFAULT_LEAD_TIME_DAYS;
+                $targetDays = $stock->desired_inventory_days > 0 ? (int)$stock->desired_inventory_days : 14;
+            }
 
             // Calculate Dynamic Statistics (Standard Retail Periodic Review Formula)
             $calc = $this->calculateDynamicStats($salesSeries, $leadTimeDays, $targetDays);
@@ -137,6 +172,8 @@ class DynamicMinMaxService
                 'min_qty' => $calc['min_qty'],
                 'max_qty' => $calc['max_qty'],
                 'safety_stock' => $calc['safety_stock'],
+                'lead_time' => $leadTimeDays,
+                'desired_inventory_days' => $targetDays,
             ];
 
             $updatedCount++;
@@ -166,9 +203,13 @@ class DynamicMinMaxService
                 $minCases = '';
                 $maxCases = '';
                 $safetyCases = '';
+                $ltCases = '';
+                $targetCases = '';
                 $minBindings = [];
                 $maxBindings = [];
                 $safetyBindings = [];
+                $ltBindings = [];
+                $targetBindings = [];
 
                 foreach ($chunk as $item) {
                     $ids[] = $item['id'];
@@ -184,10 +225,18 @@ class DynamicMinMaxService
                     $safetyCases .= "WHEN ? THEN ? ";
                     $safetyBindings[] = $item['id'];
                     $safetyBindings[] = $item['safety_stock'];
+
+                    $ltCases .= "WHEN ? THEN ? ";
+                    $ltBindings[] = $item['id'];
+                    $ltBindings[] = $item['lead_time'];
+
+                    $targetCases .= "WHEN ? THEN ? ";
+                    $targetBindings[] = $item['id'];
+                    $targetBindings[] = $item['desired_inventory_days'];
                 }
 
                 $idPlaceholders = implode(',', array_fill(0, count($ids), '?'));
-                $bindings = array_merge($minBindings, $maxBindings, $safetyBindings, $ids);
+                $bindings = array_merge($minBindings, $maxBindings, $safetyBindings, $ltBindings, $targetBindings, $ids);
 
                 DB::update("
                     UPDATE stocks 
@@ -195,6 +244,8 @@ class DynamicMinMaxService
                         min_qty = CASE id {$minCases} END,
                         max_qty = CASE id {$maxCases} END,
                         safety_stock = CASE id {$safetyCases} END,
+                        lead_time = CASE id {$ltCases} END,
+                        desired_inventory_days = CASE id {$targetCases} END,
                         updated_at = '{$now}'
                     WHERE id IN ({$idPlaceholders})
                 ", $bindings);
@@ -212,6 +263,28 @@ class DynamicMinMaxService
             'months_evaluated' => $monthsCount,
             'earliest_live_pos_date' => $earliestLiveDate ? $earliestLiveDate->format('Y-m') : 'None (All Migration)',
             'sample_results' => $itemsRecalculated,
+        ];
+    }
+
+    /**
+     * Hitung ulang Min-Max Dinamis untuk seluruh produk milik Supplier / Sub-Divisi tertentu
+     * pada satu cabang atau semua cabang.
+     */
+    public function recalculateForSupplier(string $supplierId, ?string $divisionId = null, ?string $branchId = null, int $monthsCount = 12): array
+    {
+        $branches = $branchId ? Branch::where('id', $branchId)->get() : Branch::all();
+        $totalEvaluated = 0;
+        $totalUpdated = 0;
+
+        foreach ($branches as $branch) {
+            $res = $this->recalculateForBranch($branch->id, null, $monthsCount, $supplierId, $divisionId);
+            $totalEvaluated += $res['total_stocks_evaluated'];
+            $totalUpdated += $res['total_stocks_updated'];
+        }
+
+        return [
+            'total_stocks_evaluated' => $totalEvaluated,
+            'total_stocks_updated' => $totalUpdated,
         ];
     }
 

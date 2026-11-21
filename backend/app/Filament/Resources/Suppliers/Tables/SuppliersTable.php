@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Suppliers\Tables;
 
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\DeleteAction;
@@ -80,6 +81,31 @@ class SuppliersTable
             ])
             ->recordActions([
                 EditAction::make(),
+                Action::make('recalculate_min_max')
+                    ->label('Hitung Min-Max')
+                    ->icon('heroicon-o-calculator')
+                    ->color('warning')
+                    ->visible(fn () => (bool) auth()->user()?->hasCustomAuthorization('EDIT_SUPPLIER_CYCLE'))
+                    ->requiresConfirmation()
+                    ->modalHeading(fn ($record) => "Kalkulasi Ulang Min-Max: {$record->name}")
+                    ->modalDescription('Sistem akan menganalisis histori penjualan 12 bulan terakhir dan memperbarui Min, Max, dan Safety Stock untuk seluruh barang milik supplier ini di semua cabang berdasarkan siklus kunjungan yang aktif.')
+                    ->modalSubmitActionLabel('Mulai Hitung Ulang')
+                    ->action(function ($record) {
+                        try {
+                            $res = app(\App\Services\DynamicMinMaxService::class)->recalculateForSupplier($record->id);
+                            Notification::make()
+                                ->title('Min-Max Dinamis Berhasil Dihitung Ulang')
+                                ->body("Berhasil memperbarui {$res['total_stocks_updated']} stok cabang untuk supplier {$record->name}.")
+                                ->success()
+                                ->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()
+                                ->title('Gagal Menghitung Ulang')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
                 DeleteAction::make()
                     ->hidden(fn ($record) => $record->products()->exists())
                     ->disabled(fn ($record) => $record->products()->exists()),
