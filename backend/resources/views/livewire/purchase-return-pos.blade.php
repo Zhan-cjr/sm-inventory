@@ -260,8 +260,8 @@
                                 </div>
                             </div>
                             <div style="text-align: right; flex-shrink: 0; margin-left: 1rem;">
-                                <div style="font-size: 0.8rem; font-weight: 600; color: {{ $stockQty > 0 ? '#059669' : '#dc2626' }};">
-                                    Stok: {{ number_format($stockQty, 0) }} Pcs
+                                <div style="font-size: 0.8rem; font-weight: 600; color: {{ $salableQty > 0 ? '#059669' : ($damagedQty > 0 ? '#d97706' : '#dc2626') }};">
+                                    Layak Jual: {{ number_format($salableQty, 0) }} Pcs
                                 </div>
                                 @if($damagedQty > 0)
                                     <div style="margin-top: 1px;">

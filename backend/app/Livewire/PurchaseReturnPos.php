@@ -73,6 +73,15 @@ class PurchaseReturnPos extends Component
                 if ($item->stock_batch_id) {
                     $batch = StockBatch::find($item->stock_batch_id);
                     $remainingInBatch = $batch ? (float) $batch->remaining_quantity : 0;
+                } else {
+                    $stock = Stock::where('product_id', $item->product_id)
+                        ->where('branch_id', $purchaseReturn->branch_id)
+                        ->first();
+                    if ($stock) {
+                        $phys = (float) $stock->quantity_on_hand;
+                        $dmg = max(0.0, (float) ($stock->quantity_damaged ?? 0));
+                        $remainingInBatch = max(0.0, $phys - $dmg) + $dmg;
+                    }
                 }
 
                 $maxQty = $remainingInBatch + (float) $item->quantity;
@@ -139,6 +148,7 @@ class PurchaseReturnPos extends Component
 
         $query = Product::query()
             ->where('is_active', true)
+            ->with(['stocks' => fn($sq) => $sq->where('branch_id', $this->branch_id)])
             ->whereHas('stocks', fn($sq) => $sq->where('branch_id', $this->branch_id))
             ->where(function ($q) use ($escaped) {
                 $q->where('barcode', 'like', "%{$escaped}%")
@@ -232,7 +242,13 @@ class PurchaseReturnPos extends Component
         $stock = Stock::where('product_id', $productId)
             ->where('branch_id', $branchId)
             ->first();
-        $physicalStock = $stock ? (float)$stock->quantity_on_hand : 0;
+        $physicalStock = $stock ? (float) $stock->quantity_on_hand : 0.0;
+        $damagedStock = $stock ? max(0.0, (float) ($stock->quantity_damaged ?? 0)) : 0.0;
+        $salableStock = max(0.0, $physicalStock - $damagedStock);
+        // Total fisik yang bisa diretur = stok layak jual + stok karantina BS.
+        // Dengan rumus ini, meskipun stok layak jual 0 atau quantity_on_hand <= 0,
+        // stok di Karantina BS tetap terhitung dan dapat diretur.
+        $returnableStock = $salableStock + $damagedStock;
 
         $batches = StockBatch::where('product_id', $productId)
             ->where('branch_id', $branchId)
@@ -282,25 +298,47 @@ class PurchaseReturnPos extends Component
             $totalBatchRemaining += $remainingQty;
         }
 
-        // Fallback: Jika stok fisik toko > total sisa batch GR dari supplier ini
-        // (Bisa berasal dari Saldo Awal / Import Stok / Mutasi Cabang)
-        $nonGrStock = max(0, $physicalStock - $totalBatchRemaining);
+        // Fallback: Jika total stok yang bisa diretur (Layak Jual + Karantina BS) > sisa batch GR aktif supplier ini
+        // (Bisa berasal dari Karantina BS yang batch GR-nya sudah habis terjual FIFO, Saldo Awal, Import Stok, atau Mutasi Cabang)
+        $nonGrStock = max(0.0, $returnableStock - $totalBatchRemaining);
         if ($nonGrStock > 0 || empty($batchList)) {
             $product = Product::find($productId);
-            $hpp = 0;
-            if ($stock && $stock->cost_price > 0) {
+            $hpp = 0.0;
+            if ($stock && ((float) $stock->cost_price_tax > 0 || (float) $stock->cost_price > 0)) {
                 $hpp = (float) ($stock->cost_price_tax > 0 ? $stock->cost_price_tax : $stock->cost_price);
-            } elseif ($product && $product->cost_price > 0) {
+            } elseif ($product && ((float) $product->cost_price_tax > 0 || (float) $product->cost_price > 0)) {
                 $hpp = (float) ($product->cost_price_tax > 0 ? $product->cost_price_tax : $product->cost_price);
             }
 
-            $maxNonGr = $nonGrStock > 0 ? $nonGrStock : max(0, $physicalStock);
+            if ($hpp <= 0 && $supplierId) {
+                $lastGrItem = GoodsReceiptItem::where('product_id', $productId)
+                    ->whereHas('goodsReceipt', function ($q) use ($supplierId, $branchId) {
+                        $q->where('supplier_id', $supplierId)
+                          ->where('branch_id', $branchId)
+                          ->where('status', '!=', 'CANCELLED');
+                    })
+                    ->latest('id')
+                    ->first();
+                if ($lastGrItem) {
+                    $gr = $lastGrItem->goodsReceipt;
+                    $netUnitPrice = $lastGrItem->quantity_received > 0
+                        ? ((float) $lastGrItem->subtotal / (float) $lastGrItem->quantity_received)
+                        : (float) $lastGrItem->unit_price;
+                    $hpp = ($gr && $gr->include_tax) ? round($netUnitPrice * $taxMultiplier, 2) : round($netUnitPrice, 2);
+                }
+            }
+
+            $maxNonGr = $nonGrStock > 0 ? $nonGrStock : max(0.0, $returnableStock);
 
             if ($maxNonGr > 0) {
+                $nonGrLabel = ($damagedStock > 0 && $salableStock <= 0 && empty($batchList))
+                    ? 'KARANTINA BS / NON-GR'
+                    : 'NON-GR / SALDO AWAL';
+
                 $batchList[] = [
                     'stock_batch_id' => null,
                     'goods_receipt_id' => null,
-                    'gr_number' => 'NON-GR / SALDO AWAL',
+                    'gr_number' => $nonGrLabel,
                     'gr_date' => '-',
                     'remaining_qty' => $maxNonGr,
                     'unit_price' => $hpp,
@@ -311,6 +349,9 @@ class PurchaseReturnPos extends Component
 
         return [
             'physical_stock' => $physicalStock,
+            'damaged_stock' => $damagedStock,
+            'salable_stock' => $salableStock,
+            'returnable_stock' => $returnableStock,
             'batches' => $batchList,
         ];
     }
@@ -318,11 +359,11 @@ class PurchaseReturnPos extends Component
     public function addProductToReturn($product, $qtyToAdd = 1)
     {
         $batchInfo = $this->getAvailableBatchesForProduct($product->id);
-        $physicalStock = $batchInfo['physical_stock'];
+        $returnableStock = $batchInfo['returnable_stock'];
         $batches = $batchInfo['batches'];
 
-        if ($physicalStock <= 0 && empty($batches)) {
-            Notification::make()->title("Stok fisik '{$product->name}' di cabang ini adalah 0!")->warning()->send();
+        if ($returnableStock <= 0 && empty($batches)) {
+            Notification::make()->title("Stok fisik & karantina BS '{$product->name}' di cabang ini adalah 0!")->warning()->send();
             return;
         }
 
@@ -649,19 +690,20 @@ class PurchaseReturnPos extends Component
 
                         if ($stock) {
                             if ($diffQty > 0) {
-                                $stock->log_type = 'RETURN';
-                                $stock->reason_code = 'PURCHASE_RETURN';
-                                $stock->reference_doc_type = 'PURCHASE_RETURN';
-                                $stock->reference_doc_id = $pr->return_number ?: $pr->id;
-                                $stock->notes = 'Penyesuaian Tambah Retur ' . $pr->return_number;
-                                $stock->decrement('quantity_on_hand', $diffQty);
+                                $this->deductReturnStock(
+                                    $stock,
+                                    $pr,
+                                    $diffQty,
+                                    'Penyesuaian Tambah Retur ' . $pr->return_number,
+                                    $pair['item']['gr_number'] ?? null
+                                );
                             } else {
-                                $stock->log_type = 'ADJUSTMENT';
-                                $stock->reason_code = 'RETURN_EDIT_REVERT';
-                                $stock->reference_doc_type = 'PURCHASE_RETURN';
-                                $stock->reference_doc_id = $pr->return_number ?: $pr->id;
-                                $stock->notes = 'Penyesuaian Kurang Retur ' . $pr->return_number;
-                                $stock->increment('quantity_on_hand', abs($diffQty));
+                                $this->restoreReturnStock(
+                                    $stock,
+                                    $pr,
+                                    abs($diffQty),
+                                    'Penyesuaian Kurang Retur ' . $pr->return_number
+                                );
                             }
                         }
                     }
@@ -772,13 +814,12 @@ class PurchaseReturnPos extends Component
             ->first();
 
         if ($stock) {
-            $stock->log_type = 'ADJUSTMENT';
-            $stock->reason_code = 'RETURN_EDIT_REVERT';
-            $stock->reference_doc_type = 'PURCHASE_RETURN';
-            $stock->reference_doc_id = $pr->return_number ?: $pr->id;
-            $stock->notes = 'Revert sebelum Edit Retur ' . $pr->return_number;
-
-            $stock->increment('quantity_on_hand', $oldItem->quantity);
+            $this->restoreReturnStock(
+                $stock,
+                $pr,
+                (float) $oldItem->quantity,
+                'Revert sebelum Edit Retur ' . $pr->return_number
+            );
         }
     }
 
@@ -809,37 +850,124 @@ class PurchaseReturnPos extends Component
             ->first();
 
         if ($stock) {
-            $qtyReturned = (float) $item['qty_returned'];
-            $damaged = (float) ($stock->quantity_damaged ?? 0);
-            $cutFromDamaged = min($qtyReturned, $damaged);
-            $cutFromSalable = $qtyReturned - $cutFromDamaged;
+            $this->deductReturnStock(
+                $stock,
+                $pr,
+                (float) $item['qty_returned'],
+                'Retur Pembelian ' . $pr->return_number,
+                $item['gr_number'] ?? null
+            );
+        }
+    }
 
-            if ($cutFromDamaged > 0) {
-                $stock->decrement('quantity_damaged', $cutFromDamaged);
+    private function deductReturnStock(Stock $stock, PurchaseReturn $pr, float $qtyReturned, string $notePrefix, ?string $grNumber = null): void
+    {
+        if ($qtyReturned <= 0) {
+            return;
+        }
 
-                StockQuarantineMovement::create([
-                    'organization_id' => $stock->branch->organization_id ?? null,
-                    'branch_id' => $stock->branch_id,
-                    'product_id' => $stock->product_id,
-                    'movement_type' => 'PURCHASE_RETURN',
-                    'quantity' => $cutFromDamaged,
-                    'reason' => 'RETUR_KE_SUPPLIER',
-                    'reference_doc_type' => 'PURCHASE_RETURN',
-                    'reference_doc_id' => $pr->id,
-                    'notes' => 'Retur Pembelian ' . $pr->return_number,
-                    'created_by' => auth()->id(),
-                ]);
-            }
+        $physicalBefore = (float) $stock->quantity_on_hand;
+        $damaged = max(0.0, (float) ($stock->quantity_damaged ?? 0));
+        $cutFromDamaged = min($qtyReturned, $damaged);
+        $cutFromSalable = $qtyReturned - $cutFromDamaged;
 
+        // Hanya kurangi quantity_on_hand sebesar porsi BS yang memang tercakup di quantity_on_hand positif
+        // ditambah porsi dari stok layak jual, agar retur stok BS saat quantity_on_hand <= 0 tidak membuat stok minus.
+        $damagedInPhysical = min($damaged, max(0.0, $physicalBefore));
+        $unbackedDamaged = max(0.0, $damaged - $damagedInPhysical);
+        $qohDeductionFromDamaged = max(0.0, $cutFromDamaged - $unbackedDamaged);
+        $totalQohDeduction = $qohDeductionFromDamaged + $cutFromSalable;
+
+        if ($cutFromDamaged > 0) {
+            $stock->decrement('quantity_damaged', $cutFromDamaged);
+
+            StockQuarantineMovement::create([
+                'organization_id' => $stock->branch->organization_id ?? null,
+                'branch_id' => $stock->branch_id,
+                'product_id' => $stock->product_id,
+                'movement_type' => 'PURCHASE_RETURN',
+                'quantity' => $cutFromDamaged,
+                'reason' => 'RETUR_KE_SUPPLIER',
+                'reference_doc_type' => 'PURCHASE_RETURN',
+                'reference_doc_id' => $pr->id,
+                'notes' => $notePrefix,
+                'created_by' => auth()->id(),
+            ]);
+        }
+
+        $detailNote = $cutFromDamaged > 0 ? " ({$cutFromDamaged} pcs dari BS, {$cutFromSalable} pcs dari Layak Jual)" : "";
+        $fullNotes = $notePrefix . (!empty($grNumber) ? ' (Ref: ' . $grNumber . ')' : '') . $detailNote;
+
+        if ($totalQohDeduction > 0) {
             $stock->log_type = 'RETURN';
             $stock->reason_code = 'PURCHASE_RETURN';
             $stock->reference_doc_type = 'PURCHASE_RETURN';
             $stock->reference_doc_id = $pr->return_number ?: $pr->id;
-            $detailNote = $cutFromDamaged > 0 ? " ({$cutFromDamaged} pcs dari BS, {$cutFromSalable} pcs dari Layak Jual)" : "";
-            $stock->notes = 'Retur Pembelian ' . $pr->return_number . (!empty($item['gr_number']) ? ' (Ref: ' . $item['gr_number'] . ')' : '') . $detailNote;
+            $stock->notes = $fullNotes;
 
-            $stock->decrement('quantity_on_hand', $qtyReturned);
+            $stock->decrement('quantity_on_hand', $totalQohDeduction);
+        } else {
+            // Jika quantity_on_hand sudah <= 0 dan murni memotong Karantina BS, tetap catat di Kartu Stok
+            \App\Models\InventoryLog::create([
+                'branch_id' => $stock->branch_id,
+                'product_id' => $stock->product_id,
+                'log_type' => 'RETURN',
+                'quantity_before' => $physicalBefore,
+                'quantity_change' => 0,
+                'quantity_after' => $physicalBefore,
+                'balance' => $physicalBefore,
+                'reason_code' => 'PURCHASE_RETURN',
+                'reference_doc_type' => 'PURCHASE_RETURN',
+                'reference_doc_id' => $pr->return_number ?: $pr->id,
+                'recorded_by' => auth()->id() ?? '00000000-0000-0000-0000-000000000000',
+                'notes' => $fullNotes,
+            ]);
         }
+    }
+
+    private function restoreReturnStock(Stock $stock, PurchaseReturn $pr, float $qtyToRestore, string $notePrefix): void
+    {
+        if ($qtyToRestore <= 0) {
+            return;
+        }
+
+        // Cek apakah retur ini sebelumnya memotong stok Karantina BS
+        $bsMovements = StockQuarantineMovement::where('reference_doc_type', 'PURCHASE_RETURN')
+            ->where('reference_doc_id', $pr->id)
+            ->where('product_id', $stock->product_id)
+            ->where('branch_id', $stock->branch_id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $remainingBsToRestore = $qtyToRestore;
+        $restoredToBs = 0.0;
+
+        foreach ($bsMovements as $mov) {
+            if ($remainingBsToRestore <= 0) break;
+            $movQty = (float) $mov->quantity;
+            if ($movQty <= $remainingBsToRestore + 0.0001) {
+                $restoredToBs += $movQty;
+                $remainingBsToRestore -= $movQty;
+                $mov->delete();
+            } else {
+                $restoredToBs += $remainingBsToRestore;
+                $mov->decrement('quantity', $remainingBsToRestore);
+                $remainingBsToRestore = 0;
+            }
+        }
+
+        if ($restoredToBs > 0) {
+            $stock->increment('quantity_damaged', $restoredToBs);
+        }
+
+        $stock->log_type = 'ADJUSTMENT';
+        $stock->reason_code = 'RETURN_EDIT_REVERT';
+        $stock->reference_doc_type = 'PURCHASE_RETURN';
+        $stock->reference_doc_id = $pr->return_number ?: $pr->id;
+        $detailNote = $restoredToBs > 0 ? " ({$restoredToBs} pcs dikembalikan ke BS)" : "";
+        $stock->notes = $notePrefix . $detailNote;
+
+        $stock->increment('quantity_on_hand', $qtyToRestore);
     }
 
     private function hasHeaderChanges(PurchaseReturn $pr, array $data): bool

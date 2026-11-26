@@ -469,9 +469,20 @@ class StockQuarantineAuditPos extends Component
                     }
                 } elseif ($action === 'ADJUST_INCREASE' && $diff > 0) {
                     $qtyToAdd = $diff;
-                    $stock = Stock::where('branch_id', $this->branch_id)->where('product_id', $productId)->first();
+                    $stock = Stock::firstOrCreate(
+                        ['branch_id' => $this->branch_id, 'product_id' => $productId],
+                        ['quantity_on_hand' => 0, 'quantity_damaged' => 0, 'is_active' => true, 'version' => 1]
+                    );
                     if ($stock) {
-                        $prevDamaged = (float)($stock->quantity_damaged ?? 0);
+                        $prevQoh = (float) $stock->quantity_on_hand;
+                        $prevDamaged = max(0.0, (float) ($stock->quantity_damaged ?? 0));
+                        $salableBefore = max(0.0, $prevQoh - $prevDamaged);
+
+                        // Jika stok layak jual tidak cukup menutup penambahan BS (misal layak jual 0),
+                        // naikkan juga quantity_on_hand sebesar selisihnya agar total fisik toko sinkron dengan stok BS.
+                        $fromSalable = min($qtyToAdd, $salableBefore);
+                        $unbackedIncrease = max(0.0, $qtyToAdd - $fromSalable);
+
                         $stock->increment('quantity_damaged', $qtyToAdd);
 
                         StockQuarantineMovement::create([
@@ -488,19 +499,31 @@ class StockQuarantineAuditPos extends Component
                             'created_by'         => $userId,
                         ]);
 
-                        InventoryLog::create([
-                            'branch_id'          => $this->branch_id,
-                            'product_id'         => $productId,
-                            'log_type'           => 'QUARANTINE_IN',
-                            'quantity_before'    => (float)$stock->quantity_on_hand,
-                            'quantity_change'    => 0,
-                            'quantity_after'     => (float)$stock->quantity_on_hand,
-                            'reason_code'        => 'PENAMBAHAN_HASIL_AUDIT_BS',
-                            'reference_doc_type' => 'STOCK_QUARANTINE_AUDIT',
-                            'reference_doc_id'   => $audit->audit_number,
-                            'notes'              => "[{$audit->audit_number}] Pindah ke Karantina BS ({$qtyToAdd} pcs) hasil temuan audit keranjang BS. " . ($item['notes'] ? "Catatan: {$item['notes']}. " : '') . "Saldo Layak Jual: {$stock->salable_quantity} pcs, BS: " . ($prevDamaged + $qtyToAdd) . " pcs.",
-                            'recorded_by'        => (string)$userId,
-                        ]);
+                        $logNotes = "[{$audit->audit_number}] Pindah ke Karantina BS ({$qtyToAdd} pcs) hasil temuan audit keranjang BS. " . ($item['notes'] ? "Catatan: {$item['notes']}. " : '') . "Saldo Layak Jual: " . max(0.0, ($prevQoh + $unbackedIncrease) - ($prevDamaged + $qtyToAdd)) . " pcs, BS: " . ($prevDamaged + $qtyToAdd) . " pcs.";
+
+                        if ($unbackedIncrease > 0) {
+                            $stock->log_type = 'QUARANTINE_IN';
+                            $stock->reason_code = 'PENAMBAHAN_HASIL_AUDIT_BS';
+                            $stock->reference_doc_type = 'STOCK_QUARANTINE_AUDIT';
+                            $stock->reference_doc_id = $audit->audit_number;
+                            $stock->recorded_by = (string) $userId;
+                            $stock->notes = $logNotes;
+                            $stock->increment('quantity_on_hand', $unbackedIncrease);
+                        } else {
+                            InventoryLog::create([
+                                'branch_id'          => $this->branch_id,
+                                'product_id'         => $productId,
+                                'log_type'           => 'QUARANTINE_IN',
+                                'quantity_before'    => $prevQoh,
+                                'quantity_change'    => 0,
+                                'quantity_after'     => $prevQoh,
+                                'reason_code'        => 'PENAMBAHAN_HASIL_AUDIT_BS',
+                                'reference_doc_type' => 'STOCK_QUARANTINE_AUDIT',
+                                'reference_doc_id'   => $audit->audit_number,
+                                'notes'              => $logNotes,
+                                'recorded_by'        => (string)$userId,
+                            ]);
+                        }
                     }
                 }
             }
