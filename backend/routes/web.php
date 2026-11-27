@@ -12,13 +12,13 @@ Route::get('/login', function () {
 
 Route::get('/print/transaction/{transaction}', function (\App\Models\Transaction $transaction) {
     return view('print.transaction-receipt', compact('transaction'));
-})->name('print.transaction')->middleware('web');
+})->name('print.transaction')->middleware(['web', 'auth']);
 
-Route::get('/print/report/{type}', [\App\Http\Controllers\ReportPrintController::class, 'print'])->name('print.report')->middleware('web');
+Route::get('/print/report/{type}', [\App\Http\Controllers\ReportPrintController::class, 'print'])->name('print.report')->middleware(['web', 'auth']);
 
 Route::get('/print/document/{type}', [\App\Http\Controllers\DocumentPrintController::class, 'print'])->name('print.document')->middleware(['web', 'auth']);
 
-Route::get('/print/eod/{shift}', [\App\Http\Controllers\Api\V1\ShiftController::class, 'printEod'])->name('print.eod')->middleware('web');
+Route::get('/print/eod/{shift}', [\App\Http\Controllers\Api\V1\ShiftController::class, 'printEod'])->name('print.eod')->middleware(['web', 'auth']);
 
 // ============================================================
 // Stok Opname — Halaman Cetak QR (perlu session Filament admin)

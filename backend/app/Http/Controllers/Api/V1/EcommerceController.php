@@ -1149,7 +1149,7 @@ class EcommerceController extends Controller
         $key = 'otp_forgot_pw_' . $request->phone;
         $cachedOtp = \Cache::get($key);
 
-        if (!$cachedOtp || $cachedOtp !== $request->otp) {
+        if (!$cachedOtp || !hash_equals((string) $cachedOtp, (string) $request->otp)) {
             return response()->json([
                 'message' => 'Kode OTP salah atau telah kedaluwarsa.',
             ], 400);
@@ -1179,34 +1179,15 @@ class EcommerceController extends Controller
     }
 
     /**
-     * Debug endpoint to get last OTP
-     */
-    public function debugLastOtp(Request $request)
-    {
-        $phone = $request->query('phone', '085861094485');
-        
-        $key = 'otp_forgot_pw_' . $phone;
-        $otp = \Cache::get($key);
-
-        if (!$otp) {
-            $formatted = $phone;
-            if (str_starts_with($phone, '0')) {
-                $formatted = '62' . substr($phone, 1);
-            }
-            $otp = \Cache::get('otp_forgot_pw_' . $formatted);
-        }
-
-        return response()->json([
-            'phone' => $phone,
-            'otp' => $otp,
-        ]);
-    }
-    /**
      * Webhook notifikasi dari Midtrans
      */
     public function paymentNotification(Request $request)
     {
-        \Log::info('Midtrans Webhook Received:', $request->all());
+        \Log::info('Midtrans Webhook Received:', [
+            'order_id' => $request->input('order_id'),
+            'transaction_status' => $request->input('transaction_status'),
+            'status_code' => $request->input('status_code'),
+        ]);
 
         try {
             $this->_configureMidtrans();
@@ -1214,23 +1195,32 @@ class EcommerceController extends Controller
             // Extract from request payload
             $transaction = $request->input('transaction_status');
             $type = $request->input('payment_type');
-            $rawOrderId = $request->input('order_id');
+            $rawOrderId = (string) $request->input('order_id', '');
             $fraud = $request->input('fraud_status');
-            $signatureKey = $request->input('signature_key');
-            $statusCode = $request->input('status_code');
-            $grossAmount = $request->input('gross_amount');
+            $signatureKey = (string) $request->input('signature_key', '');
+            $statusCode = (string) $request->input('status_code', '');
+            $grossAmount = (string) $request->input('gross_amount', '');
 
-            // Verify Signature
-            $serverKey = config('services.midtrans.server_key') ?? env('MIDTRANS_SERVER_KEY');
-            $calculatedSignature = hash("sha512", $rawOrderId . $statusCode . $grossAmount . $serverKey);
+            // Allow official Midtrans Dashboard dummy connectivity test without touching real orders
+            if (strpos($rawOrderId, 'payment_notif_test') !== false) {
+                return response()->json(['message' => 'Test notification accepted'], 200);
+            }
 
-            if ($calculatedSignature !== $signatureKey) {
-                // If Midtrans test notification sends dummy data
-                if (strpos($rawOrderId, 'payment_notif_test') !== false) {
-                    return response()->json(['message' => 'Test notification accepted'], 200);
-                }
-                \Log::warning('Midtrans Webhook Invalid Signature', ['expected' => $calculatedSignature, 'received' => $signatureKey]);
-                // We shouldn't block test webhook from Midtrans Dashboard but in production we should reject invalid signatures
+            // Verify Signature strictly in constant time
+            $serverKey = (string) (config('services.midtrans.server_key') ?? env('MIDTRANS_SERVER_KEY'));
+            if ($serverKey === '' || $signatureKey === '') {
+                \Log::warning('Midtrans Webhook Missing Key or Signature', ['order_id' => $rawOrderId, 'ip' => $request->ip()]);
+                return response()->json(['message' => 'Unauthorized webhook'], 403);
+            }
+
+            $calculatedSignature = hash('sha512', $rawOrderId . $statusCode . $grossAmount . $serverKey);
+
+            if (!hash_equals($calculatedSignature, $signatureKey)) {
+                \Log::warning('Midtrans Webhook Invalid Signature Rejected', [
+                    'order_id' => $rawOrderId,
+                    'ip' => $request->ip(),
+                ]);
+                return response()->json(['message' => 'Invalid signature'], 403);
             }
 
             // Parse order_id because we might append -{timestamp} to generate new tokens

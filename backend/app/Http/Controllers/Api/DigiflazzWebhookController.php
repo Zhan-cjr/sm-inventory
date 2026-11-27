@@ -12,13 +12,19 @@ class DigiflazzWebhookController extends Controller
     public function handle(Request $request)
     {
         $payload = $request->all();
-        $secret = config('services.digiflazz.webhook_secret') ?? env('DIGIFLAZZ_WEBHOOK_SECRET'); 
-        
-        $signature = $request->header('X-Hub-Signature');
-        
-        // Very basic validation - ideally use hash_hmac to verify signature
-        if (!$signature) {
-            return response()->json(['error' => 'No signature provided'], 401);
+        $secret = (string) (config('services.digiflazz.webhook_secret') ?? env('DIGIFLAZZ_WEBHOOK_SECRET'));
+        $signature = (string) $request->header('X-Hub-Signature', '');
+
+        if ($secret === '' || $signature === '') {
+            return response()->json(['error' => 'Unauthorized webhook'], 401);
+        }
+
+        $expectedSignature = 'sha1=' . hash_hmac('sha1', $request->getContent(), $secret);
+        if (!hash_equals($expectedSignature, $signature)) {
+            Log::warning('Digiflazz Webhook Invalid Signature Rejected', [
+                'ip' => $request->ip(),
+            ]);
+            return response()->json(['error' => 'Invalid signature'], 401);
         }
 
         try {

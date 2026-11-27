@@ -40,9 +40,8 @@ Route::prefix('v1/ecommerce')->group(function () {
     Route::post('members/login', [EcommerceController::class, 'memberLogin']);
     Route::get('members/history', [EcommerceController::class, 'getMemberHistory']);
     Route::get('members/profile', [EcommerceController::class, 'getMemberProfile']);
-    Route::post('members/forgot-password', [EcommerceController::class, 'forgotPassword']);
-    Route::get('members/debug-otp', [EcommerceController::class, 'debugLastOtp']);
-    Route::post('members/reset-password', [EcommerceController::class, 'resetPassword']);
+    Route::post('members/forgot-password', [EcommerceController::class, 'forgotPassword'])->middleware('throttle:10,1');
+    Route::post('members/reset-password', [EcommerceController::class, 'resetPassword'])->middleware('throttle:10,1');
     Route::get('members/notifications', [EcommerceController::class, 'getNotifications']);
     Route::post('members/notifications/{id}/read', [EcommerceController::class, 'markNotificationRead']);
     Route::post('members/notifications/read-all', [EcommerceController::class, 'markAllNotificationsRead']);
