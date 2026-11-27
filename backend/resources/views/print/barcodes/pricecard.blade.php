@@ -50,8 +50,10 @@
             flex-shrink: 0;
         }
         .logo-container {
-            padding: 0.8mm 2mm;
+            padding: 0.8mm 1.5mm 0.8mm 2mm;
             flex: 1;
+            min-width: 0;
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: flex-start;
@@ -65,27 +67,30 @@
             background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
             color: #ffffff;
             border-bottom-left-radius: 10px;
-            padding: 0.8mm 2.5mm;
+            padding: 0.7mm 2.2mm 0.7mm 3.2mm;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: flex-end;
             text-align: right;
-            max-width: 58%;
+            width: 52%;
+            max-width: 52%;
+            flex-shrink: 0;
+            overflow: hidden;
         }
         .store-name {
             font-weight: 800;
-            font-size: 8.5px;
-            line-height: 1.1;
-            white-space: nowrap;
+            font-size: 9.5px;
+            line-height: 1.15;
             text-transform: uppercase;
             letter-spacing: 0.2px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
         }
-        .store-motto {
-            font-size: 4.5px;
-            line-height: 1.1;
+        .branch-line {
+            display: inline-block;
             white-space: nowrap;
-            opacity: 0.9;
         }
         
         .separator {
@@ -237,13 +242,22 @@
         .stripe-grey { background: #94a3b8; }
     </style>
 </head>
-<body onload="window.print()">
+<body onload="fitBranchNames(); window.print();">
     @php
         $generator = new Picqer\Barcode\BarcodeGeneratorSVG();
         $org = \App\Models\Organization::first();
         $orgName = $org ? $org->name : 'Toko Kita';
         $branch = \App\Models\Branch::find($branch_id ?? null);
         $branchName = $branch ? $branch->name : 'Pasar UmMat';
+        $branchWords = preg_split('/\s+/', trim($branchName), -1, PREG_SPLIT_NO_EMPTY);
+        $branchLine1 = $branchWords[0] ?? 'PUSAT';
+        $branchLine2 = count($branchWords) > 1 ? implode(' ', array_slice($branchWords, 1)) : '';
+        $maxBranchChars = max(mb_strlen($branchLine1), mb_strlen($branchLine2));
+        if ($branchLine2 === '') {
+            $branchFontSize = $maxBranchChars <= 10 ? 10.5 : ($maxBranchChars <= 14 ? 8.8 : max(6.0, round(120 / $maxBranchChars, 1)));
+        } else {
+            $branchFontSize = $maxBranchChars <= 10 ? 9.5 : ($maxBranchChars <= 14 ? 8.5 : ($maxBranchChars <= 18 ? 7.2 : max(5.5, round(125 / $maxBranchChars, 1))));
+        }
         
         if (($date_type ?? 'cetak') === 'expired' && !empty($custom_date)) {
             $dateStr = \Carbon\Carbon::parse($custom_date)->format('d/m/Y');
@@ -274,8 +288,12 @@
                             @endif
                         </div>
                         <div class="store-info">
-                            <div class="store-name">{{ Str::limit($branchName, 20) }}</div>
-                            <div class="store-motto">Untung Murah Manfaat<br>dan InsyaAllah Berkah</div>
+                            <div class="store-name" style="font-size: {{ $branchFontSize }}px;">
+                                <span class="branch-line">{{ $branchLine1 }}</span>
+                                @if($branchLine2 !== '')
+                                    <span class="branch-line">{{ $branchLine2 }}</span>
+                                @endif
+                            </div>
                         </div>
                     </div>
                     
@@ -325,5 +343,29 @@
             @endfor
         @endforeach
     </div>
+    <script>
+        function fitBranchNames() {
+            document.querySelectorAll('.store-info').forEach(function (box) {
+                var nameEl = box.querySelector('.store-name');
+                if (!nameEl) return;
+                var cs = window.getComputedStyle(box);
+                var availW = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
+                var availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+                var lines = nameEl.querySelectorAll('.branch-line');
+                var size = parseFloat(window.getComputedStyle(nameEl).fontSize);
+                var fits = function () {
+                    if (nameEl.offsetHeight > availH) return false;
+                    for (var i = 0; i < lines.length; i++) {
+                        if (lines[i].offsetWidth > availW) return false;
+                    }
+                    return true;
+                };
+                while (!fits() && size > 4.5) {
+                    size -= 0.25;
+                    nameEl.style.fontSize = size + 'px';
+                }
+            });
+        }
+    </script>
 </body>
 </html>
