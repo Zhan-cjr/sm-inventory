@@ -45,18 +45,19 @@
             display: flex;
             justify-content: space-between;
             align-items: stretch;
-            height: 8.5mm;
+            height: 7.5mm;
             background: #ffffff;
+            flex-shrink: 0;
         }
         .logo-container {
-            padding: 1mm 2mm;
+            padding: 0.8mm 2mm;
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: flex-start;
         }
         .logo-container img {
-            max-height: 6mm;
+            max-height: 5.6mm;
             max-width: 100%;
             object-fit: contain;
         }
@@ -64,7 +65,7 @@
             background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
             color: #ffffff;
             border-bottom-left-radius: 10px;
-            padding: 1mm 2.5mm;
+            padding: 0.8mm 2.5mm;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -91,30 +92,39 @@
             height: 1.5px;
             background: #dc2626;
             margin: 0 2mm;
+            flex-shrink: 0;
         }
         
         .body-content {
             display: flex;
             flex: 1;
-            padding: 1.5mm 2mm 0 2mm;
+            min-height: 0;
+            padding: 0.8mm 1.8mm 0.4mm 2mm;
         }
         .product-info {
             flex: 1;
+            min-width: 0;
             display: flex;
             flex-direction: column;
-            padding-right: 1.5mm;
+            padding-right: 1.2mm;
             justify-content: space-between;
         }
         .product-name {
             font-weight: 800;
-            font-size: 8.5px;
-            line-height: 1.25;
+            font-size: 12px;
+            line-height: 1.15;
+            letter-spacing: -0.15px;
             text-transform: uppercase;
-            color: #0f172a;
-            height: 2.5em;
+            color: #000000;
+            min-height: 2.3em;
+            max-height: 2.3em;
             display: flex;
             flex-direction: column;
-            justify-content: flex-start;
+            justify-content: center;
+        }
+        .product-name.name-long {
+            font-size: 11px;
+            line-height: 1.15;
         }
         .product-name span {
             display: -webkit-box;
@@ -122,11 +132,12 @@
             -webkit-box-orient: vertical;
             overflow: hidden;
             text-overflow: ellipsis;
+            word-break: break-word;
         }
         
         .grey-line {
             height: 1px;
-            background: #e2e8f0;
+            background: #cbd5e1;
             width: 100%;
             flex-shrink: 0;
         }
@@ -134,52 +145,65 @@
         .product-price {
             display: flex;
             align-items: flex-start;
-            padding-top: 0.5mm;
-            padding-bottom: 0.5mm;
+            padding-top: 0.3mm;
+            padding-bottom: 0.3mm;
+            white-space: nowrap;
         }
         .price-currency {
             font-weight: 900;
-            font-size: 9px;
+            font-size: 10.5px;
             color: #dc2626;
-            margin-right: 2px;
-            margin-top: 1mm;
+            margin-right: 1.5px;
+            margin-top: 0.8mm;
+            letter-spacing: -0.3px;
         }
         .price-amount {
             font-weight: 900;
-            font-size: 23px;
+            font-size: 33px;
             color: #dc2626;
+            letter-spacing: -1px;
+            line-height: 0.86;
+            font-variant-numeric: tabular-nums;
+        }
+        .price-amount.price-6digits {
+            font-size: 28px;
+        }
+        .price-amount.price-millions {
+            font-size: 23px;
             letter-spacing: -0.8px;
-            line-height: 0.85;
         }
         
         .barcode-wrapper {
-            width: 25mm;
+            width: 20.5mm;
+            flex-shrink: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
-            padding-top: 0.5mm;
+            justify-content: center;
         }
         .barcode-wrapper svg {
+            width: 100%;
             max-width: 100%;
-            height: 8mm;
+            height: 8.5mm;
         }
         .barcode-text {
-            font-size: 6.5px;
-            letter-spacing: 0.8px;
-            margin-top: 0.8mm;
+            font-size: 6.8px;
+            letter-spacing: 0.4px;
+            margin-top: 0.6mm;
             font-family: 'Courier New', Courier, monospace;
             font-weight: 800;
-            color: #1e293b;
+            color: #0f172a;
+            white-space: nowrap;
         }
         
         .footer {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            height: 4mm;
+            height: 3.2mm;
             padding-right: 2mm;
             background: #ffffff;
+            flex-shrink: 0;
         }
         .print-date {
             background: #0f172a;
@@ -203,7 +227,7 @@
             display: flex;
             gap: 1mm;
             height: 2mm;
-            margin-bottom: 1mm;
+            margin-bottom: 0.6mm;
         }
         .stripe {
             width: 2mm;
@@ -233,6 +257,10 @@
             @php 
                 $itemCopies = $product->copies ?? 1; 
                 $vColor = $product->velocity_color ?? '#dc2626';
+                $formattedPrice = number_format($product->display_price ?? $product->selling_price, 0, ',', '.');
+                $priceLen = strlen($formattedPrice);
+                $priceClass = $priceLen >= 9 ? 'price-millions' : ($priceLen >= 7 ? 'price-6digits' : '');
+                $nameClass = mb_strlen($product->name ?? '') > 34 ? 'name-long' : '';
             @endphp
             @for($i = 0; $i < $itemCopies; $i++)
                 <div class="pricecard" style="border-left: 4.5px solid {{ $vColor }};">
@@ -256,18 +284,18 @@
                     <!-- Body -->
                     <div class="body-content">
                         <div class="product-info">
-                            <div class="product-name">
+                            <div class="product-name {{ $nameClass }}">
                                 <span>{{ $product->name }}</span>
                             </div>
                             
-                            <div class="grey-line" style="margin-top: 1mm; margin-bottom: 0.5mm;"></div>
+                            <div class="grey-line" style="margin-top: 0.4mm; margin-bottom: 0.3mm;"></div>
                             
                             <div class="product-price">
                                 <span class="price-currency">Rp.</span>
-                                <span class="price-amount">{{ number_format($product->display_price ?? $product->selling_price, 0, ',', '.') }}</span>
+                                <span class="price-amount {{ $priceClass }}">{{ $formattedPrice }}</span>
                             </div>
                             
-                            <div class="grey-line" style="margin-bottom: 0.5mm;"></div>
+                            <div class="grey-line" style="margin-bottom: 0.3mm;"></div>
                         </div>
                         
                         <div class="barcode-wrapper">
