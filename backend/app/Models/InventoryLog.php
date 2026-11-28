@@ -34,9 +34,9 @@ class InventoryLog extends Model
             return $doc;
         }
 
-        // 2. Cek apakah di kolom notes terdapat nomor dokumen (misal AUD-BS-..., ADJ-..., OP-..., GR-..., PR-..., TR-..., PH-...)
+        // 2. Cek apakah di kolom notes terdapat nomor dokumen (termasuk format kode cabang {PREFIX}-{CAB}-{YYMMDD}-{SEQ4})
         if (!empty($this->notes)) {
-            if (preg_match('/\b(AUD-BS-[A-Z0-9-]+|ADJ-[A-Z0-9]+|OP-[A-Z0-9-]+|GR-[0-9]+|PR-[A-Z0-9-]+|TR-[A-Z0-9-]+|PO-[A-Z0-9-]+|PH-[A-Z0-9-]+|BS-[A-Z0-9-]+)\b/i', $this->notes, $matches)) {
+            if (preg_match('/\b(AUD-BS-[A-Z0-9-]+|ADJ-[A-Z0-9-]+|OP-[A-Z0-9-]+|SDK-[A-Z0-9-]+|GR-[A-Z0-9-]+|PRT?-[A-Z0-9-]+|TRF?-[A-Z0-9-]+|PO-[A-Z0-9-]+|KBC?-[A-Z0-9-]+|PAY-[A-Z0-9-]+|EXP-[A-Z0-9-]+|PH-[A-Z0-9-]+|BS-[A-Z0-9-]+)\b/i', $this->notes, $matches)) {
                 return $matches[1];
             }
         }
@@ -64,7 +64,7 @@ class InventoryLog extends Model
 
             if (in_array($this->log_type, ['TRANSFER_IN', 'TRANSFER_OUT'])) {
                 $st = \App\Models\StockTransfer::find($doc);
-                if ($st) return $st->transfer_number ?: $doc;
+                if ($st) return $st->reference_number ?: ($st->transfer_number ?: $doc);
             }
 
             if ($this->log_type === 'PURCHASE_RETURN') {

@@ -578,7 +578,7 @@
     }
 
     function proceedSubmit() {
-        localStorage.removeItem(storageKey); // Clear draft on submit
+        // Draft localStorage hanya dihapus setelah server mengonfirmasi simpan (di opname/done)
         const btn = document.getElementById('submit-btn');
         btn.disabled = true;
         btn.textContent = '⏳ Mengirim data...';

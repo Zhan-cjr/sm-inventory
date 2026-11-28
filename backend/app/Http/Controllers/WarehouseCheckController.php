@@ -162,76 +162,99 @@ class WarehouseCheckController extends Controller
             return back()->with('error', 'Tidak ada barang yang di-scan.');
         }
 
-        $checkId = $request->check_id;
-        $check = null;
-        if ($checkId) {
-            $check = WarehouseCheck::where('id', $checkId)->where('purchase_order_id', $po->id)->first();
-        }
-        if (!$check) {
-            $check = WarehouseCheck::where('purchase_order_id', $po->id)
-                ->whereIn('status', ['rejected', 'pending_approval', 'pending', 'approved'])
-                ->latest()
-                ->first();
-        }
-        
-        if ($check && $check->isEditable()) {
-            // Update existing check
-            $check->cancelPendingApprovals();
-            $check->update([
-                'checked_by' => Auth::id(),
-                'status' => 'pending',
-                'notes' => $request->notes,
-            ]);
-            $check->items()->delete(); // Clear old items to recreate
-        } else {
-            // Create new check
-            $check = WarehouseCheck::create([
-                'purchase_order_id' => $po->id,
-                'branch_id' => $po->branch_id, // assume same branch
-                'checked_by' => Auth::id(),
-                'status' => 'pending',
-                'notes' => $request->notes,
-            ]);
+        $lock = \Illuminate\Support\Facades\Cache::lock("wh_check_submit_{$po->id}", 15);
+        if (!$lock->get()) {
+            return redirect()->route('warehouse.receive.index')
+                ->with('warning', 'Proses simpan pengecekan sedang berlangsung, mohon tunggu.');
         }
 
-        $hasOverQty = false;
-
-        $previousChecks = WarehouseCheck::with('items')->where('purchase_order_id', $po->id)
-            ->where('id', '!=', $check->id)
-            ->whereIn('status', ['pending', 'pending_approval', 'approved', 'processed'])
-            ->get();
-            
-        $alreadyScanned = [];
-        foreach ($previousChecks as $c) {
-            foreach ($c->items as $item) {
-                $alreadyScanned[$item->product_id] = ($alreadyScanned[$item->product_id] ?? 0) + $item->qty_scanned;
+        try {
+            $checkId = $request->check_id;
+            $check = null;
+            if ($checkId) {
+                $check = WarehouseCheck::where('id', $checkId)->where('purchase_order_id', $po->id)->first();
             }
-        }
-
-        foreach ($scannedItems as $productId => $qtyScanned) {
-            $poItem = $po->items()->where('product_id', $productId)->first();
-            $qtyOrdered = $poItem ? $poItem->quantity_ordered : 0;
-            $qtyAlreadyScanned = $alreadyScanned[$productId] ?? 0;
-            $remainingQty = max(0, $qtyOrdered - $qtyAlreadyScanned);
-            
-            WarehouseCheckItem::create([
-                'warehouse_check_id' => $check->id,
-                'product_id' => $productId,
-                'qty_po' => $remainingQty,
-                'qty_scanned' => $qtyScanned,
-            ]);
-
-            if ($qtyScanned > $remainingQty) {
-                $hasOverQty = true;
+            if (!$check) {
+                $check = WarehouseCheck::where('purchase_order_id', $po->id)
+                    ->whereIn('status', ['rejected', 'pending_approval', 'pending', 'approved'])
+                    ->latest()
+                    ->first();
             }
-        }
+            
+            if ($check && $check->isEditable()) {
+                // Update existing check
+                $check->cancelPendingApprovals();
+                $check->update([
+                    'checked_by' => Auth::id(),
+                    'status' => 'pending',
+                    'notes' => $request->notes,
+                ]);
+                $check->items()->delete(); // Clear old items to recreate
+            } else {
+                // Create new check
+                $check = WarehouseCheck::create([
+                    'purchase_order_id' => $po->id,
+                    'branch_id' => $po->branch_id, // assume same branch
+                    'checked_by' => Auth::id(),
+                    'status' => 'pending',
+                    'notes' => $request->notes,
+                ]);
+            }
 
-        if ($hasOverQty) {
-            $check->requestApproval('Revisi: Terdapat kuantitas barang yang melebihi sisa PO.', 1);
-            return redirect()->route('warehouse.receive.index')->with('warning', 'Pengecekan berhasil disimpan, namun karena ada barang yang melebihi Sisa PO, membutuhkan Otorisasi Supervisor.');
-        } else {
-            $check->update(['status' => 'approved']);
-            return redirect()->route('warehouse.receive.index')->with('success', 'Pengecekan berhasil disimpan dan Disetujui (Sesuai Sisa PO). Silakan infokan EDP untuk memproses GR.');
+            $hasOverQty = false;
+
+            $previousChecks = WarehouseCheck::with('items')->where('purchase_order_id', $po->id)
+                ->where('id', '!=', $check->id)
+                ->whereIn('status', ['pending', 'pending_approval', 'approved', 'processed'])
+                ->get();
+                
+            $alreadyScanned = [];
+            foreach ($previousChecks as $c) {
+                foreach ($c->items as $item) {
+                    $alreadyScanned[$item->product_id] = ($alreadyScanned[$item->product_id] ?? 0) + $item->qty_scanned;
+                }
+            }
+
+            foreach ($scannedItems as $productId => $qtyScanned) {
+                $poItem = $po->items()->where('product_id', $productId)->first();
+                $qtyOrdered = $poItem ? $poItem->quantity_ordered : 0;
+                $qtyAlreadyScanned = $alreadyScanned[$productId] ?? 0;
+                $remainingQty = max(0, $qtyOrdered - $qtyAlreadyScanned);
+                
+                WarehouseCheckItem::create([
+                    'warehouse_check_id' => $check->id,
+                    'product_id' => $productId,
+                    'qty_po' => $remainingQty,
+                    'qty_scanned' => $qtyScanned,
+                ]);
+
+                if ($qtyScanned > $remainingQty) {
+                    $hasOverQty = true;
+                }
+            }
+
+            $draftKeysToClear = array_values(array_unique(array_filter([
+                'wh_scan_draft_po_' . $po->id . '_check_new',
+                $checkId ? ('wh_scan_draft_po_' . $po->id . '_check_' . $checkId) : null,
+                'wh_scan_draft_po_' . $po->id . '_check_' . $check->id,
+            ])));
+
+            if ($hasOverQty) {
+                $check->requestApproval('Revisi: Terdapat kuantitas barang yang melebihi sisa PO.', 1);
+                return redirect()->route('warehouse.receive.index')
+                    ->with('clear_wh_draft_keys', $draftKeysToClear)
+                    ->with('warning', 'Pengecekan berhasil disimpan, namun karena ada barang yang melebihi Sisa PO, membutuhkan Otorisasi Supervisor.');
+            } else {
+                $check->update(['status' => 'approved']);
+                return redirect()->route('warehouse.receive.index')
+                    ->with('clear_wh_draft_keys', $draftKeysToClear)
+                    ->with('success', 'Pengecekan berhasil disimpan dan Disetujui (Sesuai Sisa PO). Silakan infokan EDP untuk memproses GR.');
+            }
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
         }
     }
 }

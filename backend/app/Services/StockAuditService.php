@@ -39,7 +39,7 @@ class StockAuditService
             $orgId = \App\Models\Branch::where('id', $branchId)->value('organization_id');
         }
 
-        $auditNumber = 'SDK-' . date('Ymd') . '-' . strtoupper(Str::random(4));
+        $auditNumber = DocumentNumberService::generate('SDK', 'stock_audit_inspections', 'audit_number', $branchId, $data['inspection_date'] ?? null);
 
         return DB::transaction(function () use ($data, $user, $branchId, $orgId, $mode, $auditNumber) {
             $inspection = StockAuditInspection::create([
@@ -308,7 +308,7 @@ class StockAuditService
     {
         return DB::transaction(function () use ($inspection, $user) {
             $discrepancyItems = $inspection->items()->where('status', '!=', 'MATCH')->get();
-            $adjNumber = 'ADJ-' . date('Ymd') . '-' . strtoupper(Str::random(4));
+            $adjNumber = DocumentNumberService::generate('ADJ', 'stock_adjustments', 'adjustment_number', $inspection->branch_id);
             $reasonId = \App\Models\AdjustmentReason::where('name', 'like', '%Koreksi%')->first()?->id;
 
             $adjustment = StockAdjustment::create([

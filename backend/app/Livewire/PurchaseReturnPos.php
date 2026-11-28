@@ -104,11 +104,12 @@ class PurchaseReturnPos extends Component
                 ];
             }
         } else {
-            $this->return_number = 'PRT-' . strtoupper(substr(uniqid(), -6));
+            $this->return_number = 'AUTO-GENERATED';
             $this->return_date = date('Y-m-d');
             $this->branch_id = auth()->user()->branch_id ?? Branch::first()?->id;
 
             $this->loadDraft();
+            $this->return_number = 'AUTO-GENERATED';
         }
 
         $this->calculateTotals();
@@ -583,18 +584,49 @@ class PurchaseReturnPos extends Component
             return;
         }
 
-        $noChanges = false;
-        DB::transaction(function () use ($validCart, &$pr, &$noChanges) {
-            // Ambil GR pertama jika ada untuk backward compatibility di header (atau null jika multi-GR)
-            $firstGrId = $validCart->firstWhere('goods_receipt_id', '!=', null)['goods_receipt_id'] ?? null;
+        $lock = $this->acquirePosSaveLock('prt');
+        if (!$lock) {
+            return;
+        }
 
-            $data = [
-                'organization_id' => \App\Models\Organization::first()->id ?? 1,
+        try {
+            $prtFingerprint = $this->computeCartFingerprint('prt', [
                 'branch_id' => $this->branch_id,
                 'supplier_id' => $this->supplier_id,
                 'supplier_division_id' => $this->supplier_division_id,
-                'goods_receipt_id' => $firstGrId,
-                'return_number' => $this->return_number,
+            ], $validCart->values()->all());
+
+            if (!$this->purchaseReturn) {
+                $recentPrt = $this->getRecentSavedFingerprint($prtFingerprint);
+                if ($recentPrt) {
+                    $this->clearDraft();
+                    Notification::make()
+                        ->title('Retur Pembelian Sudah Tersimpan')
+                        ->body("Transaksi retur yang identik baru saja tersimpan dengan nomor {$recentPrt}.")
+                        ->warning()
+                        ->send();
+                    return redirect()->to(route('filament.admin.resources.purchase-returns.index'));
+                }
+            }
+
+            $noChanges = false;
+            $wasCreating = !$this->purchaseReturn;
+            DB::transaction(function () use ($validCart, &$pr, &$noChanges) {
+                // Ambil GR pertama jika ada untuk backward compatibility di header (atau null jika multi-GR)
+                $firstGrId = $validCart->firstWhere('goods_receipt_id', '!=', null)['goods_receipt_id'] ?? null;
+
+                $returnNo = $this->purchaseReturn
+                    ? $this->purchaseReturn->return_number
+                    : \App\Services\DocumentNumberService::generate('PRT', 'purchase_returns', 'return_number', $this->branch_id, $this->return_date);
+                $this->return_number = $returnNo;
+
+                $data = [
+                    'organization_id' => \App\Models\Organization::first()->id ?? 1,
+                    'branch_id' => $this->branch_id,
+                    'supplier_id' => $this->supplier_id,
+                    'supplier_division_id' => $this->supplier_division_id,
+                    'goods_receipt_id' => $firstGrId,
+                    'return_number' => $returnNo,
                 'return_date' => $this->return_date,
                 'status' => 'completed',
                 'total_amount' => $this->grandTotal,
@@ -760,23 +792,29 @@ class PurchaseReturnPos extends Component
             }
         });
 
-        if ($noChanges) {
-            Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+            if ($noChanges) {
+                Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+                return redirect()->to(route('filament.admin.resources.purchase-returns.index'));
+            }
+
+            if ($wasCreating && isset($pr)) {
+                $this->recordSavedFingerprint($prtFingerprint, $pr->return_number);
+            }
+            $this->clearDraft();
+
+            Notification::make()->title('Retur Pembelian berhasil disimpan.')->success()->send();
+
+            if ($this->cetak_nota && isset($pr)) {
+                $printUrl = route('print.document', ['type' => 'purchase-return', 'ids' => [$pr->id]]);
+                $indexUrl = route('filament.admin.resources.purchase-returns.index');
+                $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+                return;
+            }
+            
             return redirect()->to(route('filament.admin.resources.purchase-returns.index'));
+        } finally {
+            $this->releasePosSaveLock($lock);
         }
-
-        Notification::make()->title('Retur Pembelian berhasil disimpan.')->success()->send();
-        
-        $this->clearDraft();
-
-        if ($this->cetak_nota && isset($pr)) {
-            $printUrl = route('print.document', ['type' => 'purchase-return', 'ids' => [$pr->id]]);
-            $indexUrl = route('filament.admin.resources.purchase-returns.index');
-            $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
-            return;
-        }
-        
-        return redirect()->to(route('filament.admin.resources.purchase-returns.index'));
     }
 
     private function buildReturnItemPayload(array $item): array

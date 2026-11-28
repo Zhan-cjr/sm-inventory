@@ -250,7 +250,7 @@ HTML;
                                 'purchase_order_id' => $po->id,
                                 'supplier_id' => $po->supplier_id,
                                 'branch_id' => $record->branch_id,
-                                'receipt_number' => 'GR-' . date('YmdHis'),
+                                'receipt_number' => \App\Services\DocumentNumberService::generate('GR', 'goods_receipts', 'receipt_number', $record->branch_id ?? $po->branch_id),
                                 'receipt_date' => now(),
                                 'due_date' => now()->addDays($due_days),
                                 'received_by' => $record->checker->name,

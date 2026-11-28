@@ -32,7 +32,7 @@ class KontrabonPos extends Component
 
     public function mount()
     {
-        $this->kontrabon_number = 'KB-' . date('YmdHis');
+        $this->kontrabon_number = 'AUTO-GENERATED';
         $this->tanggal_kontrabon = date('Y-m-d');
         // Default jatuh tempo 14 hari dari sekarang jika belum ada supplier
         $this->tanggal_jatuh_tempo = date('Y-m-d', strtotime('+14 days'));
@@ -193,15 +193,24 @@ class KontrabonPos extends Component
             session()->flash('error', 'Pilih minimal 1 faktur untuk dikontrabonkan.');
             return;
         }
+
+        $lock = \Illuminate\Support\Facades\Cache::lock('kb_save_' . (auth()->id() ?: request()->ip()), 15);
+        if (!$lock->get()) {
+            session()->flash('error', 'Proses simpan kontrabon sedang berlangsung, mohon tunggu.');
+            return;
+        }
         
         DB::beginTransaction();
         try {
+            $resolvedBranchId = auth()->user()?->branch_id ?: ($this->branch_id ?: null);
+            $this->kontrabon_number = \App\Services\DocumentNumberService::generate('KB', 'kontrabons', 'kontrabon_number', $resolvedBranchId, $this->tanggal_kontrabon);
+
             $kontrabon = Kontrabon::create([
                 'kontrabon_number' => $this->kontrabon_number,
                 'tanggal_kontrabon' => $this->tanggal_kontrabon,
                 'tanggal_jatuh_tempo' => $this->tanggal_jatuh_tempo,
                 'supplier_id' => $this->supplier_id,
-                'branch_id' => auth()->user()?->branch_id ?: ($this->branch_id ?: null),
+                'branch_id' => $resolvedBranchId,
                 'total_amount' => $this->grand_total,
                 'paid_amount' => 0,
                 'notes' => $this->notes,
@@ -265,6 +274,11 @@ class KontrabonPos extends Component
         } catch (\Exception $e) {
             DB::rollBack();
             session()->flash('error', $e->getMessage());
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
         }
     }
 

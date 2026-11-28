@@ -66,6 +66,10 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     public $bulkReasonCode = '';
     public $bulkReasonNote = '';
 
+    public bool $showDuplicatePoModal = false;
+    public string $duplicatePoNumber = '';
+    public bool $forceDuplicateSave = false;
+
     public const OVER_ORDER_REASON_PRESETS = [
         'CARTON_PACK' => '📦 Pembulatan Kemasan Dus / Karton dari Pabrik',
         'PROMO_SUPPLIER' => '🏷️ Promo Supplier (Diskon Ekstra / Bonus Barang)',
@@ -744,6 +748,21 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         ];
     }
 
+    public function confirmForceDuplicateSave()
+    {
+        $this->showDuplicatePoModal = false;
+        $this->forceDuplicateSave = true;
+        return $this->save();
+    }
+
+    public function cancelDuplicateSaveRedirect()
+    {
+        $this->showDuplicatePoModal = false;
+        $this->forceDuplicateSave = false;
+        $this->clearDraft();
+        return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
+    }
+
     public function save()
     {
         if ($this->readOnly) {
@@ -825,176 +844,203 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
             return;
         }
 
-        $needsApproval = false;
-        $approvalReason = [];
-
-        if ($organization) {
-            if ($organization->po_approval_limit !== null && $this->grandTotal > $organization->po_approval_limit) {
-                $needsApproval = true;
-                $approvalReason[] = 'Nominal PO melebihi batas persetujuan: Rp ' . number_format($organization->po_approval_limit, 0, ',', '.');
-            }
-
-            if ($organization->po_approval_max_qty_enabled) {
-                $overCount = 0;
-                foreach ($this->cart as $item) {
-                    $qtySaran = $item['qty_saran'] ?? 0;
-
-                    if ($item['qty'] > $qtySaran) {
-                        $needsApproval = true;
-                        $overCount++;
-                        $promoText = !empty($item['promo_note']) ? " [Promo: {$item['promo_note']}]" : ((float)$item['discount_1'] > 0 ? " [Disc: {$item['discount_1']}%]" : "");
-                        $stockVal = $item['stock'] ?? 0;
-                        $avgSales = $item['avg_bln'] ?? 0;
-                        $oosText = !empty($item['is_oos_with_history']) ? " (Pasokan Macet, 90hr: " . (int)$item['sales_90d'] . " pcs)" : "";
-
-                        // Keterangan transparan jika order ini merupakan pembulatan kemasan dus resmi
-                        $cartonNote = "";
-                        $cartonSize = (int)($item['carton_size'] ?? 0);
-                        if ($cartonSize > 1 && $qtySaran > 0) {
-                            $targetDus = ceil($qtySaran / $cartonSize) * $cartonSize;
-                            if ((float)$item['qty'] == (float)$targetDus) {
-                                $dusCount = (int)($targetDus / $cartonSize);
-                                $cartonNote = " [Pembulatan {$dusCount} Dus @{$cartonSize}]";
-                            } elseif ((float)$item['qty'] > $qtySaran) {
-                                $cartonNote = " [Kemasan Dus: {$cartonSize} pcs]";
-                            }
-                        }
-
-                        $reasonSuffix = !empty($item['over_order_reason']) ? " [Alasan: {$item['over_order_reason']}]" : "";
-                        if ($overCount <= 5) {
-                            $approvalReason[] = "{$item['name']} (Order: {$item['qty']} | Saran: {$qtySaran}{$cartonNote} | Stok: {$stockVal} | Jual: {$avgSales}/bln{$oosText}){$promoText}{$reasonSuffix}";
-                        }
-                    }
-                }
-                if ($overCount > 5) {
-                    $approvalReason[] = "...dan " . ($overCount - 5) . " item lainnya melebihi saran order.";
-                }
-            }
-        }
-
-        $status = $needsApproval ? 'pending_approval' : 'approved';
-        
-        $data = [
-            'organization_id' => $organization->id,
-            'branch_id' => empty($this->branch_id) ? null : $this->branch_id,
-            'supplier_id' => $this->supplier_id,
-            'supplier_division_id' => empty($this->supplier_division_id) ? null : $this->supplier_division_id,
-            'po_number' => $this->po_number,
-            'po_date' => $this->po_date,
-            'expired_date' => empty($this->expired_date) ? null : $this->expired_date,
-            'faktur' => $this->faktur,
-            'status' => $status,
-            'total_amount' => $this->grandTotal,
-            'include_tax' => false,
-            'tax_amount' => 0,
-            'notes' => $this->notes,
-            'over_order_reason' => empty(trim($this->overOrderReason)) ? null : trim($this->overOrderReason),
-            'created_by' => auth()->id(),
-        ];
-
-        if ($this->purchaseOrder) {
-            unset($data['created_by']);
-            // Lock supplier, branch, po_date, and po_number on edit
-            $data['supplier_id'] = $this->purchaseOrder->supplier_id;
-            $data['branch_id'] = $this->purchaseOrder->branch_id;
-            $data['po_number'] = $this->purchaseOrder->po_number;
-            $data['po_date'] = $this->purchaseOrder->po_date;
-
-            $headerChanged = $this->hasHeaderChanges($this->purchaseOrder, $data);
-            $oldItems = $this->purchaseOrder->items()->get()->keyBy('id');
-            $incomingIds = collect($this->cart)->pluck('id')->filter()->all();
-            $deletedItems = $oldItems->filter(fn ($old) => !in_array($old->id, $incomingIds));
-
-            $toCreate = [];
-            $toUpdate = [];
-            $anyItemMutated = $deletedItems->isNotEmpty();
-
-            foreach ($this->cart as $item) {
-                $payload = $this->buildPoItemPayload($item);
-                $itemId = $item['id'] ?? null;
-                $oldItem = $itemId ? $oldItems->get($itemId) : null;
-
-                if (!$oldItem) {
-                    $toCreate[] = $payload;
-                    $anyItemMutated = true;
-                } elseif ((string) $oldItem->product_id !== (string) $payload['product_id']) {
-                    $deletedItems->put($oldItem->id, $oldItem);
-                    $toCreate[] = $payload;
-                    $anyItemMutated = true;
-                } elseif ($this->hasItemChanged($oldItem, $payload)) {
-                    $toUpdate[] = ['model' => $oldItem, 'payload' => $payload];
-                    $anyItemMutated = true;
-                }
-            }
-
-            if (!$headerChanged && !$anyItemMutated) {
-                Notification::make()->title('Tidak ada perubahan data.')->info()->send();
-                return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
-            }
-
-            if ($headerChanged) {
-                $this->purchaseOrder->update($data);
-            }
-            $po = $this->purchaseOrder;
-
-            foreach ($deletedItems as $oldItem) {
-                $oldItem->delete();
-            }
-
-            foreach ($toUpdate as $pair) {
-                $pair['model']->update($pair['payload']);
-            }
-
-            foreach ($toCreate as $payload) {
-                PurchaseOrderItem::create(array_merge(['purchase_order_id' => $po->id], $payload));
-            }
-
-            // ALWAYS cancel old pending approvals because the document has been modified
-            $po->cancelPendingApprovals();
-        } else {
-            // New PO always enforces current server date to prevent stale client/draft dates
-            $data['po_date'] = now()->toDateString();
-            $this->po_date = $data['po_date'];
-
-            $po = \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
-                $data['po_number'] = PurchaseOrder::generatePoNumber($data['branch_id'], $data['po_date']);
-                $this->po_number = $data['po_number'];
-
-                $createdPo = PurchaseOrder::create($data);
-
-                foreach ($this->cart as $item) {
-                    PurchaseOrderItem::create(array_merge(
-                        ['purchase_order_id' => $createdPo->id],
-                        $this->buildPoItemPayload($item)
-                    ));
-                }
-
-                return $createdPo;
-            });
-        }
-
-        if ($needsApproval) {
-            $notes = "";
-            if (!empty(trim($this->overOrderReason))) {
-                $notes .= "Alasan Over-Order: " . trim($this->overOrderReason) . "\n";
-            }
-            $notes .= "Otomatis: " . implode(', ', $approvalReason);
-            $po->requestApproval($notes);
-            Notification::make()->title('PO memerlukan persetujuan Manajer.')->warning()->send();
-        } else {
-            Notification::make()->title('Pesanan Pembelian berhasil disimpan.')->success()->send();
-        }
-        
-        $this->clearDraft();
-
-        if ($this->cetak_nota && !$needsApproval) {
-            $printUrl = route('print.document', ['type' => 'po', 'ids' => [$po->id]]);
-            $indexUrl = route('filament.admin.resources.purchase-orders.index');
-            $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+        $lock = $this->acquirePosSaveLock('po');
+        if (!$lock) {
             return;
         }
 
-        return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
+        try {
+            $poFingerprint = $this->computeCartFingerprint('po', [
+                'branch_id' => $this->branch_id,
+                'supplier_id' => $this->supplier_id,
+                'supplier_division_id' => $this->supplier_division_id,
+            ], $this->cart);
+
+            if (!$this->purchaseOrder && !$this->forceDuplicateSave) {
+                $recentPo = $this->getRecentSavedFingerprint($poFingerprint);
+                if ($recentPo) {
+                    $this->duplicatePoNumber = $recentPo;
+                    $this->showDuplicatePoModal = true;
+                    return;
+                }
+            }
+
+            $needsApproval = false;
+            $approvalReason = [];
+
+            if ($organization) {
+                if ($organization->po_approval_limit !== null && $this->grandTotal > $organization->po_approval_limit) {
+                    $needsApproval = true;
+                    $approvalReason[] = 'Nominal PO melebihi batas persetujuan: Rp ' . number_format($organization->po_approval_limit, 0, ',', '.');
+                }
+
+                if ($organization->po_approval_max_qty_enabled) {
+                    $overCount = 0;
+                    foreach ($this->cart as $item) {
+                        $qtySaran = $item['qty_saran'] ?? 0;
+
+                        if ($item['qty'] > $qtySaran) {
+                            $needsApproval = true;
+                            $overCount++;
+                            $promoText = !empty($item['promo_note']) ? " [Promo: {$item['promo_note']}]" : ((float)$item['discount_1'] > 0 ? " [Disc: {$item['discount_1']}%]" : "");
+                            $stockVal = $item['stock'] ?? 0;
+                            $avgSales = $item['avg_bln'] ?? 0;
+                            $oosText = !empty($item['is_oos_with_history']) ? " (Pasokan Macet, 90hr: " . (int)$item['sales_90d'] . " pcs)" : "";
+
+                            // Keterangan transparan jika order ini merupakan pembulatan kemasan dus resmi
+                            $cartonNote = "";
+                            $cartonSize = (int)($item['carton_size'] ?? 0);
+                            if ($cartonSize > 1 && $qtySaran > 0) {
+                                $targetDus = ceil($qtySaran / $cartonSize) * $cartonSize;
+                                if ((float)$item['qty'] == (float)$targetDus) {
+                                    $dusCount = (int)($targetDus / $cartonSize);
+                                    $cartonNote = " [Pembulatan {$dusCount} Dus @{$cartonSize}]";
+                                } elseif ((float)$item['qty'] > $qtySaran) {
+                                    $cartonNote = " [Kemasan Dus: {$cartonSize} pcs]";
+                                }
+                            }
+
+                            $reasonSuffix = !empty($item['over_order_reason']) ? " [Alasan: {$item['over_order_reason']}]" : "";
+                            if ($overCount <= 5) {
+                                $approvalReason[] = "{$item['name']} (Order: {$item['qty']} | Saran: {$qtySaran}{$cartonNote} | Stok: {$stockVal} | Jual: {$avgSales}/bln{$oosText}){$promoText}{$reasonSuffix}";
+                            }
+                        }
+                    }
+                    if ($overCount > 5) {
+                        $approvalReason[] = "...dan " . ($overCount - 5) . " item lainnya melebihi saran order.";
+                    }
+                }
+            }
+
+            $status = $needsApproval ? 'pending_approval' : 'approved';
+
+            $data = [
+                'organization_id' => $organization->id,
+                'branch_id' => empty($this->branch_id) ? null : $this->branch_id,
+                'supplier_id' => $this->supplier_id,
+                'supplier_division_id' => empty($this->supplier_division_id) ? null : $this->supplier_division_id,
+                'po_number' => $this->po_number,
+                'po_date' => $this->po_date,
+                'expired_date' => empty($this->expired_date) ? null : $this->expired_date,
+                'faktur' => $this->faktur,
+                'status' => $status,
+                'total_amount' => $this->grandTotal,
+                'include_tax' => false,
+                'tax_amount' => 0,
+                'notes' => $this->notes,
+                'over_order_reason' => empty(trim($this->overOrderReason)) ? null : trim($this->overOrderReason),
+                'created_by' => auth()->id(),
+            ];
+
+            if ($this->purchaseOrder) {
+                unset($data['created_by']);
+                // Lock supplier, branch, po_date, and po_number on edit
+                $data['supplier_id'] = $this->purchaseOrder->supplier_id;
+                $data['branch_id'] = $this->purchaseOrder->branch_id;
+                $data['po_number'] = $this->purchaseOrder->po_number;
+                $data['po_date'] = $this->purchaseOrder->po_date;
+
+                $headerChanged = $this->hasHeaderChanges($this->purchaseOrder, $data);
+                $oldItems = $this->purchaseOrder->items()->get()->keyBy('id');
+                $incomingIds = collect($this->cart)->pluck('id')->filter()->all();
+                $deletedItems = $oldItems->filter(fn ($old) => !in_array($old->id, $incomingIds));
+
+                $toCreate = [];
+                $toUpdate = [];
+                $anyItemMutated = $deletedItems->isNotEmpty();
+
+                foreach ($this->cart as $item) {
+                    $payload = $this->buildPoItemPayload($item);
+                    $itemId = $item['id'] ?? null;
+                    $oldItem = $itemId ? $oldItems->get($itemId) : null;
+
+                    if (!$oldItem) {
+                        $toCreate[] = $payload;
+                        $anyItemMutated = true;
+                    } elseif ((string) $oldItem->product_id !== (string) $payload['product_id']) {
+                        $deletedItems->put($oldItem->id, $oldItem);
+                        $toCreate[] = $payload;
+                        $anyItemMutated = true;
+                    } elseif ($this->hasItemChanged($oldItem, $payload)) {
+                        $toUpdate[] = ['model' => $oldItem, 'payload' => $payload];
+                        $anyItemMutated = true;
+                    }
+                }
+
+                if (!$headerChanged && !$anyItemMutated) {
+                    Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+                    return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
+                }
+
+                if ($headerChanged) {
+                    $this->purchaseOrder->update($data);
+                }
+                $po = $this->purchaseOrder;
+
+                foreach ($deletedItems as $oldItem) {
+                    $oldItem->delete();
+                }
+
+                foreach ($toUpdate as $pair) {
+                    $pair['model']->update($pair['payload']);
+                }
+
+                foreach ($toCreate as $payload) {
+                    PurchaseOrderItem::create(array_merge(['purchase_order_id' => $po->id], $payload));
+                }
+
+                // ALWAYS cancel old pending approvals because the document has been modified
+                $po->cancelPendingApprovals();
+            } else {
+                // New PO always enforces current server date to prevent stale client/draft dates
+                $data['po_date'] = now()->toDateString();
+                $this->po_date = $data['po_date'];
+
+                $po = \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
+                    $data['po_number'] = PurchaseOrder::generatePoNumber($data['branch_id'], $data['po_date']);
+                    $this->po_number = $data['po_number'];
+
+                    $createdPo = PurchaseOrder::create($data);
+
+                    foreach ($this->cart as $item) {
+                        PurchaseOrderItem::create(array_merge(
+                            ['purchase_order_id' => $createdPo->id],
+                            $this->buildPoItemPayload($item)
+                        ));
+                    }
+
+                    return $createdPo;
+                });
+
+                $this->recordSavedFingerprint($poFingerprint, $po->po_number);
+            }
+
+            $this->forceDuplicateSave = false;
+            $this->clearDraft();
+
+            if ($needsApproval) {
+                $notes = "";
+                if (!empty(trim($this->overOrderReason))) {
+                    $notes .= "Alasan Over-Order: " . trim($this->overOrderReason) . "\n";
+                }
+                $notes .= "Otomatis: " . implode(', ', $approvalReason);
+                $po->requestApproval($notes);
+                Notification::make()->title('PO memerlukan persetujuan Manajer.')->warning()->send();
+            } else {
+                Notification::make()->title('Pesanan Pembelian berhasil disimpan.')->success()->send();
+            }
+
+            if ($this->cetak_nota && !$needsApproval) {
+                $printUrl = route('print.document', ['type' => 'po', 'ids' => [$po->id]]);
+                $indexUrl = route('filament.admin.resources.purchase-orders.index');
+                $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+                return;
+            }
+
+            return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
+        } finally {
+            $this->releasePosSaveLock($lock);
+        }
     }
 
     public function updatedBranchId($value)

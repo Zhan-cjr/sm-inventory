@@ -795,8 +795,7 @@
                         Swal.showLoading();
                     }
                 });
-                // Clear draft on successful submit
-                clearLocalDraft();
+                // Draft localStorage hanya dihapus setelah server mengonfirmasi simpan (di halaman index)
                 document.getElementById('scanned_items_input').value = JSON.stringify(scannedState);
                 document.getElementById('submit-form').submit();
             }

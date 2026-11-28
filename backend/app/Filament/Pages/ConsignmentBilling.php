@@ -296,10 +296,16 @@ class ConsignmentBilling extends Page implements HasForms
             return;
         }
 
+        $lock = \Illuminate\Support\Facades\Cache::lock('kbc_save_' . (auth()->id() ?: request()->ip()), 15);
+        if (!$lock->get()) {
+            Notification::make()->title('Proses pembuatan kontrabon sedang berjalan, mohon tunggu...')->warning()->send();
+            return;
+        }
+
         DB::beginTransaction();
         try {
             $orgId = auth()->user()->organization_id ?? 1;
-            $kontrabonNo = 'KBC-' . date('YmdHis');
+            $kontrabonNo = \App\Services\DocumentNumberService::generate('KBC', 'kontrabons', 'kontrabon_number', $this->branch_id);
 
             $kontrabon = Kontrabon::create([
                 'branch_id' => $this->branch_id,
@@ -340,6 +346,11 @@ class ConsignmentBilling extends Page implements HasForms
         } catch (\Exception $e) {
             DB::rollBack();
             Notification::make()->title('Terjadi Kesalahan: ' . $e->getMessage())->danger()->send();
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
         }
     }
 }

@@ -362,5 +362,18 @@ function handleLastPOCheck() {
         }
     }
 }
+
+@if(session('clear_wh_draft_keys'))
+(function() {
+    try {
+        const keys = @json(session('clear_wh_draft_keys'));
+        if (Array.isArray(keys)) {
+            keys.forEach(function(k) {
+                if (k) localStorage.removeItem(k);
+            });
+        }
+    } catch (e) {}
+})();
+@endif
 </script>
 @endsection

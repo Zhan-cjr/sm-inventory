@@ -24,7 +24,7 @@ class CreateStockOpnameSession extends CreateRecord
         $data['organization_id'] = $user->organization_id;
         $data['created_by']      = $user->id;
         $data['status']          = 'DRAFT';
-        $data['session_number']  = 'OP-' . date('Ymd') . '-' . strtoupper(Str::random(4));
+        $data['session_number']  = \App\Services\DocumentNumberService::generate('OP', 'stock_opname_sessions', 'session_number', $data['branch_id'] ?? $user->branch_id, $data['opname_date'] ?? null);
         $data['session_token']   = Str::random(48); // QR untuk pengecek 2
 
         return $data;

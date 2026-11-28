@@ -37,7 +37,7 @@ class StockQuarantineAuditPos extends Component
 
     public function mount()
     {
-        $this->audit_number = 'AUD-BS-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -4));
+        $this->audit_number = 'AUTO-GENERATED';
         $this->audit_date = date('Y-m-d');
 
         $userBranchId = Auth::user()?->branch_id;
@@ -343,10 +343,17 @@ class StockQuarantineAuditPos extends Component
             return;
         }
 
+        $lock = \Illuminate\Support\Facades\Cache::lock('aud_bs_save_' . (Auth::id() ?: request()->ip()), 15);
+        if (!$lock->get()) {
+            Notification::make()->title('Proses simpan audit BS sedang berlangsung, mohon tunggu...')->warning()->send();
+            return;
+        }
+
         DB::beginTransaction();
         try {
             $userId = Auth::id() ?: 1;
             $userOrgId = Auth::user()?->organization_id;
+            $this->audit_number = \App\Services\DocumentNumberService::generate('AUD-BS', 'stock_quarantine_audits', 'audit_number', $this->branch_id, $this->audit_date);
 
             // 1. Ambil seluruh barang di cabang ini yang punya quantity_damaged > 0
             $existingDamagedStocks = Stock::where('branch_id', $this->branch_id)
@@ -550,6 +557,11 @@ class StockQuarantineAuditPos extends Component
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
         }
     }
 

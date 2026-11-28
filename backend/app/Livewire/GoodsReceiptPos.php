@@ -180,13 +180,14 @@ class GoodsReceiptPos extends Component
                 $this->syncRowMargins(count($this->cart) - 1);
             }
         } else {
-            $this->receipt_number = 'GR-' . date('YmdHis');
+            $this->receipt_number = 'AUTO-GENERATED';
             $this->receipt_date = date('Y-m-d');
             $this->due_date = date('Y-m-d');
             $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
 
             // Load draft if not editing existing GR
             $this->loadDraft();
+            $this->receipt_number = 'AUTO-GENERATED';
         }
 
         if ($this->supplier_id) {
@@ -1094,13 +1095,16 @@ class GoodsReceiptPos extends Component
 
         $this->calculateTotals();
 
-        $this->validate([
+        $rules = [
             'supplier_id' => 'required',
             'branch_id' => 'nullable',
             'receipt_date' => 'required|date',
-            'receipt_number' => 'required|unique:goods_receipts,receipt_number,' . ($this->goodsReceipt ? $this->goodsReceipt->id : 'NULL'),
             'faktur_image.*' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:10240',
-        ]);
+        ];
+        if ($this->goodsReceipt) {
+            $rules['receipt_number'] = 'required|unique:goods_receipts,receipt_number,' . $this->goodsReceipt->id;
+        }
+        $this->validate($rules);
 
         if (empty($this->cart)) {
             Notification::make()->title('Keranjang kosong!')->danger()->send();
@@ -1127,45 +1131,77 @@ class GoodsReceiptPos extends Component
             }
         }
 
-        $imagePaths = $this->existing_faktur_image;
+        $lock = $this->acquirePosSaveLock('gr');
+        if (!$lock) {
+            return;
+        }
 
-        if ($this->faktur_image && is_array($this->faktur_image) && count($this->faktur_image) > 0) {
-            foreach ($this->faktur_image as $file) {
-                if ($file && !is_string($file)) {
-                    $extension = strtolower($file->getClientOriginalExtension());
-                    if (in_array($extension, ['jpg', 'jpeg', 'png'])) {
-                        $manager = new \Intervention\Image\ImageManager(new \Intervention\Image\Drivers\Gd\Driver());
-                        $image = $manager->decode($file->getRealPath());
-                        
-                        if ($image->width() > 1200) {
-                            $image->scaleDown(width: 1200);
-                        }
-                        
-                        $filename = 'faktur_receipts/' . uniqid() . '.jpg';
-                        $fullPath = storage_path('app/public/' . $filename);
-                        
-                        if (!file_exists(storage_path('app/public/faktur_receipts'))) {
-                            mkdir(storage_path('app/public/faktur_receipts'), 0755, true);
-                        }
+        try {
+            $grFingerprint = $this->computeCartFingerprint('gr', [
+                'branch_id' => $this->branch_id,
+                'supplier_id' => $this->supplier_id,
+                'purchase_order_id' => $this->purchase_order_id,
+                'faktur_supplier' => $this->faktur_supplier,
+            ], $this->cart);
 
-                        $image->encode(new \Intervention\Image\Encoders\JpegEncoder(75))->save($fullPath);
-                        $imagePaths[] = $filename;
-                    } else {
-                        $imagePaths[] = $file->store('faktur_receipts', 'public');
+            if (!$this->goodsReceipt) {
+                $recentGr = $this->getRecentSavedFingerprint($grFingerprint);
+                if ($recentGr) {
+                    $this->clearDraft();
+                    Notification::make()
+                        ->title('Penerimaan Barang Sudah Tersimpan')
+                        ->body("Transaksi penerimaan yang identik baru saja tersimpan dengan nomor {$recentGr}.")
+                        ->warning()
+                        ->send();
+                    return redirect()->to(route('filament.admin.resources.goods-receipts.index'));
+                }
+            }
+
+            $imagePaths = $this->existing_faktur_image;
+
+            if ($this->faktur_image && is_array($this->faktur_image) && count($this->faktur_image) > 0) {
+                foreach ($this->faktur_image as $file) {
+                    if ($file && !is_string($file)) {
+                        $extension = strtolower($file->getClientOriginalExtension());
+                        if (in_array($extension, ['jpg', 'jpeg', 'png'])) {
+                            $manager = new \Intervention\Image\ImageManager(new \Intervention\Image\Drivers\Gd\Driver());
+                            $image = $manager->decode($file->getRealPath());
+                            
+                            if ($image->width() > 1200) {
+                                $image->scaleDown(width: 1200);
+                            }
+                            
+                            $filename = 'faktur_receipts/' . uniqid() . '.jpg';
+                            $fullPath = storage_path('app/public/' . $filename);
+                            
+                            if (!file_exists(storage_path('app/public/faktur_receipts'))) {
+                                mkdir(storage_path('app/public/faktur_receipts'), 0755, true);
+                            }
+
+                            $image->encode(new \Intervention\Image\Encoders\JpegEncoder(75))->save($fullPath);
+                            $imagePaths[] = $filename;
+                        } else {
+                            $imagePaths[] = $file->store('faktur_receipts', 'public');
+                        }
                     }
                 }
             }
-        }
 
-        $gr = null;
-        $noChanges = false;
-        DB::transaction(function () use (&$gr, &$noChanges, $imagePaths) {
-            $data = [
-                'purchase_order_id' => $this->purchase_order_id,
-                'supplier_id' => $this->supplier_id,
-                'supplier_division_id' => empty($this->supplier_division_id) ? null : $this->supplier_division_id,
-                'branch_id' => $this->branch_id,
-                'receipt_number' => $this->receipt_number,
+            $gr = null;
+            $noChanges = false;
+            $wasCreating = !$this->goodsReceipt;
+            DB::transaction(function () use (&$gr, &$noChanges, $imagePaths) {
+                $receiptNo = $this->goodsReceipt
+                    ? $this->goodsReceipt->receipt_number
+                    : \App\Services\DocumentNumberService::generate('GR', 'goods_receipts', 'receipt_number', $this->branch_id, $this->receipt_date);
+                $this->receipt_number = $receiptNo;
+
+                $data = [
+                    'purchase_order_id' => $this->purchase_order_id,
+                    'supplier_id' => $this->supplier_id,
+                    'supplier_division_id' => empty($this->supplier_division_id) ? null : $this->supplier_division_id,
+                    'branch_id' => $this->branch_id,
+                    'receipt_number' => $receiptNo,
                 'receipt_date' => $this->receipt_date,
                 'due_date' => $this->due_date,
                 'received_by' => auth()->user()->name,
@@ -1359,23 +1395,29 @@ class GoodsReceiptPos extends Component
             }
         });
 
-        if ($noChanges) {
-            Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+            if ($noChanges) {
+                Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+                return redirect()->to(route('filament.admin.resources.goods-receipts.index'));
+            }
+
+            if ($wasCreating && $gr) {
+                $this->recordSavedFingerprint($grFingerprint, $gr->receipt_number);
+            }
+            $this->clearDraft();
+
+            Notification::make()->title('Penerimaan Barang berhasil disimpan dan stok telah diupdate.')->success()->send();
+            
+            if ($this->cetak_nota && $gr) {
+                $printUrl = route('print.document', ['type' => 'receipt', 'ids' => [$gr->id]]);
+                $indexUrl = route('filament.admin.resources.goods-receipts.index');
+                $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+                return;
+            }
+            
             return redirect()->to(route('filament.admin.resources.goods-receipts.index'));
+        } finally {
+            $this->releasePosSaveLock($lock);
         }
-
-        Notification::make()->title('Penerimaan Barang berhasil disimpan dan stok telah diupdate.')->success()->send();
-
-        $this->clearDraft();
-        
-        if ($this->cetak_nota && $gr) {
-            $printUrl = route('print.document', ['type' => 'receipt', 'ids' => [$gr->id]]);
-            $indexUrl = route('filament.admin.resources.goods-receipts.index');
-            $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
-            return;
-        }
-        
-        return redirect()->to(route('filament.admin.resources.goods-receipts.index'));
     }
 
     private function hasHeaderChanges(GoodsReceipt $gr, array $data): bool

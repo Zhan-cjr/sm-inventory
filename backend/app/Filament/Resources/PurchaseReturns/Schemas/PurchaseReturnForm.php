@@ -128,7 +128,7 @@ class PurchaseReturnForm
 
                 TextInput::make('return_number')
                     ->label('Nomor Retur')
-                    ->default(fn () => 'PRT-' . strtoupper(substr(uniqid(), -6)))
+                    ->default(fn () => \App\Services\DocumentNumberService::generate('PRT', 'purchase_returns', 'return_number', auth()->user()?->branch_id))
                     ->required()
                     ->readOnly(),
 

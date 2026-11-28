@@ -57,7 +57,7 @@ class StockAdjustmentResource extends Resource
                         TextInput::make('adjustment_number')
                             ->label('No Transaksi')
                             ->required()
-                            ->default(fn () => 'ADJ-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(2))))
+                            ->default(fn () => \App\Services\DocumentNumberService::generate('ADJ', 'stock_adjustments', 'adjustment_number', \Illuminate\Support\Facades\Auth::user()?->branch_id))
                             ->readOnly(),
                         DatePicker::make('adjustment_date')
                             ->label('Tgl Transaksi')

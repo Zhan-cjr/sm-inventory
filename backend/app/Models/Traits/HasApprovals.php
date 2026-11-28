@@ -19,10 +19,22 @@ trait HasApprovals
             'notes' => $notes,
             'level' => $level,
         ]);
-        
-        $this->sendTelegramNotification($approval);
-        
+
+        $model = $this;
+        dispatch(function () use ($model, $approval) {
+            try {
+                $model->sendTelegramNotificationNow($approval);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Async Telegram Approval Notification Error: ' . $e->getMessage());
+            }
+        })->afterResponse();
+
         return $approval;
+    }
+
+    public function sendTelegramNotificationNow($approval = null)
+    {
+        $this->sendTelegramNotification($approval);
     }
 
     protected function sendTelegramNotification($approval = null)
@@ -123,7 +135,7 @@ trait HasApprovals
             if ($replyMarkup) {
                 $payload['reply_markup'] = $replyMarkup;
             }
-            $response = \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
+            $response = \Illuminate\Support\Facades\Http::timeout(8)->post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
             if ($response->successful() && $approval) {
                 $result = $response->json('result');
                 if (isset($result['message_id']) && isset($result['chat']['id'])) {
@@ -159,7 +171,7 @@ trait HasApprovals
                     if ($replyMarkup) {
                         $payload['reply_markup'] = $replyMarkup;
                     }
-                    $response = \Illuminate\Support\Facades\Http::post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
+                    $response = \Illuminate\Support\Facades\Http::timeout(8)->post("https://api.telegram.org/bot{$token}/sendMessage", $payload);
                     if ($response->successful() && $approval) {
                         $result = $response->json('result');
                         if (isset($result['message_id']) && isset($result['chat']['id'])) {

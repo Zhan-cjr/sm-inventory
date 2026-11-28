@@ -119,107 +119,127 @@ class OpnamePublicController extends Controller
             ->where('rack_token', $rackToken)
             ->firstOrFail();
 
-        // Double-check lock
-        if ($rackSession->count1_status === 'DONE') {
-            return redirect()->back()->with('error', 'Rak ini sudah dikunci!');
+        $lock = \Illuminate\Support\Facades\Cache::lock("opname_c1_{$rackSession->id}", 15);
+        if (!$lock->get()) {
+            return redirect()->back()->with('error', 'Pengiriman hasil hitung sedang diproses, mohon tunggu.');
         }
 
-        if (!in_array($rackSession->session->status, ['COUNTING', 'CHECKING'])) {
-            return redirect()->back()->with('error', 'Sesi tidak aktif.');
-        }
+        try {
+            $rackSession->refresh();
 
-        \DB::transaction(function () use ($request, $rackSession) {
-            $submittedIds = [];
-            $quantities = $request->input('quantities', []);
-            if (is_array($quantities)) {
-                foreach ($quantities as $itemId => $qty) {
-                    $item = StockOpnameItem::where('id', $itemId)
-                        ->where('rack_session_id', $rackSession->id)
-                        ->first();
-
-                    if ($item && $item->status === 'PENDING') {
-                        $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
-                        $item->update([
-                            'count1_quantity' => $actualQty,
-                            'count1_at'       => now(),
-                            'status'          => 'COUNT1_DONE',
-                        ]);
-                        $submittedIds[] = $itemId;
-                    }
-                }
-            }
-
-            // Handle items removed from rack
-            if ($request->has('remove_from_rack') && is_array($request->remove_from_rack)) {
-                foreach ($request->remove_from_rack as $itemId) {
-                    $item = StockOpnameItem::where('id', $itemId)
-                        ->where('rack_session_id', $rackSession->id)
-                        ->first();
-                        
-                    if ($item) {
-                        // Detach from Stock
-                        $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
-                            ->where('product_id', $item->product_id)
-                            ->first();
-                            
-                        if ($stock && $rackSession->rack_id) {
-                            $stock->racks()->detach($rackSession->rack_id);
-                        }
-                        
-                        $item->delete();
-                        
-                        // Ensure it's not marked as submitted for the 0.0 default fallback
-                        $submittedIds[] = $itemId; 
-                    }
-                }
-            }
-
-            // Handle dynamically added products (new_quantities)
-            if ($request->has('new_quantities') && is_array($request->new_quantities)) {
-                foreach ($request->new_quantities as $productId => $qty) {
-                    $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
-                    $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
-                        ->where('product_id', $productId)
-                        ->first();
-                        
-                    \App\Models\StockOpnameItem::create([
-                        'session_id' => $rackSession->session_id,
-                        'rack_session_id' => $rackSession->id,
-                        'product_id' => $productId,
-                        'system_quantity' => $stock ? $stock->quantity_on_hand : 0,
-                        'count1_quantity' => $actualQty,
-                        'count1_at' => now(),
-                        'status' => 'COUNT1_DONE',
-                    ]);
-                }
-            }
-
-            // Default any remaining PENDING items in this rack session to 0.0
-            $remainingPendingItems = StockOpnameItem::where('rack_session_id', $rackSession->id)
-                ->where('status', 'PENDING')
-                ->whereNotIn('id', $submittedIds)
-                ->get();
-
-            foreach ($remainingPendingItems as $item) {
-                $item->update([
-                    'count1_quantity' => 0.0,
-                    'count1_at'       => now(),
-                    'status'          => 'COUNT1_DONE',
+            // Double-check lock (idempotent redirect if retry arrived after success)
+            if ($rackSession->count1_status === 'DONE') {
+                return redirect()->route('opname.done', [
+                    'role'            => 'penghitung',
+                    'rack_code'       => $rackSession->rack?->rack_code,
+                    'next_url'        => route('opname.portal', $rackSession->session->session_token),
+                    'clear_draft_key' => 'opname_hitung_' . $rackSession->rack_token,
                 ]);
             }
 
-            $rackSession->update([
-                'count1_status'  => 'DONE',
-                'count1_by_name' => $request->counter_name,
-                'count1_at'      => now(),
-            ]);
-        });
+            if (!in_array($rackSession->session->status, ['COUNTING', 'CHECKING'])) {
+                return redirect()->back()->with('error', 'Sesi tidak aktif.');
+            }
 
-        return redirect()->route('opname.done', [
-            'role'      => 'penghitung',
-            'rack_code' => $rackSession->rack?->rack_code,
-            'next_url'  => route('opname.portal', $rackSession->session->session_token),
-        ]);
+            \DB::transaction(function () use ($request, $rackSession) {
+                $submittedIds = [];
+                $quantities = $request->input('quantities', []);
+                if (is_array($quantities)) {
+                    foreach ($quantities as $itemId => $qty) {
+                        $item = StockOpnameItem::where('id', $itemId)
+                            ->where('rack_session_id', $rackSession->id)
+                            ->first();
+
+                        if ($item && $item->status === 'PENDING') {
+                            $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
+                            $item->update([
+                                'count1_quantity' => $actualQty,
+                                'count1_at'       => now(),
+                                'status'          => 'COUNT1_DONE',
+                            ]);
+                            $submittedIds[] = $itemId;
+                        }
+                    }
+                }
+
+                // Handle items removed from rack
+                if ($request->has('remove_from_rack') && is_array($request->remove_from_rack)) {
+                    foreach ($request->remove_from_rack as $itemId) {
+                        $item = StockOpnameItem::where('id', $itemId)
+                            ->where('rack_session_id', $rackSession->id)
+                            ->first();
+                            
+                        if ($item) {
+                            // Detach from Stock
+                            $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
+                                ->where('product_id', $item->product_id)
+                                ->first();
+                                
+                            if ($stock && $rackSession->rack_id) {
+                                $stock->racks()->detach($rackSession->rack_id);
+                            }
+                            
+                            $item->delete();
+                            
+                            // Ensure it's not marked as submitted for the 0.0 default fallback
+                            $submittedIds[] = $itemId; 
+                        }
+                    }
+                }
+
+                // Handle dynamically added products (new_quantities)
+                if ($request->has('new_quantities') && is_array($request->new_quantities)) {
+                    foreach ($request->new_quantities as $productId => $qty) {
+                        $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
+                        $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
+                            ->where('product_id', $productId)
+                            ->first();
+                            
+                        \App\Models\StockOpnameItem::create([
+                            'session_id' => $rackSession->session_id,
+                            'rack_session_id' => $rackSession->id,
+                            'product_id' => $productId,
+                            'system_quantity' => $stock ? $stock->quantity_on_hand : 0,
+                            'count1_quantity' => $actualQty,
+                            'count1_at' => now(),
+                            'status' => 'COUNT1_DONE',
+                        ]);
+                    }
+                }
+
+                // Default any remaining PENDING items in this rack session to 0.0
+                $remainingPendingItems = StockOpnameItem::where('rack_session_id', $rackSession->id)
+                    ->where('status', 'PENDING')
+                    ->whereNotIn('id', $submittedIds)
+                    ->get();
+
+                foreach ($remainingPendingItems as $item) {
+                    $item->update([
+                        'count1_quantity' => 0.0,
+                        'count1_at'       => now(),
+                        'status'          => 'COUNT1_DONE',
+                    ]);
+                }
+
+                $rackSession->update([
+                    'count1_status'  => 'DONE',
+                    'count1_by_name' => $request->counter_name,
+                    'count1_at'      => now(),
+                ]);
+            });
+
+            return redirect()->route('opname.done', [
+                'role'            => 'penghitung',
+                'rack_code'       => $rackSession->rack?->rack_code,
+                'next_url'        => route('opname.portal', $rackSession->session->session_token),
+                'clear_draft_key' => 'opname_hitung_' . $rackSession->rack_token,
+            ]);
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
+        }
     }
 
     // ============================================================
@@ -326,118 +346,139 @@ class OpnamePublicController extends Controller
             ->where('id', $rackId)
             ->firstOrFail();
 
-        if ($rackSession->count2_status === 'DONE') {
-            return redirect()->back()->with('error', 'Rak ini sudah terkunci untuk pengecek 2!');
+        $lock = \Illuminate\Support\Facades\Cache::lock("opname_c2_{$rackSession->id}", 15);
+        if (!$lock->get()) {
+            return redirect()->back()->with('error', 'Pengiriman hasil pengecekan sedang diproses, mohon tunggu.');
         }
 
-        \DB::transaction(function () use ($request, $rackSession) {
-            $submittedIds = [];
-            $quantities = $request->input('quantities', []);
+        try {
+            $rackSession->refresh();
 
-            if (is_array($quantities)) {
-                foreach ($quantities as $itemId => $qty) {
-                    $item = StockOpnameItem::where('id', $itemId)
-                        ->where('rack_session_id', $rackSession->id)
-                        ->where('status', 'COUNT1_DONE')
-                        ->first();
-
-                    if ($item) {
-                        $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
-                        $item->count2_quantity = $actualQty;
-                        $item->count2_at       = now();
-                        $item->save();
-
-                        // Deteksi selisih (juga evaluasi cross-rack)
-                        $item->detectDiscrepancy();
-                        $submittedIds[] = $itemId;
-                    }
-                }
+            if ($rackSession->count2_status === 'DONE') {
+                return redirect()->route('opname.done', [
+                    'role'            => 'pengecek',
+                    'rack_code'       => $rackSession->rack?->rack_code,
+                    'next_url'        => route('opname.cek', $sessionToken),
+                    'clear_draft_key' => 'opname_cek_' . $rackSession->id,
+                ]);
             }
 
-            // Handle items removed from rack
-            if ($request->has('remove_from_rack') && is_array($request->remove_from_rack)) {
-                foreach ($request->remove_from_rack as $itemId) {
-                    $item = StockOpnameItem::where('id', $itemId)
-                        ->where('rack_session_id', $rackSession->id)
-                        ->first();
-                        
-                    if ($item) {
-                        // Detach from Stock
-                        $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
-                            ->where('product_id', $item->product_id)
+            \DB::transaction(function () use ($request, $rackSession) {
+                $submittedIds = [];
+                $quantities = $request->input('quantities', []);
+
+                if (is_array($quantities)) {
+                    foreach ($quantities as $itemId => $qty) {
+                        $item = StockOpnameItem::where('id', $itemId)
+                            ->where('rack_session_id', $rackSession->id)
+                            ->where('status', 'COUNT1_DONE')
+                            ->first();
+
+                        if ($item) {
+                            $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
+                            $item->count2_quantity = $actualQty;
+                            $item->count2_at       = now();
+                            $item->save();
+
+                            // Deteksi selisih (juga evaluasi cross-rack)
+                            $item->detectDiscrepancy();
+                            $submittedIds[] = $itemId;
+                        }
+                    }
+                }
+
+                // Handle items removed from rack
+                if ($request->has('remove_from_rack') && is_array($request->remove_from_rack)) {
+                    foreach ($request->remove_from_rack as $itemId) {
+                        $item = StockOpnameItem::where('id', $itemId)
+                            ->where('rack_session_id', $rackSession->id)
                             ->first();
                             
-                        if ($stock && $rackSession->rack_id) {
-                            $stock->racks()->detach($rackSession->rack_id);
+                        if ($item) {
+                            // Detach from Stock
+                            $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
+                                ->where('product_id', $item->product_id)
+                                ->first();
+                                
+                            if ($stock && $rackSession->rack_id) {
+                                $stock->racks()->detach($rackSession->rack_id);
+                            }
+                            
+                            $item->delete();
+                            
+                            // Ensure it's not marked as submitted for the 0.0 default fallback
+                            $submittedIds[] = $itemId; 
                         }
-                        
-                        $item->delete();
-                        
-                        // Ensure it's not marked as submitted for the 0.0 default fallback
-                        $submittedIds[] = $itemId; 
                     }
                 }
-            }
 
-            // Handle dynamically added products (new_quantities)
-            if ($request->has('new_quantities') && is_array($request->new_quantities)) {
-                foreach ($request->new_quantities as $productId => $qty) {
-                    $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
-                    $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
-                        ->where('product_id', $productId)
-                        ->first();
+                // Handle dynamically added products (new_quantities)
+                if ($request->has('new_quantities') && is_array($request->new_quantities)) {
+                    foreach ($request->new_quantities as $productId => $qty) {
+                        $actualQty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
+                        $stock = \App\Models\Stock::where('branch_id', $rackSession->session->branch_id)
+                            ->where('product_id', $productId)
+                            ->first();
+                            
+                        $newItem = \App\Models\StockOpnameItem::create([
+                            'session_id' => $rackSession->session_id,
+                            'rack_session_id' => $rackSession->id,
+                            'product_id' => $productId,
+                            'system_quantity' => $stock ? $stock->quantity_on_hand : 0,
+                            'count1_quantity' => 0.0, // Pengecek 2 menambahkan produk baru yg terlewat, brarti count1=0
+                            'count1_at' => now(),
+                            'count2_quantity' => $actualQty,
+                            'count2_at' => now(),
+                            'status' => 'COUNT1_DONE',
+                        ]);
                         
-                    $newItem = \App\Models\StockOpnameItem::create([
-                        'session_id' => $rackSession->session_id,
-                        'rack_session_id' => $rackSession->id,
-                        'product_id' => $productId,
-                        'system_quantity' => $stock ? $stock->quantity_on_hand : 0,
-                        'count1_quantity' => 0.0, // Pengecek 2 menambahkan produk baru yg terlewat, brarti count1=0
-                        'count1_at' => now(),
-                        'count2_quantity' => $actualQty,
-                        'count2_at' => now(),
-                        'status' => 'COUNT1_DONE',
-                    ]);
-                    
-                    $newItem->detectDiscrepancy();
+                        $newItem->detectDiscrepancy();
+                    }
                 }
-            }
 
-            // Default any remaining COUNT1_DONE items in this rack session to 0.0
-            $remainingItems = StockOpnameItem::where('rack_session_id', $rackSession->id)
-                ->where('status', 'COUNT1_DONE')
-                ->whereNotIn('id', $submittedIds)
-                ->get();
+                // Default any remaining COUNT1_DONE items in this rack session to 0.0
+                $remainingItems = StockOpnameItem::where('rack_session_id', $rackSession->id)
+                    ->where('status', 'COUNT1_DONE')
+                    ->whereNotIn('id', $submittedIds)
+                    ->get();
 
-            foreach ($remainingItems as $item) {
-                $item->count2_quantity = 0.0;
-                $item->count2_at       = now();
-                $item->save();
+                foreach ($remainingItems as $item) {
+                    $item->count2_quantity = 0.0;
+                    $item->count2_at       = now();
+                    $item->save();
 
-                // Deteksi selisih (juga evaluasi cross-rack)
-                $item->detectDiscrepancy();
-            }
+                    // Deteksi selisih (juga evaluasi cross-rack)
+                    $item->detectDiscrepancy();
+                }
 
-            $rackSession->update([
-                'count2_status'  => 'DONE',
-                'count2_by_name' => $request->checker_name,
-                'count2_at'      => now(),
+                $rackSession->update([
+                    'count2_status'  => 'DONE',
+                    'count2_by_name' => $request->checker_name,
+                    'count2_at'      => now(),
+                ]);
+            });
+
+            return redirect()->route('opname.done', [
+                'role'            => 'pengecek',
+                'rack_code'       => $rackSession->rack?->rack_code,
+                'next_url'        => route('opname.cek', $sessionToken),
+                'clear_draft_key' => 'opname_cek_' . $rackSession->id,
             ]);
-        });
-
-        return redirect()->route('opname.done', [
-            'role'      => 'pengecek',
-            'rack_code' => $rackSession->rack?->rack_code,
-            'next_url'  => route('opname.cek', $sessionToken),
-        ]);
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
+        }
     }
 
     public function done(Request $request)
     {
         return view('opname.done', [
-            'role'      => $request->role,
-            'rack_code' => $request->rack_code,
-            'next_url'  => $request->next_url,
+            'role'            => $request->role,
+            'rack_code'       => $request->rack_code,
+            'next_url'        => $request->next_url,
+            'clear_draft_key' => $request->clear_draft_key,
         ]);
     }
 

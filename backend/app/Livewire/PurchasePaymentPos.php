@@ -29,7 +29,7 @@ class PurchasePaymentPos extends Component
 
     public function mount()
     {
-        $this->payment_number = 'PAY-' . date('YmdHis');
+        $this->payment_number = 'AUTO-GENERATED';
         $this->payment_date = date('Y-m-d');
         $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
         $this->suppliers = Supplier::where('is_active', true)->select('id', 'name', 'code', 'address')->get()->toArray();
@@ -113,9 +113,17 @@ class PurchasePaymentPos extends Component
             session()->flash('error', 'Pilih minimal 1 faktur/kontrabon untuk dibayar.');
             return;
         }
+
+        $lock = \Illuminate\Support\Facades\Cache::lock('pay_save_' . (auth()->id() ?: request()->ip()), 15);
+        if (!$lock->get()) {
+            session()->flash('error', 'Proses simpan pembayaran sedang berlangsung, mohon tunggu.');
+            return;
+        }
         
         DB::beginTransaction();
         try {
+            $this->payment_number = \App\Services\DocumentNumberService::generate('PAY', 'purchase_payments', 'payment_number', $this->branch_id ?: null, $this->payment_date);
+
             $payment = PurchasePayment::create([
                 'payment_number' => $this->payment_number,
                 'payment_date' => $this->payment_date,
@@ -187,6 +195,11 @@ class PurchasePaymentPos extends Component
         } catch (\Exception $e) {
             DB::rollBack();
             session()->flash('error', $e->getMessage());
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
         }
     }
 

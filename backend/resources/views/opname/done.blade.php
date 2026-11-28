@@ -86,6 +86,15 @@
 </div>
 
 <script>
+@if(!empty($clear_draft_key))
+(function() {
+    try {
+        const key = @json($clear_draft_key);
+        if (key) localStorage.removeItem(key);
+    } catch (e) {}
+})();
+@endif
+
 function closeThisTab() {
     // 1. Coba window.close standar
     try {

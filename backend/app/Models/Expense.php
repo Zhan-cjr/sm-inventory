@@ -51,7 +51,13 @@ class Expense extends Model
     {
         static::creating(function ($expense) {
             if (empty($expense->reference_number)) {
-                $expense->reference_number = 'EXP-' . date('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(4));
+                $expense->reference_number = \App\Services\DocumentNumberService::generate(
+                    'EXP',
+                    'expenses',
+                    'reference_number',
+                    $expense->branch_id,
+                    $expense->expense_date ? (string) $expense->expense_date : null
+                );
             }
         });
 

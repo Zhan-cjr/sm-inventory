@@ -71,7 +71,7 @@ class StockTransferPos extends Component
                 ];
             }
         } else {
-            $this->reference_number = 'TRF-' . strtoupper(uniqid());
+            $this->reference_number = 'AUTO-GENERATED';
             $this->transfer_date = date('Y-m-d');
             
             // Dukungan parameter dari Retail Intelligence & Saran Mutasi Antar Cabang
@@ -363,12 +363,15 @@ class StockTransferPos extends Component
             return;
         }
 
-        $this->validate([
+        $rules = [
             'from_branch_id' => 'required',
             'to_branch_id' => 'required|different:from_branch_id',
             'transfer_date' => 'required|date',
-            'reference_number' => 'required|unique:stock_transfers,reference_number,' . ($this->stockTransfer ? $this->stockTransfer->id : 'NULL'),
-        ], [
+        ];
+        if ($this->stockTransfer) {
+            $rules['reference_number'] = 'required|unique:stock_transfers,reference_number,' . $this->stockTransfer->id;
+        }
+        $this->validate($rules, [
             'to_branch_id.different' => 'Cabang asal dan tujuan tidak boleh sama.',
         ]);
 
@@ -377,11 +380,23 @@ class StockTransferPos extends Component
             return;
         }
 
-        $st = null;
-        $noChanges = false;
-        DB::transaction(function () use (&$st, &$noChanges) {
-            $data = [
-                'reference_number' => $this->reference_number,
+        $lock = \Illuminate\Support\Facades\Cache::lock('trf_save_' . (auth()->id() ?: request()->ip()), 15);
+        if (!$lock->get()) {
+            Notification::make()->title('Proses simpan mutasi sedang berjalan, mohon tunggu...')->warning()->send();
+            return;
+        }
+
+        try {
+            $st = null;
+            $noChanges = false;
+            DB::transaction(function () use (&$st, &$noChanges) {
+                $refNo = $this->stockTransfer
+                    ? $this->stockTransfer->reference_number
+                    : \App\Services\DocumentNumberService::generate('TRF', 'stock_transfers', 'reference_number', $this->from_branch_id, $this->transfer_date);
+                $this->reference_number = $refNo;
+
+                $data = [
+                    'reference_number' => $refNo,
                 'from_branch_id' => $this->from_branch_id,
                 'to_branch_id' => $this->to_branch_id,
                 'transfer_date' => $this->transfer_date,
@@ -465,21 +480,27 @@ class StockTransferPos extends Component
             }
         });
 
-        if ($noChanges) {
-            Notification::make()->title('Tidak ada perubahan data.')->info()->send();
-            return redirect()->to(route('filament.admin.resources.stock-transfers.index'));
-        }
+            if ($noChanges) {
+                Notification::make()->title('Tidak ada perubahan data.')->info()->send();
+                return redirect()->to(route('filament.admin.resources.stock-transfers.index'));
+            }
 
-        Notification::make()->title('Mutasi Stok berhasil disimpan.')->success()->send();
-        
-        if ($this->cetak_nota && $st) {
-            $printUrl = route('print.document', ['type' => 'transfer', 'ids' => [$st->id]]);
-            $indexUrl = route('filament.admin.resources.stock-transfers.index');
-            $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
-            return;
+            Notification::make()->title('Mutasi Stok berhasil disimpan.')->success()->send();
+            
+            if ($this->cetak_nota && $st) {
+                $printUrl = route('print.document', ['type' => 'transfer', 'ids' => [$st->id]]);
+                $indexUrl = route('filament.admin.resources.stock-transfers.index');
+                $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+                return;
+            }
+            
+            return redirect()->to(route('filament.admin.resources.stock-transfers.index'));
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
         }
-        
-        return redirect()->to(route('filament.admin.resources.stock-transfers.index'));
     }
 
     private function hasHeaderChanges(StockTransfer $st, array $data): bool

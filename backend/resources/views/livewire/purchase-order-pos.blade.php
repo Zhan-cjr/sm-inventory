@@ -719,9 +719,10 @@
         <!-- Actions Button -->
         <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-right: auto;">
             @if(!$readOnly)
-                <button wire:click="save" style="background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
-                    SIMPAN
+                <button wire:click="save" wire:loading.attr="disabled" wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave" style="background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg wire:loading.remove wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
+                    <span wire:loading.remove wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave">SIMPAN</span>
+                    <span wire:loading wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave">Menyimpan...</span>
                 </button>
             @endif
             <a href="{{ route('filament.admin.resources.purchase-orders.index') }}" style="background-color: #fff; color: #374151; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; font-size: 0.875rem; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
@@ -807,6 +808,37 @@
                 </button>
                 <button wire:click="removeZeroQtyItems" type="button" class="pos-btn-danger">
                     Hapus Semua
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    @if($showDuplicatePoModal)
+    <div class="pos-modal-overlay" style="z-index: 9999999;">
+        <div class="pos-modal-card" style="max-width: 34rem; width: 95%;">
+            <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                <div style="background-color: #fef3c7; color: #d97706; padding: 0.75rem; border-radius: 9999px; flex-shrink: 0;">
+                    <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div style="flex: 1 1 0%;">
+                    <h3 class="pos-modal-title">Deteksi Pesanan Pembelian Kembar</h3>
+                    <p class="pos-modal-body" style="margin-top: 0.4rem;">
+                        Pesanan dengan supplier, cabang, dan rincian barang yang <strong>100% sama</strong> baru saja berhasil disimpan dengan nomor <strong>{{ $duplicatePoNumber }}</strong>.
+                    </p>
+                    <p class="pos-modal-body" style="margin-top: 0.4rem;">
+                        Apakah Anda ingin membuka daftar PO tersebut, atau memang sengaja membuat PO kedua yang identik?
+                    </p>
+                </div>
+            </div>
+            <div class="pos-modal-footer" style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button wire:click="cancelDuplicateSaveRedirect" type="button" style="background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer;">
+                    Batal &amp; Buka Daftar PO
+                </button>
+                <button wire:click="confirmForceDuplicateSave" wire:loading.attr="disabled" type="button" class="pos-btn-cancel" style="font-size: 0.85rem;">
+                    Ya, Sengaja Buat PO Baru
                 </button>
             </div>
         </div>
@@ -917,8 +949,9 @@
                 <button wire:click="closeOverOrderModal" type="button" class="pos-btn-cancel">
                     Kembali Periksa
                 </button>
-                <button wire:click="confirmOverOrderSave" type="button" style="background-color: #10b981; color: white; padding: 0.5rem 1.25rem; border-radius: 0.375rem; font-weight: 700; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors">
-                    Simpan & Ajukan Persetujuan
+                <button wire:click="confirmOverOrderSave" wire:loading.attr="disabled" wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave" type="button" style="background-color: #10b981; color: white; padding: 0.5rem 1.25rem; border-radius: 0.375rem; font-weight: 700; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span wire:loading.remove wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave">Simpan &amp; Ajukan Persetujuan</span>
+                    <span wire:loading wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave">Menyimpan...</span>
                 </button>
             </div>
         </div>

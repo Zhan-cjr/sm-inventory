@@ -17,7 +17,8 @@ class StockTransferForm
             ->components([
                 TextInput::make('reference_number')
                     ->required()
-                    ->default('TRF-' . strtoupper(uniqid())),
+                    ->default(fn () => \App\Services\DocumentNumberService::generate('TRF', 'stock_transfers', 'reference_number', \Illuminate\Support\Facades\Auth::user()?->branch_id))
+                    ->readOnly(),
                 Select::make('from_branch_id')
                     ->relationship('fromBranch', 'name')
                     ->required()

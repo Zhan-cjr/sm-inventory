@@ -71,17 +71,24 @@ class StockAdjustmentPos extends Component
                 ];
             }
         } else {
-            $this->adjustment_number = 'ADJ-' . strtoupper(substr(uniqid(), -6));
+            $this->adjustment_number = 'AUTO-GENERATED';
             $this->adjustment_date = date('Y-m-d');
             $this->branch_id = auth()->user()->branch_id ?? \App\Models\Branch::first()?->id;
 
-            // Load draft if not editing existing adjustment
-            $this->loadDraft();
-            
             $firstReason = AdjustmentReason::where('is_active', true)->first();
             if ($firstReason) {
                 $this->adjustment_reason_id = $firstReason->id;
                 $this->reason_type = $firstReason->type;
+            }
+
+            // Load draft if not editing existing adjustment
+            $this->loadDraft();
+            $this->adjustment_number = 'AUTO-GENERATED';
+            if ($this->adjustment_reason_id) {
+                $loadedReason = AdjustmentReason::find($this->adjustment_reason_id);
+                if ($loadedReason) {
+                    $this->reason_type = $loadedReason->type;
+                }
             }
         }
 
@@ -317,12 +324,15 @@ class StockAdjustmentPos extends Component
             return;
         }
 
-        $this->validate([
+        $rules = [
             'branch_id' => 'required',
             'adjustment_reason_id' => 'required',
             'adjustment_date' => 'required|date',
-            'adjustment_number' => 'required|unique:stock_adjustments,adjustment_number,' . ($this->stockAdjustment ? $this->stockAdjustment->id : 'NULL'),
-        ]);
+        ];
+        if ($this->stockAdjustment) {
+            $rules['adjustment_number'] = 'required|unique:stock_adjustments,adjustment_number,' . $this->stockAdjustment->id;
+        }
+        $this->validate($rules);
 
         if (empty($this->cart)) {
             Notification::make()->title('Keranjang kosong!')->danger()->send();
@@ -340,21 +350,50 @@ class StockAdjustmentPos extends Component
             }
         }
 
-        $organization = \App\Models\Organization::find(auth()->user()->organization_id ?? \App\Models\Organization::first()->id);
-        
-        $needsApproval = false;
-        if ($organization && $organization->stock_adjustment_approval_amount_limit !== null) {
-            if ($this->grandTotal > $organization->stock_adjustment_approval_amount_limit) {
-                $needsApproval = true;
-            }
+        $lock = $this->acquirePosSaveLock('adj');
+        if (!$lock) {
+            return;
         }
 
-        $status = $needsApproval ? 'PENDING_APPROVAL' : 'COMPLETED';
+        try {
+            $adjFingerprint = $this->computeCartFingerprint('adj', [
+                'branch_id' => $this->branch_id,
+                'adjustment_reason_id' => $this->adjustment_reason_id,
+            ], $this->cart);
 
-        $data = [
-            'organization_id' => $organization->id,
-            'branch_id' => $this->branch_id,
-            'adjustment_number' => $this->adjustment_number,
+            if (!$this->stockAdjustment) {
+                $recentAdj = $this->getRecentSavedFingerprint($adjFingerprint);
+                if ($recentAdj) {
+                    $this->clearDraft();
+                    Notification::make()
+                        ->title('Koreksi Stok Sudah Tersimpan')
+                        ->body("Transaksi koreksi stok yang identik baru saja tersimpan dengan nomor {$recentAdj}.")
+                        ->warning()
+                        ->send();
+                    return redirect()->to(route('filament.admin.resources.stock-adjustments.index'));
+                }
+            }
+
+            $organization = \App\Models\Organization::find(auth()->user()->organization_id ?? \App\Models\Organization::first()->id);
+            
+            $needsApproval = false;
+            if ($organization && $organization->stock_adjustment_approval_amount_limit !== null) {
+                if ($this->grandTotal > $organization->stock_adjustment_approval_amount_limit) {
+                    $needsApproval = true;
+                }
+            }
+
+            $status = $needsApproval ? 'PENDING_APPROVAL' : 'COMPLETED';
+            $isEditing = !empty($this->stockAdjustment);
+            $adjNumber = $isEditing
+                ? $this->stockAdjustment->adjustment_number
+                : \App\Services\DocumentNumberService::generate('ADJ', 'stock_adjustments', 'adjustment_number', $this->branch_id, $this->adjustment_date);
+            $this->adjustment_number = $adjNumber;
+
+            $data = [
+                'organization_id' => $organization->id,
+                'branch_id' => $this->branch_id,
+                'adjustment_number' => $adjNumber,
             'adjustment_date' => $this->adjustment_date,
             'adjustment_reason_id' => $this->adjustment_reason_id,
             'notes' => $this->notes,
@@ -532,23 +571,29 @@ class StockAdjustmentPos extends Component
             }
         }
 
-        if ($needsApproval) {
-            $adj->requestApproval('Otomatis: Nominal koreksi melebihi batas (Rp ' . number_format($organization->stock_adjustment_approval_amount_limit, 0, ',', '.') . ')');
-            Notification::make()->title('Koreksi Stok memerlukan persetujuan Manajer.')->warning()->send();
-        } else {
-            Notification::make()->title('Koreksi Stok berhasil disimpan.')->success()->send();
-        }
-        
-        $this->clearDraft();
+            if (!$isEditing) {
+                $this->recordSavedFingerprint($adjFingerprint, $adj->adjustment_number);
+            }
+            $this->clearDraft();
 
-        if ($this->cetak_nota && !$needsApproval) {
-            $printUrl = route('print.document', ['type' => 'adjustment', 'ids' => [$adj->id]]);
-            $indexUrl = route('filament.admin.resources.stock-adjustments.index');
-            $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
-            return;
+            if ($needsApproval) {
+                $adj->requestApproval('Otomatis: Nominal koreksi melebihi batas (Rp ' . number_format($organization->stock_adjustment_approval_amount_limit, 0, ',', '.') . ')');
+                Notification::make()->title('Koreksi Stok memerlukan persetujuan Manajer.')->warning()->send();
+            } else {
+                Notification::make()->title('Koreksi Stok berhasil disimpan.')->success()->send();
+            }
+
+            if ($this->cetak_nota && !$needsApproval) {
+                $printUrl = route('print.document', ['type' => 'adjustment', 'ids' => [$adj->id]]);
+                $indexUrl = route('filament.admin.resources.stock-adjustments.index');
+                $this->js("window.open('{$printUrl}', '_blank'); window.location.href = '{$indexUrl}';");
+                return;
+            }
+            
+            return redirect()->to(route('filament.admin.resources.stock-adjustments.index'));
+        } finally {
+            $this->releasePosSaveLock($lock);
         }
-        
-        return redirect()->to(route('filament.admin.resources.stock-adjustments.index'));
     }
 
     private function buildAdjustmentItemPayload(array $item): array

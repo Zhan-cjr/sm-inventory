@@ -36,7 +36,7 @@ class StockQuarantinePos extends Component
 
     public function mount()
     {
-        $this->reference_number = 'BS-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -4));
+        $this->reference_number = 'AUTO-GENERATED';
         $this->movement_date = date('Y-m-d');
         
         $userBranchId = Auth::user()?->branch_id;
@@ -278,9 +278,16 @@ class StockQuarantinePos extends Component
             }
         }
 
+        $lock = \Illuminate\Support\Facades\Cache::lock('bs_save_' . (Auth::id() ?: request()->ip()), 15);
+        if (!$lock->get()) {
+            Notification::make()->title('Proses simpan sedang berlangsung, mohon tunggu...')->warning()->send();
+            return;
+        }
+
         DB::beginTransaction();
         try {
             $userId = Auth::id();
+            $this->reference_number = \App\Services\DocumentNumberService::generateQuarantineMovementNumber($this->branch_id, $this->movement_date);
             foreach ($this->cart as $item) {
                 $stock = Stock::where('branch_id', $this->branch_id)->where('product_id', $item['product_id'])->lockForUpdate()->first();
                 if (!$stock) {
@@ -319,6 +326,11 @@ class StockQuarantinePos extends Component
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
         }
     }
 

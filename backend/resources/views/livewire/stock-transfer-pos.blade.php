@@ -270,9 +270,10 @@
         <!-- Actions Button -->
         <div style="display: flex; gap: 0.5rem;">
             @if(!$readOnly)
-                <button wire:click="save" style="background-color: #2563eb; color: white; padding: 0.75rem 2rem; border-radius: 0.375rem; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-blue-700 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
-                    SIMPAN MUTASI
+                <button wire:click="save" wire:loading.attr="disabled" wire:target="save" style="background-color: #2563eb; color: white; padding: 0.75rem 2rem; border-radius: 0.375rem; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg wire:loading.remove wire:target="save" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
+                    <span wire:loading.remove wire:target="save">SIMPAN MUTASI</span>
+                    <span wire:loading wire:target="save">Menyimpan...</span>
                 </button>
             @endif
             <a href="{{ route('filament.admin.resources.stock-transfers.index') }}" style="background-color: #fff; color: #374151; padding: 0.75rem 1.5rem; border-radius: 0.375rem; font-weight: 500; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">

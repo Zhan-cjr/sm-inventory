@@ -385,7 +385,7 @@ class SuggestedStockTransferService
     {
         return DB::transaction(function () use ($fromBranchId, $toBranchId, $items, $userId, $notes) {
             $transfer = StockTransfer::create([
-                'reference_number' => 'TRF-' . date('Ymd') . '-' . strtoupper(Str::random(5)),
+                'reference_number' => DocumentNumberService::generate('TRF', 'stock_transfers', 'reference_number', $fromBranchId),
                 'from_branch_id' => $fromBranchId,
                 'to_branch_id' => $toBranchId,
                 'status' => 'pending',
