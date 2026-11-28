@@ -21,7 +21,7 @@ export let options = {
 const BASE_URL = "https://adminstg.toserbaselamat.id";
 const DEVICE_UUID = "4f6d26b9-5ee6-4ef1-9c5b-ae25c4086583";
 const BRANCH_ID = "01a09dd8-929a-72a5-a88f-9ff80536718d";
-const TOKEN = "395|UdP1kWFbAirJvEgEF8XCqmH5rUf98k0Nc3jdBQKf5d4860d5";
+const TOKEN = __ENV.K6_AUTH_TOKEN || "";
 
 // Sample valid product IDs from staging database
 const SAMPLE_PRODUCTS = [

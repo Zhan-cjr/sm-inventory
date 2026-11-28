@@ -23,7 +23,7 @@ export const VirtualNumpad: React.FC<Props> = ({ onClose }) => {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.get('/ecommerce/members/profile', { params: { phone } });
+      const res = await axios.get('/ecommerce/kiosk/check-points', { params: { phone } });
       if (res.data.member) setMember(res.data.member);
       else setError('Member tidak ditemukan!');
     } catch (e) {

@@ -36,8 +36,9 @@ Route::prefix('v1/ecommerce')->group(function () {
     Route::post('orders/{id}/check-status', [EcommerceController::class, 'checkPaymentStatus']);
     Route::get('orders/{id}/tracking', [EcommerceController::class, 'trackOrder']);
     Route::post('payment/notification', [EcommerceController::class, 'paymentNotification']);
-    Route::post('members', [EcommerceController::class, 'registerMember']);
-    Route::post('members/login', [EcommerceController::class, 'memberLogin']);
+    Route::post('members', [EcommerceController::class, 'registerMember'])->middleware('throttle:10,1');
+    Route::post('members/login', [EcommerceController::class, 'memberLogin'])->middleware('throttle:15,1');
+    Route::get('kiosk/check-points', [EcommerceController::class, 'checkKioskPoints'])->middleware('throttle:30,1');
     Route::get('members/history', [EcommerceController::class, 'getMemberHistory']);
     Route::get('members/profile', [EcommerceController::class, 'getMemberProfile']);
     Route::post('members/forgot-password', [EcommerceController::class, 'forgotPassword'])->middleware('throttle:10,1');

@@ -18,6 +18,33 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
+const attachMemberToken = (config: any) => {
+  const token = localStorage.getItem('ecom_member_token');
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers['X-Member-Token'] = token;
+  }
+  return config;
+};
+
+const handleMemberUnauthorized = (error: any) => {
+  const status = error?.response?.status;
+  const reqUrl = String(error?.config?.url || '');
+  if (
+    status === 401 &&
+    !reqUrl.includes('/ecommerce/members/login') &&
+    localStorage.getItem('ecom_member')
+  ) {
+    window.dispatchEvent(new Event('ecom-member-unauthorized'));
+  }
+  return Promise.reject(error);
+};
+
+axios.interceptors.request.use(attachMemberToken);
+api.interceptors.request.use(attachMemberToken);
+axios.interceptors.response.use((res) => res, handleMemberUnauthorized);
+api.interceptors.response.use((res) => res, handleMemberUnauthorized);
+
 // Deduplicate concurrent & short-lived GET requests to public catalog/settings endpoints
 // (prevents 4-6x /ecommerce/settings and 2x /ecommerce/products calls per homepage visit)
 const DEDUP_PATHS = ['/ecommerce/settings', '/ecommerce/products', '/ecommerce/branches'];

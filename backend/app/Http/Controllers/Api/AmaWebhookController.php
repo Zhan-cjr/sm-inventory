@@ -24,10 +24,22 @@ class AmaWebhookController extends Controller
             return response()->json(['error' => 'Missing trxid'], 400);
         }
 
+        $expectedUserId = (string) (config('services.ama.user_id') ?? env('AMA_USER_ID', ''));
+        if ($expectedUserId !== '' && $userid !== null && $userid !== '' && !hash_equals($expectedUserId, (string) $userid)) {
+            Log::warning('AMA Webhook Rejected: userid mismatch', [
+                'trxid' => $trxid,
+                'ip' => $request->header('CF-Connecting-IP') ?? $request->ip(),
+            ]);
+            return response('Forbidden', 403)->header('Content-Type', 'text/plain');
+        }
+
         try {
             $transaction = PpobTransaction::where('ref_id', $trxid)->first();
             
             if ($transaction) {
+                if ($transaction->status === 'Sukses') {
+                    return response('OK', 200)->header('Content-Type', 'text/plain');
+                }
                 // Map AMA status to our standard status
                 // '00' or '0' = Success, '04' = Failed, '68' = Pending
                 $mappedStatus = 'Pending';

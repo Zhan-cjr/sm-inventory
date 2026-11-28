@@ -118,4 +118,73 @@ class Customer extends Model
             'description' => $description,
         ]);
     }
+
+    public function createMemberToken(int $ttlDays = 90): string
+    {
+        $payload = [
+            'cid' => $this->id,
+            'pwd' => substr(hash('sha256', (string) $this->password), 0, 16),
+            'exp' => now()->addDays($ttlDays)->timestamp,
+        ];
+
+        return \Illuminate\Support\Facades\Crypt::encryptString(json_encode($payload));
+    }
+
+    public static function resolveFromMemberToken(?string $token): ?self
+    {
+        if (empty($token)) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode(\Illuminate\Support\Facades\Crypt::decryptString($token), true);
+            if (!is_array($decoded) || empty($decoded['cid']) || empty($decoded['exp'])) {
+                return null;
+            }
+            if ((int) $decoded['exp'] < now()->timestamp) {
+                return null;
+            }
+
+            $customer = static::where('id', $decoded['cid'])
+                ->where('is_active', true)
+                ->first();
+
+            if (!$customer) {
+                return null;
+            }
+
+            $expectedPwdHash = substr(hash('sha256', (string) $customer->password), 0, 16);
+            if (!isset($decoded['pwd']) || !hash_equals($expectedPwdHash, (string) $decoded['pwd'])) {
+                return null;
+            }
+
+            return $customer;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    public function toMaskedKioskArray(): array
+    {
+        $words = preg_split('/\s+/', trim((string) $this->name), -1, PREG_SPLIT_NO_EMPTY);
+        if (count($words) > 1) {
+            $maskedName = $words[0] . ' ' . mb_substr($words[1], 0, 1) . '***';
+        } else {
+            $rawName = $words[0] ?? 'Member';
+            $maskedName = mb_substr($rawName, 0, min(3, mb_strlen($rawName))) . '***';
+        }
+
+        $phone = (string) $this->phone;
+        $len = strlen($phone);
+        $maskedPhone = $len > 7
+            ? substr($phone, 0, 4) . str_repeat('*', max(3, $len - 7)) . substr($phone, -3)
+            : $phone;
+
+        return [
+            'name' => $maskedName,
+            'phone' => $maskedPhone,
+            'points' => (int) $this->points,
+            'member_tier' => $this->member_tier ?: 'REGULAR',
+        ];
+    }
 }

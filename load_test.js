@@ -28,7 +28,7 @@ const BASE_URL = 'http://100.114.176.71';
 
 // [PENTING]: Ganti dengan Token Auth dari salah satu akun kasir Anda yang valid
 // Cara dapatnya: Login ke POS Kasir, buka Inspect Element (F12) -> Application -> Local Storage -> cari 'pos_user' -> copy token-nya.
-const TOKEN = '323|XJnf80wayOqOeImr0wz34elBauVnur9jTgH1YUWhac3791e3';
+const TOKEN = __ENV.K6_AUTH_TOKEN || '';
 
 // =========================================================================
 // SIMULASI PERILAKU KASIR

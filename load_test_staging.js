@@ -21,7 +21,7 @@ const BASE_URL = "https://adminstg.toserbaselamat.id";
 const DEVICE_UUID = "4f6d26b9-5ee6-4ef1-9c5b-ae25c4086583";
 
 // Dapatkan token saat inisialisasi atau gunakan token aktif
-const TOKEN = "395|UdP1kWFbAirJvEgEF8XCqmH5rUf98k0Nc3jdBQKf5d4860d5";
+const TOKEN = __ENV.K6_AUTH_TOKEN || "";
 
 export default function () {
     const headers = {

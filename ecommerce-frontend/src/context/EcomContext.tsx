@@ -79,7 +79,7 @@ interface EcomContextType {
   selectedCategory: string;
   setSelectedCategory: (category: string) => void;
   member: Member | null;
-  setMember: (member: Member | null) => void;
+  setMember: (member: Member | null, token?: string) => void;
   logoutMember: () => void;
   syncMemberPoints: () => Promise<void>;
   selectedProductForModal: Product | null;
@@ -114,6 +114,11 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [member, setMemberState] = useState<Member | null>(() => {
     const saved = localStorage.getItem('ecom_member');
+    const token = localStorage.getItem('ecom_member_token');
+    if (saved && !token) {
+      localStorage.removeItem('ecom_member');
+      return null;
+    }
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -247,12 +252,16 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const setMember = (newMember: Member | null) => {
+  const setMember = (newMember: Member | null, token?: string) => {
     setMemberState(newMember);
     if (newMember) {
       localStorage.setItem('ecom_member', JSON.stringify(newMember));
+      if (token) {
+        localStorage.setItem('ecom_member_token', token);
+      }
     } else {
       localStorage.removeItem('ecom_member');
+      localStorage.removeItem('ecom_member_token');
     }
   };
 
@@ -262,29 +271,33 @@ export const EcomProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const syncMemberPoints = async () => {
     const saved = localStorage.getItem('ecom_member');
-    if (!saved) return;
+    const token = localStorage.getItem('ecom_member_token');
+    if (!saved || !token) return;
     try {
-      const parsed = JSON.parse(saved);
-      if (!parsed?.phone) return;
-      const response = await axios.get('/ecommerce/members/profile', {
-        params: { phone: parsed.phone }
-      });
+      const response = await axios.get('/ecommerce/members/profile');
       if (response.data.member) {
         setMember(response.data.member);
       }
     } catch (error) {
       console.error('Failed to sync member info:', error);
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
+      if (
+        axios.isAxiosError(error) &&
+        (error.response?.status === 404 || error.response?.status === 401)
+      ) {
         logoutMember();
       }
     }
   };
 
   useEffect(() => {
+    const onUnauthorized = () => logoutMember();
+    window.addEventListener('ecom-member-unauthorized', onUnauthorized);
     const saved = localStorage.getItem('ecom_member');
-    if (saved) {
+    const token = localStorage.getItem('ecom_member_token');
+    if (saved && token) {
       syncMemberPoints();
     }
+    return () => window.removeEventListener('ecom-member-unauthorized', onUnauthorized);
   }, []);
 
   const addToCart = (product: Product) => {

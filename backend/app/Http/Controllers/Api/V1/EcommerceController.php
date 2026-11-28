@@ -324,21 +324,22 @@ class EcommerceController extends Controller
         return response()->json(['message' => $result['message']], 500);
     }
 
+    private function resolveAuthenticatedMember(Request $request): ?\App\Models\Customer
+    {
+        $token = $request->header('X-Member-Token') ?? $request->bearerToken();
+        return \App\Models\Customer::resolveFromMemberToken($token);
+    }
+
     /**
      * Ambil daftar alamat customer yang sedang login
      */
     public function getCustomerAddresses(Request $request)
     {
-        // This endpoint will be protected by sanctum/customer auth
-        // Assuming we pass customer token, but Ecommerce member login might be custom.
-        // The frontend passes member id or we use auth guard.
-        // Wait, the current E-commerce member login returns a token or just saves it?
-        // Let's check `memberLogin`.
-        
-        $memberId = $request->header('X-Member-ID') ?? $request->input('member_id');
-        if (!$memberId) {
-            return response()->json(['message' => 'Unauthorized. Harap sertakan member_id'], 401);
+        $customer = $this->resolveAuthenticatedMember($request);
+        if (!$customer) {
+            return response()->json(['message' => 'Unauthorized. Silakan login kembali.'], 401);
         }
+        $memberId = $customer->id;
 
         $addresses = \App\Models\CustomerAddress::where('customer_id', $memberId)
             ->orderBy('is_primary', 'desc')
@@ -350,10 +351,11 @@ class EcommerceController extends Controller
 
     public function addCustomerAddress(Request $request)
     {
-        $memberId = $request->header('X-Member-ID') ?? $request->input('member_id');
-        if (!$memberId) {
-            return response()->json(['message' => 'Unauthorized'], 401);
+        $customer = $this->resolveAuthenticatedMember($request);
+        if (!$customer) {
+            return response()->json(['message' => 'Unauthorized. Silakan login kembali.'], 401);
         }
+        $memberId = $customer->id;
 
         $request->validate([
             'label' => 'required|string|max:50',
@@ -392,8 +394,9 @@ class EcommerceController extends Controller
 
     public function setPrimaryCustomerAddress(Request $request, $id)
     {
-        $memberId = $request->header('X-Member-ID') ?? $request->input('member_id');
-        if (!$memberId) return response()->json(['message' => 'Unauthorized'], 401);
+        $customer = $this->resolveAuthenticatedMember($request);
+        if (!$customer) return response()->json(['message' => 'Unauthorized. Silakan login kembali.'], 401);
+        $memberId = $customer->id;
 
         $address = \App\Models\CustomerAddress::where('customer_id', $memberId)->findOrFail($id);
         
@@ -405,8 +408,9 @@ class EcommerceController extends Controller
 
     public function deleteCustomerAddress(Request $request, $id)
     {
-        $memberId = $request->header('X-Member-ID') ?? $request->input('member_id');
-        if (!$memberId) return response()->json(['message' => 'Unauthorized'], 401);
+        $customer = $this->resolveAuthenticatedMember($request);
+        if (!$customer) return response()->json(['message' => 'Unauthorized. Silakan login kembali.'], 401);
+        $memberId = $customer->id;
 
         $address = \App\Models\CustomerAddress::where('customer_id', $memberId)->findOrFail($id);
         $wasPrimary = $address->is_primary;
@@ -457,16 +461,15 @@ class EcommerceController extends Controller
         $orgId = $organization ? $organization->id : null;
 
         $pointsToRedeem = (int)$request->input('points_to_redeem', 0);
-        $customer = null;
+        $authMember = $this->resolveAuthenticatedMember($request);
         if ($pointsToRedeem > 0) {
             if ($organization && !$organization->point_redemption_enabled) {
                 return response()->json(['message' => 'Penukaran poin saat ini dinonaktifkan oleh Perusahaan.'], 422);
             }
-            $customer = \App\Models\Customer::where('phone', $request->customer_phone)->first();
-            if (!$customer) {
-                return response()->json(['message' => 'Member tidak ditemukan untuk penukaran poin.'], 422);
+            if (!$authMember) {
+                return response()->json(['message' => 'Sesi login member berakhir. Silakan login ulang untuk menukarkan poin.'], 401);
             }
-            if ($customer->points < $pointsToRedeem) {
+            if ($authMember->points < $pointsToRedeem) {
                 return response()->json(['message' => 'Poin Anda tidak mencukupi.'], 422);
             }
             $minPoints = $organization?->minimum_points_to_redeem ?? 100;
@@ -475,7 +478,7 @@ class EcommerceController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($request, $orgId, $organization, $pointsToRedeem) {
+        return DB::transaction(function () use ($request, $orgId, $organization, $pointsToRedeem, $authMember) {
             $totalAmount = 0;
             $itemsData = [];
 
@@ -683,10 +686,17 @@ class EcommerceController extends Controller
             }
 
             // Update customer points if registered member
-            $customer = \App\Models\Customer::where('phone', $request->customer_phone)->first();
+            $customer = $authMember
+                ? \App\Models\Customer::where('id', $authMember->id)->lockForUpdate()->first()
+                : \App\Models\Customer::where('phone', $request->customer_phone)->first();
             if ($customer) {
-                // Deduct points first if redeemed
+                // Deduct points first if redeemed (strictly for authenticated member)
                 if ($actualPointsToRedeem > 0) {
+                    if (!$authMember || $customer->points < $actualPointsToRedeem) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'points_to_redeem' => ['Saldo poin member tidak mencukupi.'],
+                        ]);
+                    }
                     $customer->deductPoints($actualPointsToRedeem, 'ECOMMERCE_ORDER', $order->id, "Tukar Poin E-Commerce: #{$orderIdShort}");
                 }
 
@@ -774,7 +784,7 @@ class EcommerceController extends Controller
             return response()->json([
                 'message' => 'Pesanan berhasil dikirim.',
                 'order' => $order->load('items.product', 'branch'),
-                'member' => $customer ? $customer->fresh() : null,
+                'member' => ($authMember && $customer) ? $customer->fresh() : null,
             ], 201);
         });
     }
@@ -852,6 +862,7 @@ class EcommerceController extends Controller
         return response()->json([
             'message' => $existing ? 'Pendaftaran online berhasil! Akun toko fisik Anda kini terhubung.' : 'Pendaftaran member berhasil!',
             'member' => $customer,
+            'member_token' => $customer->createMemberToken(),
         ], $existing ? 200 : 201);
     }
 
@@ -890,14 +901,14 @@ class EcommerceController extends Controller
         return response()->json([
             'message' => 'Login member berhasil!',
             'member' => $customer,
+            'member_token' => $customer->createMemberToken(),
         ]);
     }
 
     public function getNotifications(Request $request)
     {
-        $request->validate(['phone' => 'required|string']);
-        $customer = \App\Models\Customer::where('phone', $request->phone)->first();
-        if (!$customer) return response()->json(['message' => 'Member not found'], 404);
+        $customer = $this->resolveAuthenticatedMember($request);
+        if (!$customer) return response()->json(['message' => 'Unauthenticated'], 401);
 
         $notifications = \App\Models\EcommerceNotification::where('customer_id', $customer->id)
             ->orderBy('created_at', 'desc')
@@ -914,9 +925,8 @@ class EcommerceController extends Controller
 
     public function markNotificationRead(Request $request, $id)
     {
-        $request->validate(['phone' => 'required|string']);
-        $customer = \App\Models\Customer::where('phone', $request->phone)->first();
-        if (!$customer) return response()->json(['message' => 'Member not found'], 404);
+        $customer = $this->resolveAuthenticatedMember($request);
+        if (!$customer) return response()->json(['message' => 'Unauthenticated'], 401);
 
         $notification = \App\Models\EcommerceNotification::where('customer_id', $customer->id)
             ->where('id', $id)
@@ -931,9 +941,8 @@ class EcommerceController extends Controller
 
     public function markAllNotificationsRead(Request $request)
     {
-        $request->validate(['phone' => 'required|string']);
-        $customer = \App\Models\Customer::where('phone', $request->phone)->first();
-        if (!$customer) return response()->json(['message' => 'Member not found'], 404);
+        $customer = $this->resolveAuthenticatedMember($request);
+        if (!$customer) return response()->json(['message' => 'Unauthenticated'], 401);
 
         \App\Models\EcommerceNotification::where('customer_id', $customer->id)
             ->where('is_read', false)
@@ -947,18 +956,14 @@ class EcommerceController extends Controller
      */
     public function getMemberHistory(Request $request)
     {
-        $request->validate([
-            'phone' => 'required|string|max:50',
-        ]);
-
-        $phone = $request->phone;
-        $customer = \App\Models\Customer::where('phone', $phone)->first();
-
+        $customer = $this->resolveAuthenticatedMember($request);
         if (!$customer) {
             return response()->json([
-                'message' => 'Member tidak ditemukan.',
-            ], 404);
+                'message' => 'Sesi login member berakhir. Silakan masuk kembali.',
+            ], 401);
         }
+
+        $phone = $customer->phone;
 
         // 1. Ambil pesanan E-Commerce
         $ecommerceOrders = \App\Models\EcommerceOrder::with(['items.product', 'branch', 'ppobTransaction'])
@@ -1064,9 +1069,26 @@ class EcommerceController extends Controller
     }
 
     /**
-     * Get member profile by phone number (for syncing points and tier)
+     * Get authenticated member profile (for syncing points and tier)
      */
     public function getMemberProfile(Request $request)
+    {
+        $customer = $this->resolveAuthenticatedMember($request);
+        if (!$customer) {
+            return response()->json([
+                'message' => 'Sesi login member berakhir. Silakan masuk kembali.',
+            ], 401);
+        }
+
+        return response()->json([
+            'member' => $customer,
+        ]);
+    }
+
+    /**
+     * Public masked points lookup exclusively for in-store Kiosk touchscreen
+     */
+    public function checkKioskPoints(Request $request)
     {
         $request->validate([
             'phone' => 'required|string|max:50',
@@ -1083,7 +1105,7 @@ class EcommerceController extends Controller
         }
 
         return response()->json([
-            'member' => $customer,
+            'member' => $customer->toMaskedKioskArray(),
         ]);
     }
 
@@ -1633,18 +1655,17 @@ class EcommerceController extends Controller
      */
     public function updateMemberProfile(Request $request)
     {
+        $customer = $this->resolveAuthenticatedMember($request);
+        if (!$customer) {
+            return response()->json(['error' => 'Sesi login member berakhir. Silakan masuk kembali.'], 401);
+        }
+
         $request->validate([
-            'id' => 'required|uuid',
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:20',
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|string'
         ]);
-
-        $customer = \App\Models\Customer::find($request->id);
-        if (!$customer) {
-            return response()->json(['error' => 'Customer not found'], 404);
-        }
 
         $oldPhone = $customer->phone;
         $newPhone = $request->phone;
@@ -1677,7 +1698,8 @@ class EcommerceController extends Controller
 
         return response()->json([
             'message' => 'Profil berhasil diperbarui.',
-            'user' => $customer
+            'user' => $customer,
+            'member_token' => $customer->fresh()->createMemberToken(),
         ]);
     }
 

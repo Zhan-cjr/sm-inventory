@@ -179,7 +179,7 @@ const MemberModal = () => {
         password: loginPassword,
       });
 
-      setMember(response.data.member);
+      setMember(response.data.member, response.data.member_token);
       setSuccessMsg('Selamat datang kembali!');
       setTimeout(() => setSuccessMsg(null), 3000);
       setMemberTab('profile');
@@ -209,7 +209,7 @@ const MemberModal = () => {
         password: regPassword,
       });
 
-      setMember(response.data.member);
+      setMember(response.data.member, response.data.member_token);
       setSuccessMsg(response.data.message || 'Pendaftaran member berhasil!');
       setTimeout(() => setSuccessMsg(null), 3000);
       setMemberTab('profile');
@@ -248,7 +248,7 @@ const MemberModal = () => {
         address: editAddress || null,
       });
 
-      setMember(response.data.user);
+      setMember(response.data.user, response.data.member_token);
       setSuccessMsg(response.data.message || 'Profil berhasil diperbarui!');
       setTimeout(() => setSuccessMsg(null), 3000);
       setIsEditingProfile(false);
