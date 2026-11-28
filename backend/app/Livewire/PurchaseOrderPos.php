@@ -70,6 +70,10 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
     public string $duplicatePoNumber = '';
     public bool $forceDuplicateSave = false;
 
+    public bool $showApprovalDecisionModal = false;
+    public string $approvalDecisionAction = 'approve';
+    public string $approvalDecisionNotes = '';
+
     public const OVER_ORDER_REASON_PRESETS = [
         'CARTON_PACK' => '📦 Pembulatan Kemasan Dus / Karton dari Pabrik',
         'PROMO_SUPPLIER' => '🏷️ Promo Supplier (Diskon Ekstra / Bonus Barang)',
@@ -761,6 +765,98 @@ class PurchaseOrderPos extends Component implements HasActions, HasForms
         $this->forceDuplicateSave = false;
         $this->clearDraft();
         return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
+    }
+
+    public function getCanApprovePoProperty(): bool
+    {
+        return $this->readOnly
+            && $this->purchaseOrder
+            && strtolower((string) $this->purchaseOrder->status) === 'pending_approval'
+            && (bool) auth()->user()?->hasCustomAuthorization('APPROVE_PO');
+    }
+
+    public function openApprovalDecisionModal(string $action = 'approve')
+    {
+        if (!$this->canApprovePo) {
+            Notification::make()
+                ->title('Akses Ditolak')
+                ->body('Anda tidak memiliki izin APPROVE_PO atau PO ini tidak dalam status menunggu persetujuan.')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $this->approvalDecisionAction = $action === 'reject' ? 'reject' : 'approve';
+        $this->approvalDecisionNotes = '';
+        $this->showApprovalDecisionModal = true;
+    }
+
+    public function closeApprovalDecisionModal()
+    {
+        $this->showApprovalDecisionModal = false;
+        $this->approvalDecisionNotes = '';
+    }
+
+    public function submitApprovalDecision()
+    {
+        if (!auth()->user()?->hasCustomAuthorization('APPROVE_PO')) {
+            Notification::make()->title('Anda tidak memiliki akses Approve PO.')->danger()->send();
+            return;
+        }
+
+        if (!$this->purchaseOrder) {
+            return;
+        }
+
+        $notes = trim($this->approvalDecisionNotes);
+        if ($this->approvalDecisionAction === 'reject' && $notes === '') {
+            Notification::make()->title('Alasan penolakan wajib diisi.')->danger()->send();
+            return;
+        }
+
+        $lock = \Illuminate\Support\Facades\Cache::lock("po_decision_{$this->purchaseOrder->id}", 15);
+        if (!$lock->get()) {
+            Notification::make()->title('Proses persetujuan PO sedang berjalan, mohon tunggu...')->warning()->send();
+            return;
+        }
+
+        try {
+            $po = PurchaseOrder::find($this->purchaseOrder->id);
+            if (!$po || strtolower((string) $po->status) !== 'pending_approval') {
+                $this->showApprovalDecisionModal = false;
+                Notification::make()
+                    ->title('Status PO Sudah Berubah')
+                    ->body('PO ini sudah diproses sebelumnya.')
+                    ->info()
+                    ->send();
+                return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
+            }
+
+            if ($this->approvalDecisionAction === 'reject') {
+                $po->reject(auth()->id(), $notes);
+                Notification::make()
+                    ->title("PO {$po->po_number} Ditolak")
+                    ->warning()
+                    ->send();
+            } else {
+                $po->approve(auth()->id(), $notes !== '' ? $notes : null);
+                Notification::make()
+                    ->title("PO {$po->po_number} Berhasil Disetujui")
+                    ->success()
+                    ->send();
+            }
+
+            $this->purchaseOrder = $po->fresh();
+            $this->showApprovalDecisionModal = false;
+            $this->approvalDecisionNotes = '';
+
+            return redirect()->to(route('filament.admin.resources.purchase-orders.index'));
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
+        }
     }
 
     public function save()

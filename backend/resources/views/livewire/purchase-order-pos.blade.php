@@ -96,9 +96,23 @@
     </style>
 
     @if($readOnly)
-        <div style="padding: 0.65rem 1rem; background-color: #eff6ff; border-bottom: 1px solid #bfdbfe; color: #1e40af; font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; justify-content: space-between;" class="dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-200"
-             x-data x-init="$nextTick(() => { $el.parentElement.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; }); })">
+        @php
+            $poStatusLower = strtolower((string) ($purchaseOrder->status ?? ''));
+            $poStatusMeta = match ($poStatusLower) {
+                'pending_approval' => ['label' => 'MENUNGGU PERSETUJUAN', 'bg' => '#fef3c7', 'text' => '#b45309', 'border' => '#fcd34d'],
+                'approved' => ['label' => 'DISETUJUI (APPROVED)', 'bg' => '#dcfce7', 'text' => '#166534', 'border' => '#86efac'],
+                'rejected' => ['label' => 'DITOLAK', 'bg' => '#fee2e2', 'text' => '#b91c1c', 'border' => '#fca5a5'],
+                'partially_received' => ['label' => 'DITERIMA SEBAGIAN', 'bg' => '#dbeafe', 'text' => '#1d4ed8', 'border' => '#93c5fd'],
+                'completed' => ['label' => 'SELESAI', 'bg' => '#dcfce7', 'text' => '#166534', 'border' => '#86efac'],
+                default => ['label' => strtoupper($poStatusLower ?: 'DRAFT'), 'bg' => '#f3f4f6', 'text' => '#374151', 'border' => '#d1d5db'],
+            };
+        @endphp
+        <div style="padding: 0.65rem 1rem; background-color: #eff6ff; border-bottom: 1px solid #bfdbfe; color: #1e40af; font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;" class="dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-200"
+             x-data x-init="$nextTick(() => { $el.parentElement.querySelectorAll('input:not(.pos-approval-input), select:not(.pos-approval-input), textarea:not(.pos-approval-input)').forEach(el => { el.disabled = true; }); })">
             <span>Mode Lihat (Read-Only) &mdash; Data tidak dapat diubah di halaman ini. Klik tombol <strong>Edit</strong> di kanan atas jika perlu melakukan perubahan.</span>
+            <span style="font-size: 0.72rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 9999px; background-color: {{ $poStatusMeta['bg'] }}; color: {{ $poStatusMeta['text'] }}; border: 1px solid {{ $poStatusMeta['border'] }}; white-space: nowrap;">
+                Status: {{ $poStatusMeta['label'] }}
+            </span>
         </div>
     @endif
 
@@ -717,12 +731,21 @@
     <div style="padding: 1rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;" class="bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
         
         <!-- Actions Button -->
-        <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-right: auto;">
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-right: auto; flex-wrap: wrap;">
             @if(!$readOnly)
                 <button wire:click="save" wire:loading.attr="disabled" wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave" style="background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                     <svg wire:loading.remove wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4.207a1 1 0 0 0-.293-.707l-2.5-2.5A1 1 0 0 0 10.5 1H2zm1 2h7.086L12 4.914V13H3V3z"/><path d="M4 4h5v2H4V4zm0 5h8v4H4V9z"/></svg>
                     <span wire:loading.remove wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave">SIMPAN</span>
                     <span wire:loading wire:target="save,confirmOverOrderSave,confirmForceDuplicateSave">Menyimpan...</span>
+                </button>
+            @elseif($this->canApprovePo)
+                <button type="button" wire:click="openApprovalDecisionModal('approve')" wire:loading.attr="disabled" style="background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 700; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.45rem;" class="hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    <span>Approve PO</span>
+                </button>
+                <button type="button" wire:click="openApprovalDecisionModal('reject')" wire:loading.attr="disabled" style="background-color: #ef4444; color: white; padding: 0.5rem 0.9rem; border-radius: 0.375rem; font-weight: 600; font-size: 0.875rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;" class="hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <span>Tolak PO</span>
                 </button>
             @endif
             <a href="{{ route('filament.admin.resources.purchase-orders.index') }}" style="background-color: #fff; color: #374151; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; font-size: 0.875rem; border: 1px solid #d1d5db; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;" class="hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
@@ -809,6 +832,67 @@
                 <button wire:click="removeZeroQtyItems" type="button" class="pos-btn-danger">
                     Hapus Semua
                 </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    @if($showApprovalDecisionModal)
+    <div class="pos-modal-overlay" style="z-index: 9999999;">
+        <div class="pos-modal-card" style="max-width: 32rem; width: 95%;">
+            <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                @if($approvalDecisionAction === 'reject')
+                    <div style="background-color: #fee2e2; color: #dc2626; padding: 0.75rem; border-radius: 9999px; flex-shrink: 0;">
+                        <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </div>
+                    <div style="flex: 1 1 0%;">
+                        <h3 class="pos-modal-title" style="color: #b91c1c;">Tolak Pesanan Pembelian</h3>
+                        <p class="pos-modal-body" style="margin-top: 0.35rem;">
+                            Apakah Anda yakin ingin menolak PO <strong>{{ $po_number }}</strong>? Tuliskan alasan penolakan di bawah ini.
+                        </p>
+                    </div>
+                @else
+                    <div style="background-color: #d1fae5; color: #059669; padding: 0.75rem; border-radius: 9999px; flex-shrink: 0;">
+                        <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                    <div style="flex: 1 1 0%;">
+                        <h3 class="pos-modal-title" style="color: #047857;">Setujui Pesanan Pembelian</h3>
+                        <p class="pos-modal-body" style="margin-top: 0.35rem;">
+                            Setujui PO <strong>{{ $po_number }}</strong> senilai <strong>Rp {{ number_format($grandTotal, 2) }}</strong>? Setelah disetujui, PO dapat diproses untuk penerimaan gudang.
+                        </p>
+                    </div>
+                @endif
+            </div>
+
+            <div>
+                <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #374151; margin-bottom: 0.35rem;" class="dark:text-gray-300">
+                    {{ $approvalDecisionAction === 'reject' ? 'Alasan Penolakan (Wajib diisi)' : 'Catatan Approval (Opsional)' }}
+                </label>
+                <textarea wire:model="approvalDecisionNotes"
+                          rows="3"
+                          class="pos-input pos-approval-input"
+                          placeholder="{{ $approvalDecisionAction === 'reject' ? 'Tuliskan alasan penolakan PO ini...' : 'Catatan tambahan untuk pembuat PO (opsional)...' }}"></textarea>
+            </div>
+
+            <div class="pos-modal-footer" style="margin-top: 0.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button wire:click="closeApprovalDecisionModal" type="button" class="pos-btn-cancel" style="font-size: 0.85rem;">
+                    Batal
+                </button>
+                @if($approvalDecisionAction === 'reject')
+                    <button wire:click="submitApprovalDecision" wire:loading.attr="disabled" wire:target="submitApprovalDecision" type="button" style="background-color: #ef4444; color: white; padding: 0.5rem 1.15rem; border-radius: 0.375rem; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer;" class="hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span wire:loading.remove wire:target="submitApprovalDecision">Ya, Tolak PO</span>
+                        <span wire:loading wire:target="submitApprovalDecision">Memproses...</span>
+                    </button>
+                @else
+                    <button wire:click="submitApprovalDecision" wire:loading.attr="disabled" wire:target="submitApprovalDecision" type="button" style="background-color: #10b981; color: white; padding: 0.5rem 1.15rem; border-radius: 0.375rem; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer;" class="hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span wire:loading.remove wire:target="submitApprovalDecision">Ya, Approve PO</span>
+                        <span wire:loading wire:target="submitApprovalDecision">Memproses...</span>
+                    </button>
+                @endif
             </div>
         </div>
     </div>
